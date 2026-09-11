@@ -1,0 +1,43 @@
+// 品牌核心主色（遵循原型图与规范）
+$color-primary: #1677FF;
+$color-primary-light: #EAF3FF;
+$color-primary-hover: #4096FF;
+$color-primary-active: #0958D9;
+
+// 功能状态色
+$color-success: #52C41A;
+$color-warning: #FA8C16;
+$color-danger: #F5222D;
+$color-info: #909399;
+$color-ai-gradient: linear-gradient(135deg, #1677FF 0%, #722ED1 100%);
+
+// 文本颜色
+$text-primary: #1F2937;
+$text-regular: #4B5563;
+$text-secondary: #64748B;
+$text-placeholder: #94A3B8;
+
+// 背景与卡片
+$bg-body: #F5F8FC;
+$bg-card: #FFFFFF;
+$bg-sidebar: #0A1B39;
+
+// 圆角 (引入全站通用的纯正长圆跑道圆角)
+$border-radius-sm: 6px;
+$border-radius-base: 10px;
+$border-radius-lg: 14px;
+$border-radius-xl: 18px;
+$border-radius-pill: 9999px; // 长圆胶囊核心尺寸 (与登录页对齐)
+
+// 控件高度规范
+$control-height-sm: 32px;
+$control-height-base: 40px;
+$control-height-lg: 48px;
+
+// 阴影与光晕 (聚焦蓝光环与浮起微阴影)
+$shadow-sm: 0 2px 8px rgba(30, 80, 150, 0.04);
+$shadow-base: 0 4px 20px rgba(30, 80, 150, 0.06);
+$shadow-hover: 0 8px 28px rgba(30, 80, 150, 0.12);
+$shadow-pill-focus: 0 0 0 2px rgba(22, 119, 255, 0.18);
+$shadow-btn-hover: 0 6px 18px rgba(22, 119, 255, 0.28);
+

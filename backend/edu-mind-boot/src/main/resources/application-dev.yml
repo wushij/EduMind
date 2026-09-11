@@ -1,0 +1,25 @@
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+minio:
+  endpoint: http://localhost:9000
+  accessKey: minioadmin
+  secretKey: minioadmin
+  bucketName: edumind
+
+ai:
+  llm:
+    provider: mock
+    api-key: ${AI_API_KEY:${DEEPSEEK_API_KEY:}}
+    base-url: https://api.deepseek.com
+    model: deepseek-chat
+    timeout-ms: 60000
+    mock-enabled: true
+    stream-enabled: true
+
+edumind:
+  rate-limit:
+    enabled: false

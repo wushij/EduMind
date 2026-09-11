@@ -1,0 +1,22 @@
+@mixin card-style {
+  background: $bg-card;
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-base;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  transition: all 0.25s ease;
+  &:hover {
+    box-shadow: $shadow-hover;
+  }
+}
+
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

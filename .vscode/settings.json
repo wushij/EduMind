@@ -1,0 +1,6 @@
+{
+  "java.debug.settings.vmArgs": "-Dspring.profiles.active=dev",
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.preferences.includePackageJsonAutoImports": "on"
+}

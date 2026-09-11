@@ -1,0 +1,10 @@
+/**
+ * 验证码工具函数 (对齐云盘 E:\Cloud_Disk\frontend\src\utils\captcha.ts)
+ */
+
+/** 将后端验证码 base64 转为可在 img 中显示的 data URL */
+export function toCaptchaDataUrl(img?: string): string {
+  if (!img) return '';
+  if (img.startsWith('data:')) return img;
+  return `data:image/png;base64,${img}`;
+}

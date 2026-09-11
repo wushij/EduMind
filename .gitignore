@@ -1,0 +1,144 @@
+# ==============================================================================
+# 智教云 · EduMind | Git 忽略配置文件 (.gitignore)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. 操作系统临时文件 (OS Generated Files)
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# ------------------------------------------------------------------------------
+# 2. 常见 IDE 与 编辑器配置 (IDE & Editor Files)
+# ------------------------------------------------------------------------------
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+.idea_modules/
+
+# Eclipse
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+
+# VS Code 配置（允许提交团队共享环境配置）
+# .vscode/ 允许提交
+*.code-workspace
+.history/
+
+# 通用编辑临时文件
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
+
+# ------------------------------------------------------------------------------
+# 3. 后端 Java / Maven / Spring Boot 编译构建产物 (Backend)
+# ------------------------------------------------------------------------------
+# Maven 构建输出与二进制产物
+**/target/
+target/
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Maven 依赖与版本备份
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# 运行日志
+logs/
+**/logs/
+*.log
+*.log.*
+*.stdout
+*.stderr
+
+# JVM 堆转储与异常排查
+*.hprof
+hs_err_pid*
+replay_pid*
+
+# 本地专属配置与私密配置文件（防密码/密钥泄露）
+**/application-local.yml
+**/application-local.yaml
+**/application-local.properties
+**/application-secret.yml
+**/application-secret.yaml
+**/application-dev-secret.yml
+
+# 本地文件存储/临时上传目录
+upload/
+uploads/
+file-storage/
+temp-files/
+
+# ------------------------------------------------------------------------------
+# 4. 前端 Node.js / Vue 3 / Vite 依赖与构建产物 (Frontend)
+# ------------------------------------------------------------------------------
+# 依赖包
+node_modules/
+**/node_modules/
+.pnp
+.pnp.js
+
+# 构建打包产物
+dist/
+**/dist/
+dist-ssr/
+**/dist-ssr/
+
+# 构建缓存
+.vite/
+**/.vite/
+.turbo/
+.cache/
+
+# 包管理器日志
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 本地专属环境变量文件 (敏感配置，保留 .env, .env.development, .env.production)
+.env.local
+.env.*.local
+
+# ------------------------------------------------------------------------------
+# 5. 项目临时原型 / 草稿 / 调试目录 (Project Scratch & Temp)
+# ------------------------------------------------------------------------------
+scratch/
+tools/temp/
+*.pid
+
+# ------------------------------------------------------------------------------
+# 6. 文档目录 (Docs - 暂不提交)
+# ------------------------------------------------------------------------------
+docs/
+**/docs/

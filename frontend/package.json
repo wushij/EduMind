@@ -1,0 +1,36 @@
+{
+  "name": "edu-mind-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "智教云 · EduMind｜AI 智能教学赋能平台 - 前端工程",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "@vueuse/core": "^10.11.0",
+    "axios": "^1.7.5",
+    "echarts": "^5.5.1",
+    "element-plus": "^2.8.1",
+    "highlight.js": "^11.10.0",
+    "katex": "^0.16.11",
+    "markdown-it": "^14.1.0",
+    "pinia": "^2.2.2",
+    "qrcode.vue": "^3.11.0",
+    "tdesign-icons-vue-next": "^0.4.11",
+    "vue": "^3.4.38",
+    "vue-router": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/katex": "^0.16.7",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^20.14.14",
+    "@vitejs/plugin-vue": "^5.1.2",
+    "sass": "^1.77.8",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.1",
+    "vue-tsc": "^2.0.29"
+  }
+}

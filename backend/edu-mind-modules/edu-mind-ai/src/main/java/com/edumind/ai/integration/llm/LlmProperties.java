@@ -1,0 +1,16 @@
+package com.edumind.ai.integration.llm;
+
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
+@Data
+@ConfigurationProperties(prefix = "ai.llm")
+public class LlmProperties {
+    private String provider = "mock";
+    private String apiKey;
+    private String baseUrl = "https://api.deepseek.com";
+    private String model = "deepseek-chat";
+    private Integer timeoutMs = 60000;
+    private Boolean mockEnabled = true;
+    private Boolean streamEnabled = true;
+}

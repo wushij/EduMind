@@ -1,0 +1,212 @@
+// ==========================================
+// EduMind Capsule Design System - Element Plus 深度定制
+// 严格对齐登录页面输入框与按钮的长圆跑道美学 (border-radius: 9999px)
+// ==========================================
+
+// 1. 全局长圆按钮 (Buttons)
+.el-button {
+  font-weight: 500;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+
+  // 普通实体按钮全部采用长圆胶囊形态
+  &:not(.is-link):not(.is-text):not(.el-button--text) {
+    border-radius: 9999px !important;
+    padding-left: 20px;
+    padding-right: 20px;
+
+    &.el-button--small {
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+
+    &.el-button--large {
+      padding-left: 26px;
+      padding-right: 26px;
+    }
+  }
+
+  &--primary:not(.is-link):not(.is-text) {
+    --el-button-bg-color: #1677FF;
+    --el-button-border-color: #1677FF;
+    --el-button-hover-bg-color: #4096FF;
+    --el-button-hover-border-color: #4096FF;
+    --el-button-active-bg-color: #0958D9;
+    --el-button-active-border-color: #0958D9;
+    box-shadow: 0 2px 6px rgba(22, 119, 255, 0.2);
+
+    &:hover:not(.is-disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(22, 119, 255, 0.32);
+    }
+
+    &:active:not(.is-disabled) {
+      transform: translateY(0);
+    }
+  }
+
+  &--default:not(.is-link):not(.is-text) {
+    border: 1px solid #E2E8F0;
+    color: #475569;
+    background: #FFFFFF;
+
+    &:hover:not(.is-disabled) {
+      color: #1677FF;
+      border-color: #93C5FD;
+      background: #F0F7FF;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(30, 80, 150, 0.08);
+    }
+  }
+
+  // 纯圆图标按钮
+  &.is-circle {
+    padding: 8px !important;
+    border-radius: 50% !important;
+  }
+}
+
+// 2. 全局长圆输入框 (Inputs) - 1:1 复刻登录页面输入框质感
+.el-input {
+  --el-input-hover-border-color: #CBD5E1;
+  --el-input-focus-border-color: #1677FF;
+
+  .el-input__wrapper {
+    border-radius: 9999px !important; // 长圆跑道胶囊
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    box-shadow: none !important;
+    padding: 4px 18px !important;
+    transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:hover {
+      border-color: #CBD5E1;
+    }
+
+    &.is-focus {
+      border-color: #1677FF !important;
+      box-shadow: 0 0 0 2.5px rgba(22, 119, 255, 0.16) !important;
+    }
+
+    .el-input__inner {
+      color: #1E293B;
+      font-size: 14px;
+
+      &::placeholder {
+        color: #94A3B8;
+        font-size: 13.5px;
+      }
+    }
+  }
+
+  // 尺寸变体
+  &--large .el-input__wrapper {
+    height: 46px;
+    padding: 0 22px !important;
+  }
+
+  &--small .el-input__wrapper {
+    height: 32px;
+    padding: 0 14px !important;
+  }
+}
+
+// 3. 全局长圆下拉选择器 (Selects)
+.el-select {
+  .el-select__wrapper {
+    border-radius: 9999px !important;
+    border: 1px solid #E2E8F0;
+    background-color: #FFFFFF;
+    box-shadow: none !important;
+    padding: 4px 18px !important;
+    transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:hover {
+      border-color: #CBD5E1;
+    }
+
+    &.is-focused {
+      border-color: #1677FF !important;
+      box-shadow: 0 0 0 2.5px rgba(22, 119, 255, 0.16) !important;
+    }
+  }
+}
+
+// 4. 全局长圆药丸标签 (Tags)
+.el-tag {
+  border-radius: 9999px !important; // 胶囊药丸造型
+  padding: 0 12px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+
+  &--small {
+    padding: 0 8px;
+    height: 22px;
+    font-size: 11.5px;
+  }
+}
+
+// 5. 大圆角卡片 (Cards) - 外方内圆，呼吸科技感
+.el-card {
+  border-radius: 16px;
+  border: 1px solid #EBF1F7;
+  background: #FFFFFF;
+  box-shadow: 0 4px 20px rgba(30, 80, 150, 0.05);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.is-hover-shadow:hover {
+    box-shadow: 0 10px 30px rgba(30, 80, 150, 0.1);
+    transform: translateY(-2px);
+  }
+}
+
+// 6. 分页器 (Pagination)
+.el-pagination {
+  .el-pager li,
+  .btn-prev,
+  .btn-next {
+    border-radius: 9999px !important;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+
+    &:hover {
+      color: #1677FF;
+      border-color: #DBEAFE;
+      background: #EFF6FF;
+    }
+
+    &.is-active {
+      background: #1677FF !important;
+      color: #FFFFFF !important;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(22, 119, 255, 0.3);
+    }
+  }
+}
+
+// 7. 弹窗 (Dialog)
+.el-dialog {
+  border-radius: 20px !important;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.15);
+
+  .el-dialog__header {
+    margin-right: 0;
+    padding: 20px 24px;
+    border-bottom: 1px solid #F1F5F9;
+
+    .el-dialog__title {
+      font-weight: 600;
+      color: #0F172A;
+    }
+  }
+
+  .el-dialog__body {
+    padding: 24px;
+  }
+
+  .el-dialog__footer {
+    padding: 16px 24px;
+    border-top: 1px solid #F1F5F9;
+    background: #F8FAFC;
+  }
+}

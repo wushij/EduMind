@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "后端 dev",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "$env:SPRING_PROFILES_ACTIVE='dev'; mvn -pl edu-mind-boot spring-boot:run \"-DskipTests\"",
+      "cwd": "${workspaceFolder}/backend"
+    },
+    {
+      "name": "前端 dev",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev",
+      "cwd": "${workspaceFolder}/frontend"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "全栈",
+      "configurations": ["后端 dev", "前端 dev"]
+    }
+  ]
+}

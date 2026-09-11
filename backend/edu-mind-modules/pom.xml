@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.edumind</groupId>
+        <artifactId>edu-mind-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>edu-mind-modules</artifactId>
+    <packaging>pom</packaging>
+    <name>edu-mind-modules</name>
+    <description>业务领域模块聚合工程</description>
+
+    <modules>
+        <module>edu-mind-system</module>
+        <module>edu-mind-course</module>
+        <module>edu-mind-question</module>
+        <module>edu-mind-teaching</module>
+        <module>edu-mind-resource</module>
+        <module>edu-mind-knowledge</module>
+        <module>edu-mind-ai</module>
+        <module>edu-mind-notification</module>
+        <module>edu-mind-statistics</module>
+    </modules>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-infrastructure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.3.3</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.edumind</groupId>
+    <artifactId>edu-mind-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>edu-mind-parent</name>
+    <description>智教云 · EduMind｜AI 智能教学赋能平台 - 后端聚合根工程</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <spring-boot.version>3.3.3</spring-boot.version>
+        <mybatis-plus.version>3.5.7</mybatis-plus.version>
+        <sa-token.version>1.38.0</sa-token.version>
+        <fastjson2.version>2.0.51</fastjson2.version>
+        <hutool.version>5.8.28</hutool.version>
+        <minio.version>8.5.10</minio.version>
+        <bouncycastle.version>1.78.1</bouncycastle.version>
+        <pdfbox.version>3.0.2</pdfbox.version>
+        <poi.version>5.2.5</poi.version>
+        <edumind.version>1.0.0-SNAPSHOT</edumind.version>
+        <redisson.version>3.34.1</redisson.version>
+    </properties>
+
+    <modules>
+        <module>edu-mind-common</module>
+        <module>edu-mind-system-api</module>
+        <module>edu-mind-security</module>
+        <module>edu-mind-infrastructure</module>
+        <module>edu-mind-modules</module>
+        <module>edu-mind-job</module>
+        <module>edu-mind-boot</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- 内部模块依赖 -->
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-common</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-system-api</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-security</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-infrastructure</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-system</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-course</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-question</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-teaching</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-resource</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-knowledge</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-ai</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-notification</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-statistics</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-job</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+
+            <!-- MyBatis-Plus -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+
+            <!-- Sa-Token 权限认证 -->
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-spring-boot3-starter</artifactId>
+                <version>${sa-token.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-redis-jackson</artifactId>
+                <version>${sa-token.version}</version>
+            </dependency>
+
+            <!-- 工具包 -->
+            <dependency>
+                <groupId>com.alibaba.fastjson2</groupId>
+                <artifactId>fastjson2</artifactId>
+                <version>${fastjson2.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>pdfbox</artifactId>
+                <version>${pdfbox.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi-ooxml</artifactId>
+                <version>${poi.version}</version>
+            </dependency>
+
+            <!-- 对象存储 MinIO -->
+            <dependency>
+                <groupId>io.minio</groupId>
+                <artifactId>minio</artifactId>
+                <version>${minio.version}</version>
+            </dependency>
+
+            <!-- 国密加密 Bouncy Castle -->
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+
+            <!-- Redisson 分布式锁 -->
+            <dependency>
+                <groupId>org.redisson</groupId>
+                <artifactId>redisson-spring-boot-starter</artifactId>
+                <version>${redisson.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

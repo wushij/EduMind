@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/edumind?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      # Sentinel / Cluster 生产扩展示例：
+      # sentinel:
+      #   master: mymaster
+      #   nodes: ${REDIS_SENTINEL_NODES:127.0.0.1:26379}
+
+edumind:
+  rate-limit:
+    enabled: true
