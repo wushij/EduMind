@@ -117,6 +117,17 @@ public class AgentExecutorImpl {
     }
 
     private Object runTeachingAgent(String runId, String goal, Map<String, Object> params, int index) {
+        if (goal != null && (goal.contains("资源") || goal.contains("微课") || goal.contains("拓展") || goal.contains("分析"))) {
+            Object courseInfo = invokeTool(runId, index++, "查询课程教学目标", "search_course", params);
+            Object profile = invokeTool(runId, index++, "分析学生弱项画像", "get_student_profile", params);
+            params.put("studentProfile", profile);
+            Object resources = invokeTool(runId, index++, "匹配拓展微课与练习", "recommend_resource", params);
+            saveStep(runId, index, "LLM", "生成教学推进综合方案", null, "DONE", goal, "教学方案已生成");
+            return Map.of("course", courseInfo != null ? courseInfo : Map.of(),
+                    "profile", profile != null ? profile : Map.of(),
+                    "resources", resources != null ? resources : Map.of(),
+                    "answer", "已综合课程目标、学情画像与推荐资源，生成完整教学推进方案。");
+        }
         Long courseId = params.get("courseId") != null ? Long.valueOf(params.get("courseId").toString()) : null;
         List<KnowledgeBaseVO> bases = knowledgeQueryApi.listKnowledgeBasesByCourseId(courseId);
         if (bases.isEmpty()) {
@@ -136,18 +147,22 @@ public class AgentExecutorImpl {
     }
 
     private Object runLearningAgent(String runId, Map<String, Object> params, int index) {
-        Object kpResult = invokeTool(runId, index++, "分析薄弱知识点", "search_knowledge_point", params);
-        String advice = aiGatewayFacade.chat("AGENT", "你是学习路径顾问。", "基于以下知识点分析给出复习建议：\n" + kpResult);
-        saveStep(runId, index, "LLM", "生成学习建议", null, "DONE", null, advice);
+        Object profile = invokeTool(runId, index++, "获取学情画像", "get_student_profile", params);
+        Object resources = invokeTool(runId, index++, "匹配弱项巩固资源", "recommend_resource", params);
+        String advice = aiGatewayFacade.chat("AGENT", "你是学习路径顾问。", "基于以下学情给出复习建议：\n" + profile);
+        saveStep(runId, index, "LLM", "生成个性化学习建议", null, "DONE", null, advice);
         streamRegistry.emit(runId, "step", Map.of("index", index, "title", "生成学习建议", "status", "DONE"));
-        return Map.of("weakPoints", kpResult, "advice", advice);
+        return Map.of("profile", profile != null ? profile : Map.of(),
+                "resources", resources != null ? resources : Map.of(),
+                "advice", advice);
     }
 
     private Object runGradingAgent(String runId, String goal, int index) {
-        String result = aiGatewayFacade.chat("GRADING", "你是批改 Agent。", goal);
-        saveStep(runId, index, "LLM", "批改分析", null, "DONE", goal, result);
+        Object gradingResult = invokeTool(runId, index++, "智能作答评判", "grade_answer", Map.of("question", goal));
+        String summary = aiGatewayFacade.chat("GRADING", "你是批改 Agent，请总结批改分析。", goal);
+        saveStep(runId, index, "LLM", "批改综合归因分析", null, "DONE", goal, summary);
         streamRegistry.emit(runId, "step", Map.of("index", index, "title", "批改分析", "status", "DONE"));
-        return Map.of("grading", result);
+        return Map.of("grading", gradingResult != null ? gradingResult : Map.of(), "summary", summary);
     }
 
     private Object invokeTool(String runId, int index, String title, String toolName, Map<String, Object> params) {

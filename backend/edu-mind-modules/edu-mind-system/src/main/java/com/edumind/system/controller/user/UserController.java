@@ -28,6 +28,11 @@ public class UserController {
         return ApiResult.success(userService.updateProfile(dto));
     }
 
+    @org.springframework.web.bind.annotation.PostMapping("/api/users/avatar")
+    public ApiResult<UserVO> uploadAvatar(@org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return ApiResult.success(userService.uploadAvatar(file));
+    }
+
     @org.springframework.web.bind.annotation.PostMapping("/api/users/send-bind-code")
     public ApiResult<Void> sendBindCode(@Valid @RequestBody com.edumind.system.dto.auth.EmailSendCodeDTO dto) {
         userService.sendBindEmailCode(dto.getEmail());

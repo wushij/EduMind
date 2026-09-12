@@ -1,7 +1,7 @@
 -- =============================================================================
 -- 智教云 · EduMind 数据库全量初始化脚本
 -- 文件：sql/init.sql
--- 说明：包含全量 43 张表结构定义 + 丰富完整的核心业务种子数据（含 V0.5 RAG/Chunk/Prompt 治理 + V1.0 学情/图谱/Gateway/Agent）
+-- 说明：包含全量 43 张表结构定义 + 丰富完整的核心业务种子数据（含 V0.5 RAG/Chunk/Prompt 治理 + V1.0 学情/图谱/Gateway/Agent + V1.1 审计/学情聚合）
 -- 适配：MySQL 8.0+ / utf8mb4 / MyBatis-Plus Java Entity 100% 对齐
 -- 执行：mysql -u root -p < sql/init.sql
 -- 默认账号：admin / teacher / student / student2，密码均为 admin123
@@ -516,6 +516,7 @@ CREATE TABLE ai_message (
 CREATE TABLE ai_call_log (
     id                  BIGINT      NOT NULL AUTO_INCREMENT COMMENT '日志ID',
     user_id             BIGINT      DEFAULT NULL COMMENT '调用用户ID',
+    course_id           BIGINT      DEFAULT NULL COMMENT '关联课程ID (NULL表示全局/无课程上下文)',
     model               VARCHAR(64) DEFAULT NULL COMMENT '调用的LLM模型名',
     prompt_tokens       INT         DEFAULT 0 COMMENT 'Prompt Token数',
     completion_tokens   INT         DEFAULT 0 COMMENT 'Completion Token数',
@@ -526,7 +527,8 @@ CREATE TABLE ai_call_log (
     citation_doc_ids    VARCHAR(512) DEFAULT NULL COMMENT '引用文档ID列表',
     create_time         DATETIME    DEFAULT CURRENT_TIMESTAMP COMMENT '记录时间',
     PRIMARY KEY (id),
-    KEY idx_user_id (user_id)
+    KEY idx_user_id (user_id),
+    KEY idx_call_log_course_time (course_id, create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模型调用日志表';
 
 CREATE TABLE prompt_template (
@@ -660,16 +662,21 @@ CREATE TABLE wrong_question_record (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='错题记录';
 
 CREATE TABLE course_statistics (
-    id              BIGINT        NOT NULL AUTO_INCREMENT COMMENT '统计ID',
+    id              BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     course_id       BIGINT        NOT NULL COMMENT '课程ID',
-    stat_date       DATE          NOT NULL COMMENT '统计日期',
-    active_users    INT           DEFAULT 0 COMMENT '活跃用户数',
-    avg_score       DECIMAL(5,2)  DEFAULT NULL COMMENT '平均分',
-    completion_rate DECIMAL(5,4)  DEFAULT NULL COMMENT '完成率',
-    create_time     DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    stat_date       DATE          NOT NULL COMMENT '统计日期 (YYYY-MM-DD)',
+    student_count   INT           NOT NULL DEFAULT 0 COMMENT '当日活跃学生数',
+    avg_score       DECIMAL(5,2)  NOT NULL DEFAULT 0.00 COMMENT '班级均分',
+    mastery_avg     DECIMAL(5,4)  NOT NULL DEFAULT 0.0000 COMMENT '班级知识点平均掌握度(0.0000~1.0000)',
+    ai_call_count   INT           NOT NULL DEFAULT 0 COMMENT '当日AI助教调用总量',
+    wrong_count     INT           NOT NULL DEFAULT 0 COMMENT '当日新增错题记录数',
+    create_time     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '生成时间',
+    update_time     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_course_date (course_id, stat_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程日聚合';
+    UNIQUE KEY uk_course_date (course_id, stat_date),
+    KEY idx_stat_date (stat_date),
+    KEY idx_course_stat (course_id, stat_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程学情日聚合统计表';
 
 CREATE TABLE knowledge_point_relation (
     id                      BIGINT       NOT NULL AUTO_INCREMENT COMMENT '关系ID',
@@ -1060,9 +1067,9 @@ INSERT INTO ai_message (id, conversation_id, role, content, token_count) VALUES
 ('msg_s_02', 'conv_student_001', 'assistant', '同学你好！在单链表就地逆置时，当我们执行 `curr->next = prev;` 反转当前节点的指针指向后，原有的后续节点链条就会断开。如果不提前使用 `temp = curr->next;` 记录后续节点地址，将无法继续遍历剩余链表，造成链表丢失（内存泄漏或无法循环）。', 560);
 
 -- 28. AI 调用日志
-INSERT INTO ai_call_log (id, user_id, model, prompt_tokens, completion_tokens, latency_ms, scene) VALUES
-(1, 2, 'deepseek-chat', 320, 530, 1250, 'QUESTION_GEN'),
-(2, 3, 'deepseek-chat', 180, 440, 890,  'AI_CHAT');
+INSERT INTO ai_call_log (id, user_id, course_id, model, prompt_tokens, completion_tokens, latency_ms, scene) VALUES
+(1, 2, 101, 'deepseek-chat', 320, 530, 1250, 'QUESTION_GEN'),
+(2, 3, 102, 'deepseek-chat', 180, 440, 890,  'AI_CHAT');
 
 -- 29. 每日学情与 AI 消耗统计快照（近 7 天连续趋势，供大屏与仪表盘直接渲染）
 INSERT INTO statistics_daily_snapshot (id, stat_date, course_id, active_student_count, total_ai_conversations, total_tokens_consumed, avg_score) VALUES
@@ -1104,6 +1111,13 @@ INSERT INTO wrong_question_record (student_id, course_id, question_id, knowledge
 INSERT INTO learning_record (student_id, course_id, action_type, duration_minutes) VALUES
 (3, 102, 'STUDY', 45),
 (4, 102, 'STUDY', 60);
+
+-- 32. V1.1 课程学情日聚合样本（供报表与 Gate V1.1 演示）
+INSERT INTO course_statistics (course_id, stat_date, student_count, avg_score, mastery_avg, ai_call_count, wrong_count) VALUES
+(101, DATE_SUB(CURDATE(), INTERVAL 1 DAY), 78, 88.00, 0.8200, 235, 12),
+(101, CURDATE(),                           85, 88.50, 0.8350, 260, 8),
+(102, DATE_SUB(CURDATE(), INTERVAL 1 DAY), 42, 86.50, 0.7600, 145, 6),
+(102, CURDATE(),                           48, 87.20, 0.7750, 168, 4);
 
 -- =============================================================================
 -- 初始化完成：包含全量 43 张业务表结构与完整种子数据

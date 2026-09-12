@@ -21,8 +21,6 @@ public class SmartPaperComposeController {
     @SaCheckPermission("ai:exam")
     @PostMapping("/compose")
     public ApiResult<SmartPaperComposeVO> compose(@RequestBody SmartPaperComposeDTO dto) {
-        int count = dto.getTotalCount() != null ? dto.getTotalCount() : 10;
-        return ApiResult.success(smartPaperComposeService.compose(
-                dto.getCourseId(), dto.getKnowledgePointIds(), count, dto.getExcludeIds()));
+        return ApiResult.success(smartPaperComposeService.composeV2(dto));
     }
 }

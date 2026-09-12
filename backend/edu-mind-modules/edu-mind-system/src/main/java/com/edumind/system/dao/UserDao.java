@@ -43,6 +43,10 @@ public class UserDao {
         return userMapper.updateById(entity);
     }
 
+    public int deleteById(Long id) {
+        return userMapper.deleteById(id);
+    }
+
     public Page<UserEntity> pageQuery(UserQueryDTO query) {
         long pageNum = query.getPage() != null && query.getPage() > 0 ? query.getPage() : 1L;
         long pageSize = query.getPageSize() != null && query.getPageSize() > 0 ? query.getPageSize() : 10L;

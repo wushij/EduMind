@@ -2,6 +2,7 @@ package com.edumind.security.filter;
 
 import com.edumind.infrastructure.redis.RedisService;
 import com.edumind.infrastructure.redis.RedisSupport;
+import com.edumind.security.config.DynamicSecurityConfigService;
 import com.edumind.security.config.SecurityProperties;
 import com.edumind.security.crypto.SignatureService;
 import com.edumind.security.crypto.Sm3HmacService;
@@ -23,6 +24,7 @@ public class FilterSecurityTest {
     private ReplayAttackFilter replayAttackFilter;
     private SignatureFilter signatureFilter;
     private SignatureService signatureService;
+    private DynamicSecurityConfigService dynamicSecurityConfigService;
 
     @BeforeEach
     public void setUp() {
@@ -31,10 +33,15 @@ public class FilterSecurityTest {
         when(redisSupport.useRedisOrFallback()).thenReturn(false);
         when(redisSupport.requireRedis()).thenReturn(false);
         SecurityProperties securityProperties = new SecurityProperties();
-        replayAttackFilter = new ReplayAttackFilter(redisService, redisSupport, securityProperties);
+        dynamicSecurityConfigService = mock(DynamicSecurityConfigService.class);
+        when(dynamicSecurityConfigService.isSm3SignEnabled()).thenReturn(false);
+        when(dynamicSecurityConfigService.isTimestampEnabled()).thenReturn(false);
+        when(dynamicSecurityConfigService.isNonceEnabled()).thenReturn(false);
+        when(dynamicSecurityConfigService.getTimestampWindowMs()).thenReturn(300000L);
+        replayAttackFilter = new ReplayAttackFilter(redisService, redisSupport, securityProperties, dynamicSecurityConfigService);
         Sm3HmacService sm3HmacService = new Sm3HmacService();
         signatureService = new SignatureService(sm3HmacService);
-        signatureFilter = new SignatureFilter(signatureService, securityProperties);
+        signatureFilter = new SignatureFilter(signatureService, securityProperties, dynamicSecurityConfigService);
     }
 
     @Test
@@ -126,7 +133,7 @@ public class FilterSecurityTest {
         props.setSmEnabled(true);
         props.setSensitivePaths(List.of("/api/analytics"));
         props.setHmacSecret("EduMind_Platform_SecretKey_2026");
-        SignatureFilter smFilter = new SignatureFilter(signatureService, props);
+        SignatureFilter smFilter = new SignatureFilter(signatureService, props, dynamicSecurityConfigService);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/analytics/learning");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -142,7 +149,7 @@ public class FilterSecurityTest {
         props.setSmEnabled(true);
         props.setSensitivePaths(List.of("/api/ai/agent"));
         props.setHmacSecret("EduMind_Platform_SecretKey_2026");
-        SignatureFilter smFilter = new SignatureFilter(signatureService, props);
+        SignatureFilter smFilter = new SignatureFilter(signatureService, props, dynamicSecurityConfigService);
 
         long now = System.currentTimeMillis();
         String nonce = "body_tamper_nonce";

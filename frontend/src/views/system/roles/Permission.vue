@@ -228,8 +228,6 @@ onMounted(loadPermissions);
 .permission-page-container {
   padding: 24px;
   background: #f8fafc;
-  min-height: calc(100vh - 64px);
-
   .perm-header-dock {
     display: flex;
     align-items: center;

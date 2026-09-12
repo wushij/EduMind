@@ -37,6 +37,9 @@ public class GatewayManageServiceImpl implements GatewayManageService {
         vo.setSuccessRate(snap.getSuccessRate());
         vo.setAvgLatencyMs(snap.getAvgLatencyMs());
         vo.setFallbackCount(snap.getFallbackCount());
+        vo.setCircuitOpenCount(snap.getCircuitOpenCount());
+        vo.setRateLimitedCount(snap.getRateLimitedCount());
+        vo.setRetryCount(snap.getRetryCount());
         List<AiCallLogEntity> logs = aiCallLogDao.list(new LambdaQueryWrapper<>());
         Map<String, Long> calls = new HashMap<>();
         Map<String, Long> tokens = new HashMap<>();

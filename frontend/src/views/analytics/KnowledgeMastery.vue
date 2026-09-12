@@ -28,6 +28,9 @@
       class="mock-alert"
     />
 
+    <!-- V1.1 班级知识点全景掌握度热力矩阵 -->
+    <KnowledgeHeatmap :course-id="courseId" />
+
     <div class="content-grid">
       <el-card shadow="never" class="radar-card">
         <template #header>
@@ -60,6 +63,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import KnowledgeRadar from '@/components/analytics/KnowledgeRadar.vue';
+import KnowledgeHeatmap from '@/components/analytics/KnowledgeHeatmap.vue';
 import { useLearningAnalytics } from '@/composables/analytics/useLearningAnalytics';
 import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
 

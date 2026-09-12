@@ -11,6 +11,9 @@ public class GatewayMetricsVO {
     private Double successRate;
     private Long avgLatencyMs;
     private Long fallbackCount;
+    private Long circuitOpenCount;
+    private Long rateLimitedCount;
+    private Long retryCount;
     private List<ProviderMetricVO> byProvider = new ArrayList<>();
 
     @Data

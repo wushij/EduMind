@@ -34,4 +34,29 @@ public interface SysConfigService {
      * 根据键获取配置值
      */
     String getConfigValue(String key);
+
+    /**
+     * 获取存储引擎展示配置（密钥脱敏）
+     */
+    com.edumind.system.vo.config.StorageConfigVO getStorageConfigVO();
+
+    /**
+     * 更新存储引擎系统配置并热重载驱动
+     */
+    com.edumind.system.vo.config.StorageConfigVO updateStorageConfig(com.edumind.system.dto.config.StorageConfigDTO dto);
+
+    /**
+     * 测试存储引擎连通性
+     */
+    boolean testStorageConfig(com.edumind.system.dto.config.StorageConfigDTO dto);
+
+    /**
+     * 获取全链路安全防护配置
+     */
+    com.edumind.system.vo.config.SecurityConfigVO getSecurityConfigVO();
+
+    /**
+     * 更新全链路安全防护配置并热生效
+     */
+    com.edumind.system.vo.config.SecurityConfigVO updateSecurityConfig(com.edumind.system.dto.config.SecurityConfigDTO dto);
 }

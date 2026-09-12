@@ -25,7 +25,7 @@
     </div>
 
     <div v-if="composeMode === 'quick'" class="config-section-card quick-compose-card">
-      <h3 class="section-title">快速智能组卷</h3>
+      <h3 class="section-title">快速智能组卷 (V1.1 多目标正态分布算法)</h3>
       <div class="form-grid-row">
         <div class="form-item-col">
           <label class="form-label">适用课程</label>
@@ -42,18 +42,43 @@
           <label class="form-label">抽题数量</label>
           <el-input-number v-model="quickCount" :min="5" :max="50" size="large" />
         </div>
+        <div class="form-item-col">
+          <label class="form-label">卷面目标总分</label>
+          <el-input-number v-model="quickTotalScore" :min="50" :max="150" :step="10" size="large" />
+        </div>
       </div>
-      <div v-if="composePreview" class="compose-preview">
-        <el-alert
-          :title="`知识点覆盖率 ${(composePreview.coverageRate * 100).toFixed(1)}% · 已选 ${composePreview.selectedCount} 题 · 覆盖 ${composePreview.distinctKnowledgePointCount} 个知识点`"
-          type="success"
-          :closable="false"
-          show-icon
+
+      <!-- 难度梯度模型 -->
+      <div class="difficulty-model-section" style="margin-top: 16px;">
+        <label class="form-label" style="display:block; margin-bottom: 8px;">难度分布模型</label>
+        <el-radio-group v-model="difficultyModel" size="default">
+          <el-radio-button label="FOUNDATION">基础巩固型 (5:4:1)</el-radio-button>
+          <el-radio-button label="NORMAL">标准正态型 (3:5:2)</el-radio-button>
+          <el-radio-button label="ADVANCED">综合拔高型 (1:4:5)</el-radio-button>
+        </el-radio-group>
+      </div>
+
+      <div style="margin-top: 20px;">
+        <el-button type="primary" size="large" :loading="composing" @click="handleQuickCompose">
+          <el-icon><Lightning /></el-icon>
+          <span>启动智能组卷 v2 计算</span>
+        </el-button>
+      </div>
+
+      <div v-if="composePreview" class="compose-preview" style="margin-top: 20px;">
+        <PaperDistributionChart
+          :coverage-rate="composePreview.coverageRate || 0"
+          :distinct-knowledge-count="composePreview.distinctKnowledgePointCount || 0"
+          :total-count="composePreview.selectedCount || quickCount"
+          :difficulty-histogram="composePreview.difficultyHistogram"
+          :type-distribution="composePreview.typeDistribution"
         />
+        <div style="margin-top: 14px; text-align: right;">
+          <el-button type="success" size="large" @click="handleProceedToPreview">
+            确认并进入试卷预览与发布 →
+          </el-button>
+        </div>
       </div>
-      <el-button type="primary" :loading="composing" @click="handleQuickCompose">
-        启动快速组卷
-      </el-button>
     </div>
 
     <!-- 试卷基本信息配置卡片 -->
@@ -231,7 +256,8 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Check, Warning, Lightning } from '@element-plus/icons-vue';
 import { useExamGenerate } from '@/composables/ai/useExamGenerate';
-import { composeSmartPaper } from '@/api/ai/paper-compose';
+import { composeSmartPaperV2 } from '@/api/ai/paper-compose';
+import PaperDistributionChart from '@/components/question/PaperDistributionChart.vue';
 import type { SmartPaperComposeVO } from '@/types/ai/paper-compose';
 import { getCourseList } from '@/api/course/course';
 import { USE_MOCK } from '@/config/mock';
@@ -243,6 +269,8 @@ import examBannerImg from '@/assets/images/ai组卷.png';
 const router = useRouter();
 const composeMode = ref<'quick' | 'full'>('quick');
 const quickCount = ref(10);
+const quickTotalScore = ref(100);
+const difficultyModel = ref<'FOUNDATION' | 'NORMAL' | 'ADVANCED'>('NORMAL');
 const composing = ref(false);
 const composePreview = ref<SmartPaperComposeVO | null>(null);
 
@@ -256,6 +284,16 @@ const {
 } = useExamGenerate();
 
 const courses = ref<any[]>([]);
+
+const getDifficultyDistribution = () => {
+  if (difficultyModel.value === 'FOUNDATION') {
+    return { EASY: 0.5, MEDIUM: 0.4, HARD: 0.1 };
+  }
+  if (difficultyModel.value === 'ADVANCED') {
+    return { EASY: 0.1, MEDIUM: 0.4, HARD: 0.5 };
+  }
+  return { EASY: 0.3, MEDIUM: 0.5, HARD: 0.2 };
+};
 
 onMounted(async () => {
   try {
@@ -290,41 +328,53 @@ async function handleGenerateExam() {
 async function handleQuickCompose() {
   composing.value = true;
   try {
-    const res = await composeSmartPaper({
+    const res = await composeSmartPaperV2({
       courseId: examForm.courseId,
-      totalCount: quickCount.value
+      totalCount: quickCount.value,
+      totalScore: quickTotalScore.value,
+      difficultyDistribution: getDifficultyDistribution(),
+      typeRatios: {
+        SINGLE_CHOICE: 0.5,
+        MULTIPLE_CHOICE: 0.3,
+        JUDGE: 0.2
+      }
     });
     composePreview.value = res.data ?? null;
     if (!composePreview.value?.questions?.length) {
       ElMessage.warning('未抽到题目，请检查题库');
       return;
     }
-    currentExam.value = {
-      id: Date.now(),
-      courseId: examForm.courseId,
-      courseName: displayCourses.value.find((c) => c.id === examForm.courseId)?.title ?? '',
-      title: examForm.title || '智能组卷试卷',
-      semester: '',
-      totalScore: composePreview.value.questions.reduce((sum: number, q: any) => sum + (q.score ?? 5), 0),
-      durationMinutes: examForm.durationMinutes,
-      passScore: 60,
-      rules: [],
-      questions: composePreview.value.questions.map((q: any) =>
-        normalizeQuestion({
-          ...q,
-          courseId: examForm.courseId,
-          score: q.score ?? 5
-        })
-      ),
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    ElMessage.success('快速组卷成功');
-    router.push('/ai/exam/preview');
-  } catch {
-    ElMessage.error('快速组卷失败');
+    ElMessage.success(`智能组卷 v2 运算完成！知识点覆盖率: ${((composePreview.value.coverageRate || 0) * 100).toFixed(1)}%`);
+  } catch (err: any) {
+    ElMessage.error(err?.message || '快速智能组卷运算失败');
   } finally {
     composing.value = false;
   }
+}
+
+function handleProceedToPreview() {
+  if (!composePreview.value?.questions?.length) return;
+  currentExam.value = {
+    id: Date.now(),
+    courseId: examForm.courseId,
+    courseName: displayCourses.value.find((c) => c.id === examForm.courseId)?.title ?? '',
+    title: examForm.title || `智能组卷 · 难度梯度(${difficultyModel.value === 'FOUNDATION' ? '基础' : difficultyModel.value === 'ADVANCED' ? '拔高' : '标准'})综合测试`,
+    semester: '',
+    totalScore: composePreview.value.totalScore || quickTotalScore.value,
+    durationMinutes: examForm.durationMinutes,
+    passScore: Math.round((composePreview.value.totalScore || quickTotalScore.value) * 0.6),
+    rules: [],
+    questions: composePreview.value.questions.map((q: any) =>
+      normalizeQuestion({
+        ...q,
+        courseId: examForm.courseId,
+        score: q.score ?? 5
+      })
+    ),
+    createdAt: new Date().toISOString().split('T')[0]
+  };
+  ElMessage.success('试卷规划生成就绪，已进入预览发布页');
+  router.push('/ai/exam/preview');
 }
 </script>
 
@@ -333,7 +383,6 @@ async function handleQuickCompose() {
   width: 100%;
   padding: 24px;
   background: #f8fafc;
-  min-height: calc(100vh - 64px);
   box-sizing: border-box;
 
   // 顶部专属 3D 视觉大 Banner (比例 2508×627)

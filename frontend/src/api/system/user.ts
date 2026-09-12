@@ -1,4 +1,5 @@
-import { get, post, put } from '@/core/http/request';
+import { del, get, post, put } from '@/core/http/request';
+import { axiosInstance } from '@/core/http/axios';
 import { UserInfo } from '@/types/auth/auth';
 import { PageResult } from '@/types/common/api';
 
@@ -15,6 +16,8 @@ export const updateUser = (id: number, data: Record<string, any>) =>
 export const updateUserStatus = (id: number, status: string) =>
   put<void>(`/system/users/${id}/status`, { status });
 
+export const deleteUser = (id: number) => del<void>(`/system/users/${id}`);
+
 export const getProfile = () => get<UserInfo>('/users/profile');
 
 export const updateProfile = (data: Partial<UserInfo>) => put<UserInfo>('/users/profile', data);
@@ -24,3 +27,12 @@ export const sendBindEmailCode = (email: string) =>
 
 export const bindEmail = (data: { email: string; code: string }) =>
   post<UserInfo>('/users/bind-email', data);
+
+export const uploadAvatar = async (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await axiosInstance.post('/users/avatar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return res.data;
+};

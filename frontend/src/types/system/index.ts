@@ -102,3 +102,72 @@ export interface MailConfigDTO {
   codeIntervalSeconds?: number;
   dailyLimitPerEmail?: number;
 }
+
+export type StorageType = 'local' | 'minio' | 'cos' | 'oss';
+
+export interface StorageConfigVO {
+  activeType: StorageType;
+  localPath?: string;
+  localDomain?: string;
+  minioEndpoint?: string;
+  minioBucket?: string;
+  minioAccessKey?: string;
+  minioSecretKey?: string;
+  minioSecretKeyConfigured?: boolean;
+  minioDomain?: string;
+  cosRegion?: string;
+  cosBucket?: string;
+  cosSecretId?: string;
+  cosSecretKey?: string;
+  cosSecretKeyConfigured?: boolean;
+  cosDomain?: string;
+  ossEndpoint?: string;
+  ossBucket?: string;
+  ossAccessKeyId?: string;
+  ossAccessKeySecret?: string;
+  ossAccessKeySecretConfigured?: boolean;
+  ossDomain?: string;
+}
+
+export interface StorageConfigDTO {
+  activeType: StorageType;
+  localPath?: string;
+  localDomain?: string;
+  minioEndpoint?: string;
+  minioBucket?: string;
+  minioAccessKey?: string;
+  minioSecretKey?: string;
+  minioDomain?: string;
+  cosRegion?: string;
+  cosBucket?: string;
+  cosSecretId?: string;
+  cosSecretKey?: string;
+  cosDomain?: string;
+  ossEndpoint?: string;
+  ossBucket?: string;
+  ossAccessKeyId?: string;
+  ossAccessKeySecret?: string;
+  ossDomain?: string;
+}
+
+export interface SecurityConfigVO {
+  timestampCheckEnabled: boolean;
+  timestampToleranceSeconds: number;
+  nonceCheckEnabled: boolean;
+  sm3SignEnabled: boolean;
+  sm4EncryptEnabled: boolean;
+  loginCaptchaStrategy: 'always' | 'fail_trigger' | 'off';
+  registerCaptchaEnabled: boolean;
+  antiDebugEnabled: boolean;
+}
+
+export interface SecurityConfigDTO {
+  timestampCheckEnabled: boolean;
+  timestampToleranceSeconds?: number;
+  nonceCheckEnabled: boolean;
+  sm3SignEnabled: boolean;
+  sm4EncryptEnabled: boolean;
+  loginCaptchaStrategy: 'always' | 'fail_trigger' | 'off';
+  registerCaptchaEnabled: boolean;
+  antiDebugEnabled: boolean;
+}

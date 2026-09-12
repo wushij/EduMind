@@ -39,8 +39,40 @@ public class MinioFileStorageService implements FileStorageService {
 
     private volatile MinioClient minioClient;
     private volatile boolean minioAvailable;
+
+    @Value("${storage.local.dir:}")
+    private String customStorageDir;
+
+    private volatile Path localStorageDir;
     private final Map<String, Path> localFallbackFiles = new ConcurrentHashMap<>();
-    private final Path localStorageDir = Path.of(System.getProperty("java.io.tmpdir"), "edumind-storage");
+
+    public MinioFileStorageService() {
+    }
+
+    public MinioFileStorageService(String endpoint, String accessKey, String secretKey, String defaultBucketName) {
+        this.endpoint = endpoint;
+        this.accessKey = accessKey;
+        this.secretKey = secretKey;
+        this.defaultBucketName = defaultBucketName != null && !defaultBucketName.isBlank() ? defaultBucketName : "edumind";
+    }
+
+    @Override
+    public String getStorageType() {
+        return "minio";
+    }
+
+    @Override
+    public boolean testConnection() {
+        try {
+            if (!useMinio()) {
+                return false;
+            }
+            return minioClient.bucketExists(BucketExistsArgs.builder().bucket(defaultBucketName).build());
+        } catch (Exception e) {
+            log.warn("MinIO 连通性测试失败: {}", e.getMessage());
+            return false;
+        }
+    }
 
     @Override
     public String uploadFile(String bucketName, String objectName, InputStream inputStream, String contentType) {
@@ -148,11 +180,11 @@ public class MinioFileStorageService implements FileStorageService {
 
     private String storeLocally(String bucket, String objectName, InputStream inputStream) {
         try {
-            Path target = resolveLocalPath(bucket, objectName);
+            Path target = getLocalStorageDir().resolve(bucket).resolve(objectName);
             Files.createDirectories(target.getParent());
             Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
             localFallbackFiles.put(buildLocalKey(bucket, objectName), target);
-            return "file://" + target.toAbsolutePath();
+            return "/api/storage/files/" + bucket + "/" + objectName.replace("\\", "/");
         } catch (IOException ex) {
             throw new IllegalStateException("Local fallback storage failed", ex);
         }
@@ -160,10 +192,63 @@ public class MinioFileStorageService implements FileStorageService {
 
     private Path resolveLocalPath(String bucket, String objectName) {
         Path cached = localFallbackFiles.get(buildLocalKey(bucket, objectName));
-        if (cached != null) {
+        if (cached != null && Files.exists(cached)) {
             return cached;
         }
-        return localStorageDir.resolve(bucket).resolve(objectName);
+        Path target = getLocalStorageDir().resolve(bucket).resolve(objectName);
+        if (Files.exists(target)) {
+            return target;
+        }
+        Path legacyTarget = Path.of(System.getProperty("java.io.tmpdir"), "edumind-storage")
+                .resolve(bucket).resolve(objectName);
+        if (Files.exists(legacyTarget)) {
+            return legacyTarget;
+        }
+        return target;
+    }
+
+    private Path getLocalStorageDir() {
+        if (localStorageDir != null) {
+            return localStorageDir;
+        }
+        synchronized (this) {
+            if (localStorageDir == null) {
+                localStorageDir = determineLocalStorageDir();
+                try {
+                    Files.createDirectories(localStorageDir);
+                } catch (IOException e) {
+                    log.warn("Failed to create storage directory {}: {}", localStorageDir, e.getMessage());
+                }
+            }
+        }
+        return localStorageDir;
+    }
+
+    private Path determineLocalStorageDir() {
+        if (customStorageDir != null && !customStorageDir.isBlank()) {
+            return Path.of(customStorageDir);
+        }
+        Path userDir = Path.of(System.getProperty("user.dir")).toAbsolutePath();
+        if (userDir.getFileName() != null && userDir.getFileName().toString().equalsIgnoreCase("backend")) {
+            return userDir.resolve("data");
+        }
+        Path backendData = userDir.resolve("backend").resolve("data");
+        if (Files.exists(backendData) || Files.exists(userDir.resolve("backend"))) {
+            return backendData;
+        }
+        Path directData = userDir.resolve("data");
+        if (Files.exists(directData)) {
+            return directData;
+        }
+        Path current = userDir;
+        while (current != null) {
+            Path p = current.resolve("backend").resolve("data");
+            if (Files.exists(p) || Files.exists(current.resolve("backend"))) {
+                return p;
+            }
+            current = current.getParent();
+        }
+        return Path.of(System.getProperty("java.io.tmpdir"), "edumind-storage");
     }
 
     private String buildLocalKey(String bucket, String objectName) {

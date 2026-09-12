@@ -90,6 +90,7 @@ class GateV10IntegrationTest {
         LearningAnalyticsVO vo = learningAnalyticsService.getLearningAnalytics(102L, "7d", null);
         assertNotNull(vo);
         assertNotNull(vo.getCourseId());
+        assertNotNull(vo.getAiUsageCount(), "AI usage count should not be null");
     }
 
     @Test
@@ -115,7 +116,7 @@ class GateV10IntegrationTest {
         AgentRunVO run = waitForRun(runId, 60);
         assertNotNull(run);
         assertTrue(!"RUNNING".equals(run.getStatus()), "Agent run should finish: " + run.getStatus());
-        assertTrue(run.getSteps().size() >= 1, "Agent should record at least one step");
+        assertTrue(run.getSteps().size() >= 3, "Agent should record multiple steps: " + run.getSteps().size());
     }
 
     @Test

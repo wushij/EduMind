@@ -1,14 +1,11 @@
 <template>
   <div class="dashboard-page-container">
-    <!-- 1. 顶部 Hero：背景图已含文案/按钮，仅保留透明热区，避免与 PageHeroBanner 重复叠字 -->
     <DashboardHero
       @primary="router.push('/ai/marketplace')"
       @video="handleWatchVideo"
     />
 
-    <!-- 2. 中间核心业务区分栏 (常用功能 8 宫格 + 我的待办，100% 对齐原型图 1 左图) -->
     <div class="dashboard-middle-section">
-      <!-- 左侧：常用功能 (8 宫格彩色卡片，零 emoji) -->
       <div class="common-functions-card">
         <div class="section-title-row">
           <h2 class="section-title">常用功能</h2>
@@ -32,7 +29,6 @@
         </div>
       </div>
 
-      <!-- 右侧：我的待办 -->
       <div class="todo-card">
         <div class="section-title-row">
           <h2 class="section-title">我的待办</h2>
@@ -58,9 +54,7 @@
       </div>
     </div>
 
-    <!-- 3. 下方三栏并排图表矩阵 (教学数据概览 + 学生能力分布 + 最新动态，100% 对齐原型图 1 左图) -->
     <div class="dashboard-bottom-grid">
-      <!-- A. 教学数据概览 (ECharts 折线图) -->
       <div class="grid-card">
         <div class="card-header-row">
           <h3 class="card-title">教学数据概览</h3>
@@ -79,7 +73,6 @@
         <div ref="teachingLineChartRef" class="chart-container"></div>
       </div>
 
-      <!-- B. 学生能力分布 (ECharts 环形饼图) -->
       <div class="grid-card">
         <div class="card-header-row">
           <h3 class="card-title">学生能力分布</h3>
@@ -87,7 +80,6 @@
 
         <div class="donut-chart-wrapper">
           <div ref="abilityPieChartRef" class="chart-container-donut"></div>
-          <!-- 图例列表 -->
           <div class="legend-list">
             <div
               v-for="item in abilityLegend"
@@ -102,7 +94,6 @@
         </div>
       </div>
 
-      <!-- C. 最新动态 (活动流列表) -->
       <div class="grid-card">
         <div class="card-header-row">
           <h3 class="card-title">最新动态</h3>
@@ -145,9 +136,9 @@ import {
   Connection
 } from '@element-plus/icons-vue';
 import * as echarts from 'echarts';
+
 const router = useRouter();
 
-// 常用功能 8 宫格定义 (对齐原型图 1 左图，全部使用矢量图标)
 interface CommonFunctionItem {
   title: string;
   icon: any;
@@ -156,7 +147,7 @@ interface CommonFunctionItem {
 }
 
 const commonFunctions: CommonFunctionItem[] = [
-  { title: 'AI备课', icon: EditPen, theme: 'blue', route: '/ai/lesson' },
+  { title: 'AI 备课', icon: EditPen, theme: 'blue', route: '/ai/lesson' },
   { title: '智能出题', icon: Tickets, theme: 'cyan', route: '/ai/question/generate' },
   { title: '作业批改', icon: CircleCheck, theme: 'emerald', route: '/ai/grading' },
   { title: '学情分析', icon: TrendCharts, theme: 'amber', route: '/analytics/learning' },
@@ -166,7 +157,6 @@ const commonFunctions: CommonFunctionItem[] = [
   { title: '家校沟通', icon: Connection, theme: 'teal', route: '/dashboard' }
 ];
 
-// 我的待办列表 (对齐原型图 1 左图)
 interface TodoItem {
   id: number;
   title: string;
@@ -176,11 +166,11 @@ interface TodoItem {
 }
 
 const todoItems: TodoItem[] = [
-  { id: 1, title: '待批改作业', count: '12份', dotColor: '#3B82F6', route: '/question/submissions' },
-  { id: 2, title: '待审核课程资源', count: '3个', dotColor: '#10B981', route: '/course' },
-  { id: 3, title: '学生问题咨询', count: '8条', dotColor: '#EF4444', route: '/course/ai-assistant' },
-  { id: 4, title: '课堂反馈待处理', count: '5条', dotColor: '#F59E0B', route: '/analytics' },
-  { id: 5, title: '系统通知', count: '2条', dotColor: '#3B82F6', route: '/dashboard' }
+  { id: 1, title: '待批改作业', count: '12 份', dotColor: '#3B82F6', route: '/question/submissions' },
+  { id: 2, title: '待审核课程资源', count: '3 个', dotColor: '#10B981', route: '/course' },
+  { id: 3, title: '学生问题咨询', count: '8 条', dotColor: '#EF4444', route: '/course/ai-assistant' },
+  { id: 4, title: '课堂反馈待处理', count: '5 条', dotColor: '#F59E0B', route: '/analytics' },
+  { id: 5, title: '系统通知', count: '2 条', dotColor: '#3B82F6', route: '/dashboard' }
 ];
 
 function handleTodoClick(item: TodoItem) {
@@ -188,13 +178,11 @@ function handleTodoClick(item: TodoItem) {
 }
 
 function handleWatchVideo() {
-  // 设计稿按钮保留占位，后续可接产品介绍视频
+  // 预留：产品介绍视频
 }
 
-// 教学数据概览：周期选择
 const selectedDataPeriod = ref('WEEK');
 
-// 学生能力分布图例数据
 const abilityLegend = [
   { label: '优秀', percent: 24, color: '#2563EB' },
   { label: '良好', percent: 36, color: '#06B6D4' },
@@ -202,16 +190,14 @@ const abilityLegend = [
   { label: '待提升', percent: 12, color: '#F97316' }
 ];
 
-// 最新动态列表 (对齐原型图 1 左图)
 const latestNews = [
   { id: 1, title: '三年级数学单元测试', time: '10:24', tagColor: '#3B82F6' },
-  { id: 2, title: 'AI生成的教案已完成', time: '09:18', tagColor: '#8B5CF6' },
+  { id: 2, title: 'AI 生成的教案已完成', time: '09:18', tagColor: '#8B5CF6' },
   { id: 3, title: '学生提交了作业', time: '昨天', tagColor: '#10B981' },
   { id: 4, title: '新课程资源已上线', time: '昨天', tagColor: '#F59E0B' },
   { id: 5, title: '系统版本更新', time: '05-20', tagColor: '#64748B' }
 ];
 
-// ECharts 图表实例与 Ref
 const teachingLineChartRef = ref<HTMLElement | null>(null);
 const abilityPieChartRef = ref<HTMLElement | null>(null);
 
@@ -376,15 +362,13 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding-bottom: 48px; // 底部预留充足留白，支持滚动露出完整阴影与间距
 }
 
-// 1. 中间核心业务区分栏 (常用功能 8 宫格 + 我的待办)
 .dashboard-middle-section {
   display: grid;
   grid-template-columns: 7fr 3fr;
   gap: 20px;
-  margin-top: -6px; // 向上微移，消除冗余间距，使常用功能和我的待办紧凑贴合上方 Banner
+  margin-top: -6px;
 
   @media (max-width: 1100px) {
     grid-template-columns: 1fr;
@@ -533,7 +517,6 @@ onUnmounted(() => {
   }
 }
 
-// 3. 下方三栏并排图表网格 (教学数据概览 + 学生能力分布 + 最新动态)
 .dashboard-bottom-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -599,7 +582,7 @@ onUnmounted(() => {
     .chart-container {
       width: 100%;
       height: 170px;
-      flex: 1;
+      flex-shrink: 0;
     }
 
     .donut-chart-wrapper {

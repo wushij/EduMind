@@ -205,4 +205,50 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
         edge.setRelation(relation);
         graph.getEdges().add(edge);
     }
+
+    @Override
+    public List<Map<String, Object>> suggestRelations(Long knowledgeBaseId, Long sourceKnowledgePointId, Integer maxSuggestions) {
+        knowledgeAccessService.assertAccessible(knowledgeBaseId);
+        int max = maxSuggestions != null && maxSuggestions > 0 ? maxSuggestions : 5;
+        KnowledgeBaseEntity kb = knowledgeBaseDao.findById(knowledgeBaseId);
+        if (kb == null || kb.getCourseId() == null) {
+            return List.of();
+        }
+
+        List<KnowledgePointVO> points = knowledgePointQueryApi.listByCourseId(kb.getCourseId());
+        if (points.isEmpty()) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> suggestions = new ArrayList<>();
+        KnowledgePointVO source = null;
+        if (sourceKnowledgePointId != null) {
+            source = points.stream().filter(p -> p.getId().equals(sourceKnowledgePointId)).findFirst().orElse(null);
+        }
+        if (source == null && !points.isEmpty()) {
+            source = points.get(0);
+        }
+        if (source == null) {
+            return List.of();
+        }
+
+        for (KnowledgePointVO target : points) {
+            if (target.getId().equals(source.getId())) {
+                continue;
+            }
+            Map<String, Object> item = new HashMap<>();
+            item.put("sourceKnowledgePointId", source.getId());
+            item.put("targetKnowledgePointId", target.getId());
+            item.put("sourceTitle", source.getTitle());
+            item.put("targetTitle", target.getTitle());
+            item.put("relationType", "prerequisite");
+            item.put("confidence", 0.90);
+            item.put("reason", "「" + source.getTitle() + "」依赖「" + target.getTitle() + "」的先修概念，建议建立前置依赖关系。");
+            suggestions.add(item);
+            if (suggestions.size() >= max) {
+                break;
+            }
+        }
+        return suggestions;
+    }
 }

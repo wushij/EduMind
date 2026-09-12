@@ -4,6 +4,7 @@ import com.edumind.ai.vo.audit.AiUsageSummaryVO;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * AI 审计与调用日志跨模块公开查询 API
@@ -33,4 +34,14 @@ public interface AiAuditQueryApi {
      * @return 聚合统计摘要
      */
     AiUsageSummaryVO getUsageSummary(List<Long> knowledgeBaseIds, LocalDateTime since);
+
+    /**
+     * 按课程 ID 及起始时间统计 AI 调用量
+     */
+    long countCallsByCourse(Long courseId, LocalDateTime since);
+
+    /**
+     * 按课程 ID 列表批量统计 AI 调用量
+     */
+    Map<Long, Long> countCallsByCourseBatch(List<Long> courseIds, LocalDateTime since);
 }

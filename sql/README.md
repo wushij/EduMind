@@ -8,13 +8,16 @@
 
 ```text
 sql/
-├── init.sql                                    # 全量单文件初始化（建库 + 43 张表 + 种子数据，含 V0.1~V1.0）
+├── init.sql                                    # 全量单文件初始化（建库 + 43 张表 + 种子数据，含 V0.1~V1.1）
 ├── migration/                                  # 增量版本脚本（每个大版本一个文件）
 │   ├── V0_1_0__mvp_core.sql                    # V0.1 MVP 核心（用户/课程/AI/题目/试卷/会话）
 │   ├── V0_2_0__mvp_expansion.sql               # V0.2 MVP 扩展（题库/作业/文档/RBAC/通知/工具广场）
 │   ├── V0_5_0__product_enhancement.sql         # V0.5 产品增强（Chunk/向量/RAG/Prompt/配额/权限）
 │   ├── V0_5_1__user_preferences.sql            # V0.5.1 用户偏好设置
 │   ├── V1_0_0__intelligent_hub.sql             # V1.0 智能教学中枢（学情/图谱/Gateway/Agent）
+│   ├── V1_0_1__agent_tool_permission.sql       # V1.0.1 Agent Tool 调用权限
+│   ├── V1_1_0__ai_call_log_course_id.sql       # V1.1.0 AI 审计日志增加 course_id
+│   ├── V1_1_1__course_statistics_job.sql       # V1.1.1 课程学情日聚合表结构
 │   ├── R__gate_f_e2e_seed.sql                  # Gate F 隔离测试种子（teacher2 + course104）
 │   ├── R__gate_g_e2e_seed.sql                  # Gate G E2E 种子（掌握度/图谱/错题，幂等）
 │   └── R__seed_data.sql                        # 种子数据（可重复执行，注意幂等）
@@ -35,7 +38,7 @@ mysql -u root -p < sql/init.sql
 
 或在 Navicat / DataGrip 中打开并执行 `sql/init.sql`。
 
-`init.sql` 已包含所有版本迁移脚本的最终表结构与种子数据，**无需再跑 migration**。
+`init.sql` 已包含 **V0.1 ~ V1.1** 迁移脚本的最终表结构与种子数据，**无需再跑 migration**（Gate E2E 可选种子除外）。
 
 ### 方式二：按版本增量迁移（已有空库分步升级）
 
@@ -47,7 +50,10 @@ mysql -u root -p < sql/init.sql
 3. V0_5_0__product_enhancement.sql
 4. V0_5_1__user_preferences.sql
 5. V1_0_0__intelligent_hub.sql
-6. R__seed_data.sql          # 可选，补充演示种子数据
+6. V1_0_1__agent_tool_permission.sql
+7. V1_1_0__ai_call_log_course_id.sql
+8. V1_1_1__course_statistics_job.sql
+9. R__seed_data.sql          # 可选，补充演示种子数据
 ```
 
 示例：
@@ -58,6 +64,9 @@ mysql -u root -p edumind < sql/migration/V0_2_0__mvp_expansion.sql
 mysql -u root -p edumind < sql/migration/V0_5_0__product_enhancement.sql
 mysql -u root -p edumind < sql/migration/V0_5_1__user_preferences.sql
 mysql -u root -p edumind < sql/migration/V1_0_0__intelligent_hub.sql
+mysql -u root -p edumind < sql/migration/V1_0_1__agent_tool_permission.sql
+mysql -u root -p edumind < sql/migration/V1_1_0__ai_call_log_course_id.sql
+mysql -u root -p edumind < sql/migration/V1_1_1__course_statistics_job.sql
 mysql -u root -p edumind < sql/migration/R__seed_data.sql
 ```
 
@@ -74,6 +83,9 @@ mysql -u root -p edumind < sql/migration/R__seed_data.sql
 | V0.5 产品增强 | `V0_5_0__product_enhancement.sql` | Chunk、向量索引、RAG、Prompt 治理、配额、权限 |
 | V0.5.1 用户偏好 | `V0_5_1__user_preferences.sql` | 用户偏好设置 `sys_user_preference` |
 | V1.0 智能教学中枢 | `V1_0_0__intelligent_hub.sql` | 学情/掌握度/图谱关系/AI Gateway/Agent |
+| V1.0.1 Agent 权限 | `V1_0_1__agent_tool_permission.sql` | `ai:tool:use` 权限种子 |
+| V1.1.0 AI 审计维度 | `V1_1_0__ai_call_log_course_id.sql` | `ai_call_log.course_id` |
+| V1.1.1 学情聚合表 | `V1_1_1__course_statistics_job.sql` | `course_statistics` 日聚合结构 |
 
 示例（从 V0.2 升级到 V0.5）：
 
@@ -82,14 +94,15 @@ mysql -u root -p edumind < sql/migration/V0_5_0__product_enhancement.sql
 mysql -u root -p edumind < sql/migration/V0_5_1__user_preferences.sql
 ```
 
-示例（从 V0.5 升级到 V1.0）：
+示例（从 V1.0 升级到 V1.1）：
 
 ```bash
-mysql -u root -p edumind < sql/migration/V1_0_0__intelligent_hub.sql
-mysql -u root -p edumind < sql/migration/R__gate_g_e2e_seed.sql   # 可选，Gate G 联调种子
+mysql -u root -p edumind < sql/migration/V1_0_1__agent_tool_permission.sql
+mysql -u root -p edumind < sql/migration/V1_1_0__ai_call_log_course_id.sql
+mysql -u root -p edumind < sql/migration/V1_1_1__course_statistics_job.sql
 ```
 
-> 全新建库请直接执行最新版 `sql/init.sql`（已含完整结构及种子），无需再跑 migration。
+> 全新建库请直接执行最新版 `sql/init.sql`（已含 V0.1~V1.1 完整结构及种子），无需再跑 migration。
 
 ---
 
@@ -174,7 +187,7 @@ mysql -u root -proot < sql/init.sql
 | | `learning_record` | - | 学习行为明细（V1.0） |
 | | `knowledge_mastery` | - | 知识点掌握度（V1.0） |
 | | `wrong_question_record` | - | 错题记录与归因（V1.0） |
-| | `course_statistics` | - | 课程日聚合统计（V1.0） |
+| | `course_statistics` | `CourseStatisticsEntity` | 课程日聚合（活跃学生/均分/掌握度/AI 调用/错题，V1.1） |
 | **知识图谱** | `knowledge_point_relation` | - | 知识点关系边（V1.0） |
 | **AI Gateway** | `ai_model_config` | - | 模型配置与降级策略（V1.0） |
 | | `ai_gateway_route` | - | 场景路由（CHAT/RAG/AGENT/GRADING）（V1.0） |

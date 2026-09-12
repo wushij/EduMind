@@ -5,8 +5,12 @@ import com.alibaba.fastjson2.JSON;
 import com.edumind.common.api.ApiResult;
 import com.edumind.system.dto.config.MailConfigDTO;
 import com.edumind.system.dto.config.MailTestDTO;
+import com.edumind.system.dto.config.SecurityConfigDTO;
+import com.edumind.system.dto.config.StorageConfigDTO;
 import com.edumind.system.service.config.SysConfigService;
 import com.edumind.system.vo.config.MailConfigVO;
+import com.edumind.system.vo.config.SecurityConfigVO;
+import com.edumind.system.vo.config.StorageConfigVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -54,6 +58,54 @@ public class SysConfigController {
     @PostMapping("/mail/test")
     public ApiResult<Void> testMail(@Valid @RequestBody MailTestDTO dto) {
         sysConfigService.testMail(dto);
+        return ApiResult.success();
+    }
+
+    /**
+     * 获取系统文件存储配置
+     */
+    @SaCheckRole("ADMIN")
+    @GetMapping("/storage")
+    public ApiResult<StorageConfigVO> getStorageConfig() {
+        return ApiResult.success(sysConfigService.getStorageConfigVO());
+    }
+
+    /**
+     * 更新文件存储配置并热重载存储引擎
+     */
+    @SaCheckRole("ADMIN")
+    @PutMapping("/storage")
+    public ApiResult<Void> updateStorageConfig(@Valid @RequestBody StorageConfigDTO dto) {
+        sysConfigService.updateStorageConfig(dto);
+        return ApiResult.success();
+    }
+
+    /**
+     * 测试指定文件存储配置的连通性
+     */
+    @SaCheckRole("ADMIN")
+    @PostMapping("/storage/test")
+    public ApiResult<Void> testStorageConfig(@Valid @RequestBody StorageConfigDTO dto) {
+        sysConfigService.testStorageConfig(dto);
+        return ApiResult.success();
+    }
+
+    /**
+     * 获取系统网络安全配置
+     */
+    @SaCheckRole("ADMIN")
+    @GetMapping("/security")
+    public ApiResult<SecurityConfigVO> getSecurityConfig() {
+        return ApiResult.success(sysConfigService.getSecurityConfigVO());
+    }
+
+    /**
+     * 更新网络安全配置并热生效
+     */
+    @SaCheckRole("ADMIN")
+    @PutMapping("/security")
+    public ApiResult<Void> updateSecurityConfig(@Valid @RequestBody SecurityConfigDTO dto) {
+        sysConfigService.updateSecurityConfig(dto);
         return ApiResult.success();
     }
 

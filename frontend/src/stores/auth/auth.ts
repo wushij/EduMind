@@ -7,6 +7,7 @@ import { storage } from '@/core/storage/local';
 import { getUserInfo, logout as logoutApi, login as loginApi } from '@/api/auth/auth';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_USERS } from '@/mock/users';
+import { normalizeAvatarUrl } from '@/utils/format/file';
 
 const DEFAULT_ROLE_ACCOUNTS: Record<'ADMIN' | 'TEACHER' | 'STUDENT', { username: string; password: string }> = {
   ADMIN: { username: 'admin', password: 'admin123' },
@@ -16,10 +17,17 @@ const DEFAULT_ROLE_ACCOUNTS: Record<'ADMIN' | 'TEACHER' | 'STUDENT', { username:
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(tokenUtil.get());
-  const storedUser = storage.get(USER_INFO_KEY) as UserInfo | null;
-  const currentUser = ref<UserInfo | null>(storedUser);
-  const permissions = ref<string[]>(storedUser?.permissions || []);
-  const userInfoLoaded = ref(!!storedUser);
+  const rawStoredUser = storage.get(USER_INFO_KEY) as UserInfo | null;
+  if (rawStoredUser?.avatar) {
+    const norm = normalizeAvatarUrl(rawStoredUser.avatar);
+    if (norm && norm !== rawStoredUser.avatar) {
+      rawStoredUser.avatar = norm;
+      storage.set(USER_INFO_KEY, rawStoredUser);
+    }
+  }
+  const currentUser = ref<UserInfo | null>(rawStoredUser);
+  const permissions = ref<string[]>(rawStoredUser?.permissions || []);
+  const userInfoLoaded = ref(!!rawStoredUser);
 
   const currentRole = computed(() => currentUser.value?.roles?.[0] || null);
 
@@ -29,6 +37,12 @@ export const useAuthStore = defineStore('auth', () => {
   };
 
   const setUser = (user: UserInfo) => {
+    if (user.avatar) {
+      const norm = normalizeAvatarUrl(user.avatar);
+      if (norm) {
+        user.avatar = norm;
+      }
+    }
     currentUser.value = user;
     permissions.value = user.permissions || [];
     userInfoLoaded.value = true;

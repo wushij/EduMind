@@ -26,4 +26,12 @@ public class KnowledgeMasteryController {
         Long targetStudent = studentId != null ? studentId : UserContext.getUserId();
         return ApiResult.success(knowledgeMasteryService.getMastery(courseId, targetStudent));
     }
+
+    @SaCheckPermission("course:view")
+    @GetMapping("/heatmap")
+    public ApiResult<java.util.Map<String, Object>> getMasteryHeatmap(
+            @RequestParam Long courseId,
+            @RequestParam(required = false) String range) {
+        return ApiResult.success(knowledgeMasteryService.getHeatmap(courseId, range));
+    }
 }

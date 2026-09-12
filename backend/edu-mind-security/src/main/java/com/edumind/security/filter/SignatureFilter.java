@@ -2,6 +2,7 @@ package com.edumind.security.filter;
 
 import com.edumind.common.api.ApiResponseWriter;
 import com.edumind.common.api.ResultCode;
+import com.edumind.security.config.DynamicSecurityConfigService;
 import com.edumind.security.config.SecurityProperties;
 import com.edumind.security.crypto.SignatureService;
 import jakarta.servlet.FilterChain;
@@ -26,12 +27,13 @@ public class SignatureFilter extends OncePerRequestFilter {
 
     private final SignatureService signatureService;
     private final SecurityProperties securityProperties;
+    private final DynamicSecurityConfigService dynamicSecurityConfigService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String uri = request.getRequestURI();
-        boolean smRequired = securityProperties.isSmEnabled() && isSensitivePath(uri);
+        boolean smRequired = (securityProperties.isSmEnabled() || dynamicSecurityConfigService.isSm3SignEnabled()) && isSensitivePath(uri);
         String signatureHeader = request.getHeader("X-Signature");
 
         if (!smRequired && signatureHeader == null) {

@@ -18,6 +18,7 @@ import com.edumind.ai.service.chat.ChatService;
 import com.edumind.ai.service.chat.ChatStreamRegistry;
 import com.edumind.ai.service.prompt.PromptService;
 import com.edumind.ai.vo.rag.CitationVO;
+import com.edumind.ai.router.IntentRouter;
 import com.edumind.common.event.LearningActivityEvent;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.infrastructure.redis.cache.AiSessionCacheService;
@@ -54,6 +55,7 @@ public class ChatServiceImpl implements ChatService {
     private final KnowledgeQueryApi knowledgeQueryApi;
     private final KnowledgeAccessService knowledgeAccessService;
     private final ApplicationEventPublisher eventPublisher;
+    private final com.edumind.ai.router.IntentRouter intentRouter;
 
     @Override
     public SseEmitter streamChat(ChatStreamDTO dto) {
@@ -106,6 +108,13 @@ public class ChatServiceImpl implements ChatService {
         final Long knowledgeBaseId = resolveKnowledgeBaseId(dto);
         final boolean useRag = shouldUseRag(dto, knowledgeBaseId);
         try {
+            IntentRouter.IntentResult intent = intentRouter.route(dto.getMessage(), dto.getCourseId());
+            sendEvent(emitter, "intent", Map.of(
+                    "route", intent.type(),
+                    "agentCode", intent.targetCode() != null ? intent.targetCode() : "",
+                    "confidence", intent.confidence()
+            ));
+
             String systemPrompt = promptService.getSystemPrompt("chat");
             String userPrompt = dto.getMessage();
             List<CitationVO> citations = List.of();
@@ -158,7 +167,7 @@ public class ChatServiceImpl implements ChatService {
                     done.put("messageId", assistantMsg.getId());
                     sendEvent(emitter, "done", done);
                     emitter.complete();
-                    logCall(start, useRag, knowledgeBaseId, promptForLog, assistantContent.toString(), ragHolder[0]);
+                    logCall(start, useRag, knowledgeBaseId, conversation.getCourseId(), promptForLog, assistantContent.toString(), ragHolder[0]);
                     publishChatActivity(conversation);
                     chatStreamRegistry.remove(streamId);
                 }
@@ -237,6 +246,11 @@ public class ChatServiceImpl implements ChatService {
         if (dto.getUseRag() != null) {
             return dto.getUseRag();
         }
+        // 基于 IntentRouter 统一意图判断分流
+        IntentRouter.IntentResult intent = intentRouter.route(dto.getMessage(), dto.getCourseId());
+        if ("rag".equalsIgnoreCase(intent.type())) {
+            return true;
+        }
         return knowledgeBaseId != null;
     }
 
@@ -251,10 +265,11 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
-    private void logCall(long start, boolean useRag, Long knowledgeBaseId, String prompt, String completion,
+    private void logCall(long start, boolean useRag, Long knowledgeBaseId, Long courseId, String prompt, String completion,
                          RagResult ragResult) {
         AiCallLogEntity log = new AiCallLogEntity();
         log.setUserId(LoginUserResolver.resolveUserId());
+        log.setCourseId(courseId);
         log.setModel(llmProperties.getModel());
         log.setScene(useRag ? "CHAT_RAG" : "chat_stream");
         log.setLatencyMs((int) (System.currentTimeMillis() - start));

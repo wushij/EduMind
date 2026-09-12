@@ -11,6 +11,7 @@ import com.edumind.system.service.user.UserService;
 import com.edumind.system.vo.user.UserVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -56,5 +57,12 @@ public class UserManageController {
     public ApiResult<UserVO> updateUserStatus(@PathVariable("id") Long id,
                                               @Valid @RequestBody UserStatusUpdateDTO dto) {
         return ApiResult.success(userService.updateUserStatus(id, dto));
+    }
+
+    @SaCheckPermission("system:user:edit")
+    @DeleteMapping("/{id}")
+    public ApiResult<Void> deleteUser(@PathVariable("id") Long id) {
+        userService.deleteUser(id);
+        return ApiResult.success();
     }
 }

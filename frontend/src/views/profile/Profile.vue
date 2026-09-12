@@ -4,13 +4,13 @@
     <div class="profile-header-card">
       <div class="user-avatar-block">
         <img :src="currentUser?.avatar" alt="Avatar" class="avatar-img" />
-        <span class="role-badge-pill">{{ roleLabel }}</span>
       </div>
 
       <div class="user-main-info">
         <div class="name-title-row">
           <h1 class="user-name">{{ currentUser?.realName || '平台学者' }}</h1>
           <span class="username-tag">@{{ currentUser?.username }}</span>
+          <span class="role-badge-pill">{{ roleLabel }}</span>
         </div>
         <p class="user-dept">{{ currentUser?.department || '教务处与信息化中心' }}</p>
       </div>
@@ -482,7 +482,7 @@ async function handleConfirmBind() {
     flex-wrap: wrap;
 
     .user-avatar-block {
-      position: relative;
+      flex-shrink: 0;
 
       .avatar-img {
         width: 72px;
@@ -491,21 +491,6 @@ async function handleConfirmBind() {
         border: 2px solid #1677FF;
         box-shadow: 0 4px 12px rgba(22, 119, 255, 0.2);
         object-fit: cover;
-      }
-
-      .role-badge-pill {
-        position: absolute;
-        bottom: -6px;
-        left: 50%;
-        transform: translateX(-50%);
-        white-space: nowrap;
-        padding: 1px 10px;
-        border-radius: 9999px;
-        background: #1677FF;
-        color: #FFFFFF;
-        font-size: 10.5px;
-        font-weight: 600;
-        box-shadow: 0 2px 6px rgba(22, 119, 255, 0.3);
       }
     }
 
@@ -516,6 +501,7 @@ async function handleConfirmBind() {
       .name-title-row {
         display: flex;
         align-items: center;
+        flex-wrap: wrap;
         gap: 10px;
         margin-bottom: 4px;
 
@@ -529,6 +515,18 @@ async function handleConfirmBind() {
         .username-tag {
           font-size: 13px;
           color: #94A3B8;
+        }
+
+        .role-badge-pill {
+          white-space: nowrap;
+          padding: 2px 10px;
+          border-radius: 9999px;
+          background: #1677FF;
+          color: #FFFFFF;
+          font-size: 10.5px;
+          font-weight: 600;
+          line-height: 1.4;
+          box-shadow: 0 2px 6px rgba(22, 119, 255, 0.3);
         }
       }
 

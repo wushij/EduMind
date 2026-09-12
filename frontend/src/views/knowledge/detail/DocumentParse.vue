@@ -271,8 +271,6 @@ onMounted(async () => {
 .document-parse-container {
   padding: 24px;
   background: #f8fafc;
-  min-height: calc(100vh - 64px);
-
   .filter-panel-card {
     display: flex;
     gap: 12px;

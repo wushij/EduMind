@@ -45,6 +45,23 @@ public class KnowledgeGraphController {
         return ApiResult.success(knowledgeGraphService.findGaps(knowledgeBaseId, studentId, masteryThreshold));
     }
 
+    @PostMapping("/knowledge-bases/{id}/graph/suggest-relations")
+    public ApiResult<List<java.util.Map<String, Object>>> suggestRelations(
+            @PathVariable("id") Long knowledgeBaseId,
+            @RequestBody(required = false) java.util.Map<String, Object> params) {
+        Long sourceKpId = null;
+        Integer max = 5;
+        if (params != null) {
+            if (params.get("sourceKnowledgePointId") != null) {
+                sourceKpId = Long.valueOf(params.get("sourceKnowledgePointId").toString());
+            }
+            if (params.get("maxSuggestions") != null) {
+                max = Integer.valueOf(params.get("maxSuggestions").toString());
+            }
+        }
+        return ApiResult.success(knowledgeGraphService.suggestRelations(knowledgeBaseId, sourceKpId, max));
+    }
+
     @PostMapping("/knowledge-points/{id}/relations")
     public ApiResult<Void> createRelation(
             @PathVariable("id") Long sourceKnowledgePointId,

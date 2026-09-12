@@ -1,10 +1,21 @@
-import { QuestionItem } from '../question/question';
-
-export interface WrongQuestion {
+export interface WrongQuestionRecordItem {
   id: number;
-  question: QuestionItem;
-  studentAnswer: string;
-  errorReason: string;
-  aiAdvice: string;
-  status: 'NOT_MASTERED' | 'LEARNING' | 'MASTERED';
+  questionId: number;
+  stem?: string;
+  type?: string;
+  difficulty?: string;
+  options?: string;
+  answer?: string;
+  analysis?: string;
+  studentAnswer?: string;
+  wrongCount: number;
+  errorTypes?: string[];
+  diagnosis?: string;
+  variantQuestionIds?: number[];
+  createTime?: string;
+}
+
+export interface WrongQuestionListVO {
+  list: WrongQuestionRecordItem[];
+  total: number;
 }

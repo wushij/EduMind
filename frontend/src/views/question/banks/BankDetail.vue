@@ -655,8 +655,6 @@ function getDifficultyTagType(diff: Difficulty | string) {
 .bank-detail-container {
   padding: 24px;
   background-color: #f8fafc;
-  min-height: calc(100vh - 64px);
-
   .top-nav-bar {
     display: flex;
     align-items: center;

@@ -113,7 +113,6 @@ async function handleBatchSave() {
   width: 100%;
   padding: 24px;
   background: #f8fafc;
-  min-height: calc(100vh - 64px);
   box-sizing: border-box;
 
   .preview-top-bar {

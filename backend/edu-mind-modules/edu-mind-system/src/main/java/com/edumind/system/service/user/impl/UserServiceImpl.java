@@ -17,13 +17,17 @@ import com.edumind.system.dto.user.UserStatusUpdateDTO;
 import com.edumind.system.dto.user.UserUpdateDTO;
 import com.edumind.system.entity.UserEntity;
 import com.edumind.system.service.user.UserService;
+import com.edumind.infrastructure.oss.FileStorageService;
 import com.edumind.system.vo.user.UserVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,6 +39,7 @@ public class UserServiceImpl implements UserService {
     private final UserConverter userConverter;
     private final UserVoAssembler userVoAssembler;
     private final com.edumind.system.service.email.EmailCodeService emailCodeService;
+    private final FileStorageService fileStorageService;
 
     @Override
     public UserVO getProfile() {
@@ -69,6 +74,48 @@ public class UserServiceImpl implements UserService {
         }
         userDao.updateById(entity);
         return userVoAssembler.toVO(entity);
+    }
+
+    @Override
+    public UserVO uploadAvatar(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException("上传的头像文件不能为空");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new BusinessException("只支持图片格式文件 (JPG/PNG/GIF/WebP等)");
+        }
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new BusinessException("头像文件大小不能超过 5MB");
+        }
+
+        Long userId = StpUtil.getLoginIdAsLong();
+        UserEntity entity = userDao.findById(userId);
+        if (entity == null) {
+            throw new BusinessException("用户不存在");
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        String ext = "png";
+        if (StringUtils.hasText(originalFilename) && originalFilename.contains(".")) {
+            ext = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
+        }
+        String username = StringUtils.hasText(entity.getUsername())
+                ? entity.getUsername().trim().toLowerCase().replaceAll("[^a-zA-Z0-9_-]", "_")
+                : "user_" + userId;
+        String objectKey = String.format("users/%s/avatar/avatar_%s.%s",
+                username,
+                UUID.randomUUID().toString().replace("-", "").substring(0, 16),
+                ext);
+
+        try {
+            String avatarUrl = fileStorageService.uploadFile("edumind", objectKey, file.getInputStream(), contentType);
+            entity.setAvatar(avatarUrl);
+            userDao.updateById(entity);
+            return userVoAssembler.toVO(entity);
+        } catch (IOException e) {
+            throw new BusinessException("头像上传处理失败: " + e.getMessage());
+        }
     }
 
     @Override
@@ -197,6 +244,24 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException("用户不存在");
         }
         return userVoAssembler.toVO(entity);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteUser(Long id) {
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (id.equals(currentUserId)) {
+            throw new BusinessException("不能删除当前登录账号");
+        }
+        UserEntity entity = userDao.findById(id);
+        if (entity == null) {
+            throw new BusinessException("用户不存在");
+        }
+        if ("admin".equalsIgnoreCase(entity.getUsername())) {
+            throw new BusinessException("系统内置管理员账号不允许删除");
+        }
+        userRoleDao.deleteByUserId(id);
+        userDao.deleteById(id);
     }
 
     private boolean matchesPassword(String rawPassword, String storedPassword) {

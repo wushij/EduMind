@@ -343,7 +343,6 @@ onMounted(() => {
   // AI 助教页：精简顶栏并保留充足底部呼吸空间，允许平滑向下滚动
   &.course-detail-container--ai {
     gap: 12px;
-    padding-bottom: 32px;
 
     .course-header-bar {
       display: none;

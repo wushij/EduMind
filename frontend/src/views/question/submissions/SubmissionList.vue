@@ -275,8 +275,6 @@ async function handleBatchAIGrading() {
 .submission-list-container {
   padding: 24px;
   background: #f8fafc;
-  min-height: calc(100vh - 64px);
-
   .submission-header-dock {
     display: flex;
     align-items: center;

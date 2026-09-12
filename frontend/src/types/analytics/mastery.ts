@@ -47,3 +47,28 @@ export interface TeachingAdviceVO {
   summary: string;
   actions: string[];
 }
+
+export interface KnowledgeHeatmapPoint {
+  id: number;
+  title: string;
+}
+
+export interface KnowledgeHeatmapStudent {
+  id: number;
+  name: string;
+  studentNo?: string;
+}
+
+export interface KnowledgeHeatmapCell {
+  studentId: number;
+  knowledgePointId: number;
+  mastery: number;
+}
+
+export interface KnowledgeHeatmapVO {
+  courseId: number;
+  knowledgePoints: KnowledgeHeatmapPoint[];
+  students: KnowledgeHeatmapStudent[];
+  cells: KnowledgeHeatmapCell[];
+}
+

@@ -18,4 +18,6 @@ public interface KnowledgeGraphService {
     List<KnowledgePointRelationVO> listRelations(Long knowledgePointId);
 
     void deleteRelation(Long relationId);
+
+    java.util.List<java.util.Map<String, Object>> suggestRelations(Long knowledgeBaseId, Long sourceKnowledgePointId, Integer maxSuggestions);
 }

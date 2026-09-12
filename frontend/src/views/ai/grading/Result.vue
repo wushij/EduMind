@@ -276,8 +276,6 @@ function handleExportReport() {
 .grading-result-container {
   padding: 24px;
   background: #f8fafc;
-  min-height: calc(100vh - 64px);
-
   .top-nav-bar {
     display: flex;
     align-items: center;

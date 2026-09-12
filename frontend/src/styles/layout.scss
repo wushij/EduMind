@@ -1,0 +1,11 @@
+@use './variables.scss' as *;
+
+// 主布局全局变量（供各页面 min-height 统一计算）
+:root {
+  --layout-header-height: 64px;
+  --layout-content-padding-y: 20px;
+  --page-bottom-spacing: #{$page-bottom-spacing};
+  --page-min-height: calc(
+    100vh - var(--layout-header-height) - var(--layout-content-padding-y) - var(--page-bottom-spacing)
+  );
+}

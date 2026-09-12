@@ -31,7 +31,7 @@
           <el-option label="在读学生" value="STUDENT" />
         </el-select>
         <el-select v-model="selectedStatus" placeholder="账号状态" clearable class="filter-select" @change="handleSearch">
-          <el-option label="全部状态" :value="null" />
+          <el-option label="全部状态" value="" />
           <el-option label="正常活跃" value="ENABLE" />
           <el-option label="冻结停用" value="DISABLED" />
         </el-select>
@@ -41,17 +41,21 @@
     <!-- 用户列表表格卡片 -->
     <div v-loading="loading" class="user-table-card">
       <el-table :data="users" stripe class="main-table">
-        <el-table-column label="用户名/账号" prop="username" width="160">
+        <el-table-column label="用户信息" min-width="220">
           <template #default="{ row }">
-            <span class="font-mono font-semibold text-slate-800">{{ row.username }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="真实姓名" prop="realName" width="140">
-          <template #default="{ row }">
-            <div class="name-cell">
-              <span class="avatar-dot"></span>
-              <span class="font-medium text-slate-800">{{ row.realName }}</span>
+            <div class="em-user-cell">
+              <el-avatar
+                :size="40"
+                :src="(!avatarBroken[row.id] && normalizeAvatarUrl(row.avatar)) ? normalizeAvatarUrl(row.avatar) : undefined"
+                class="em-user-avatar-sm"
+                @error="onAvatarError(row.id)"
+              >
+                {{ (row.realName || row.username || 'U').charAt(0).toUpperCase() }}
+              </el-avatar>
+              <div class="user-meta-info">
+                <div class="user-real-name">{{ row.realName || row.username }}</div>
+                <div class="user-account-sub">@{{ row.username }}</div>
+              </div>
             </div>
           </template>
         </el-table-column>
@@ -85,24 +89,33 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
-            <el-button
-              type="primary"
-              link
-              size="small"
-              @click="router.push(`/system/users/${row.id}`)"
-            >
-              档案与权限
-            </el-button>
-            <el-button
-              :type="isUserEnabled(row) ? 'danger' : 'success'"
-              link
-              size="small"
-              @click="toggleUserStatus(row)"
-            >
-              {{ isUserEnabled(row) ? '冻结' : '解冻' }}
-            </el-button>
+            <div class="table-action-group">
+              <button
+                type="button"
+                class="table-action-pill table-action-pill--primary"
+                @click="router.push(`/system/users/${row.id}`)"
+              >
+                档案与权限
+              </button>
+              <button
+                type="button"
+                class="table-action-pill"
+                :class="isUserEnabled(row) ? 'table-action-pill--warning' : 'table-action-pill--success'"
+                @click="toggleUserStatus(row)"
+              >
+                {{ isUserEnabled(row) ? '冻结' : '解冻' }}
+              </button>
+              <button
+                type="button"
+                class="table-action-pill table-action-pill--danger"
+                :disabled="!canDeleteUser(row)"
+                @click="handleDeleteUser(row)"
+              >
+                删除
+              </button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -147,14 +160,17 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { Plus, Search } from '@element-plus/icons-vue';
-import { getUsers, createUser, updateUserStatus } from '@/api/system/user';
+import { getUsers, createUser, updateUserStatus, deleteUser } from '@/api/system/user';
 import { getRoles } from '@/api/system/role';
 import AppPagination from '@/components/common/AppPagination.vue';
+import { normalizeAvatarUrl } from '@/utils/format/file';
 import { USE_MOCK } from '@/config/mock';
+import { useAuthStore } from '@/stores/auth/auth';
 
 const router = useRouter();
+const authStore = useAuthStore();
 const loading = ref(false);
 const creating = ref(false);
 const showCreateDialog = ref(false);
@@ -169,6 +185,11 @@ const roles = ref<Array<{ id: number; roleCode: string }>>([]);
 const pageNum = ref(1);
 const pageSize = ref(10);
 const total = ref(0);
+const avatarBroken = ref<Record<number, boolean>>({});
+
+function onAvatarError(userId: number) {
+  avatarBroken.value[userId] = true;
+}
 
 const newUserForm = reactive({
   username: '',
@@ -234,6 +255,7 @@ function getDefaultUsers() {
       id: 1,
       username: 'admin',
       realName: '系统超级管理员',
+      avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=EduMindAdmin&backgroundColor=e0e7ff',
       department: '数字化与信息化中心',
       roles: ['ADMIN'],
       status: 'ENABLE'
@@ -242,6 +264,7 @@ function getDefaultUsers() {
       id: 2,
       username: 'teacher',
       realName: '李华教授',
+      avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=TeacherZhang&backgroundColor=dbeafe',
       department: '计算机学院 · 软件工程系',
       roles: ['TEACHER'],
       status: 'ENABLE'
@@ -250,6 +273,7 @@ function getDefaultUsers() {
       id: 3,
       username: 'student',
       realName: '张子轩',
+      avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=StudentLi&backgroundColor=fef3c7',
       department: '计算机学院 · 2024级软工1班',
       roles: ['STUDENT'],
       status: 'ENABLE'
@@ -258,6 +282,7 @@ function getDefaultUsers() {
       id: 4,
       username: 'student2',
       realName: '李梦琪',
+      avatar: 'https://api.dicebear.com/7.x/micah/svg?seed=ScholarChen&backgroundColor=fce7f3',
       department: '计算机学院 · 2024级软工1班',
       roles: ['STUDENT'],
       status: 'ENABLE'
@@ -287,14 +312,61 @@ function isUserEnabled(row: { status?: string }) {
   return row.status === 'ENABLE' || row.status === 'ENABLED';
 }
 
+function canDeleteUser(row: { id: number; username: string }) {
+  if (row.username === 'admin') return false;
+  return row.id !== authStore.currentUser?.id;
+}
+
 async function toggleUserStatus(row: any) {
-  const newStatus = isUserEnabled(row) ? 'DISABLED' : 'ENABLE';
+  const enabling = !isUserEnabled(row);
+  const actionText = enabling ? '解冻恢复该用户账号' : '冻结该用户账号';
+  const confirmType = enabling ? 'info' : 'warning';
+
   try {
+    await ElMessageBox.confirm(
+      `确定要${actionText}「${row.realName || row.username}」吗？${enabling ? '' : '冻结后该用户将无法登录系统。'}`,
+      '账号状态变更确认',
+      {
+        confirmButtonText: enabling ? '确认解冻' : '确认冻结',
+        cancelButtonText: '取消',
+        type: confirmType
+      }
+    );
+    const newStatus = enabling ? 'ENABLE' : 'DISABLED';
     await updateUserStatus(row.id, newStatus);
     row.status = newStatus;
-    ElMessage.success(`已${newStatus === 'ENABLE' ? '启用' : '冻结'}用户：${row.username}`);
-  } catch {
-    ElMessage.error('更新用户状态失败，请稍后重试');
+    ElMessage.success(`已${enabling ? '解冻' : '冻结'}用户：${row.username}`);
+  } catch (err: any) {
+    if (err !== 'cancel' && err !== 'close') {
+      ElMessage.error('更新用户状态失败，请稍后重试');
+    }
+  }
+}
+
+async function handleDeleteUser(row: any) {
+  if (!canDeleteUser(row)) {
+    ElMessage.warning(row.username === 'admin' ? '系统内置管理员账号不允许删除' : '不能删除当前登录账号');
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `删除后账号「${row.realName || row.username}」将无法恢复，其角色授权也将一并清除。确定继续吗？`,
+      '删除用户确认',
+      {
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger'
+      }
+    );
+    await deleteUser(row.id);
+    ElMessage.success(`已删除用户：${row.username}`);
+    await loadUsers();
+  } catch (err: any) {
+    if (err !== 'cancel' && err !== 'close') {
+      ElMessage.error(err?.message || '删除用户失败，请稍后重试');
+    }
   }
 }
 
@@ -332,7 +404,6 @@ async function handleCreateUser() {
 .user-list-container {
   padding: 24px;
   background: #f8fafc;
-  min-height: calc(100vh - 64px);
 
   .page-header-card {
     display: flex;
@@ -392,16 +463,34 @@ async function handleCreateUser() {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
     padding: 16px 20px;
 
-    .name-cell {
+    .em-user-cell {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 12px;
 
-      .avatar-dot {
-        width: 8px;
-        height: 8px;
-        background: #3b82f6;
-        border-radius: 50%;
+      .em-user-avatar-sm {
+        flex-shrink: 0;
+        background: linear-gradient(135deg, #dbeafe, #eff6ff);
+        color: #2563eb;
+        font-weight: 700;
+      }
+
+      .user-meta-info {
+        min-width: 0;
+
+        .user-real-name {
+          font-size: 14px;
+          font-weight: 600;
+          color: #0f172a;
+          line-height: 1.3;
+        }
+
+        .user-account-sub {
+          font-size: 12px;
+          color: #64748B;
+          font-family: monospace;
+          line-height: 1.2;
+        }
       }
     }
 
@@ -409,6 +498,79 @@ async function handleCreateUser() {
       display: flex;
       gap: 6px;
       flex-wrap: wrap;
+    }
+
+    .table-action-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .table-action-pill {
+      height: 30px;
+      padding: 0 14px;
+      border-radius: 9999px;
+      border: 1px solid transparent;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+
+      &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      &--primary {
+        background: #eff6ff;
+        border-color: #bfdbfe;
+        color: #2563eb;
+
+        &:hover:not(:disabled) {
+          background: #2563eb;
+          border-color: #2563eb;
+          color: #ffffff;
+        }
+      }
+
+      &--warning {
+        background: #fff7ed;
+        border-color: #fed7aa;
+        color: #ea580c;
+
+        &:hover:not(:disabled) {
+          background: #ea580c;
+          border-color: #ea580c;
+          color: #ffffff;
+        }
+      }
+
+      &--success {
+        background: #ecfdf5;
+        border-color: #a7f3d0;
+        color: #059669;
+
+        &:hover:not(:disabled) {
+          background: #059669;
+          border-color: #059669;
+          color: #ffffff;
+        }
+      }
+
+      &--danger {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #dc2626;
+
+        &:hover:not(:disabled) {
+          background: #dc2626;
+          border-color: #dc2626;
+          color: #ffffff;
+        }
+      }
     }
   }
 }

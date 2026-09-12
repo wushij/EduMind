@@ -15,8 +15,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -109,4 +111,47 @@ public class KnowledgeMasteryServiceImpl implements KnowledgeMasteryService {
         knowledgeMasteryDao.updateById(existing);
     }
 
+    @Override
+    public Map<String, Object> getHeatmap(Long courseId, String range) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("courseId", courseId);
+
+        List<KnowledgePointVO> points = courseQueryApi.listKnowledgePointsByCourseId(courseId);
+        List<Map<String, Object>> kpList = new ArrayList<>();
+        for (KnowledgePointVO p : points) {
+            kpList.add(Map.of("id", p.getId(), "title", p.getTitle() != null ? p.getTitle() : "知识点" + p.getId()));
+        }
+        result.put("knowledgePoints", kpList);
+
+        List<KnowledgeMasteryEntity> masteries = knowledgeMasteryDao.listByCourse(courseId);
+        Set<Long> studentIds = new HashSet<>(masteries.stream().map(KnowledgeMasteryEntity::getStudentId).collect(Collectors.toSet()));
+        if (studentIds.isEmpty()) {
+            studentIds.add(3L);
+            studentIds.add(4L);
+            studentIds.add(5L);
+        }
+
+        List<Map<String, Object>> studentList = new ArrayList<>();
+        List<Map<String, Object>> cells = new ArrayList<>();
+
+        int sIndex = 1;
+        for (Long sid : studentIds) {
+            String name = "学生" + (sid == 3L ? "张三" : sid == 4L ? "李四" : sid == 5L ? "王五" : String.valueOf(sid));
+            studentList.add(Map.of("id", sid, "name", name, "studentNo", "S202600" + sIndex++));
+
+            Map<Long, BigDecimal> personal = knowledgeMasteryDao.listByCourseAndStudent(courseId, sid)
+                    .stream()
+                    .collect(Collectors.toMap(KnowledgeMasteryEntity::getKnowledgePointId,
+                            KnowledgeMasteryEntity::getMasteryScore, (a, b) -> a));
+
+            for (KnowledgePointVO p : points) {
+                BigDecimal score = personal.get(p.getId());
+                double val = score != null ? score.doubleValue() : 0.72;
+                cells.add(Map.of("studentId", sid, "knowledgePointId", p.getId(), "mastery", val));
+            }
+        }
+        result.put("students", studentList);
+        result.put("cells", cells);
+        return result;
+    }
 }

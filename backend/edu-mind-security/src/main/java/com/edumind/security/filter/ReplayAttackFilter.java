@@ -2,6 +2,7 @@ package com.edumind.security.filter;
 
 import com.edumind.common.api.ApiResponseWriter;
 import com.edumind.common.api.ResultCode;
+import com.edumind.security.config.DynamicSecurityConfigService;
 import com.edumind.security.config.SecurityProperties;
 import com.edumind.infrastructure.redis.RedisKeyBuilder;
 import com.edumind.infrastructure.redis.RedisService;
@@ -28,6 +29,7 @@ public class ReplayAttackFilter extends OncePerRequestFilter {
     private final RedisService redisService;
     private final RedisSupport redisSupport;
     private final SecurityProperties securityProperties;
+    private final DynamicSecurityConfigService dynamicSecurityConfigService;
     private final ConcurrentHashMap<String, Long> localNonceCache = new ConcurrentHashMap<>();
 
     @Override
@@ -35,12 +37,15 @@ public class ReplayAttackFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String timestampHeader = request.getHeader("X-Timestamp");
         String nonceHeader = request.getHeader("X-Nonce");
-        boolean smRequired = securityProperties.isSmEnabled()
+        boolean checkRequired = (securityProperties.isSmEnabled()
+                || dynamicSecurityConfigService.isSm3SignEnabled()
+                || dynamicSecurityConfigService.isTimestampEnabled()
+                || dynamicSecurityConfigService.isNonceEnabled())
                 && securityProperties.getSensitivePaths().stream()
                 .anyMatch(request.getRequestURI()::startsWith);
 
-        if (smRequired && (timestampHeader == null || nonceHeader == null)) {
-            ApiResponseWriter.write(response, ResultCode.FORBIDDEN, "国密模式已开启：缺少 X-Timestamp 或 X-Nonce");
+        if (checkRequired && (timestampHeader == null || nonceHeader == null)) {
+            ApiResponseWriter.write(response, ResultCode.FORBIDDEN, "安全防护已开启：缺少 X-Timestamp 或 X-Nonce");
             return;
         }
 
@@ -48,8 +53,7 @@ public class ReplayAttackFilter extends OncePerRequestFilter {
             try {
                 long clientTimestamp = Long.parseLong(timestampHeader);
                 long currentTimestamp = System.currentTimeMillis();
-                long skew = securityProperties.getTimestampSkewMs() > 0
-                        ? securityProperties.getTimestampSkewMs() : TIME_WINDOW_MILLIS;
+                long skew = dynamicSecurityConfigService.getTimestampWindowMs();
                 if (Math.abs(currentTimestamp - clientTimestamp) > skew) {
                     ApiResponseWriter.write(response, ResultCode.FORBIDDEN, "请求已失效：时间戳超出允许范围");
                     return;

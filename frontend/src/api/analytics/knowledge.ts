@@ -1,5 +1,6 @@
 import { get, post } from '@/core/http/request';
 import type {
+  KnowledgeHeatmapVO,
   KnowledgeMasteryQuery,
   KnowledgeMasteryVO,
   WrongQuestionAnalyticsVO,
@@ -8,6 +9,9 @@ import type {
 
 export const getKnowledgeMastery = (params: KnowledgeMasteryQuery) =>
   get<KnowledgeMasteryVO>('/analytics/knowledge-mastery', params);
+
+export const getKnowledgeHeatmap = (courseId: number) =>
+  get<KnowledgeHeatmapVO>('/analytics/knowledge-mastery/heatmap', { courseId });
 
 export const getWrongQuestions = (params: WrongQuestionQuery) =>
   get<WrongQuestionAnalyticsVO>('/analytics/wrong-questions', params);

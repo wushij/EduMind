@@ -34,7 +34,23 @@ public class WrongQuestionController {
 
     @SaCheckPermission("course:view")
     @PostMapping("/{id}/diagnose")
-    public ApiResult<WrongQuestionRecordEntity> diagnose(@PathVariable("id") Long id) {
-        return ApiResult.success(wrongQuestionDiagnosisService.diagnoseRecord(id));
+    public ApiResult<WrongQuestionAnalyticsVO.WrongQuestionItemVO> diagnose(@PathVariable("id") Long id) {
+        WrongQuestionRecordEntity entity = wrongQuestionDiagnosisService.diagnoseRecord(id);
+        WrongQuestionAnalyticsVO.WrongQuestionItemVO vo = new WrongQuestionAnalyticsVO.WrongQuestionItemVO();
+        vo.setId(entity.getId());
+        vo.setQuestionId(entity.getQuestionId());
+        vo.setWrongCount(entity.getWrongCount());
+        vo.setDiagnosis(entity.getDiagnosis());
+        if (entity.getErrorTypes() != null) {
+            vo.setErrorTypes(java.util.Arrays.asList(entity.getErrorTypes().split(",")));
+        }
+        if (entity.getVariantQuestionIds() != null && !entity.getVariantQuestionIds().isBlank()) {
+            vo.setVariantQuestionIds(java.util.Arrays.stream(entity.getVariantQuestionIds().split(","))
+                    .filter(s -> !s.isBlank())
+                    .map(Long::valueOf)
+                    .collect(java.util.stream.Collectors.toList()));
+        }
+        return ApiResult.success(vo);
     }
 }
+

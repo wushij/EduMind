@@ -14,6 +14,7 @@ public class AiCallLogEntity implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long userId;
+    private Long courseId;
     private String model;
     private Integer promptTokens;
     private Integer completionTokens;

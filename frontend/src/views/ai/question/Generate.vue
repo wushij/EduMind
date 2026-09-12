@@ -432,7 +432,6 @@ async function handleGenerateSubmit() {
   width: 100%;
   padding: 24px;
   background: #f8fafc;
-  min-height: calc(100vh - 64px);
   box-sizing: border-box;
 
   // 顶部专属 3D 视觉大 Banner (比例 2508×627)

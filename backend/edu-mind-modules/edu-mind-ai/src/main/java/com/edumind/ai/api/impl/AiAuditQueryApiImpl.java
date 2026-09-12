@@ -83,4 +83,27 @@ public class AiAuditQueryApiImpl implements AiAuditQueryApi {
         summary.setProviderTokens(providerTokens);
         return summary;
     }
+
+    @Override
+    public long countCallsByCourse(Long courseId, LocalDateTime since) {
+        if (courseId == null) {
+            return 0L;
+        }
+        LambdaQueryWrapper<AiCallLogEntity> wrapper = new LambdaQueryWrapper<AiCallLogEntity>()
+                .eq(AiCallLogEntity::getCourseId, courseId)
+                .ge(since != null, AiCallLogEntity::getCreateTime, since);
+        return aiCallLogDao.count(wrapper);
+    }
+
+    @Override
+    public Map<Long, Long> countCallsByCourseBatch(List<Long> courseIds, LocalDateTime since) {
+        Map<Long, Long> result = new HashMap<>();
+        if (CollectionUtils.isEmpty(courseIds)) {
+            return result;
+        }
+        for (Long cid : courseIds) {
+            result.put(cid, countCallsByCourse(cid, since));
+        }
+        return result;
+    }
 }

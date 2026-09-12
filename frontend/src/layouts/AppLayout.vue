@@ -5,6 +5,7 @@
       <AppHeader :is-collapsed="isCollapsed" @toggle-sidebar="toggle" />
       <AppContent />
     </div>
+    <GlobalAssistantDrawer />
   </div>
 </template>
 
@@ -12,6 +13,7 @@
 import AppSidebar from './components/AppSidebar.vue';
 import AppHeader from './components/AppHeader.vue';
 import AppContent from './components/AppContent.vue';
+import GlobalAssistantDrawer from '@/components/ai/GlobalAssistantDrawer.vue';
 import { useSidebar } from '@/composables/layout/useSidebar';
 
 const { isCollapsed, toggle } = useSidebar();

@@ -421,8 +421,6 @@ function getTypeTagType(type: QuestionType | string) {
 .submission-detail-container {
   padding: 24px;
   background: #f8fafc;
-  min-height: calc(100vh - 64px);
-  padding-bottom: 90px;
 
   .top-nav-bar {
     display: flex;

@@ -42,4 +42,20 @@ public class WrongQuestionRecordDao {
                         .last("LIMIT 1")
         );
     }
+
+    public long countByCourse(Long courseId) {
+        return wrongQuestionRecordMapper.selectCount(
+                new LambdaQueryWrapper<WrongQuestionRecordEntity>()
+                        .eq(WrongQuestionRecordEntity::getCourseId, courseId)
+        );
+    }
+
+    public long countByCourseAndDateRange(Long courseId, java.time.LocalDateTime start, java.time.LocalDateTime end) {
+        return wrongQuestionRecordMapper.selectCount(
+                new LambdaQueryWrapper<WrongQuestionRecordEntity>()
+                        .eq(WrongQuestionRecordEntity::getCourseId, courseId)
+                        .ge(start != null, WrongQuestionRecordEntity::getCreateTime, start)
+                        .le(end != null, WrongQuestionRecordEntity::getCreateTime, end)
+        );
+    }
 }

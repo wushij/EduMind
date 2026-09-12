@@ -26,4 +26,8 @@ public class LearningRecordDao {
     public int insert(LearningRecordEntity entity) {
         return learningRecordMapper.insert(entity);
     }
+
+    public List<LearningRecordEntity> listAll() {
+        return learningRecordMapper.selectList(new LambdaQueryWrapper<>());
+    }
 }
