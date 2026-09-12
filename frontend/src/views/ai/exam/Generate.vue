@@ -1,21 +1,63 @@
 <template>
   <div class="exam-generate-page">
-    <!-- 顶部工作台标题 -->
-    <div class="generate-top-bar">
-      <div class="title-group">
-        <h1 class="page-title">AI 智能组卷向导</h1>
-        <p class="page-subtitle">
-          配置标准化试卷题型比例与总分规则，AI 组卷引擎将按知识点覆盖度自动抽题排版
-        </p>
+    <!-- 顶部专属 3D 视觉大 Banner (ai组卷.png，比例 2508×627) -->
+    <div class="exam-banner-stage">
+      <div class="banner-ratio-box">
+        <img
+          class="banner-image"
+          :src="examBannerImg"
+          alt="AI 智能组卷"
+          draggable="false"
+        />
+        <div class="banner-float-actions">
+          <button type="button" class="capsule-back-btn" @click="router.push('/ai/marketplace')">
+            <span>← 返回 AI 广场</span>
+          </button>
+        </div>
       </div>
+    </div>
 
-      <button type="button" class="capsule-back-btn" @click="router.push('/ai/marketplace')">
-        <span>← 返回 AI 广场</span>
-      </button>
+    <div class="mode-switch-bar">
+      <el-radio-group v-model="composeMode">
+        <el-radio-button label="quick">快速智能组卷</el-radio-button>
+        <el-radio-button label="full">完整试卷编排</el-radio-button>
+      </el-radio-group>
+    </div>
+
+    <div v-if="composeMode === 'quick'" class="config-section-card quick-compose-card">
+      <h3 class="section-title">快速智能组卷</h3>
+      <div class="form-grid-row">
+        <div class="form-item-col">
+          <label class="form-label">适用课程</label>
+          <el-select v-model="examForm.courseId" size="large" class="w-100">
+            <el-option
+              v-for="c in displayCourses"
+              :key="c.id"
+              :label="`${c.code || ('CS' + c.id)} · ${c.title}`"
+              :value="c.id"
+            />
+          </el-select>
+        </div>
+        <div class="form-item-col">
+          <label class="form-label">抽题数量</label>
+          <el-input-number v-model="quickCount" :min="5" :max="50" size="large" />
+        </div>
+      </div>
+      <div v-if="composePreview" class="compose-preview">
+        <el-alert
+          :title="`知识点覆盖率 ${(composePreview.coverageRate * 100).toFixed(1)}% · 已选 ${composePreview.selectedCount} 题 · 覆盖 ${composePreview.distinctKnowledgePointCount} 个知识点`"
+          type="success"
+          :closable="false"
+          show-icon
+        />
+      </div>
+      <el-button type="primary" :loading="composing" @click="handleQuickCompose">
+        启动快速组卷
+      </el-button>
     </div>
 
     <!-- 试卷基本信息配置卡片 -->
-    <div class="config-section-card">
+    <div v-else class="config-section-card">
       <h3 class="section-title">1. 试卷基本信息</h3>
       <div class="form-grid-row">
         <div class="form-item-col">
@@ -72,7 +114,7 @@
     </div>
 
     <!-- 题型题量与分值配置卡片 -->
-    <div class="config-section-card">
+    <div v-if="composeMode === 'full'" class="config-section-card">
       <div class="section-header-flex">
         <div>
           <h3 class="section-title">2. 题型配比与分值精细规划</h3>
@@ -163,7 +205,7 @@
     </div>
 
     <!-- 底部生成按钮栏 -->
-    <div class="launch-exam-footer">
+    <div v-if="composeMode === 'full'" class="launch-exam-footer">
       <button
         type="button"
         class="capsule-generate-btn"
@@ -189,13 +231,24 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Check, Warning, Lightning } from '@element-plus/icons-vue';
 import { useExamGenerate } from '@/composables/ai/useExamGenerate';
+import { composeSmartPaper } from '@/api/ai/paper-compose';
+import type { SmartPaperComposeVO } from '@/types/ai/paper-compose';
 import { getCourseList } from '@/api/course/course';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_COURSES } from '@/mock/courses';
+import { normalizeQuestion } from '@/utils/question/normalize-question';
+import { ElMessage } from 'element-plus';
+import examBannerImg from '@/assets/images/ai组卷.png';
 
 const router = useRouter();
+const composeMode = ref<'quick' | 'full'>('quick');
+const quickCount = ref(10);
+const composing = ref(false);
+const composePreview = ref<SmartPaperComposeVO | null>(null);
+
 const {
   examForm,
+  currentExam,
   generating,
   calculatedTotalScore,
   isScoreMatched,
@@ -233,6 +286,46 @@ const displayCourses = computed(() => {
 async function handleGenerateExam() {
   await generateExam();
 }
+
+async function handleQuickCompose() {
+  composing.value = true;
+  try {
+    const res = await composeSmartPaper({
+      courseId: examForm.courseId,
+      totalCount: quickCount.value
+    });
+    composePreview.value = res.data ?? null;
+    if (!composePreview.value?.questions?.length) {
+      ElMessage.warning('未抽到题目，请检查题库');
+      return;
+    }
+    currentExam.value = {
+      id: Date.now(),
+      courseId: examForm.courseId,
+      courseName: displayCourses.value.find((c) => c.id === examForm.courseId)?.title ?? '',
+      title: examForm.title || '智能组卷试卷',
+      semester: '',
+      totalScore: composePreview.value.questions.reduce((sum: number, q: any) => sum + (q.score ?? 5), 0),
+      durationMinutes: examForm.durationMinutes,
+      passScore: 60,
+      rules: [],
+      questions: composePreview.value.questions.map((q: any) =>
+        normalizeQuestion({
+          ...q,
+          courseId: examForm.courseId,
+          score: q.score ?? 5
+        })
+      ),
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+    ElMessage.success('快速组卷成功');
+    router.push('/ai/exam/preview');
+  } catch {
+    ElMessage.error('快速组卷失败');
+  } finally {
+    composing.value = false;
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -243,41 +336,69 @@ async function handleGenerateExam() {
   min-height: calc(100vh - 64px);
   box-sizing: border-box;
 
-  .generate-top-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 22px;
+  // 顶部专属 3D 视觉大 Banner (比例 2508×627)
+  .exam-banner-stage {
+    width: 100%;
+    margin-bottom: 20px;
 
-    .title-group {
-      .page-title {
-        margin: 0 0 6px 0;
-        font-size: 24px;
-        font-weight: 700;
-        color: #0F172A;
+    .banner-ratio-box {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 2508 / 627;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 6px 24px rgba(22, 119, 255, 0.08);
+      border: 1px solid #E2E8F0;
+
+      .banner-image {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        user-select: none;
       }
-      .page-subtitle {
-        margin: 0;
-        font-size: 13.5px;
-        color: #64748B;
+
+      .banner-float-actions {
+        position: absolute;
+        top: 16px;
+        right: 20px;
+        z-index: 2;
+
+        .capsule-back-btn {
+          height: 34px;
+          padding: 0 16px;
+          border-radius: 9999px;
+          background: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(8px);
+          border: 1px solid rgba(226, 232, 240, 0.85);
+          color: #334155;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+          &:hover {
+            color: #1677FF;
+            background: #FFFFFF;
+            border-color: #93C5FD;
+          }
+        }
       }
     }
+  }
 
-    .capsule-back-btn {
-      height: 36px;
-      padding: 0 16px;
-      border-radius: 9999px;
-      background: #FFFFFF;
-      border: 1px solid #E2E8F0;
-      color: #64748B;
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.2s;
+  .mode-switch-bar {
+    margin-bottom: 16px;
+  }
 
-      &:hover {
-        color: #1677FF;
-        border-color: #CBD5E1;
-      }
+  .quick-compose-card {
+    margin-bottom: 20px;
+
+    .compose-preview {
+      margin: 16px 0;
     }
   }
 

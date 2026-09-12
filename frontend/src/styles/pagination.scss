@@ -1,0 +1,80 @@
+@use './variables.scss' as *;
+
+.pagination-bar {
+  margin-top: 20px;
+  padding: 12px 4px 4px;
+  display: flex;
+  justify-content: flex-start !important;
+  align-items: center;
+  border-top: 1px solid #EBF1F7;
+}
+
+.pagination-bar .el-pagination {
+  --el-pagination-hover-color: #{$color-primary};
+  display: flex;
+  align-items: center;
+  justify-content: flex-start !important;
+}
+
+.pagination-bar .el-pagination .el-pagination__total {
+  font-size: 13px;
+  color: $text-secondary;
+  font-weight: 600;
+  margin-right: 16px;
+}
+
+.pagination-bar .el-pagination .el-pagination__sizes .el-select__wrapper {
+  border-radius: $border-radius-pill !important;
+  box-shadow: 0 0 0 1px #E2E8F0 inset !important;
+  background: #ffffff !important;
+  padding: 2px 10px !important;
+  height: 32px !important;
+}
+
+.pagination-bar .el-pagination .btn-prev,
+.pagination-bar .el-pagination .btn-next {
+  background-color: #ffffff !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 50% !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 4px !important;
+  color: $text-primary !important;
+}
+
+.pagination-bar .el-pagination .btn-prev:hover,
+.pagination-bar .el-pagination .btn-next:hover {
+  border-color: $color-primary !important;
+  color: $color-primary !important;
+  background-color: $color-primary-light !important;
+}
+
+.pagination-bar .el-pagination .el-pager li {
+  background-color: #ffffff !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 50% !important;
+  width: 32px !important;
+  height: 32px !important;
+  line-height: 30px !important;
+  min-width: 32px !important;
+  margin: 0 3px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  color: $text-primary !important;
+}
+
+.pagination-bar .el-pagination .el-pager li:hover {
+  border-color: $color-primary !important;
+  color: $color-primary !important;
+}
+
+.pagination-bar .el-pagination .el-pager li.is-active {
+  background: $color-primary !important;
+  border-color: $color-primary !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.28) !important;
+}

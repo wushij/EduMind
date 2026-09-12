@@ -8,11 +8,15 @@
 
 ```text
 sql/
-├── init.sql                                    # 全量单文件初始化（建库 + 33 张表 + 种子数据，含 V0.1~V0.5）
+├── init.sql                                    # 全量单文件初始化（建库 + 43 张表 + 种子数据，含 V0.1~V1.0）
 ├── migration/                                  # 增量版本脚本（每个大版本一个文件）
 │   ├── V0_1_0__mvp_core.sql                    # V0.1 MVP 核心（用户/课程/AI/题目/试卷/会话）
 │   ├── V0_2_0__mvp_expansion.sql               # V0.2 MVP 扩展（题库/作业/文档/RBAC/通知/工具广场）
 │   ├── V0_5_0__product_enhancement.sql         # V0.5 产品增强（Chunk/向量/RAG/Prompt/配额/权限）
+│   ├── V0_5_1__user_preferences.sql            # V0.5.1 用户偏好设置
+│   ├── V1_0_0__intelligent_hub.sql             # V1.0 智能教学中枢（学情/图谱/Gateway/Agent）
+│   ├── R__gate_f_e2e_seed.sql                  # Gate F 隔离测试种子（teacher2 + course104）
+│   ├── R__gate_g_e2e_seed.sql                  # Gate G E2E 种子（掌握度/图谱/错题，幂等）
 │   └── R__seed_data.sql                        # 种子数据（可重复执行，注意幂等）
 └── README.md
 ```
@@ -41,7 +45,9 @@ mysql -u root -p < sql/init.sql
 1. V0_1_0__mvp_core.sql
 2. V0_2_0__mvp_expansion.sql
 3. V0_5_0__product_enhancement.sql
-4. R__seed_data.sql          # 可选，补充演示种子数据
+4. V0_5_1__user_preferences.sql
+5. V1_0_0__intelligent_hub.sql
+6. R__seed_data.sql          # 可选，补充演示种子数据
 ```
 
 示例：
@@ -50,6 +56,8 @@ mysql -u root -p < sql/init.sql
 mysql -u root -p edumind < sql/migration/V0_1_0__mvp_core.sql
 mysql -u root -p edumind < sql/migration/V0_2_0__mvp_expansion.sql
 mysql -u root -p edumind < sql/migration/V0_5_0__product_enhancement.sql
+mysql -u root -p edumind < sql/migration/V0_5_1__user_preferences.sql
+mysql -u root -p edumind < sql/migration/V1_0_0__intelligent_hub.sql
 mysql -u root -p edumind < sql/migration/R__seed_data.sql
 ```
 
@@ -64,11 +72,21 @@ mysql -u root -p edumind < sql/migration/R__seed_data.sql
 | V0.1 MVP 核心 | `V0_1_0__mvp_core.sql` | 用户、课程、AI、题目、试卷、会话 |
 | V0.2 MVP 扩展 | `V0_2_0__mvp_expansion.sql` | 题库、作业批改、知识库文档、RBAC、通知、AI 工具广场 |
 | V0.5 产品增强 | `V0_5_0__product_enhancement.sql` | Chunk、向量索引、RAG、Prompt 治理、配额、权限 |
+| V0.5.1 用户偏好 | `V0_5_1__user_preferences.sql` | 用户偏好设置 `sys_user_preference` |
+| V1.0 智能教学中枢 | `V1_0_0__intelligent_hub.sql` | 学情/掌握度/图谱关系/AI Gateway/Agent |
 
 示例（从 V0.2 升级到 V0.5）：
 
 ```bash
 mysql -u root -p edumind < sql/migration/V0_5_0__product_enhancement.sql
+mysql -u root -p edumind < sql/migration/V0_5_1__user_preferences.sql
+```
+
+示例（从 V0.5 升级到 V1.0）：
+
+```bash
+mysql -u root -p edumind < sql/migration/V1_0_0__intelligent_hub.sql
+mysql -u root -p edumind < sql/migration/R__gate_g_e2e_seed.sql   # 可选，Gate G 联调种子
 ```
 
 > 全新建库请直接执行最新版 `sql/init.sql`（已含完整结构及种子），无需再跑 migration。
@@ -105,12 +123,13 @@ mysql -u root -proot < sql/init.sql
 |:---|:---|:---|:---|:---|
 | **admin** | `admin123` | 系统管理员 | 系统管理员 | 具备系统设置、用户与角色管理等全量权限 |
 | **teacher** | `admin123` | 教师 | 张老师 | 负责备课授课、出题组卷、发布作业与批改 |
+| **teacher2** | `admin123` | 教师 | 李老师 | Gate F 隔离测试专用（独占课程 104） |
 | **student** | `admin123` | 学生 | 李同学 | 选课学习、在线作业提交、查看 AI 批改诊断 |
 | **student2** | `admin123` | 学生 | 王同学 | 选课学生，具备选课与练习权限 |
 
 ---
 
-## 33 张核心业务表全景清单
+## 43 张核心业务表全景清单
 
 | 业务领域 | 数据表名 | Java Entity 实体映射 | 职责说明 |
 |:---|:---|:---|:---|
@@ -122,6 +141,7 @@ mysql -u root -proot < sql/init.sql
 | | `sys_notification` | `NotificationEntity` | 站内消息与作业通知 |
 | | `sys_config` | - | 系统全局参数（邮件 SMTP、平台信息等） |
 | | `sys_ai_quota` | - | AI Token / 调用配额 |
+| | `sys_user_preference` | - | 用户偏好（主题/默认模型/RAG 开关） |
 | **课程教学** | `course` | `CourseEntity` | 课程主信息 |
 | | `course_chapter` | `ChapterEntity` | 课程大纲层级章节树 |
 | | `course_knowledge_point` | `KnowledgePointEntity` | 知识图谱核心知识点 |
@@ -151,3 +171,13 @@ mysql -u root -proot < sql/init.sql
 | | `prompt_template` | - | Prompt 模板 |
 | | `prompt_template_version` | - | Prompt 模板版本历史 |
 | **统计分析** | `statistics_daily_snapshot` | `StatisticsEntity` | 每日学情与 AI 消耗快照（供 ECharts 大屏） |
+| | `learning_record` | - | 学习行为明细（V1.0） |
+| | `knowledge_mastery` | - | 知识点掌握度（V1.0） |
+| | `wrong_question_record` | - | 错题记录与归因（V1.0） |
+| | `course_statistics` | - | 课程日聚合统计（V1.0） |
+| **知识图谱** | `knowledge_point_relation` | - | 知识点关系边（V1.0） |
+| **AI Gateway** | `ai_model_config` | - | 模型配置与降级策略（V1.0） |
+| | `ai_gateway_route` | - | 场景路由（CHAT/RAG/AGENT/GRADING）（V1.0） |
+| **Agent** | `agent_run` | - | Agent 执行实例（V1.0） |
+| | `agent_step` | - | Agent 步骤时间线（V1.0） |
+| | `agent_tool_call` | - | Tool 调用日志（V1.0） |

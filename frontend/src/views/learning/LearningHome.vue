@@ -38,7 +38,7 @@
         <div class="section-card">
           <div class="section-card-header">
             <div class="header-left">
-              <span class="header-icon">⚠️</span>
+              <el-icon class="header-icon icon-warning"><WarningFilled /></el-icon>
               <h3 class="header-title">AI 考点诊断预警与薄弱项攻坚</h3>
               <span class="capsule-alert-pill">急需强化 3 项</span>
             </div>
@@ -47,7 +47,8 @@
               class="capsule-action-link"
               @click="handleGenerateWeakQuestions"
             >
-              <span>✨ 一键 AI 生成巩固练习</span>
+              <el-icon class="action-icon"><MagicStick /></el-icon>
+              <span>一键 AI 生成巩固练习</span>
             </button>
           </div>
 
@@ -92,7 +93,7 @@
         <div class="section-card">
           <div class="section-card-header">
             <div class="header-left">
-              <span class="header-icon">📋</span>
+              <el-icon class="header-icon icon-tasks"><DocumentChecked /></el-icon>
               <h3 class="header-title">今日自适应学习计划</h3>
               <span class="capsule-sub-badge">完成率 1/3</span>
             </div>
@@ -107,7 +108,7 @@
             >
               <div class="task-checkbox-col" @click="task.completed = !task.completed">
                 <span class="checkbox-circle" :class="{ checked: task.completed }">
-                  {{ task.completed ? '✓' : '' }}
+                  <el-icon v-if="task.completed" :size="12"><Check /></el-icon>
                 </span>
               </div>
 
@@ -116,7 +117,10 @@
                   <span class="task-title" :class="{ 'line-through': task.completed }">
                     {{ task.title }}
                   </span>
-                  <span class="task-time-pill">⏱️ {{ task.estimatedMinutes }} 分钟</span>
+                  <span class="task-time-pill">
+                    <el-icon class="time-icon"><Timer /></el-icon>
+                    <span>{{ task.estimatedMinutes }} 分钟</span>
+                  </span>
                 </div>
                 <div class="task-meta">
                   <span class="task-tag">{{ task.course }}</span>
@@ -131,7 +135,8 @@
                   :class="{ 'capsule-task-btn--done': task.completed }"
                   @click="handleExecuteTask(task)"
                 >
-                  <span>{{ task.completed ? '已完成' : '去完成 →' }}</span>
+                  <span>{{ task.completed ? '已完成' : '去完成' }}</span>
+                  <el-icon v-if="!task.completed" class="btn-arrow-icon"><Right /></el-icon>
                 </button>
               </div>
             </div>
@@ -144,7 +149,7 @@
         <div class="section-card">
           <div class="section-card-header">
             <div class="header-left">
-              <span class="header-icon">🎯</span>
+              <el-icon class="header-icon icon-target"><Aim /></el-icon>
               <h3 class="header-title">今日 AI 匹配度最高推荐</h3>
             </div>
             <button
@@ -152,7 +157,8 @@
               class="capsule-action-link"
               @click="router.push('/learning/recommendations')"
             >
-              更多推荐 →
+              <span>更多推荐</span>
+              <el-icon class="action-icon"><Right /></el-icon>
             </button>
           </div>
 
@@ -174,6 +180,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import {
+  WarningFilled,
+  MagicStick,
+  DocumentChecked,
+  Timer,
+  Aim,
+  Check,
+  Right
+} from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
 import RecommendationCard from '@/components/learning/RecommendationCard.vue';
 import { useRecommendations } from '@/composables/learning/useRecommendations';
@@ -409,7 +424,22 @@ function handleDiscussAI(item: RecommendationItem) {
           gap: 8px;
 
           .header-icon {
-            font-size: 18px;
+            font-size: 19px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+
+            &.icon-warning {
+              color: #EF4444;
+            }
+
+            &.icon-tasks {
+              color: #2563EB;
+            }
+
+            &.icon-target {
+              color: #EC4899;
+            }
           }
 
           .header-title {
@@ -440,6 +470,9 @@ function handleDiscussAI(item: RecommendationItem) {
         }
 
         .capsule-action-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
           background: transparent;
           border: none;
           color: #1677FF;
@@ -447,6 +480,10 @@ function handleDiscussAI(item: RecommendationItem) {
           font-weight: 600;
           cursor: pointer;
           transition: color 0.2s;
+
+          .action-icon {
+            font-size: 14px;
+          }
 
           &:hover {
             color: #0958D9;
@@ -640,8 +677,16 @@ function handleDiscussAI(item: RecommendationItem) {
               }
 
               .task-time-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
                 font-size: 11px;
                 color: #64748B;
+
+                .time-icon {
+                  font-size: 12px;
+                  color: #94A3B8;
+                }
               }
             }
 
@@ -664,6 +709,9 @@ function handleDiscussAI(item: RecommendationItem) {
             flex-shrink: 0;
 
             .capsule-task-btn {
+              display: inline-flex;
+              align-items: center;
+              gap: 4px;
               height: 30px;
               padding: 0 14px;
               border-radius: 9999px; // 长圆按钮
@@ -674,6 +722,10 @@ function handleDiscussAI(item: RecommendationItem) {
               color: #FFFFFF;
               border: none;
               transition: all 0.2s;
+
+              .btn-arrow-icon {
+                font-size: 12px;
+              }
 
               &:hover {
                 background: #4096FF;

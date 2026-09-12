@@ -3,7 +3,7 @@
     <!-- 头部新建按钮区 -->
     <div class="session-list-header">
       <button type="button" class="capsule-new-chat-btn" @click="$emit('create')">
-        <span class="btn-icon">＋</span>
+        <el-icon class="btn-icon"><Plus /></el-icon>
         <span>新建问答会话</span>
       </button>
     </div>
@@ -29,7 +29,7 @@
       >
         <div class="session-main">
           <div class="session-title-line">
-            <span class="session-icon">💬</span>
+            <el-icon class="session-icon"><ChatDotRound /></el-icon>
             <span class="session-title" :title="item.title">{{ item.title }}</span>
           </div>
           <div class="session-time">{{ item.updatedAt }}</div>
@@ -42,13 +42,13 @@
           title="删除会话"
           @click.stop="$emit('delete', item.id)"
         >
-          ✕
+          <el-icon><Close /></el-icon>
         </button>
       </div>
 
       <!-- 空状态 -->
       <div v-if="filteredSessions.length === 0" class="empty-sessions">
-        <span class="empty-emoji">🔍</span>
+        <el-icon class="empty-icon"><Search /></el-icon>
         <span class="empty-text">未找到匹配会话</span>
       </div>
     </div>
@@ -57,6 +57,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { Plus, ChatDotRound, Close, Search } from '@element-plus/icons-vue';
 import type { ChatSession } from '@/composables/ai/useAIStream';
 
 const props = defineProps<{
@@ -180,7 +181,10 @@ const filteredSessions = computed(() => {
           gap: 6px;
 
           .session-icon {
-            font-size: 13px;
+            font-size: 14px;
+            color: #64748B;
+            display: inline-flex;
+            align-items: center;
           }
 
           .session-title {
@@ -208,7 +212,7 @@ const filteredSessions = computed(() => {
         border: none;
         background: #F1F5F9;
         color: #94A3B8;
-        font-size: 10px;
+        font-size: 11px;
         align-items: center;
         justify-content: center;
         cursor: pointer;
@@ -232,9 +236,15 @@ const filteredSessions = computed(() => {
         background: #FFFFFF;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 
-        .session-main .session-title-line .session-title {
-          color: #1677FF;
-          font-weight: 600;
+        .session-main .session-title-line {
+          .session-icon {
+            color: #1677FF;
+          }
+
+          .session-title {
+            color: #1677FF;
+            font-weight: 600;
+          }
         }
 
         &::before {
@@ -257,8 +267,9 @@ const filteredSessions = computed(() => {
       align-items: center;
       gap: 6px;
 
-      .empty-emoji {
-        font-size: 24px;
+      .empty-icon {
+        font-size: 26px;
+        color: #94A3B8;
       }
 
       .empty-text {

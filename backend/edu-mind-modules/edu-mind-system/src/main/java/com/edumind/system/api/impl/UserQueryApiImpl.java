@@ -9,7 +9,6 @@ import com.edumind.system.dao.UserRoleDao;
 import com.edumind.system.entity.PermissionEntity;
 import com.edumind.system.entity.RoleEntity;
 import com.edumind.system.entity.UserEntity;
-import com.edumind.system.vo.user.UserVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

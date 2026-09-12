@@ -1,5 +1,8 @@
 package com.edumind.security.filter;
 
+import com.edumind.common.api.ApiResponseWriter;
+import com.edumind.common.api.ResultCode;
+import com.edumind.security.config.SecurityProperties;
 import com.edumind.security.crypto.SignatureService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -22,39 +25,56 @@ import java.io.IOException;
 public class SignatureFilter extends OncePerRequestFilter {
 
     private final SignatureService signatureService;
+    private final SecurityProperties securityProperties;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+        String uri = request.getRequestURI();
+        boolean smRequired = securityProperties.isSmEnabled() && isSensitivePath(uri);
         String signatureHeader = request.getHeader("X-Signature");
 
-        // 若携带签名头，执行 SM3-HMAC 防篡改签名校验
-        if (signatureHeader != null) {
-            String timestampHeader = request.getHeader("X-Timestamp");
-            String nonceHeader = request.getHeader("X-Nonce");
-
-            if (timestampHeader == null || nonceHeader == null) {
-                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                response.setContentType("application/json;charset=UTF-8");
-                response.getWriter().write("{\"code\":400,\"message\":\"签名校验失败：缺少 X-Timestamp 或 X-Nonce\"}");
-                return;
-            }
-
-            // 获取预共享密钥（开发环境或租户系统分配秘钥）
-            String secretKey = "EduMind_Platform_SecretKey_2026";
-            long timestamp = Long.parseLong(timestampHeader);
-            String path = request.getRequestURI();
-            String method = request.getMethod();
-
-            boolean isValid = signatureService.verifySignature(method, path, timestamp, nonceHeader, "", secretKey, signatureHeader);
-            if (!isValid) {
-                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                response.setContentType("application/json;charset=UTF-8");
-                response.getWriter().write("{\"code\":403,\"message\":\"请求签名验证未通过，内容可能已被篡改\"}");
-                return;
-            }
+        if (!smRequired && signatureHeader == null) {
+            filterChain.doFilter(request, response);
+            return;
         }
 
-        filterChain.doFilter(request, response);
+        HttpServletRequest wrapped = request;
+        String body = "";
+        if ("POST".equalsIgnoreCase(request.getMethod())
+                || "PUT".equalsIgnoreCase(request.getMethod())
+                || "PATCH".equalsIgnoreCase(request.getMethod())) {
+            wrapped = new CachedBodyHttpServletRequest(request);
+            body = ((CachedBodyHttpServletRequest) wrapped).getBodyString();
+        }
+
+        if (signatureHeader == null) {
+            ApiResponseWriter.write(response, ResultCode.FORBIDDEN, "国密模式已开启：缺少 X-Signature");
+            return;
+        }
+
+        String timestampHeader = request.getHeader("X-Timestamp");
+        String nonceHeader = request.getHeader("X-Nonce");
+        if (timestampHeader == null || nonceHeader == null) {
+            ApiResponseWriter.write(response, ResultCode.VALIDATE_FAILED, "签名校验失败：缺少 X-Timestamp 或 X-Nonce");
+            return;
+        }
+
+        long timestamp = Long.parseLong(timestampHeader);
+        String path = request.getRequestURI();
+        String method = request.getMethod();
+        String secretKey = securityProperties.getHmacSecret();
+
+        boolean isValid = signatureService.verifySignature(method, path, timestamp, nonceHeader, body, secretKey, signatureHeader);
+        if (!isValid) {
+            ApiResponseWriter.write(response, ResultCode.FORBIDDEN, "请求签名验证未通过，内容可能已被篡改");
+            return;
+        }
+
+        filterChain.doFilter(wrapped, response);
+    }
+
+    private boolean isSensitivePath(String uri) {
+        return securityProperties.getSensitivePaths().stream().anyMatch(uri::startsWith);
     }
 }

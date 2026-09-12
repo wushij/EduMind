@@ -9,7 +9,7 @@
           draggable="false"
         />
 
-        <!-- 按原图 2172×724 像素坐标精确对齐：胶囊外圈 x:149~1024 (6.860%~40.285%), y:383~472 (52.901%~12.293%) -->
+        <!-- 按新图 2508×627 像素坐标精确对齐：胶囊外圈 x:230~1179 (9.171%~37.839%), y:342~433 (54.545%~14.514%) -->
         <div
           class="banner-search-hitbox"
           :class="{ 'is-active': isFocused || !!inputValue }"
@@ -23,15 +23,14 @@
             placeholder="搜索AI工具、应用场景、教学资源..."
             @focus="isFocused = true"
             @blur="isFocused = false"
-            @input="handleInput"
-            @keyup.enter="emitSearch(true)"
+            @keyup.enter="emitSearch"
           />
           <!-- 右侧蓝色按钮点击热区：点击才开始搜索 -->
           <button
             type="button"
             class="banner-search-submit"
             aria-label="搜索"
-            @click="emitSearch(true)"
+            @click="emitSearch"
           />
         </div>
       </div>
@@ -62,7 +61,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { Grid, School, Reading, Star, StarFilled } from '@element-plus/icons-vue';
 import { useAuthStore } from '@/stores/auth/auth';
 import { canAccessMarketplaceCategory } from '@/utils/ai/tool-role-access';
-import marketplaceBannerImg from '@/assets/images/ai工具广场的banner1.png';
+import marketplaceBannerImg from '@/assets/images/ai广场.png';
 
 type CategoryItem = {
   label: string;
@@ -80,11 +79,8 @@ const emit = defineEmits<{
   (e: 'update:searchKeyword', val: string): void;
   (e: 'update:activeCategory', val: string): void;
   (e: 'search', val: string): void;
-  (e: 'instant-search', val: string): void;
   (e: 'category-change', val: string): void;
 }>();
-
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 const router = useRouter();
 const route = useRoute();
@@ -126,23 +122,11 @@ const currentCategory = computed(() => {
   return 'ALL';
 });
 
-function handleInput() {
-  const val = inputValue.value;
-  emit('update:searchKeyword', val);
-  emit('instant-search', val);
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    emit('search', val.trim());
-  }, 300);
-}
-
-function emitSearch(triggerBackend = true) {
+// 只有点击搜索按钮或回车才触发搜索
+function emitSearch() {
   const val = inputValue.value.trim();
   emit('update:searchKeyword', val);
-  emit('instant-search', val);
-  if (triggerBackend) {
-    emit('search', val);
-  }
+  emit('search', val);
 }
 
 function handleCategoryClick(cat: CategoryItem) {
@@ -169,7 +153,7 @@ function handleCategoryClick(cat: CategoryItem) {
 .banner-ratio-box {
   position: relative;
   width: 100%;
-  aspect-ratio: 2172 / 724;
+  aspect-ratio: 2508 / 627;
 
   .banner-image {
     position: absolute;
@@ -183,10 +167,10 @@ function handleCategoryClick(cat: CategoryItem) {
 
   .banner-search-hitbox {
     position: absolute;
-    left: 6.860%;
-    top: 52.901%;
-    width: 40.285%;
-    height: 12.293%;
+    left: 9.171%;
+    top: 54.545%;
+    width: 37.839%;
+    height: 14.514%;
     display: flex;
     align-items: center;
     border-radius: 999px;
@@ -202,8 +186,8 @@ function handleCategoryClick(cat: CategoryItem) {
   .banner-search-input {
     width: 100%;
     height: 100%;
-    padding-left: 10.5%;
-    padding-right: 24%;
+    padding-left: 10%;
+    padding-right: 25%;
     margin: 0;
     border: none;
     outline: none;
@@ -228,10 +212,10 @@ function handleCategoryClick(cat: CategoryItem) {
 
   .banner-search-submit {
     position: absolute;
-    right: 0;
-    top: 3.5%;
-    width: 23.9%;
-    height: 93%;
+    right: 0.6%;
+    top: 5.5%;
+    width: 24%;
+    height: 90.1%;
     border: none;
     outline: none;
     padding: 0;

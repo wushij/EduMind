@@ -1,0 +1,8 @@
+edumind:
+  security:
+    sm-enabled: true
+    hmac-secret: EduMind_Platform_SecretKey_2026
+    timestamp-skew-ms: 300000
+    sensitive-paths:
+      - /api/analytics
+      - /api/ai/agent

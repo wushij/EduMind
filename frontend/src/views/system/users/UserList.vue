@@ -21,14 +21,16 @@
           clearable
           class="search-input"
           :prefix-icon="Search"
+          @keyup.enter="handleSearch"
+          @clear="handleSearch"
         />
-        <el-select v-model="selectedRole" placeholder="系统角色" clearable class="filter-select">
+        <el-select v-model="selectedRole" placeholder="系统角色" clearable class="filter-select" @change="handleSearch">
           <el-option label="全部角色" value="" />
           <el-option label="系统管理员" value="ADMIN" />
           <el-option label="任课教师" value="TEACHER" />
           <el-option label="在读学生" value="STUDENT" />
         </el-select>
-        <el-select v-model="selectedStatus" placeholder="账号状态" clearable class="filter-select">
+        <el-select v-model="selectedStatus" placeholder="账号状态" clearable class="filter-select" @change="handleSearch">
           <el-option label="全部状态" :value="null" />
           <el-option label="正常活跃" value="ENABLE" />
           <el-option label="冻结停用" value="DISABLED" />
@@ -38,7 +40,7 @@
 
     <!-- 用户列表表格卡片 -->
     <div v-loading="loading" class="user-table-card">
-      <el-table :data="filteredUsers" stripe class="main-table">
+      <el-table :data="users" stripe class="main-table">
         <el-table-column label="用户名/账号" prop="username" width="160">
           <template #default="{ row }">
             <span class="font-mono font-semibold text-slate-800">{{ row.username }}</span>
@@ -104,6 +106,13 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <AppPagination
+        v-model:page-num="pageNum"
+        v-model:page-size="pageSize"
+        :total="total"
+        @change="loadUsers"
+      />
     </div>
 
     <!-- 新增用户对话框 -->
@@ -136,12 +145,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import { Plus, Search } from '@element-plus/icons-vue';
 import { getUsers, createUser, updateUserStatus } from '@/api/system/user';
 import { getRoles } from '@/api/system/role';
+import AppPagination from '@/components/common/AppPagination.vue';
 import { USE_MOCK } from '@/config/mock';
 
 const router = useRouter();
@@ -156,6 +166,9 @@ const selectedStatus = ref('');
 
 const users = ref<any[]>([]);
 const roles = ref<Array<{ id: number; roleCode: string }>>([]);
+const pageNum = ref(1);
+const pageSize = ref(10);
+const total = ref(0);
 
 const newUserForm = reactive({
   username: '',
@@ -192,13 +205,26 @@ async function loadRoles() {
 async function loadUsers() {
   loading.value = true;
   try {
-    const res = await getUsers({ page: 1, pageSize: 50 });
+    const res = await getUsers({
+      page: pageNum.value,
+      pageSize: pageSize.value,
+      keyword: searchKeyword.value.trim() || undefined,
+      role: selectedRole.value || undefined,
+      status: selectedStatus.value || undefined
+    });
     users.value = res.data?.list || [];
+    total.value = res.data?.total ?? users.value.length;
   } catch {
     users.value = USE_MOCK ? getDefaultUsers() : [];
+    total.value = users.value.length;
   } finally {
     loading.value = false;
   }
+}
+
+function handleSearch() {
+  pageNum.value = 1;
+  loadUsers();
 }
 
 // 严守默认用户名规范：admin, teacher, student, student2 (无 01 后缀)
@@ -238,20 +264,6 @@ function getDefaultUsers() {
     }
   ];
 }
-
-const filteredUsers = computed(() => {
-  return users.value.filter(u => {
-    if (selectedRole.value && !u.roles?.includes(selectedRole.value)) return false;
-    if (selectedStatus.value && u.status !== selectedStatus.value) return false;
-    if (searchKeyword.value.trim()) {
-      const kw = searchKeyword.value.trim().toLowerCase();
-      const inUsername = u.username?.toLowerCase().includes(kw);
-      const inRealName = u.realName?.toLowerCase().includes(kw);
-      if (!inUsername && !inRealName) return false;
-    }
-    return true;
-  });
-});
 
 function getRoleLabel(role: string) {
   const map: Record<string, string> = {

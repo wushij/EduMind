@@ -146,16 +146,13 @@
       </div>
 
       <!-- 分页栏 -->
-      <div v-if="totalCount > pageSize" class="pagination-footer">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :total="totalCount"
-          :page-sizes="[8, 16, 24]"
-          layout="total, prev, pager, next, sizes"
-          background
-        />
-      </div>
+      <AppPagination
+        v-model:page-num="currentPage"
+        v-model:page-size="pageSize"
+        :total="totalCount"
+        :page-sizes="[8, 16, 24]"
+        @change="() => {}"
+      />
     </div>
 
     <!-- 4. 切片详情抽屉 -->
@@ -174,6 +171,7 @@ import { useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
 import { getDocuments } from '@/api/knowledge/document';
 import type { KBDocument } from '@/types/knowledge/document';
 import ChunkViewer from '@/components/knowledge/ChunkViewer.vue';
+import AppPagination from '@/components/common/AppPagination.vue';
 import {
   Grid,
   Check,
@@ -242,18 +240,27 @@ onMounted(async () => {
   .stats-overview-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
+    gap: 16px;
+
+    @media (max-width: 1300px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    @media (max-width: 640px) {
+      grid-template-columns: 1fr;
+    }
 
     .stat-card {
       background: #FFFFFF;
       border: 1px solid #E2E8F0;
-      border-radius: 12px;
+      border-radius: 18px; // 保持优雅圆角卡片，绝不会在屏幕狭窄时被挤压成竖向椭圆
       padding: 16px 20px;
       display: flex;
       align-items: center;
       gap: 14px;
       box-shadow: 0 2px 8px rgba(30, 80, 150, 0.04);
       transition: all 0.2s ease;
+      min-width: 0;
 
       &:hover {
         transform: translateY(-2px);
@@ -263,11 +270,12 @@ onMounted(async () => {
       .stat-icon-wrapper {
         width: 44px;
         height: 44px;
-        border-radius: 10px;
+        border-radius: 12px;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 20px;
+        flex-shrink: 0;
 
         &.icon-blue {
           background: #EFF6FF;
@@ -290,18 +298,23 @@ onMounted(async () => {
       .stat-details {
         display: flex;
         flex-direction: column;
-        gap: 3px;
+        gap: 4px;
+        min-width: 0;
 
         .stat-label {
-          font-size: 12px;
+          font-size: 13px;
           color: #64748B;
           font-weight: 500;
+          white-space: nowrap; // 严禁单个字换行
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .stat-number {
           font-size: 22px;
           font-weight: 700;
           color: #1E293B;
+          white-space: nowrap;
 
           &.text-green { color: #16A34A; }
           &.text-amber { color: #D97706; }
@@ -320,18 +333,50 @@ onMounted(async () => {
   .filter-panel-card {
     background: #FFFFFF;
     border: 1px solid #E2E8F0;
-    border-radius: 12px;
-    padding: 14px 20px;
+    border-radius: 16px; // 保持卡片轮廓规整
+    padding: 12px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 16px;
+    box-shadow: 0 2px 8px rgba(30, 80, 150, 0.03);
 
     .filter-left {
       display: flex;
       align-items: center;
       gap: 12px;
       flex-wrap: wrap;
+
+      :deep(.el-radio-group) {
+        background: #F1F5F9;
+        padding: 3px;
+        border-radius: 9999px; // 内部操作项使用长圆胶囊
+        border: 1px solid #E2E8F0;
+
+        .el-radio-button {
+          .el-radio-button__inner {
+            border-radius: 9999px !important; // 长圆单选选项
+            border: none !important;
+            background: transparent;
+            color: #64748B;
+            font-size: 13px;
+            padding: 6px 16px;
+            box-shadow: none !important;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+            &:hover {
+              color: #1677FF;
+            }
+          }
+
+          &.is-active .el-radio-button__inner {
+            background: #1677FF !important;
+            color: #FFFFFF !important;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(22, 119, 255, 0.28) !important;
+          }
+        }
+      }
     }
   }
 
@@ -351,7 +396,7 @@ onMounted(async () => {
       .chunk-card {
         background: #FFFFFF;
         border: 1px solid #E2E8F0;
-        border-radius: 12px;
+        border-radius: 18px;
         padding: 16px 18px;
         cursor: pointer;
         display: flex;
@@ -473,7 +518,7 @@ onMounted(async () => {
 
     .empty-chunks-wrapper {
       background: #FFFFFF;
-      border-radius: 12px;
+      border-radius: 20px;
       padding: 60px 20px;
       border: 1px dashed #CBD5E1;
     }
@@ -483,8 +528,8 @@ onMounted(async () => {
       justify-content: flex-end;
       margin-top: 20px;
       background: #FFFFFF;
-      padding: 12px 16px;
-      border-radius: 8px;
+      padding: 10px 20px;
+      border-radius: 9999px;
       border: 1px solid #E2E8F0;
     }
   }

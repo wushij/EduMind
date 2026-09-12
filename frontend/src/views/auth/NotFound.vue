@@ -68,7 +68,8 @@
           class="capsule-btn capsule-btn--primary"
           @click="router.push('/dashboard')"
         >
-          <span>🏠 返回工作台首页</span>
+          <el-icon class="btn-icon"><HomeFilled /></el-icon>
+          <span>返回工作台首页</span>
         </button>
 
         <button
@@ -76,7 +77,8 @@
           class="capsule-btn capsule-btn--secondary"
           @click="router.back()"
         >
-          <span>⬅️ 返回上一页</span>
+          <el-icon class="btn-icon"><Back /></el-icon>
+          <span>返回上一页</span>
         </button>
 
         <button
@@ -84,7 +86,8 @@
           class="capsule-btn capsule-btn--ai"
           @click="router.push('/ai/marketplace/all')"
         >
-          <span>🤖 探索 AI 工具广场</span>
+          <el-icon class="btn-icon"><Shop /></el-icon>
+          <span>探索 AI 工具广场</span>
         </button>
       </div>
 
@@ -92,10 +95,22 @@
       <div class="quick-nav-section">
         <span class="quick-nav-label">快捷直达推荐：</span>
         <div class="pills-list">
-          <span class="nav-pill" @click="router.push('/course')">📚 课程中心</span>
-          <span class="nav-pill" @click="router.push('/ai/question/generate')">✍️ AI 智能出题</span>
-          <span class="nav-pill" @click="router.push('/ai/exam/generate')">📑 AI 智能组卷</span>
-          <span class="nav-pill" @click="router.push('/learning/home')">🎯 自适应学习</span>
+          <span class="nav-pill" @click="router.push('/course')">
+            <el-icon class="pill-icon"><FolderOpened /></el-icon>
+            <span>课程中心</span>
+          </span>
+          <span class="nav-pill" @click="router.push('/ai/question/generate')">
+            <el-icon class="pill-icon"><EditPen /></el-icon>
+            <span>AI 智能出题</span>
+          </span>
+          <span class="nav-pill" @click="router.push('/ai/exam/generate')">
+            <el-icon class="pill-icon"><Document /></el-icon>
+            <span>AI 智能组卷</span>
+          </span>
+          <span class="nav-pill" @click="router.push('/learning/home')">
+            <el-icon class="pill-icon"><Aim /></el-icon>
+            <span>自适应学习</span>
+          </span>
         </div>
       </div>
     </div>
@@ -104,6 +119,15 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
+import {
+  HomeFilled,
+  Back,
+  Shop,
+  FolderOpened,
+  EditPen,
+  Document,
+  Aim
+} from '@element-plus/icons-vue';
 
 const router = useRouter();
 </script>
@@ -275,6 +299,9 @@ const router = useRouter();
         flex-wrap: wrap;
 
         .nav-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
           padding: 3px 12px;
           border-radius: 9999px; // 长圆药丸
           background: #F1F5F9;
@@ -282,6 +309,10 @@ const router = useRouter();
           font-weight: 500;
           cursor: pointer;
           transition: all 0.2s;
+
+          .pill-icon {
+            font-size: 13px;
+          }
 
           &:hover {
             background: #EFF6FF;

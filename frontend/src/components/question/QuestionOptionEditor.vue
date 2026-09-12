@@ -74,12 +74,12 @@
       <el-radio-group :model-value="singleAnswer" class="judgment-group" @change="handleSingleSelect">
         <el-radio-button label="T">
           <span class="judgment-opt">
-            <span class="symbol">✓</span> 正确 (True)
+            <el-icon class="mr-1 text-success"><Check /></el-icon> 正确 (True)
           </span>
         </el-radio-button>
         <el-radio-button label="F">
           <span class="judgment-opt">
-            <span class="symbol">✗</span> 错误 (False)
+            <el-icon class="mr-1 text-danger"><Close /></el-icon> 错误 (False)
           </span>
         </el-radio-button>
       </el-radio-group>
@@ -110,7 +110,7 @@
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
-import { Plus, Delete } from '@element-plus/icons-vue';
+import { Plus, Delete, Check, Close } from '@element-plus/icons-vue';
 import type { QuestionType, QuestionOption } from '@/types/question/question';
 
 const props = defineProps<{

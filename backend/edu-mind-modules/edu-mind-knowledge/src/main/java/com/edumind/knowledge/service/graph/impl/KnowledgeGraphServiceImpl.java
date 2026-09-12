@@ -1,23 +1,32 @@
 package com.edumind.knowledge.service.graph.impl;
 
+import com.edumind.common.api.analytics.KnowledgeMasteryQueryApi;
 import com.edumind.course.vo.knowledge.KnowledgePointVO;
 import com.edumind.knowledge.api.KnowledgePointQueryApi;
 import com.edumind.knowledge.dao.KnowledgeBaseDao;
 import com.edumind.knowledge.dao.KnowledgeDocumentChunkDao;
+import com.edumind.knowledge.dao.KnowledgePointRelationDao;
+import com.edumind.knowledge.dto.graph.KnowledgePointRelationCreateDTO;
 import com.edumind.knowledge.entity.KnowledgeBaseEntity;
 import com.edumind.knowledge.entity.KnowledgeDocumentChunkEntity;
+import com.edumind.knowledge.entity.KnowledgePointRelationEntity;
 import com.edumind.knowledge.service.graph.KnowledgeGraphService;
 import com.edumind.knowledge.service.knowledge.KnowledgeAccessService;
+import com.edumind.common.exception.BusinessException;
+import com.edumind.knowledge.vo.graph.GraphGapVO;
 import com.edumind.knowledge.vo.graph.KnowledgeGraphVO;
+import com.edumind.knowledge.vo.graph.KnowledgePointRelationVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,10 +36,13 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
     private final KnowledgeBaseDao knowledgeBaseDao;
     private final KnowledgeDocumentChunkDao knowledgeDocumentChunkDao;
     private final KnowledgePointQueryApi knowledgePointQueryApi;
+    private final KnowledgePointRelationDao knowledgePointRelationDao;
+    private final KnowledgeMasteryQueryApi knowledgeMasteryQueryApi;
 
     @Override
-    public KnowledgeGraphVO buildGraph(Long knowledgeBaseId) {
+    public KnowledgeGraphVO buildGraph(Long knowledgeBaseId, Integer depth, List<String> types) {
         knowledgeAccessService.assertAccessible(knowledgeBaseId);
+        int maxDepth = depth != null && depth > 0 ? Math.min(depth, 3) : 2;
         KnowledgeGraphVO graph = new KnowledgeGraphVO();
         KnowledgeBaseEntity kb = knowledgeBaseDao.findById(knowledgeBaseId);
         if (kb == null) {
@@ -38,10 +50,12 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
         }
 
         Set<String> nodeIds = new HashSet<>();
+        List<Long> kpIds = new ArrayList<>();
         if (kb.getCourseId() != null) {
             List<KnowledgePointVO> points = knowledgePointQueryApi.listByCourseId(kb.getCourseId());
             Map<Long, String> chapterNodeMap = new HashMap<>();
             for (KnowledgePointVO point : points) {
+                kpIds.add(point.getId());
                 String nodeId = "kp_" + point.getId();
                 addNode(graph, nodeIds, nodeId, point.getTitle(), "KNOWLEDGE_POINT", point.getId());
                 if (point.getChapterId() != null) {
@@ -53,6 +67,7 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
                     addEdge(graph, chapterNodeId, nodeId, "contains");
                 }
             }
+            addRelationEdges(graph, nodeIds, kpIds, types, maxDepth);
         }
 
         List<KnowledgeDocumentChunkEntity> chunks = knowledgeDocumentChunkDao.findByKnowledgeBaseId(knowledgeBaseId);
@@ -71,6 +86,103 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
             prevDocumentId = chunk.getDocumentId();
         }
         return graph;
+    }
+
+    private void addRelationEdges(KnowledgeGraphVO graph, Set<String> nodeIds, List<Long> kpIds,
+                                    List<String> types, int maxDepth) {
+        Set<Long> visited = new HashSet<>(kpIds);
+        Set<Long> frontier = new HashSet<>(kpIds);
+        for (int d = 0; d < maxDepth && !frontier.isEmpty(); d++) {
+            List<KnowledgePointRelationEntity> relations = knowledgePointRelationDao.listBySourceIds(
+                    new ArrayList<>(frontier), types);
+            Set<Long> next = new HashSet<>();
+            for (KnowledgePointRelationEntity rel : relations) {
+                String source = "kp_" + rel.getSourceKnowledgePointId();
+                String target = "kp_" + rel.getTargetKnowledgePointId();
+                if (!nodeIds.contains(target)) {
+                    addNode(graph, nodeIds, target, "知识点 " + rel.getTargetKnowledgePointId(), "KNOWLEDGE_POINT",
+                            rel.getTargetKnowledgePointId());
+                }
+                addEdge(graph, source, target, rel.getRelationType());
+                if (visited.add(rel.getTargetKnowledgePointId())) {
+                    next.add(rel.getTargetKnowledgePointId());
+                }
+            }
+            frontier = next;
+        }
+    }
+
+    @Override
+    public List<GraphGapVO> findGaps(Long knowledgeBaseId, Long studentId, Double masteryThreshold) {
+        knowledgeAccessService.assertAccessible(knowledgeBaseId);
+        KnowledgeBaseEntity kb = knowledgeBaseDao.findById(knowledgeBaseId);
+        if (kb == null || kb.getCourseId() == null || studentId == null) {
+            return List.of();
+        }
+        double threshold = masteryThreshold != null ? masteryThreshold : 0.6;
+        Map<Long, Double> mastery = knowledgeMasteryQueryApi.getMasteryByStudentAndCourse(studentId, kb.getCourseId());
+        List<KnowledgePointVO> points = knowledgePointQueryApi.listByCourseId(kb.getCourseId());
+        Map<Long, String> titles = points.stream()
+                .collect(Collectors.toMap(KnowledgePointVO::getId, KnowledgePointVO::getTitle, (a, b) -> a));
+        List<GraphGapVO> gaps = new ArrayList<>();
+        for (KnowledgePointVO point : points) {
+            double score = mastery.getOrDefault(point.getId(), 0.0);
+            if (score >= threshold) {
+                continue;
+            }
+            List<KnowledgePointRelationEntity> prerequisites = knowledgePointRelationDao.listPrerequisites(point.getId());
+            List<GraphGapVO.PrerequisiteVO> missing = new ArrayList<>();
+            for (KnowledgePointRelationEntity pre : prerequisites) {
+                double preScore = mastery.getOrDefault(pre.getTargetKnowledgePointId(), 0.0);
+                if (preScore < threshold) {
+                    GraphGapVO.PrerequisiteVO p = new GraphGapVO.PrerequisiteVO();
+                    p.setId(pre.getTargetKnowledgePointId());
+                    p.setTitle(titles.getOrDefault(pre.getTargetKnowledgePointId(), "前置知识点"));
+                    missing.add(p);
+                }
+            }
+            if (!missing.isEmpty()) {
+                GraphGapVO gap = new GraphGapVO();
+                gap.setKnowledgePointId(point.getId());
+                gap.setTitle(point.getTitle());
+                gap.setMissingPrerequisites(missing);
+                gaps.add(gap);
+            }
+        }
+        return gaps;
+    }
+
+    @Override
+    public void createRelation(Long sourceKnowledgePointId, KnowledgePointRelationCreateDTO dto) {
+        KnowledgePointRelationEntity entity = new KnowledgePointRelationEntity();
+        entity.setSourceKnowledgePointId(sourceKnowledgePointId);
+        entity.setTargetKnowledgePointId(dto.getTargetKnowledgePointId());
+        entity.setRelationType(dto.getRelationType());
+        knowledgePointRelationDao.insert(entity);
+    }
+
+    @Override
+    public List<KnowledgePointRelationVO> listRelations(Long knowledgePointId) {
+        return knowledgePointRelationDao.listByKnowledgePointId(knowledgePointId).stream()
+                .map(this::toRelationVO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void deleteRelation(Long relationId) {
+        if (knowledgePointRelationDao.findById(relationId) == null) {
+            throw new BusinessException("关系不存在");
+        }
+        knowledgePointRelationDao.deleteById(relationId);
+    }
+
+    private KnowledgePointRelationVO toRelationVO(KnowledgePointRelationEntity entity) {
+        KnowledgePointRelationVO vo = new KnowledgePointRelationVO();
+        vo.setId(entity.getId());
+        vo.setSourceKnowledgePointId(entity.getSourceKnowledgePointId());
+        vo.setTargetKnowledgePointId(entity.getTargetKnowledgePointId());
+        vo.setRelationType(entity.getRelationType());
+        return vo;
     }
 
     private void addNode(KnowledgeGraphVO graph, Set<String> nodeIds, String id, String label, String type, Long refId) {

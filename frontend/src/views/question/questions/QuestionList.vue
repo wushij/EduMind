@@ -6,7 +6,7 @@
         <div class="title-with-icon">
           <el-icon class="header-icon text-blue-600"><Reading /></el-icon>
           <h1 class="main-title">智能题库管理中心</h1>
-          <span class="capsule-count-tag">已收录 {{ questions.length }} 道精选试题</span>
+          <span class="capsule-count-tag">已收录 {{ total }} 道精选试题</span>
         </div>
         <p class="sub-desc">
           覆盖单选、多选、判断与主观推导大题，支持基于课程知识大纲的试题检索、原位精修与 AI 智能批量入库。
@@ -52,12 +52,12 @@
         <div class="pill-tags-track">
           <span
             v-for="c in courseOptions"
-            :key="c"
+            :key="String(c.value)"
             class="filter-pill-tag"
-            :class="{ active: selectedCourse === c }"
-            @click="selectedCourse = c"
+            :class="{ active: selectedCourseId === c.value }"
+            @click="handleCourseFilter(c.value)"
           >
-            {{ c }}
+            {{ c.label }}
           </span>
         </div>
       </div>
@@ -71,7 +71,7 @@
             :key="t.value"
             class="filter-pill-tag"
             :class="{ active: selectedType === t.value }"
-            @click="selectedType = t.value"
+            @click="handleTypeFilter(t.value)"
           >
             {{ t.label }}
           </span>
@@ -88,7 +88,7 @@
               :key="d.value"
               class="filter-pill-tag"
               :class="{ active: selectedDifficulty === d.value }"
-              @click="selectedDifficulty = d.value"
+              @click="handleDifficultyFilter(d.value)"
             >
               {{ d.label }}
             </span>
@@ -103,12 +103,13 @@
               type="text"
               class="capsule-search-input"
               placeholder="搜索题干内容、考查知识点或解析..."
+              @keyup.enter="handleSearch"
             />
             <button
               v-if="keyword"
               type="button"
               class="clear-btn"
-              @click="keyword = ''"
+              @click="clearKeyword"
             >
               <el-icon><Close /></el-icon>
             </button>
@@ -118,14 +119,15 @@
     </div>
 
     <!-- 3. 试题卡片流列表 -->
-    <div v-if="filteredQuestions.length > 0" class="questions-stream-list">
+    <div v-loading="loading">
+    <div v-if="questions.length > 0" class="questions-stream-list">
       <div
-        v-for="(q, index) in filteredQuestions"
+        v-for="(q, index) in questions"
         :key="q.id"
         class="question-wrapper-item"
       >
         <div class="question-index-marker">
-          <span>第 {{ index + 1 }} 题</span>
+          <span>第 {{ (pageNum - 1) * pageSize + index + 1 }} 题</span>
           <span v-if="q.courseName" class="marker-course-tag">{{ q.courseName }}</span>
         </div>
 
@@ -155,11 +157,19 @@
         </button>
       </div>
     </div>
+
+    <AppPagination
+      v-model:page-num="pageNum"
+      v-model:page-size="pageSize"
+      :total="total"
+      @change="loadQuestions"
+    />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import {
@@ -171,19 +181,25 @@ import {
   Close
 } from '@element-plus/icons-vue';
 import QuestionCard from '@/components/question/QuestionCard.vue';
+import AppPagination from '@/components/common/AppPagination.vue';
 import { useQuestion } from '@/composables/question/useQuestion';
+import { getCourseList } from '@/api/course/course';
+import { difficultyToLevel } from '@/utils/question/difficulty-level';
 import type { Question } from '@/types/question/question';
 
 const router = useRouter();
-const { questions, fetchQuestions, removeQuestion, saveQuestion } = useQuestion();
+const { questions, loading, total, fetchQuestions, removeQuestion, saveQuestion } = useQuestion();
 
-onMounted(() => fetchQuestions());
-const selectedCourse = ref<string>('全部课程');
+const pageNum = ref(1);
+const pageSize = ref(10);
+const selectedCourseId = ref<number | null>(null);
 const selectedType = ref<string>('ALL');
 const selectedDifficulty = ref<string>('ALL');
 const keyword = ref<string>('');
 
-const courseOptions = ['全部课程', '大学数学：高等数学（上）', '计算机核心：数据结构与算法'];
+const courseOptions = ref<Array<{ label: string; value: number | null }>>([
+  { label: '全部课程', value: null }
+]);
 
 const typeOptions = [
   { label: '全部题型', value: 'ALL' },
@@ -199,38 +215,72 @@ const difficultyOptions = [
   { label: '困难', value: 'HARD' }
 ];
 
-const filteredQuestions = computed(() => {
-  let list = [...questions.value];
-
-  if (selectedCourse.value !== '全部课程') {
-    list = list.filter((q) => q.courseName === selectedCourse.value);
-  }
-
-  if (selectedType.value !== 'ALL') {
-    list = list.filter((q) => q.type === selectedType.value);
-  }
-
-  if (selectedDifficulty.value !== 'ALL') {
-    list = list.filter((q) => q.difficulty === selectedDifficulty.value);
-  }
-
-  if (keyword.value.trim()) {
-    const kw = keyword.value.trim().toLowerCase();
-    list = list.filter(
-      (q) =>
-        q.stem.toLowerCase().includes(kw) ||
-        q.analysis.toLowerCase().includes(kw) ||
-        q.knowledgePointNames.some((kp) => kp.toLowerCase().includes(kw))
-    );
-  }
-
-  return list;
+onMounted(async () => {
+  await loadCourseOptions();
+  await loadQuestions();
 });
+
+async function loadCourseOptions() {
+  try {
+    const res = await getCourseList({ page: 1, pageSize: 100 });
+    const list = res.data?.list || [];
+    courseOptions.value = [
+      { label: '全部课程', value: null },
+      ...list.map((item: any) => ({
+        label: item.title || item.name,
+        value: item.id
+      }))
+    ];
+  } catch {
+    courseOptions.value = [{ label: '全部课程', value: null }];
+  }
+}
+
+async function loadQuestions() {
+  await fetchQuestions({
+    page: pageNum.value,
+    pageSize: pageSize.value,
+    courseId: selectedCourseId.value || undefined,
+    type: selectedType.value !== 'ALL' ? selectedType.value : undefined,
+    difficulty: difficultyToLevel(selectedDifficulty.value),
+    keyword: keyword.value.trim() || undefined
+  });
+}
+
+function resetPageAndLoad() {
+  pageNum.value = 1;
+  loadQuestions();
+}
+
+function handleCourseFilter(value: number | null) {
+  selectedCourseId.value = value;
+  resetPageAndLoad();
+}
+
+function handleTypeFilter(value: string) {
+  selectedType.value = value;
+  resetPageAndLoad();
+}
+
+function handleDifficultyFilter(value: string) {
+  selectedDifficulty.value = value;
+  resetPageAndLoad();
+}
+
+function handleSearch() {
+  resetPageAndLoad();
+}
+
+function clearKeyword() {
+  keyword.value = '';
+  resetPageAndLoad();
+}
 
 async function handleDeleteQuestion(id: number) {
   try {
     await removeQuestion(id);
     ElMessage.success('试题已从题库中移除');
+    await loadQuestions();
   } catch {
     ElMessage.error('删除试题失败，请稍后重试');
   }

@@ -2,11 +2,11 @@ package com.edumind.security.crypto;
 
 import org.bouncycastle.crypto.engines.SM4Engine;
 import org.bouncycastle.crypto.modes.GCMBlockCipher;
+import org.bouncycastle.crypto.modes.GCMModeCipher;
 import org.bouncycastle.crypto.params.AEADParameters;
 import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Base64;
-import org.bouncycastle.util.encoders.Hex;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -49,7 +49,7 @@ public class Sm4GcmService {
      * @return 包含认证 Tag 的密文字节
      */
     public byte[] encrypt(byte[] key, byte[] iv, byte[] plainBytes, byte[] aad) throws Exception {
-        GCMBlockCipher cipher = new GCMBlockCipher(new SM4Engine());
+        GCMModeCipher cipher = GCMBlockCipher.newInstance(new SM4Engine());
         AEADParameters parameters = new AEADParameters(new KeyParameter(key), TAG_BIT_LENGTH, iv, aad);
         cipher.init(true, parameters);
 
@@ -69,7 +69,7 @@ public class Sm4GcmService {
      * @return 解密后的明文字节
      */
     public byte[] decrypt(byte[] key, byte[] iv, byte[] cipherBytes, byte[] aad) throws Exception {
-        GCMBlockCipher cipher = new GCMBlockCipher(new SM4Engine());
+        GCMModeCipher cipher = GCMBlockCipher.newInstance(new SM4Engine());
         AEADParameters parameters = new AEADParameters(new KeyParameter(key), TAG_BIT_LENGTH, iv, aad);
         cipher.init(false, parameters);
 

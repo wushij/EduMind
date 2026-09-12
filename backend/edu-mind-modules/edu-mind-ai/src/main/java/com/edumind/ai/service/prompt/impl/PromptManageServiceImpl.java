@@ -111,6 +111,29 @@ public class PromptManageServiceImpl implements PromptManageService {
         versionEntity.setVariables(entity.getVariables());
         versionEntity.setPublishedBy(UserContext.getUserId());
         promptTemplateVersionDao.insert(versionEntity);
+        promptService.evictTemplate(entity.getCode());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void rollback(Long id, Integer targetVersion) {
+        PromptTemplateEntity entity = promptTemplateDao.findById(id);
+        if (entity == null) {
+            throw new BusinessException("模板不存在");
+        }
+        if (targetVersion == null || targetVersion <= 0) {
+            throw new BusinessException("目标版本号无效");
+        }
+        PromptTemplateVersionEntity versionEntity = promptTemplateVersionDao.findByTemplateIdAndVersion(id, targetVersion);
+        if (versionEntity == null) {
+            throw new BusinessException("目标版本不存在");
+        }
+        entity.setContent(versionEntity.getContent());
+        entity.setVariables(versionEntity.getVariables());
+        entity.setStatus("PUBLISHED");
+        entity.setVersion(targetVersion);
+        promptTemplateDao.updateById(entity);
+        promptService.evictTemplate(entity.getCode());
     }
 
     @Override

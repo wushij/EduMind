@@ -1,5 +1,8 @@
 package com.edumind.security.filter;
 
+import com.edumind.common.api.ApiResponseWriter;
+import com.edumind.common.api.ResultCode;
+import com.edumind.security.config.SecurityProperties;
 import com.edumind.infrastructure.redis.RedisKeyBuilder;
 import com.edumind.infrastructure.redis.RedisService;
 import com.edumind.infrastructure.redis.RedisSupport;
@@ -24,6 +27,7 @@ public class ReplayAttackFilter extends OncePerRequestFilter {
 
     private final RedisService redisService;
     private final RedisSupport redisSupport;
+    private final SecurityProperties securityProperties;
     private final ConcurrentHashMap<String, Long> localNonceCache = new ConcurrentHashMap<>();
 
     @Override
@@ -31,23 +35,33 @@ public class ReplayAttackFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String timestampHeader = request.getHeader("X-Timestamp");
         String nonceHeader = request.getHeader("X-Nonce");
+        boolean smRequired = securityProperties.isSmEnabled()
+                && securityProperties.getSensitivePaths().stream()
+                .anyMatch(request.getRequestURI()::startsWith);
+
+        if (smRequired && (timestampHeader == null || nonceHeader == null)) {
+            ApiResponseWriter.write(response, ResultCode.FORBIDDEN, "国密模式已开启：缺少 X-Timestamp 或 X-Nonce");
+            return;
+        }
 
         if (timestampHeader != null && nonceHeader != null) {
             try {
                 long clientTimestamp = Long.parseLong(timestampHeader);
                 long currentTimestamp = System.currentTimeMillis();
-                if (Math.abs(currentTimestamp - clientTimestamp) > TIME_WINDOW_MILLIS) {
-                    writeError(response, HttpServletResponse.SC_FORBIDDEN, 403, "请求已失效：时间戳超出允许范围");
+                long skew = securityProperties.getTimestampSkewMs() > 0
+                        ? securityProperties.getTimestampSkewMs() : TIME_WINDOW_MILLIS;
+                if (Math.abs(currentTimestamp - clientTimestamp) > skew) {
+                    ApiResponseWriter.write(response, ResultCode.FORBIDDEN, "请求已失效：时间戳超出允许范围");
                     return;
                 }
 
                 boolean isNonceValid = validateNonce(nonceHeader, currentTimestamp);
                 if (!isNonceValid) {
-                    writeError(response, HttpServletResponse.SC_FORBIDDEN, 403, "检测到重放攻击：Nonce 已被使用");
+                    ApiResponseWriter.write(response, ResultCode.FORBIDDEN, "检测到重放攻击：Nonce 已被使用");
                     return;
                 }
             } catch (NumberFormatException e) {
-                writeError(response, HttpServletResponse.SC_BAD_REQUEST, 400, "非法的 X-Timestamp 格式");
+                ApiResponseWriter.write(response, ResultCode.VALIDATE_FAILED, "非法的 X-Timestamp 格式");
                 return;
             }
         }
@@ -72,11 +86,5 @@ public class ReplayAttackFilter extends OncePerRequestFilter {
         long expireAt = currentTimestamp + TIME_WINDOW_MILLIS;
         Long existing = localNonceCache.putIfAbsent(nonceHeader, expireAt);
         return existing == null || existing <= currentTimestamp;
-    }
-
-    private void writeError(HttpServletResponse response, int status, int code, String message) throws IOException {
-        response.setStatus(status);
-        response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write("{\"code\":" + code + ",\"message\":\"" + message + "\"}");
     }
 }

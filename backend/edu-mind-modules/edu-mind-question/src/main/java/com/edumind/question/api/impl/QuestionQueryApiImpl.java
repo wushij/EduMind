@@ -5,7 +5,6 @@ import com.edumind.question.api.QuestionQueryApi;
 import com.edumind.question.converter.QuestionConverter;
 import com.edumind.question.dao.QuestionDao;
 import com.edumind.question.entity.QuestionEntity;
-import com.edumind.question.vo.question.QuestionVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

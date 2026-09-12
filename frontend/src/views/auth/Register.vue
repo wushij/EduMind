@@ -63,7 +63,7 @@
                 :class="{ active: registerForm.role === 'STUDENT' }"
                 @click="registerForm.role = 'STUDENT'"
               >
-                <span class="role-icon">🎓</span>
+                <el-icon class="role-icon"><User /></el-icon>
                 <span>我是学生</span>
               </div>
               <div
@@ -71,7 +71,7 @@
                 :class="{ active: registerForm.role === 'TEACHER' }"
                 @click="registerForm.role = 'TEACHER'"
               >
-                <span class="role-icon">👨‍🏫</span>
+                <el-icon class="role-icon"><Management /></el-icon>
                 <span>我是教师</span>
               </div>
             </div>
@@ -93,16 +93,43 @@
                 placeholder="设置登录密码 (至少6位)"
                 autocomplete="new-password"
               />
-              <span class="eye-toggle" @click="showPassword = !showPassword">
-                <svg v-if="!showPassword" viewBox="0 0 24 24" class="svg-icon eye-icon" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                  <line x1="1" y1="1" x2="23" y2="23"></line>
+              <button
+                type="button"
+                class="auth-eye-btn"
+                tabindex="-1"
+                :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+                @click="showPassword = !showPassword"
+              >
+                <svg
+                  v-if="showPassword"
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
                 </svg>
-                <svg v-else viewBox="0 0 24 24" class="svg-icon eye-icon" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                  <circle cx="12" cy="7" r="3"></circle>
+                <svg
+                  v-else
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                  <line x1="3" y1="4" x2="21" y2="20" />
                 </svg>
-              </span>
+              </button>
             </div>
           </el-form-item>
 
@@ -163,6 +190,7 @@
 import { ref, reactive } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, FormInstance, FormRules } from 'element-plus';
+import { User, Management } from '@element-plus/icons-vue';
 import { register } from '@/api/auth/auth';
 
 const router = useRouter();
@@ -335,20 +363,25 @@ async function handleRegister() {
           }
         }
 
+        .auth-eye-btn,
         .eye-toggle {
+          background: none;
+          border: none;
           cursor: pointer;
+          color: #94A3B8;
+          padding: 0;
           display: flex;
           align-items: center;
-          color: #8C9BAE;
-          transition: color 0.2s;
+          justify-content: center;
+          transition: color 0.2s ease;
 
           &:hover {
-            color: #1677FF;
+            color: #475569;
           }
 
-          .eye-icon {
-            width: 17px;
-            height: 17px;
+          svg {
+            width: 15px;
+            height: 15px;
           }
         }
       }
@@ -376,7 +409,9 @@ async function handleRegister() {
           transition: all 0.2s;
 
           .role-icon {
-            font-size: 14px;
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
           }
 
           &:hover {

@@ -1,10 +1,9 @@
 <template>
   <div class="ai-marketplace-page">
     <AIMarketplaceHero
-      v-model:search-keyword="searchKeyword"
+      :search-keyword="searchKeyword"
       :active-category="activeCategory"
       @search="(val) => handleSearch(val, true)"
-      @instant-search="handleInstantSearch"
     />
 
     <div v-loading="loading" class="tools-grid-section">

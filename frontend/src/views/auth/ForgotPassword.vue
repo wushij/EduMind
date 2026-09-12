@@ -11,7 +11,7 @@
             <span>返回登录</span>
           </div>
           <h2 class="card-title">找回账号密码</h2>
-          <p class="card-subtitle">通过绑定的手机号或机构邮箱安全重置您的登录密码</p>
+          <p class="card-subtitle">通过绑定的安全邮箱获取验证码，安全重置您的登录密码</p>
         </div>
 
         <!-- 步骤进度指示条 -->
@@ -25,23 +25,19 @@
 
         <!-- 步骤 1：验证身份 -->
         <div v-if="currentStep === 0" class="step-content">
-          <el-form
-            ref="step1FormRef"
-            :model="step1Form"
-            :rules="step1Rules"
-            class="reset-form"
-          >
-            <el-form-item prop="account">
+          <el-form class="reset-form" @submit.prevent="handleVerifyStep1">
+            <el-form-item>
               <el-input
-                v-model="step1Form.account"
-                placeholder="请输入用户名 / 手机号 / 邮箱"
-                :prefix-icon="User"
+                v-model="step1Form.email"
+                placeholder="请输入注册或绑定的电子邮箱"
+                :prefix-icon="Message"
                 size="large"
                 clearable
+                @keyup.enter="handleVerifyStep1"
               />
             </el-form-item>
 
-            <el-form-item prop="code">
+            <el-form-item>
               <div class="sms-code-box">
                 <el-input
                   v-model="step1Form.code"
@@ -49,17 +45,18 @@
                   :prefix-icon="Key"
                   maxlength="6"
                   size="large"
+                  @keyup.enter="handleVerifyStep1"
                 />
-                <el-button
-                  type="primary"
-                  plain
-                  size="large"
+                <button
+                  type="button"
                   class="get-code-btn"
-                  :disabled="countdown > 0"
-                  @click="sendSmsCode"
+                  :disabled="countdown > 0 || sendingCode"
+                  @click="handleSendEmailCode"
                 >
-                  {{ countdown > 0 ? `${countdown}s 后重新获取` : '获取验证码' }}
-                </el-button>
+                  <span v-if="sendingCode">发送中...</span>
+                  <span v-else-if="countdown > 0">{{ countdown }}s 后重新获取</span>
+                  <span v-else>获取验证码</span>
+                </button>
               </div>
             </el-form-item>
 
@@ -77,13 +74,8 @@
 
         <!-- 步骤 2：设置新密码 -->
         <div v-else-if="currentStep === 1" class="step-content">
-          <el-form
-            ref="step2FormRef"
-            :model="step2Form"
-            :rules="step2Rules"
-            class="reset-form"
-          >
-            <el-form-item prop="newPassword">
+          <el-form class="reset-form" @submit.prevent="handleResetPassword">
+            <el-form-item>
               <el-input
                 v-model="step2Form.newPassword"
                 type="password"
@@ -94,7 +86,7 @@
               />
             </el-form-item>
 
-            <el-form-item prop="confirmPassword">
+            <el-form-item>
               <el-input
                 v-model="step2Form.confirmPassword"
                 type="password"
@@ -102,6 +94,7 @@
                 :prefix-icon="Lock"
                 show-password
                 size="large"
+                @keyup.enter="handleResetPassword"
               />
             </el-form-item>
 
@@ -142,33 +135,23 @@
 <script setup lang="ts">
 import { ref, reactive, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
-import { User, Lock, Key, Back, CircleCheckFilled } from '@element-plus/icons-vue';
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
+import { Message, Lock, Key, Back, CircleCheckFilled } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
+import { sendEmailCode, verifyResetCode, resetPassword } from '@/api/auth/auth';
 
 const router = useRouter();
 
 const currentStep = ref(0);
 const submitting = ref(false);
+const sendingCode = ref(false);
 const countdown = ref(0);
+const resetToken = ref('');
 let timer: ReturnType<typeof setInterval> | null = null;
-
-const step1FormRef = ref<FormInstance>();
-const step2FormRef = ref<FormInstance>();
 
 // 步骤 1 数据
 const step1Form = reactive({
-  account: '',
+  email: '',
   code: ''
-});
-
-const step1Rules = reactive<FormRules>({
-  account: [
-    { required: true, message: '请输入账号 / 手机号 / 邮箱', trigger: 'blur' }
-  ],
-  code: [
-    { required: true, message: '请输入验证码', trigger: 'blur' },
-    { len: 6, message: '验证码为6位数字', trigger: 'blur' }
-  ]
 });
 
 // 步骤 2 数据
@@ -177,71 +160,127 @@ const step2Form = reactive({
   confirmPassword: ''
 });
 
-const validateConfirmPassword = (_rule: any, value: string, callback: any) => {
-  if (!value) {
-    callback(new Error('请再次确认密码'));
-  } else if (value !== step2Form.newPassword) {
-    callback(new Error('两次输入的密码不一致'));
-  } else {
-    callback();
-  }
-};
+const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-const step2Rules = reactive<FormRules>({
-  newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 6, message: '密码不能少于 6 个字符', trigger: 'blur' }
-  ],
-  confirmPassword: [
-    { required: true, validator: validateConfirmPassword, trigger: 'blur' }
-  ]
-});
+// 发送邮箱验证码 (云盘/登录同款：ElMessage 提示，不使用表单内红色文字)
+const handleSendEmailCode = async () => {
+  if (sendingCode.value || countdown.value > 0) return;
 
-// 发送短信验证码
-const sendSmsCode = () => {
-  if (!step1Form.account) {
-    ElMessage.warning('请先输入要找回的账号、手机号或机构邮箱');
+  const email = step1Form.email.trim();
+  if (!email) {
+    ElMessage.warning('请输入要找回密码的电子邮箱');
     return;
   }
-  countdown.value = 60;
-  step1Form.code = '123456'; // 自动填入演示码
-  ElMessage.success('验证码已发送至预留手机/邮箱（演示环境已自动填入: 123456）');
+  if (!emailRegex.test(email)) {
+    ElMessage.warning('请输入有效的电子邮箱格式');
+    return;
+  }
 
-  timer = setInterval(() => {
-    countdown.value--;
-    if (countdown.value <= 0) {
-      clearInterval(timer!);
-      timer = null;
-    }
-  }, 1000);
+  sendingCode.value = true;
+  try {
+    await sendEmailCode({
+      email,
+      scene: 'resetpwd'
+    });
+    ElMessage.success('验证码已发送至您的邮箱，请前往查收');
+    countdown.value = 60;
+    if (timer) clearInterval(timer);
+    timer = setInterval(() => {
+      countdown.value--;
+      if (countdown.value <= 0) {
+        clearInterval(timer!);
+        timer = null;
+      }
+    }, 1000);
+  } catch (_err: any) {
+    // 全局拦截器已统一弹出错误提示
+  } finally {
+    sendingCode.value = false;
+  }
 };
 
 // 步骤 1 校验并推进
 const handleVerifyStep1 = async () => {
-  if (!step1FormRef.value) return;
-  const valid = await step1FormRef.value.validate().catch(() => false);
-  if (!valid) return;
+  if (submitting.value) return;
+
+  const email = step1Form.email.trim();
+  const code = step1Form.code.trim();
+
+  if (!email) {
+    ElMessage.warning('请输入注册或绑定的电子邮箱');
+    return;
+  }
+  if (!emailRegex.test(email)) {
+    ElMessage.warning('请输入有效的电子邮箱格式');
+    return;
+  }
+  if (!code) {
+    ElMessage.warning('请输入 6 位邮箱验证码');
+    return;
+  }
+  if (code.length !== 6) {
+    ElMessage.warning('验证码应为 6 位数字');
+    return;
+  }
 
   submitting.value = true;
-  setTimeout(() => {
-    submitting.value = false;
+  try {
+    const res = await verifyResetCode({
+      email,
+      code
+    });
+    resetToken.value = res.data?.resetToken || '';
     currentStep.value = 1;
     ElMessage.success('身份验证通过，请设置新密码');
-  }, 500);
+  } catch (_err: any) {
+    // 全局拦截器已提示
+  } finally {
+    submitting.value = false;
+  }
 };
 
 // 步骤 2 提交重置
 const handleResetPassword = async () => {
-  if (!step2FormRef.value) return;
-  const valid = await step2FormRef.value.validate().catch(() => false);
-  if (!valid) return;
+  if (submitting.value) return;
+
+  const newPassword = step2Form.newPassword;
+  const confirmPassword = step2Form.confirmPassword;
+
+  if (!newPassword) {
+    ElMessage.warning('请输入新密码');
+    return;
+  }
+  if (newPassword.length < 6) {
+    ElMessage.warning('新密码长度不能少于 6 个字符');
+    return;
+  }
+  if (!confirmPassword) {
+    ElMessage.warning('请再次输入新密码确认');
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    ElMessage.warning('两次输入的密码不一致，请重新核对');
+    return;
+  }
+  if (!resetToken.value) {
+    ElMessage.warning('身份核验凭据已失效，请返回第一步重新获取验证码');
+    currentStep.value = 0;
+    return;
+  }
 
   submitting.value = true;
-  setTimeout(() => {
-    submitting.value = false;
+  try {
+    await resetPassword({
+      resetToken: resetToken.value,
+      newPassword
+    });
     currentStep.value = 2;
     ElMessage.success('密码重置成功！');
-  }, 600);
+  } catch (_err: any) {
+    // 全局拦截器已提示
+  } finally {
+    submitting.value = false;
+  }
 };
 
 const goBackToLogin = () => {
@@ -340,21 +379,70 @@ onBeforeUnmount(() => {
 
         .get-code-btn {
           white-space: nowrap;
-          border-radius: 8px;
-          min-width: 110px;
+          border-radius: 9999px !important;
+          min-width: 120px;
+          height: 46px;
+          font-size: 13.5px;
+          font-weight: 600;
+          color: #FFFFFF !important;
+          background: #1677FF !important;
+          border: none;
+          box-shadow: 0 2px 8px rgba(22, 119, 255, 0.28);
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 22px;
+          user-select: none;
+          letter-spacing: 0.3px;
+          box-sizing: border-box;
+
+          span {
+            color: #FFFFFF !important;
+            font-weight: 600;
+            font-size: 13.5px;
+          }
+
+          &:hover:not(:disabled) {
+            background: #0958D9 !important;
+            box-shadow: 0 4px 14px rgba(22, 119, 255, 0.38);
+          }
+
+          &:active:not(:disabled) {
+            background: #003EB3 !important;
+          }
+
+          &:disabled {
+            background: #F1F5F9 !important;
+            color: #94A3B8 !important;
+            border: 1px solid #E2E8F0 !important;
+            box-shadow: none !important;
+            cursor: not-allowed;
+
+            span {
+              color: #94A3B8 !important;
+            }
+          }
         }
       }
 
       .action-btn {
         width: 100%;
-        height: 44px;
-        border-radius: 8px;
+        height: 46px;
+        border-radius: 9999px !important;
         font-size: 15px;
         font-weight: 600;
         background: linear-gradient(135deg, #1677FF 0%, #0958D9 100%);
         border: none;
         box-shadow: 0 4px 14px rgba(22, 119, 255, 0.3);
         margin-top: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+          box-shadow: 0 6px 20px rgba(22, 119, 255, 0.4);
+        }
       }
     }
 
@@ -385,8 +473,8 @@ onBeforeUnmount(() => {
 
       .action-btn {
         width: 100%;
-        height: 44px;
-        border-radius: 8px;
+        height: 46px;
+        border-radius: 9999px !important;
         font-size: 15px;
         font-weight: 600;
       }

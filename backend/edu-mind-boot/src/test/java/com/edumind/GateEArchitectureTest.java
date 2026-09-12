@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 
-import java.lang.reflect.Method;
 import java.util.Arrays;
 
 /**
@@ -27,6 +26,8 @@ class GateEArchitectureTest {
 
     @Test
     void coreControllersShouldBePresent() {
+        Assertions.assertNotNull(com.edumind.common.exception.GlobalExceptionHandler.class);
+        Assertions.assertNotNull(com.edumind.security.handler.SecurityExceptionHandler.class);
         Assertions.assertNotNull(AuthController.class);
         Assertions.assertNotNull(CourseController.class);
         Assertions.assertNotNull(ExamController.class);

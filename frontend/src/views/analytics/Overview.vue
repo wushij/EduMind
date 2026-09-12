@@ -1,28 +1,27 @@
 <template>
   <div class="analytics-overview-container">
-    <!-- 1. 顶部 Header Banner (保留教学分析专属背景图 + 原型图 3 中图文案与日期选择器) -->
-    <PageHeroBanner
-      title="教学分析"
-      subtitle="数据驱动教学，精准评估效果"
-      :background-image="analyticsBannerImg"
-      background-variant="default"
-      size="normal"
-    >
-      <template #actions>
-        <div class="header-date-picker-wrap">
-          <el-date-picker
-            v-model="dateRange"
-            type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            size="default"
-            value-format="YYYY-MM-DD"
-            class="custom-range-picker"
-          />
-        </div>
-      </template>
-    </PageHeroBanner>
+    <!-- 1. 页面标题与日期筛选 -->
+    <div class="page-header-bar">
+      <div class="header-text">
+        <h2 class="page-title">教学分析</h2>
+        <p class="page-subtitle">数据驱动教学，精准评估效果</p>
+      </div>
+      <div class="header-date-picker-wrap">
+        <el-select v-model="courseId" placeholder="选择课程" style="width: 220px; margin-right: 12px" @change="loadOverviewData">
+          <el-option v-for="c in courseOptions" :key="c.id" :label="c.name" :value="c.id" />
+        </el-select>
+        <el-date-picker
+          v-model="dateRange"
+          type="daterange"
+          range-separator="至"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+          size="default"
+          value-format="YYYY-MM-DD"
+          class="custom-range-picker"
+        />
+      </div>
+    </div>
 
     <!-- 2. 二级导航 Tabs (对齐原型图 3 中图：教学概览、学生分析、知识点掌握、课程分析、AI使用分析) -->
     <div class="analytics-tabs-bar">
@@ -42,33 +41,29 @@
       <div class="kpi-card">
         <div class="kpi-top">
           <span class="kpi-label">班级平均分</span>
-          <span class="trend-badge trend-badge--up">↑ 5.2%</span>
         </div>
-        <div class="kpi-value">82.5</div>
+        <div class="kpi-value">{{ avgScore }}</div>
       </div>
 
       <div class="kpi-card">
         <div class="kpi-top">
           <span class="kpi-label">知识点掌握率</span>
-          <span class="trend-badge trend-badge--up">↑ 8.3%</span>
         </div>
-        <div class="kpi-value">68%</div>
+        <div class="kpi-value">{{ masteryRate }}</div>
       </div>
 
       <div class="kpi-card">
         <div class="kpi-top">
           <span class="kpi-label">学生参与度</span>
-          <span class="trend-badge trend-badge--up">↑ 2.1%</span>
         </div>
-        <div class="kpi-value">92%</div>
+        <div class="kpi-value">{{ participationRate }}</div>
       </div>
 
       <div class="kpi-card">
         <div class="kpi-top">
           <span class="kpi-label">AI调用次数</span>
-          <span class="trend-badge trend-badge--up">↑ 12.5%</span>
         </div>
-        <div class="kpi-value">1,246</div>
+        <div class="kpi-value">{{ aiCallCount }}</div>
       </div>
     </div>
 
@@ -112,10 +107,10 @@
         <div ref="knowledgeMasteryChartRef" class="chart-body"></div>
       </div>
 
-      <!-- 图表 3：学生成绩分布 (直方图) -->
+      <!-- 图表 3：学习活跃度 -->
       <div class="chart-card">
         <div class="chart-header">
-          <h3 class="chart-title">学生成绩分布</h3>
+          <h3 class="chart-title">学习活跃度</h3>
         </div>
         <div ref="gradeDistributionChartRef" class="chart-body"></div>
       </div>
@@ -147,9 +142,30 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, shallowRef, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
 import * as echarts from 'echarts';
-import analyticsBannerImg from '@/assets/images/教学分析banner.png';
+import { getAiUsageAnalytics, getLearningAnalytics } from '@/api/analytics/learning';
+import { getKnowledgeMastery } from '@/api/analytics/knowledge';
+import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
+import type { AiUsageByProviderVO } from '@/types/analytics/learning';
+
+const { courseOptions, courseId } = useTeacherCourses(102);
+
+const avgScore = ref('--');
+const masteryRate = ref('--');
+const participationRate = ref('--');
+const aiCallCount = ref('--');
+
+const scoreTrendDates = ref<string[]>([]);
+const scoreTrendValues = ref<number[]>([]);
+const masteryCategories = ref<string[]>([]);
+const masteryValues = ref<number[]>([]);
+const activityDates = ref<string[]>([]);
+const activityValues = ref<number[]>([]);
+const aiToolLegend = ref<Array<{ name: string; ratio: number; color: string }>>([]);
+const aiPieData = ref<Array<{ value: number; name: string; itemStyle: { color: string } }>>([]);
+const aiTotalCalls = ref(0);
+
+const CHART_COLORS = ['#1677FF', '#06B6D4', '#10B981', '#722ED1', '#94A3B8', '#F59E0B'];
 
 const router = useRouter();
 const route = useRoute();
@@ -183,15 +199,6 @@ function handleTabClick(tab: AnalyticsTabItem) {
     router.push(tab.route);
   }
 }
-
-// AI 工具使用统计图例数据
-const aiToolLegend = [
-  { name: 'AI问答', ratio: 45, color: '#1677FF' },
-  { name: 'AI出题', ratio: 20, color: '#06B6D4' },
-  { name: 'AI批改', ratio: 15, color: '#10B981' },
-  { name: 'AI教案', ratio: 12, color: '#722ED1' },
-  { name: '其他', ratio: 8, color: '#94A3B8' }
-];
 
 // ECharts Refs
 const scoreTrendChartRef = ref<HTMLElement | null>(null);
@@ -229,7 +236,7 @@ function initScoreTrendChart() {
     },
     xAxis: {
       type: 'category',
-      data: ['09-01', '09-05', '09-10', '09-15', '09-20', '09-25', '09-30'],
+      data: scoreTrendDates.value,
       axisLine: { lineStyle: { color: '#CBD5E1' } },
       axisTick: { show: false },
       axisLabel: { color: '#64748B', fontSize: 11 }
@@ -249,7 +256,7 @@ function initScoreTrendChart() {
         name: '班级平均分',
         type: 'line',
         smooth: true,
-        data: [42, 50, 68, 80, 72, 60, 65],
+        data: scoreTrendValues.value,
         itemStyle: { color: '#1677FF' },
         lineStyle: { width: 3, color: '#1677FF' },
         areaStyle: {
@@ -258,14 +265,6 @@ function initScoreTrendChart() {
             { offset: 1, color: 'rgba(22, 119, 255, 0.02)' }
           ])
         }
-      },
-      {
-        name: '全校平均分',
-        type: 'line',
-        smooth: true,
-        data: [48, 55, 62, 70, 68, 62, 66],
-        itemStyle: { color: '#38BDF8' },
-        lineStyle: { width: 2.5, color: '#38BDF8', type: 'dashed' }
       }
     ]
   };
@@ -281,8 +280,8 @@ function initKnowledgeMasteryChart() {
   const chart = echarts.init(knowledgeMasteryChartRef.value);
   knowledgeMasteryChart.value = chart;
 
-  const categories = ['Spring框架', '数据库', '多线程', '集合框架', '面向对象', 'Java基础'];
-  const values = [72, 96, 68, 85, 78, 92];
+  const categories = masteryCategories.value;
+  const values = masteryValues.value;
 
   const option: echarts.EChartsOption = {
     grid: {
@@ -358,11 +357,11 @@ function initGradeDistributionChart() {
     },
     tooltip: {
       trigger: 'axis',
-      formatter: '{b} 分数段: {c} 人'
+      formatter: '{b}: {c} 人'
     },
     xAxis: {
       type: 'category',
-      data: ['0-60', '60-70', '70-80', '80-90', '90-100'],
+      data: activityDates.value,
       axisLine: { lineStyle: { color: '#CBD5E1' } },
       axisTick: { show: false },
       axisLabel: { color: '#64748B', fontSize: 11 }
@@ -370,8 +369,6 @@ function initGradeDistributionChart() {
     yAxis: {
       type: 'value',
       min: 0,
-      max: 40,
-      interval: 10,
       splitLine: {
         lineStyle: { color: '#F1F5F9', type: 'dashed' }
       },
@@ -380,7 +377,7 @@ function initGradeDistributionChart() {
     series: [
       {
         type: 'bar',
-        data: [6, 12, 22, 38, 26],
+        data: activityValues.value,
         barWidth: 28,
         itemStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -410,7 +407,7 @@ function initAiToolUsageChart() {
       formatter: '{b}: {c}% ({d}%)'
     },
     title: {
-      text: '1,246\n总次数',
+      text: `${aiTotalCalls.value.toLocaleString()}\n总次数`,
       left: 'center',
       top: '38%',
       textStyle: {
@@ -431,13 +428,7 @@ function initAiToolUsageChart() {
           scale: true,
           scaleSize: 6
         },
-        data: [
-          { value: 45, name: 'AI问答', itemStyle: { color: '#1677FF' } },
-          { value: 20, name: 'AI出题', itemStyle: { color: '#06B6D4' } },
-          { value: 15, name: 'AI批改', itemStyle: { color: '#10B981' } },
-          { value: 12, name: 'AI教案', itemStyle: { color: '#722ED1' } },
-          { value: 8, name: '其他', itemStyle: { color: '#94A3B8' } }
-        ]
+        data: aiPieData.value
       }
     ]
   };
@@ -452,17 +443,87 @@ function handleResize() {
   aiToolUsageChart.value?.resize();
 }
 
-watch(selectedTrendRange, () => {
-  initScoreTrendChart();
-});
+function resolveRange(): string {
+  if (selectedTrendRange.value === '近7天') return '7d';
+  if (selectedTrendRange.value === '近学期') return '90d';
+  return '30d';
+}
 
-onMounted(() => {
+function formatShortDate(date: string): string {
+  const parts = date.split('-');
+  return parts.length >= 3 ? `${parts[1]}-${parts[2]}` : date;
+}
+
+function buildAiLegend(byProvider: AiUsageByProviderVO[]) {
+  const total = byProvider.reduce((sum, item) => sum + (item.calls ?? 0), 0);
+  aiTotalCalls.value = total;
+  aiPieData.value = byProvider.map((item, idx) => ({
+    value: item.calls ?? 0,
+    name: item.provider || '未知',
+    itemStyle: { color: CHART_COLORS[idx % CHART_COLORS.length] }
+  }));
+  aiToolLegend.value = byProvider.map((item, idx) => ({
+    name: item.provider || '未知',
+    ratio: total > 0 ? Math.round(((item.calls ?? 0) / total) * 100) : 0,
+    color: CHART_COLORS[idx % CHART_COLORS.length]
+  }));
+}
+
+function refreshCharts() {
   nextTick(() => {
     initScoreTrendChart();
     initKnowledgeMasteryChart();
     initGradeDistributionChart();
     initAiToolUsageChart();
+  });
+}
+
+watch(selectedTrendRange, () => {
+  loadOverviewData();
+});
+
+watch(courseId, () => {
+  loadOverviewData();
+});
+
+async function loadOverviewData() {
+  const range = resolveRange();
+  try {
+    const [learningRes, aiRes, masteryRes] = await Promise.all([
+      getLearningAnalytics({ courseId: courseId.value, range }),
+      getAiUsageAnalytics({ courseId: courseId.value, range }),
+      getKnowledgeMastery({ courseId: courseId.value })
+    ]);
+    const learning = learningRes.data;
+    if (learning) {
+      avgScore.value = learning.avgScore != null ? learning.avgScore.toFixed(1) : '--';
+      masteryRate.value = `${Math.round((learning.knowledgeMasteryAvg ?? 0) * 100)}%`;
+      participationRate.value = `${Math.round((learning.completionRate ?? 0) * 100)}%`;
+      scoreTrendDates.value = (learning.trends?.score ?? []).map((p) => formatShortDate(p.date));
+      scoreTrendValues.value = (learning.trends?.score ?? []).map((p) => p.avgScore ?? 0);
+      activityDates.value = (learning.trends?.learning ?? []).map((p) => formatShortDate(p.date));
+      activityValues.value = (learning.trends?.learning ?? []).map((p) => p.activeUsers ?? 0);
+    }
+    const mastery = masteryRes.data;
+    if (mastery) {
+      masteryCategories.value = mastery.dimensions ?? [];
+      masteryValues.value = mastery.classAvg ?? [];
+    }
+    const aiUsage = aiRes.data;
+    if (aiUsage) {
+      aiCallCount.value = (aiUsage.totalCalls ?? 0).toLocaleString();
+      buildAiLegend(aiUsage.byProvider ?? []);
+    }
+  } catch {
+    // keep current values
+  }
+  refreshCharts();
+}
+
+onMounted(() => {
+  nextTick(() => {
     window.addEventListener('resize', handleResize);
+    loadOverviewData();
   });
 });
 
@@ -481,6 +542,27 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.page-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+
+  .page-title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .page-subtitle {
+    margin: 4px 0 0;
+    font-size: 14px;
+    color: #64748b;
+  }
 }
 
 // 顶部日期选择器

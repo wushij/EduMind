@@ -12,8 +12,8 @@ import com.edumind.ai.entity.MessageEntity;
 import com.edumind.ai.vo.ConversationVO;
 import com.edumind.ai.vo.MessageVO;
 import com.edumind.common.exception.BusinessException;
-import com.edumind.common.model.UserContext;
 import com.edumind.infrastructure.redis.cache.AiSessionCacheService;
+import com.edumind.security.context.LoginUserResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -95,11 +95,7 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     private Long requireUserId() {
-        Long userId = UserContext.getUserId();
-        if (userId == null) {
-            throw new BusinessException("未登录");
-        }
-        return userId;
+        return LoginUserResolver.requireUserId();
     }
 
     private ConversationEntity assertConversationOwner(String conversationId) {
@@ -107,7 +103,7 @@ public class ConversationServiceImpl implements ConversationService {
         if (entity == null) {
             throw new BusinessException("会话不存在");
         }
-        Long userId = UserContext.getUserId();
+        Long userId = LoginUserResolver.resolveUserId();
         if (userId == null || !userId.equals(entity.getUserId())) {
             throw new BusinessException("无权访问该会话");
         }

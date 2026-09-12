@@ -15,3 +15,9 @@ export interface KnowledgeGraphVO {
   nodes: KnowledgeGraphNode[];
   edges: KnowledgeGraphEdge[];
 }
+
+export interface GraphGapVO {
+  knowledgePointId: number;
+  title: string;
+  missingPrerequisites: Array<{ id: number; title: string }>;
+}

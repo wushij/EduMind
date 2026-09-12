@@ -1,5 +1,5 @@
 <template>
-  <div class="agent-center-container">
+  <div class="agent-center-container" v-loading="loading">
     <div class="header-card">
       <div class="header-left">
         <div class="agent-badge">
@@ -7,64 +7,76 @@
           <span>EduMind Autonomous Agent</span>
         </div>
         <h1>AI 教学智能体协同中心</h1>
-        <p>基于意图识别（Intent）、多步规划（Planning）与 Tool Calling 工具编排的高校级自主教学智能体系统</p>
+        <p>基于意图识别、多步规划与 Tool Calling 工具编排的高校级自主教学智能体系统</p>
       </div>
       <div class="header-actions">
-        <el-button type="primary" size="large" :icon="Plus">新建智能体</el-button>
-        <el-button size="large" :icon="Setting">编排配置</el-button>
+        <el-button type="primary" size="large" :icon="Plus" @click="goWorkflow()">
+          新建运行
+        </el-button>
       </div>
     </div>
+
+    <el-alert
+      v-if="usedMockFallback"
+      type="info"
+      :closable="false"
+      show-icon
+      title="当前展示 Mock 数据"
+      class="mock-alert"
+    />
 
     <div class="status-grid">
       <el-card shadow="hover" class="metric-card">
         <div class="metric-icon blue"><el-icon><Compass /></el-icon></div>
         <div class="metric-info">
           <span class="label">已装载智能体</span>
-          <span class="val">8 个</span>
+          <span class="val">{{ agents.length }} 个</span>
         </div>
       </el-card>
       <el-card shadow="hover" class="metric-card">
         <div class="metric-icon green"><el-icon><Tools /></el-icon></div>
         <div class="metric-info">
           <span class="label">可用工具 (Tool Calling)</span>
-          <span class="val">24 项</span>
+          <span class="val">{{ totalTools }} 项</span>
         </div>
       </el-card>
       <el-card shadow="hover" class="metric-card">
         <div class="metric-icon purple"><el-icon><Histogram /></el-icon></div>
         <div class="metric-info">
-          <span class="label">多步规划完成率</span>
-          <span class="val">98.4%</span>
+          <span class="label">平均成功率</span>
+          <span class="val">{{ avgSuccessRate }}%</span>
         </div>
       </el-card>
       <el-card shadow="hover" class="metric-card">
         <div class="metric-icon orange"><el-icon><Timer /></el-icon></div>
         <div class="metric-info">
-          <span class="label">平均响应耗时</span>
-          <span class="val">1.2s</span>
+          <span class="label">累计运行次数</span>
+          <span class="val">{{ totalRuns.toLocaleString() }}</span>
         </div>
       </el-card>
     </div>
 
     <div class="agent-grid">
-      <el-card v-for="agent in agents" :key="agent.id" shadow="hover" class="agent-card">
+      <el-card v-for="agent in agents" :key="agent.code" shadow="hover" class="agent-card">
         <div class="agent-card-header">
-          <div class="agent-avatar" :style="{ background: agent.bgColor }">
-            <el-icon :size="24" :color="agent.iconColor"><component :is="agent.icon" /></el-icon>
+          <div class="agent-avatar" :style="{ background: getAgentStyle(agent.code).bgColor }">
+            <el-icon :size="24" :color="getAgentStyle(agent.code).iconColor">
+              <component :is="getAgentStyle(agent.code).icon" />
+            </el-icon>
           </div>
           <div class="agent-meta">
             <h3>{{ agent.name }}</h3>
-            <el-tag size="small" :type="agent.status === 'ACTIVE' ? 'success' : 'info'">{{ agent.status }}</el-tag>
+            <el-tag size="small" :type="agent.status === 'ACTIVE' ? 'success' : 'info'">
+              {{ agent.status }}
+            </el-tag>
           </div>
         </div>
-        <p class="agent-desc">{{ agent.description }}</p>
-        <div class="tool-tags">
-          <span class="tool-label">调用工具：</span>
-          <el-tag v-for="t in agent.tools" :key="t" size="small" effect="plain">{{ t }}</el-tag>
-        </div>
+        <p class="agent-desc">模型：{{ agent.modelKey }} · 工具 {{ agent.toolCount }} 项</p>
         <div class="card-footer">
-          <span class="steps-info">规划步数：{{ agent.steps }} 步</span>
-          <el-button type="primary" link>进入工作台 →</el-button>
+          <span class="steps-info">
+            成功率 {{ agent.successRate?.toFixed(1) ?? 0 }}% · 运行 {{ agent.totalRuns }} 次
+          </span>
+          <el-button type="primary" link @click="goWorkflow(agent.code)">进入工作台 →</el-button>
         </div>
       </el-card>
     </div>
@@ -72,67 +84,65 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { Cpu, Plus, Setting, Compass, Tools, Histogram, Timer, MagicStick, Reading, Collection, Checked } from '@element-plus/icons-vue';
+import { computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import {
+  Cpu,
+  Plus,
+  Compass,
+  Tools,
+  Histogram,
+  Timer,
+  MagicStick,
+  Reading,
+  Collection,
+  Checked
+} from '@element-plus/icons-vue';
+import { useAgentRun } from '@/composables/ai/useAgentRun';
 
-interface AgentItem {
-  id: number;
-  name: string;
-  description: string;
-  status: 'ACTIVE' | 'IDLE';
-  icon: any;
-  iconColor: string;
-  bgColor: string;
-  tools: string[];
-  steps: number;
+const router = useRouter();
+const { loading, usedMockFallback, agents, fetchAgents } = useAgentRun();
+
+const totalTools = computed(() =>
+  agents.value.reduce((sum, item) => sum + (item.toolCount || 0), 0)
+);
+
+const totalRuns = computed(() =>
+  agents.value.reduce((sum, item) => sum + (item.totalRuns || 0), 0)
+);
+
+const avgSuccessRate = computed(() => {
+  if (!agents.value.length) return '0.0';
+  const avg =
+    agents.value.reduce((sum, item) => sum + (item.successRate || 0), 0) / agents.value.length;
+  return avg.toFixed(1);
+});
+
+const agentStyleMap: Record<string, { icon: any; iconColor: string; bgColor: string }> = {
+  'course-tutor': { icon: Reading, iconColor: '#1677FF', bgColor: '#EAF3FF' },
+  'exam-builder': { icon: Collection, iconColor: '#52C41A', bgColor: '#F6FFED' },
+  'grading-assistant': { icon: Checked, iconColor: '#722ED1', bgColor: '#F9F0FF' },
+  'lesson-planner': { icon: MagicStick, iconColor: '#FA8C16', bgColor: '#FFF7E6' }
+};
+
+function getAgentStyle(code: string) {
+  return (
+    agentStyleMap[code] ?? {
+      icon: Compass,
+      iconColor: '#1677FF',
+      bgColor: '#EAF3FF'
+    }
+  );
 }
 
-const agents = ref<AgentItem[]>([
-  {
-    id: 1,
-    name: '课程智能助教 Agent',
-    description: '自主根据学生提问定位课件章节、知识点依赖关系，生成阶梯式答疑引导与变式练习。',
-    status: 'ACTIVE',
-    icon: Reading,
-    iconColor: '#1677FF',
-    bgColor: '#EAF3FF',
-    tools: ['知识库检索', '章节定位', '公式渲染', '练习推送'],
-    steps: 4
-  },
-  {
-    id: 2,
-    name: '多维组卷评估 Agent',
-    description: '基于难度正态分布与知识点覆盖矩阵，多轮自动抽题、题型配比校验与自动重试均衡。',
-    status: 'ACTIVE',
-    icon: Collection,
-    iconColor: '#52C41A',
-    bgColor: '#F6FFED',
-    tools: ['题库检索', '难度评估', '去重校验', '排版生成'],
-    steps: 5
-  },
-  {
-    id: 3,
-    name: '主观题智能精判 Agent',
-    description: '结合评分细则细化采分点，分析逻辑缺陷与解题思路，自动输出针对性教师复核建议。',
-    status: 'ACTIVE',
-    icon: Checked,
-    iconColor: '#722ED1',
-    bgColor: '#F9F0FF',
-    tools: ['细则对齐', '语义相似度', '错因归纳', '复核提示'],
-    steps: 3
-  },
-  {
-    id: 4,
-    name: '教学大纲与教案生成 Agent',
-    description: '解析专业培养方案，自动规划周课时教案、教学目标、思政元素融合与配套作业。',
-    status: 'ACTIVE',
-    icon: MagicStick,
-    iconColor: '#FA8C16',
-    bgColor: '#FFF7E6',
-    tools: ['大纲解析', '思政库检索', '课时编排', '文档导出'],
-    steps: 6
-  }
-]);
+function goWorkflow(agentCode?: string) {
+  router.push({
+    path: '/ai/agent/workflow',
+    query: agentCode ? { agentCode } : undefined
+  });
+}
+
+onMounted(fetchAgents);
 </script>
 
 <style scoped lang="scss">
@@ -269,20 +279,7 @@ const agents = ref<AgentItem[]>([
         font-size: 14px;
         line-height: 1.6;
         min-height: 44px;
-        margin-bottom: 14px;
-      }
-
-      .tool-tags {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 8px;
         margin-bottom: 16px;
-
-        .tool-label {
-          font-size: 12px;
-          color: #94A3B8;
-        }
       }
 
       .card-footer {
@@ -298,6 +295,16 @@ const agents = ref<AgentItem[]>([
         }
       }
     }
+  }
+}
+
+@media (max-width: 960px) {
+  .status-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .agent-grid {
+    grid-template-columns: 1fr !important;
   }
 }
 </style>

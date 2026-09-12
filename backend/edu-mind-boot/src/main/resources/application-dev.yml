@@ -21,6 +21,12 @@ ai:
     stream-enabled: true
 
 edumind:
+  security:
+    sm-enabled: false
+  ai:
+    gateway:
+      enabled: true
+      force-fail-model: ''
   rate-limit:
     enabled: false
   chunk:
@@ -31,10 +37,10 @@ edumind:
     api-key: ${EMBEDDING_API_KEY:}
     model: text-embedding-3-small
     dimensions: 1536
-    mock-enabled: true
+    mock-enabled: true   # dev 默认 true；联调真实向量时设为 false
   milvus:
-    enabled: false
+    enabled: false       # dev 默认 false → InMemoryVectorStore；联调 Milvus 时设为 true
     host: localhost
     port: 19530
     collection: edumind_chunks
-    dimension: 1536
+    dimension: 1536      # 需与 embedding.dimensions 一致

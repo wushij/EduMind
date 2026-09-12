@@ -2,6 +2,7 @@ package com.edumind.security.filter;
 
 import com.edumind.infrastructure.redis.RedisService;
 import com.edumind.infrastructure.redis.RedisSupport;
+import com.edumind.security.config.SecurityProperties;
 import com.edumind.security.crypto.SignatureService;
 import com.edumind.security.crypto.Sm3HmacService;
 import org.junit.jupiter.api.Assertions;
@@ -10,6 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -26,10 +30,11 @@ public class FilterSecurityTest {
         RedisSupport redisSupport = mock(RedisSupport.class);
         when(redisSupport.useRedisOrFallback()).thenReturn(false);
         when(redisSupport.requireRedis()).thenReturn(false);
-        replayAttackFilter = new ReplayAttackFilter(redisService, redisSupport);
+        SecurityProperties securityProperties = new SecurityProperties();
+        replayAttackFilter = new ReplayAttackFilter(redisService, redisSupport, securityProperties);
         Sm3HmacService sm3HmacService = new Sm3HmacService();
         signatureService = new SignatureService(sm3HmacService);
-        signatureFilter = new SignatureFilter(signatureService);
+        signatureFilter = new SignatureFilter(signatureService, securityProperties);
     }
 
     @Test
@@ -113,5 +118,47 @@ public class FilterSecurityTest {
         signatureFilter.doFilter(requestTampered, responseTampered, new MockFilterChain());
         Assertions.assertEquals(403, responseTampered.getStatus());
         Assertions.assertTrue(responseTampered.getContentAsString().contains("请求签名验证未通过"));
+    }
+
+    @Test
+    public void testSignatureFilter_SmModeMissingSignatureOnSensitivePath() throws Exception {
+        SecurityProperties props = new SecurityProperties();
+        props.setSmEnabled(true);
+        props.setSensitivePaths(List.of("/api/analytics"));
+        props.setHmacSecret("EduMind_Platform_SecretKey_2026");
+        SignatureFilter smFilter = new SignatureFilter(signatureService, props);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/analytics/learning");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        smFilter.doFilter(request, response, new MockFilterChain());
+
+        Assertions.assertEquals(403, response.getStatus());
+        Assertions.assertTrue(response.getContentAsString().contains("缺少 X-Signature"));
+    }
+
+    @Test
+    public void testSignatureFilter_PostBodyTamperRejected() throws Exception {
+        SecurityProperties props = new SecurityProperties();
+        props.setSmEnabled(true);
+        props.setSensitivePaths(List.of("/api/ai/agent"));
+        props.setHmacSecret("EduMind_Platform_SecretKey_2026");
+        SignatureFilter smFilter = new SignatureFilter(signatureService, props);
+
+        long now = System.currentTimeMillis();
+        String nonce = "body_tamper_nonce";
+        String path = "/api/ai/agent/runs";
+        String body = "{\"agentCode\":\"teaching\"}";
+        String signature = signatureService.generateSignature("POST", path, now, nonce, body, props.getHmacSecret());
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
+        request.setContent("{\"agentCode\":\"grading\"}".getBytes(StandardCharsets.UTF_8));
+        request.addHeader("X-Timestamp", String.valueOf(now));
+        request.addHeader("X-Nonce", nonce);
+        request.addHeader("X-Signature", signature);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        smFilter.doFilter(request, response, new MockFilterChain());
+        Assertions.assertEquals(403, response.getStatus());
+        Assertions.assertTrue(response.getContentAsString().contains("请求签名验证未通过"));
     }
 }

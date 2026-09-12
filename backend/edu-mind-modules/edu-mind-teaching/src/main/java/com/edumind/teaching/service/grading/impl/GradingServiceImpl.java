@@ -4,6 +4,7 @@ import com.edumind.ai.dto.SubjectiveGradingDTO;
 import com.edumind.ai.service.grading.AiGradingService;
 import com.edumind.ai.vo.SubjectiveGradingVO;
 import com.edumind.common.enums.QuestionType;
+import com.edumind.common.event.GradingCompletedEvent;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.infrastructure.redis.DistributedLockService;
 import com.edumind.infrastructure.redis.RedisKeyBuilder;
@@ -24,6 +25,7 @@ import com.edumind.teaching.entity.SubmissionEntity;
 import com.edumind.teaching.service.grading.GradingService;
 import com.edumind.teaching.vo.submission.GradingItemVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -47,6 +49,7 @@ public class GradingServiceImpl implements GradingService {
     private final AiGradingService aiGradingService;
     private final DistributedLockService distributedLockService;
     private final TransactionTemplate transactionTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -102,6 +105,7 @@ public class GradingServiceImpl implements GradingService {
             }
             totalScore += result.getScore() != null ? result.getScore() : 0;
             gradingResultDao.insert(result);
+            publishGradingEvent(submission, assignment, question, answer, result);
         }
 
         submission.setTotalScore(totalScore);
@@ -154,6 +158,36 @@ public class GradingServiceImpl implements GradingService {
         submission.setTotalScore(totalScore);
         submission.setStatus("REVIEWED");
         submissionDao.updateById(submission);
+    }
+
+    private void publishGradingEvent(SubmissionEntity submission, AssignmentEntity assignment,
+                                     QuestionVO question, SubmissionAnswerEntity answer,
+                                     GradingResultEntity result) {
+        if (question.getKnowledgePointId() == null) {
+            return;
+        }
+        int score = result.getScore() != null ? result.getScore() : 0;
+        boolean correct = result.getIsCorrect() != null && result.getIsCorrect() == 1;
+        if (result.getIsCorrect() == null && questionMaxScore(result) > 0) {
+            correct = score >= questionMaxScore(result) * 0.6;
+        }
+        eventPublisher.publishEvent(new GradingCompletedEvent(
+                this,
+                submission.getStudentId(),
+                assignment.getCourseId(),
+                question.getId(),
+                question.getKnowledgePointId(),
+                question.getStem(),
+                answer.getAnswer(),
+                question.getAnswer(),
+                questionMaxScore(result),
+                score,
+                correct
+        ));
+    }
+
+    private int questionMaxScore(GradingResultEntity result) {
+        return result.getMaxScore() != null ? result.getMaxScore() : 0;
     }
 
     private boolean isObjectiveType(String type) {

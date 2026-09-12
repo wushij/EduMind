@@ -25,4 +25,13 @@ public class PromptTemplateVersionDao {
                         .orderByDesc(PromptTemplateVersionEntity::getVersion)
         );
     }
+
+    public PromptTemplateVersionEntity findByTemplateIdAndVersion(Long templateId, Integer version) {
+        return promptTemplateVersionMapper.selectOne(
+                new LambdaQueryWrapper<PromptTemplateVersionEntity>()
+                        .eq(PromptTemplateVersionEntity::getTemplateId, templateId)
+                        .eq(PromptTemplateVersionEntity::getVersion, version)
+                        .last("LIMIT 1")
+        );
+    }
 }

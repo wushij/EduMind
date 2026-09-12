@@ -28,6 +28,10 @@
     <dependencies>
         <dependency>
             <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.edumind</groupId>
             <artifactId>edu-mind-infrastructure</artifactId>
         </dependency>
         <dependency>

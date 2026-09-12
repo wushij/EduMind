@@ -6,6 +6,7 @@ import { generateQuestions } from '@/api/ai/generation';
 import { batchSaveQuestions } from '@/api/question/question';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_QUESTIONS } from '@/mock/questions';
+import { normalizeQuestionList } from '@/utils/question/normalize-question';
 
 const generatedQuestions = ref<Question[]>([]);
 
@@ -45,15 +46,15 @@ export function useQuestionGenerate() {
         count: formState.count,
         scorePerQuestion: formState.scorePerQuestion
       });
-      generatedQuestions.value = (res.data || []) as Question[];
+      generatedQuestions.value = normalizeQuestionList(res.data || []);
       if (generatedQuestions.value.length === 0 && USE_MOCK) {
-        generatedQuestions.value = [...MOCK_QUESTIONS];
+        generatedQuestions.value = normalizeQuestionList(MOCK_QUESTIONS);
       }
       ElMessage.success(`AI 出题完成，共生成 ${generatedQuestions.value.length} 道题目`);
       router.push('/ai/question/preview');
     } catch {
       if (USE_MOCK) {
-        generatedQuestions.value = [...MOCK_QUESTIONS];
+        generatedQuestions.value = normalizeQuestionList(MOCK_QUESTIONS);
         router.push('/ai/question/preview');
       } else {
         ElMessage.error('AI 出题失败，请稍后重试');

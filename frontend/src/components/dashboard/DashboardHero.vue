@@ -63,7 +63,7 @@ const router = useRouter();
 
 <style scoped lang="scss">
 .dashboard-hero {
-  margin-bottom: 20px;
+  margin-bottom: 0;
 
   &__frame {
     position: relative;

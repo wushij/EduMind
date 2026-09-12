@@ -23,4 +23,8 @@ public interface AuthService {
     void logout();
 
     UserVO getUserInfo();
+
+    com.edumind.system.vo.auth.PasswordResetVerifyVO verifyResetCode(com.edumind.system.dto.auth.PasswordResetVerifyDTO dto);
+
+    void resetPassword(com.edumind.system.dto.auth.PasswordResetDTO dto);
 }

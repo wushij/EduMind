@@ -17,7 +17,7 @@
       <el-card shadow="never" class="main-card">
         <template #header>
           <div class="card-header-title">
-            <span class="icon">🚀</span>
+            <el-icon class="icon"><Promotion /></el-icon>
             <div>
               <h3>发布新作业 / 课后评测</h3>
               <p>为班级学生布置在线课后作业或章节阶段考核，支持从试卷库关联或自主题库抽题，并可开启AI辅助批改。</p>
@@ -168,7 +168,10 @@
           <div class="rules-switches-grid">
             <div class="switch-item">
               <div class="switch-meta">
-                <span class="switch-title">🤖 启用 AI 智能自动预批改</span>
+                <span class="switch-title">
+                  <el-icon class="switch-icon"><Service /></el-icon>
+                  <span>启用 AI 智能自动预批改</span>
+                </span>
                 <span class="switch-desc">学生提交主观题后，自动调用大模型根据参考答案进行评分、错因分析与评语建议。</span>
               </div>
               <el-switch v-model="formData.aiGradingEnabled" />
@@ -176,7 +179,10 @@
 
             <div class="switch-item">
               <div class="switch-meta">
-                <span class="switch-title">⏰ 允许逾期迟交</span>
+                <span class="switch-title">
+                  <el-icon class="switch-icon"><Timer /></el-icon>
+                  <span>允许逾期迟交</span>
+                </span>
                 <span class="switch-desc">超过截止时间后仍允许学生补交答卷，并在批改列表中标记“迟交”。</span>
               </div>
               <el-switch v-model="formData.allowLate" />
@@ -184,7 +190,10 @@
 
             <div class="switch-item">
               <div class="switch-meta">
-                <span class="switch-title">🔍 提交后立即可见客观题得分与解析</span>
+                <span class="switch-title">
+                  <el-icon class="switch-icon"><View /></el-icon>
+                  <span>提交后立即可见客观题得分与解析</span>
+                </span>
                 <span class="switch-desc">学生提交后立即展示客观题（单选、多选、判断）对错反馈与文字解析。</span>
               </div>
               <el-switch v-model="formData.instantFeedback" />
@@ -201,7 +210,8 @@
               class="publish-btn"
               @click="handlePublishAssignment"
             >
-              🚀 确认并正式发布作业
+              <el-icon class="btn-icon"><Promotion /></el-icon>
+              <span>确认并正式发布作业</span>
             </el-button>
           </div>
         </el-form>
@@ -214,7 +224,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
-import { ArrowLeft } from '@element-plus/icons-vue';
+import { ArrowLeft, Promotion, Service, Timer, View } from '@element-plus/icons-vue';
 import { createAssignment, publishAssignment } from '@/api/question/assignment';
 import { getCourseList } from '@/api/course/course';
 import { getExams } from '@/api/question/exam';
@@ -357,7 +367,7 @@ async function handlePublishAssignment() {
       if (assignmentId) {
         await publishAssignment(assignmentId);
       }
-      ElMessage.success('🎉 作业已成功发布，学生现已可在学生端查收并作答！');
+      ElMessage.success('作业已成功发布，学生现已可在学生端查收并作答！');
       router.push('/question/assignments');
     } catch (err: any) {
       console.error('发布作业失败:', err);
@@ -427,7 +437,11 @@ function getTypeTagType(type: QuestionType | string) {
         gap: 16px;
 
         .icon {
-          font-size: 32px;
+          font-size: 28px;
+          color: #2563eb;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         h3 {
@@ -565,9 +579,17 @@ function getTypeTagType(type: QuestionType | string) {
               flex-direction: column;
 
               .switch-title {
+                display: flex;
+                align-items: center;
+                gap: 6px;
                 font-size: 14px;
                 font-weight: 600;
                 color: #1e293b;
+
+                .switch-icon {
+                  font-size: 16px;
+                  color: #2563eb;
+                }
               }
 
               .switch-desc {

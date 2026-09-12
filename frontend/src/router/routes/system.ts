@@ -93,5 +93,24 @@ export const systemRoutes: RouteRecordRaw[] = [
     name: 'SystemConfig',
     component: () => import('@/views/system/config/SystemConfig.vue'),
     meta: { title: '平台全局配置', requiresAuth: true, roles: ['ADMIN'] }
+  },
+
+  // AI 网关
+  {
+    path: '/system/gateway',
+    name: 'SystemGatewayDashboard',
+    component: () => import('@/views/system/gateway/GatewayDashboard.vue'),
+    meta: { title: 'AI 网关监控', requiresAuth: true, roles: ['ADMIN'] }
+  },
+  {
+    path: '/system/gateway/routes',
+    name: 'SystemGatewayRoutes',
+    component: () => import('@/views/system/gateway/RouteRules.vue'),
+    meta: {
+      title: '网关路由规则',
+      requiresAuth: true,
+      roles: ['ADMIN'],
+      activeMenu: '/system/gateway'
+    }
   }
 ];

@@ -24,7 +24,7 @@
           @click="handleSaveExam"
         >
           <span>保存试卷并归档入库</span>
-          <span>✓</span>
+          <el-icon><Check /></el-icon>
         </button>
       </div>
     </div>
@@ -82,7 +82,8 @@
                   title="让 AI 从题库调取同考点替选题"
                   @click="swapQuestion(q.id)"
                 >
-                  🔄 换一题
+                  <el-icon><Refresh /></el-icon>
+                  <span>换一题</span>
                 </button>
               </div>
 
@@ -130,7 +131,8 @@
                   class="swap-q-btn"
                   @click="swapQuestion(q.id)"
                 >
-                  🔄 换一题
+                  <el-icon><Refresh /></el-icon>
+                  <span>换一题</span>
                 </button>
               </div>
 
@@ -150,6 +152,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { Refresh, Check } from '@element-plus/icons-vue';
 import { useExamGenerate } from '@/composables/ai/useExamGenerate';
 
 const router = useRouter();
@@ -373,6 +376,9 @@ async function handleSaveExam() {
               }
 
               .swap-q-btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
                 height: 26px;
                 padding: 0 10px;
                 border-radius: 9999px;

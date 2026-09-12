@@ -1,9 +1,11 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import type { HttpRequestConfig } from './types';
 import { ElMessage } from 'element-plus';
 import { TOKEN_KEY } from '@/constants/auth';
-import { API_BASE_URL, API_TIMEOUT } from '@/config';
-import { getTimestamp, generateNonce } from '@/utils/crypto';
+import { API_BASE_URL, API_TIMEOUT, SM_ENABLED, SM_HMAC_SECRET } from '@/config';
+import { getTimestamp, generateNonce, generateRequestSignature } from '@/utils/crypto';
 import { storage } from '../storage/local';
+import { logAppError } from './error-handler';
 
 export const axiosInstance: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -22,36 +24,112 @@ axiosInstance.interceptors.request.use(
       config.headers['satoken'] = token;
     }
 
-    // 自动注入防重放安全请求头：13 位毫秒时间戳 + 32 位唯一 Nonce
-    config.headers['X-Timestamp'] = String(getTimestamp());
-    config.headers['X-Nonce'] = generateNonce();
+    const timestamp = getTimestamp();
+    const nonce = generateNonce();
+    config.headers['X-Timestamp'] = String(timestamp);
+    config.headers['X-Nonce'] = nonce;
+
+    const urlPath = config.url || '/';
+    const path = urlPath.startsWith('http') ? new URL(urlPath).pathname : urlPath;
+    const sensitive = SM_ENABLED && (path.startsWith('/analytics') || path.startsWith('/ai/agent'));
+    if (sensitive) {
+      const body = typeof config.data === 'string'
+        ? config.data
+        : config.data ? JSON.stringify(config.data) : '';
+      const signature = generateRequestSignature(
+        (config.method || 'get').toUpperCase(),
+        path.startsWith('/api') ? path : `/api${path}`,
+        timestamp,
+        nonce,
+        body,
+        SM_HMAC_SECRET
+      );
+      config.headers['X-Signature'] = signature;
+    }
 
     return config;
   },
   (error) => Promise.reject(error)
 );
 
+let lastErrorMsg = '';
+let lastErrorTime = 0;
+function showErrorMessage(msg: string) {
+  const now = Date.now();
+  if (msg === lastErrorMsg && now - lastErrorTime < 2500) {
+    return;
+  }
+  lastErrorMsg = msg;
+  lastErrorTime = now;
+  ElMessage.error(msg);
+}
+
+function handleUnauthorized(message = '登录状态已失效，请重新登录') {
+  storage.remove(TOKEN_KEY);
+  storage.remove('edumind_user_info');
+  showErrorMessage(message);
+  if (!window.location.pathname.startsWith('/auth/login')) {
+    setTimeout(() => {
+      window.location.href = '/auth/login';
+    }, 500);
+  }
+}
+
 // 响应拦截器
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => {
     const res = response.data;
+    const silent = (response.config as HttpRequestConfig).silent;
     if (res.code && res.code !== 200) {
-      ElMessage.error(res.message || '请求处理失败');
-      return Promise.reject(new Error(res.message || 'Error'));
+      const msg = res.message || '请求处理失败';
+      if (!silent) {
+        logAppError('API', new Error(msg), {
+          url: response.config?.url,
+          method: response.config?.method,
+          code: res.code,
+          data: res
+        });
+      }
+
+      if (res.code === 401 || res.code === 1001) {
+        handleUnauthorized(msg);
+        return Promise.reject(new Error(msg));
+      }
+
+      if (!silent) {
+        showErrorMessage(msg);
+      }
+      return Promise.reject(new Error(msg));
     }
     return res;
   },
   (error) => {
     const status = error.response?.status;
+    const apiBody = error.response?.data;
+    const silent = (error.config as HttpRequestConfig | undefined)?.silent;
+    const apiMessage =
+      (typeof apiBody === 'object' && apiBody !== null && 'message' in apiBody
+        ? String((apiBody as { message?: string }).message || '')
+        : '') || error.message || '网络通信异常';
+
+    if (!silent) {
+      logAppError('HTTP', error, {
+        url: error.config?.url,
+        method: error.config?.method,
+        status,
+        code: typeof apiBody === 'object' && apiBody !== null ? (apiBody as { code?: number }).code : undefined,
+        data: apiBody
+      });
+    }
+
     if (status === 401) {
-      storage.remove(TOKEN_KEY);
-      storage.remove('edumind_user_info');
-      if (!window.location.pathname.startsWith('/auth/login')) {
-        window.location.href = '/auth/login';
-      }
+      handleUnauthorized(apiMessage);
       return Promise.reject(error);
     }
-    ElMessage.error(error.response?.data?.message || error.message || '网络通信异常');
+
+    if (!silent) {
+      showErrorMessage(apiMessage);
+    }
     return Promise.reject(error);
   }
 );

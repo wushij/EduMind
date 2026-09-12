@@ -9,19 +9,19 @@ export const V05_TOOL_NOTICES: Record<string, V05ToolNoticeConfig> = {
   tool_lesson: {
     title: 'AI 教案生成',
     description:
-      'V0.5 将支持输入授课主题、学时与教学目标，自动生成符合规范的教学大纲、课堂设计与互动提问建议。',
+      'V0.5 已上线：输入授课主题、学时与教学目标，生成教学大纲与课堂设计建议。',
     alternatives: [
-      { label: 'AI 智能出题', route: '/ai/question/generate' },
-      { label: '课程 AI 问答', route: '/course/101/ai' }
+      { label: '打开 AI 教案', route: '/ai/lesson' },
+      { label: 'AI 智能出题', route: '/ai/question/generate' }
     ]
   },
   tool_summary: {
     title: 'AI 课程总结',
     description:
-      'V0.5 将支持上传课件或长文档，自动提炼章节要点、易错清单与考前复习精要。',
+      'V0.5 已上线：上传课件或长文档，自动提炼章节要点与复习精要。',
     alternatives: [
-      { label: '知识库文档', route: '/knowledge' },
-      { label: '课程 AI 问答', route: '/course/101/ai' }
+      { label: '打开 AI 总结', route: '/ai/summary' },
+      { label: '知识库文档', route: '/knowledge' }
     ]
   },
   tool_wrong_analysis: {
@@ -56,7 +56,7 @@ export const V05_TOOL_NOTICES: Record<string, V05ToolNoticeConfig> = {
     description:
       'V0.5 将支持根据教学大纲生成课件页结构与演讲备注。',
     alternatives: [
-      { label: 'AI 教案（规划中）', route: '/ai/lesson' },
+      { label: 'AI 教案', route: '/ai/lesson' },
       { label: '知识库', route: '/knowledge' }
     ]
   },

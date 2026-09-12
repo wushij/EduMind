@@ -1,6 +1,6 @@
 <template>
   <div class="knowledge-base-page-container">
-    <!-- 1. 顶部专属 3D 视觉大 Banner (严格对齐原型图 2 与 知识库管理banner.png，比例 2172×724) -->
+    <!-- 1. 顶部专属 3D 视觉大 Banner (知识库banner.png，比例 2508×627) -->
     <div class="knowledge-banner-stage">
       <div class="banner-ratio-box">
         <img
@@ -212,7 +212,7 @@ import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
 import KnowledgeBaseCard from '@/components/knowledge/KnowledgeBaseCard.vue';
 import { useKnowledgeBase } from '@/composables/knowledge/useKnowledgeBase';
 import type { KnowledgeBase } from '@/types/knowledge/knowledge-base';
-import kbBannerImg from '@/assets/images/知识库管理banner.png';
+import kbBannerImg from '@/assets/images/知识库banner.png';
 
 const router = useRouter();
 const { knowledgeBases, fetchKnowledgeBases, create, remove } = useKnowledgeBase();
@@ -331,7 +331,7 @@ async function handleConfirmCreate() {
   gap: 20px;
   width: 100%;
 
-  // 顶部专属 3D 视觉大 Banner (比例 2172×724)
+  // 顶部专属 3D 视觉大 Banner (比例 2508×627)
   .knowledge-banner-stage {
     width: 100%;
     margin-bottom: 2px;
@@ -339,7 +339,7 @@ async function handleConfirmCreate() {
     .banner-ratio-box {
       position: relative;
       width: 100%;
-      aspect-ratio: 2172 / 724;
+      aspect-ratio: 2508 / 627;
       border-radius: 16px;
       overflow: hidden;
       box-shadow: 0 6px 24px rgba(22, 119, 255, 0.08);

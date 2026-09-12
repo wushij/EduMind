@@ -19,7 +19,7 @@
       <el-card shadow="never" class="form-card">
         <template #header>
           <div class="card-header-title">
-            <span class="icon">📝</span>
+            <el-icon class="icon"><EditPen /></el-icon>
             <div>
               <h3>第一步：设置试卷基本规范</h3>
               <p>请填写本次测验或期末考试的名称、所属课程与考场基准时间规则。</p>
@@ -112,7 +112,8 @@
         <div class="step-footer-bar">
           <div></div>
           <el-button type="primary" size="large" @click="goToStep2">
-            下一步：编排大题与选题 ➔
+            <span>下一步：编排大题与选题</span>
+            <el-icon class="ml-1"><ArrowRight /></el-icon>
           </el-button>
         </div>
       </el-card>
@@ -181,9 +182,10 @@
                   type="primary"
                   link
                   size="small"
+                  :icon="Plus"
                   @click="openQuestionPicker(sec)"
                 >
-                  ➕ 选题入卷 ({{ sec.questions.length }})
+                  选题入卷 ({{ sec.questions.length }})
                 </el-button>
                 <el-popconfirm
                   title="确认删除该大题及其包含的所有试题吗？"
@@ -237,7 +239,7 @@
               </div>
 
               <div v-if="sec.questions.length === 0" class="sec-empty-hint">
-                暂未选择试题，请点击右上角「➕ 选题入卷」从课程题库中挑选试题。
+                暂未选择试题，请点击右上角「选题入卷」从课程题库中挑选试题。
               </div>
             </div>
           </div>
@@ -263,7 +265,13 @@
               :color="currentTotalScore === examForm.totalScore ? '#10b981' : '#3b82f6'"
             />
             <span class="progress-tip">
-              {{ currentTotalScore === examForm.totalScore ? '✅ 已达到预期满分' : `还差 ${examForm.totalScore - currentTotalScore} 分达到试卷满分` }}
+              <template v-if="currentTotalScore === examForm.totalScore">
+                <el-icon class="tip-success-icon"><CircleCheckFilled /></el-icon>
+                <span>已达到预期满分</span>
+              </template>
+              <template v-else>
+                还差 {{ examForm.totalScore - currentTotalScore }} 分达到试卷满分
+              </template>
             </span>
           </div>
 
@@ -314,7 +322,8 @@
               上一步：修改基本信息
             </el-button>
             <el-button type="primary" class="w-full" size="large" @click="goToStep3">
-              下一步：审阅与发布 ➔
+              <span>下一步：审阅与发布</span>
+              <el-icon class="ml-1"><ArrowRight /></el-icon>
             </el-button>
           </div>
         </el-card>
@@ -418,7 +427,11 @@
               class="submit-publish-btn"
               @click="handleSaveExam"
             >
-              {{ publishStatus === 'PUBLISHED' ? '🚀 确认并正式发布试卷' : '💾 保存试卷草稿' }}
+              <el-icon class="btn-icon">
+                <Promotion v-if="publishStatus === 'PUBLISHED'" />
+                <DocumentCopy v-else />
+              </el-icon>
+              <span>{{ publishStatus === 'PUBLISHED' ? '确认并正式发布试卷' : '保存试卷草稿' }}</span>
             </el-button>
           </div>
         </div>
@@ -503,12 +516,17 @@ import { useRouter, useRoute } from 'vue-router';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import {
   ArrowLeft,
+  ArrowRight,
   Document,
   Setting,
   Finished,
   Plus,
   Delete,
-  Search
+  Search,
+  EditPen,
+  CircleCheckFilled,
+  Promotion,
+  DocumentCopy
 } from '@element-plus/icons-vue';
 import { getCourseList } from '@/api/course/course';
 import { createExam } from '@/api/question/exam';
@@ -517,6 +535,7 @@ import type { Course } from '@/types/course/course';
 import type { QuestionItem, QuestionType, Difficulty } from '@/types/question/question';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_QUESTIONS } from '@/mock/questions';
+import { normalizeQuestionList } from '@/utils/question/normalize-question';
 
 const router = useRouter();
 const route = useRoute();
@@ -630,12 +649,13 @@ async function loadCourses() {
 async function loadPoolQuestions() {
   try {
     const res = await getQuestions({ pageSize: 50 });
-    poolQuestions.value = res.data?.list?.length
-      ? res.data.list
-      : (USE_MOCK ? MOCK_QUESTIONS : []);
+    const normalized = normalizeQuestionList(res.data?.list || []);
+    poolQuestions.value = normalized.length > 0
+      ? normalized
+      : (USE_MOCK ? normalizeQuestionList(MOCK_QUESTIONS) : []);
   } catch (err: any) {
     if (USE_MOCK) {
-      poolQuestions.value = MOCK_QUESTIONS;
+      poolQuestions.value = normalizeQuestionList(MOCK_QUESTIONS);
     } else {
       poolQuestions.value = [];
       ElMessage.error(err?.message || '获取试题池失败');
@@ -825,7 +845,7 @@ async function handleSaveExam() {
     };
 
     await createExam(payload as any);
-    ElMessage.success(publishStatus.value === 'PUBLISHED' ? '🎉 试卷正式发布成功！' : '试卷草稿已成功保存！');
+    ElMessage.success(publishStatus.value === 'PUBLISHED' ? '试卷正式发布成功！' : '试卷草稿已成功保存！');
     router.push('/question/exams');
   } catch (err: any) {
     console.error('保存试卷失败', err);
@@ -1187,11 +1207,19 @@ function getDifficultyTagType(diff: Difficulty | string) {
           margin-bottom: 20px;
 
           .progress-tip {
-            display: block;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
             margin-top: 6px;
             font-size: 12px;
             color: #64748b;
             text-align: center;
+
+            .tip-success-icon {
+              font-size: 14px;
+              color: #10b981;
+            }
           }
         }
 

@@ -14,7 +14,23 @@ public class TeachingReportVO {
     private Integer recommendedResources;
     private Integer aiCallCount;
     private Double avgSubmissionRate;
+    private Double knowledgeMasteryAvg;
     private List<WeakPointVO> weakPoints = new ArrayList<>();
+    private List<WeeklyActivityVO> weeklyActivity = new ArrayList<>();
+    private List<ErrorCategoryVO> errorCategories = new ArrayList<>();
+
+    @Data
+    public static class WeeklyActivityVO {
+        private String date;
+        private Integer count;
+    }
+
+    @Data
+    public static class ErrorCategoryVO {
+        private String type;
+        private String name;
+        private Integer percent;
+    }
 
     @Data
     public static class WeakPointVO {

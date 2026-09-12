@@ -6,7 +6,7 @@
         <div class="title-with-icon">
           <el-icon class="header-icon text-blue-600"><Tickets /></el-icon>
           <h1 class="main-title">试卷与考试管理中心</h1>
-          <span class="capsule-count-tag">已收录 {{ exams.length }} 套标准化期末试卷</span>
+          <span class="capsule-count-tag">已收录 {{ total }} 套标准化期末试卷</span>
         </div>
         <p class="sub-desc">
           集中管理期中/期末统一测试试卷、随堂测验与单元测试，支持双向细目表校验、AI 一键调优换题与格式化导出。
@@ -40,12 +40,12 @@
       <div class="stat-pill-item">
         <el-icon class="pill-icon text-blue-600"><Document /></el-icon>
         <span class="pill-label">试卷总数：</span>
-        <strong class="pill-val">{{ exams.length }} 套</strong>
+        <strong class="pill-val">{{ total }} 套</strong>
       </div>
       <div class="stat-pill-item">
         <el-icon class="pill-icon text-emerald-600"><CircleCheck /></el-icon>
         <span class="pill-label">已排版就绪：</span>
-        <strong class="pill-val">{{ exams.length }} 套 (总分100分合规)</strong>
+        <strong class="pill-val">{{ exams.length }} 套 (当前页)</strong>
       </div>
       <div class="stat-pill-item">
         <el-icon class="pill-icon text-indigo-600"><User /></el-icon>
@@ -66,46 +66,32 @@
         <div class="pill-tags-track">
           <span
             v-for="c in courseOptions"
-            :key="c"
+            :key="String(c.value)"
             class="filter-pill-tag"
-            :class="{ active: selectedCourse === c }"
-            @click="selectedCourse = c"
+            :class="{ active: selectedCourseId === c.value }"
+            @click="handleCourseFilter(c.value)"
           >
-            {{ c }}
+            {{ c.label }}
           </span>
         </div>
       </div>
 
       <div class="filter-row filter-row--bottom">
-        <div class="filter-left-col">
-          <span class="filter-label">考试学期：</span>
-          <div class="pill-tags-track">
-            <span
-              v-for="s in semesterOptions"
-              :key="s"
-              class="filter-pill-tag"
-              :class="{ active: selectedSemester === s }"
-              @click="selectedSemester = s"
-            >
-              {{ s }}
-            </span>
-          </div>
-        </div>
-
-        <div class="filter-right-search">
+        <div class="filter-right-search filter-right-search--full">
           <div class="capsule-search-box">
             <el-icon class="search-icon"><Search /></el-icon>
             <input
               v-model="keyword"
               type="text"
               class="capsule-search-input"
-              placeholder="搜索试卷标题、课程名称或学期..."
+              placeholder="搜索试卷标题、课程名称..."
+              @keyup.enter="handleSearch"
             />
             <button
               v-if="keyword"
               type="button"
               class="clear-btn"
-              @click="keyword = ''"
+              @click="clearKeyword"
             >
               <el-icon><Close /></el-icon>
             </button>
@@ -115,9 +101,10 @@
     </div>
 
     <!-- 4. 试卷卡片流网格 -->
-    <div v-if="filteredExams.length > 0" class="exams-cards-grid">
+    <div v-loading="loading" class="exam-list-content">
+    <div v-if="exams.length > 0" class="exams-cards-grid">
       <div
-        v-for="exam in filteredExams"
+        v-for="exam in exams"
         :key="exam.id"
         class="exam-paper-card"
       >
@@ -154,7 +141,7 @@
           </div>
           <div class="spec-pill-item">
             <span class="spec-label">收录大题：</span>
-            <strong class="spec-val">{{ exam.rules.length }} 大类</strong>
+            <strong class="spec-val">{{ (exam.rules || []).length }} 大类</strong>
           </div>
         </div>
 
@@ -163,7 +150,7 @@
           <div class="rules-title">试卷题型结构分布：</div>
           <div class="rules-tags-track">
             <span
-              v-for="r in exam.rules"
+              v-for="r in exam.rules || []"
               :key="r.type"
               class="rule-chip"
             >
@@ -220,11 +207,19 @@
         <span>立即使用 AI 智能组卷</span>
       </button>
     </div>
+
+    <AppPagination
+      v-model:page-num="pageNum"
+      v-model:page-size="pageSize"
+      :total="total"
+      @change="loadExams"
+    />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import {
@@ -242,46 +237,72 @@ import {
   View,
   Promotion
 } from '@element-plus/icons-vue';
+import AppPagination from '@/components/common/AppPagination.vue';
 import { useExam } from '@/composables/question/useExam';
+import { getCourseList } from '@/api/course/course';
 import type { Exam } from '@/types/question/exam';
 
 const router = useRouter();
-const { exams, fetchExams } = useExam();
+const { exams, loading, total, fetchExams } = useExam();
 
-onMounted(() => fetchExams());
-const selectedCourse = ref<string>('全部课程');
-const selectedSemester = ref<string>('全部学期');
+const pageNum = ref(1);
+const pageSize = ref(10);
+const selectedCourseId = ref<number | null>(null);
 const keyword = ref<string>('');
 
-const courseOptions = ['全部课程', '大学数学：高等数学（上）', '计算机核心：数据结构与算法'];
-const semesterOptions = ['全部学期', '2026秋季学期', '2026春季学期'];
+const courseOptions = ref<Array<{ label: string; value: number | null }>>([
+  { label: '全部课程', value: null }
+]);
 
-const filteredExams = computed(() => {
-  let list = [...exams.value];
-
-  if (selectedCourse.value !== '全部课程') {
-    list = list.filter((e) => e.courseName === selectedCourse.value);
-  }
-
-  if (selectedSemester.value !== '全部学期') {
-    list = list.filter((e) => e.semester === selectedSemester.value);
-  }
-
-  if (keyword.value.trim()) {
-    const kw = keyword.value.trim().toLowerCase();
-    list = list.filter(
-      (e) =>
-        e.title.toLowerCase().includes(kw) ||
-        e.courseName.toLowerCase().includes(kw) ||
-        e.semester.toLowerCase().includes(kw)
-    );
-  }
-
-  return list;
+onMounted(async () => {
+  await loadCourseOptions();
+  await loadExams();
 });
 
-function handlePreview(_exam: Exam) {
-  router.push('/ai/exam/preview');
+async function loadCourseOptions() {
+  try {
+    const res = await getCourseList({ page: 1, pageSize: 100 });
+    const list = res.data?.list || [];
+    courseOptions.value = [
+      { label: '全部课程', value: null },
+      ...list.map((item: any) => ({
+        label: item.title || item.name,
+        value: item.id
+      }))
+    ];
+  } catch {
+    courseOptions.value = [{ label: '全部课程', value: null }];
+  }
+}
+
+async function loadExams() {
+  await fetchExams({
+    page: pageNum.value,
+    pageSize: pageSize.value,
+    courseId: selectedCourseId.value || undefined,
+    keyword: keyword.value.trim() || undefined
+  });
+}
+
+function handleCourseFilter(value: number | null) {
+  selectedCourseId.value = value;
+  pageNum.value = 1;
+  loadExams();
+}
+
+function handleSearch() {
+  pageNum.value = 1;
+  loadExams();
+}
+
+function clearKeyword() {
+  keyword.value = '';
+  pageNum.value = 1;
+  loadExams();
+}
+
+function handlePreview(exam: Exam) {
+  router.push(`/question/exams/${exam.id}`);
 }
 
 function handleExportPdf(exam: Exam) {
@@ -299,6 +320,16 @@ function handlePublish(exam: Exam) {
   flex-direction: column;
   gap: 20px;
   width: 100%;
+
+  .exam-list-content {
+    min-height: 240px;
+  }
+
+  .filter-right-search--full {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+  }
 
   // 1. 顶部操作坞
   .exam-header-dock {

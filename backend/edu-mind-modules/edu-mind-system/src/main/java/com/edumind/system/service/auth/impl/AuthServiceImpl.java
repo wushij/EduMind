@@ -3,6 +3,8 @@ package com.edumind.system.service.auth.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import com.edumind.common.exception.BusinessException;
+import com.edumind.infrastructure.redis.RedisService;
+import com.edumind.infrastructure.redis.cache.PermissionCacheService;
 import com.edumind.security.captcha.CaptchaService;
 import com.edumind.common.enums.RoleCode;
 import com.edumind.system.dao.RoleDao;
@@ -41,6 +43,8 @@ public class AuthServiceImpl implements AuthService {
     private final CaptchaService captchaService;
     private final UserVoAssembler userVoAssembler;
     private final com.edumind.system.service.email.EmailCodeService emailCodeService;
+    private final RedisService redisService;
+    private final PermissionCacheService permissionCacheService;
 
     @Override
     public LoginVO login(LoginDTO loginDTO) {
@@ -55,6 +59,7 @@ public class AuthServiceImpl implements AuthService {
 
         if (user == null) {
             if ("admin".equals(username) && "admin123".equals(password)) {
+                permissionCacheService.evictUser(1L);
                 StpUtil.login(1L);
                 UserVO adminVO = UserVO.builder()
                         .id(1L)
@@ -81,6 +86,7 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException("该账号已被停用，请联系管理员");
         }
 
+        permissionCacheService.evictUser(user.getId());
         StpUtil.login(user.getId());
 
         return LoginVO.builder()
@@ -108,6 +114,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 3. 执行登录授权
+        permissionCacheService.evictUser(user.getId());
         StpUtil.login(user.getId());
 
         return LoginVO.builder()
@@ -118,6 +125,17 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void sendEmailCode(com.edumind.system.dto.auth.EmailSendCodeDTO sendCodeDTO) {
+        String scene = sendCodeDTO.getScene() != null ? sendCodeDTO.getScene().trim().toLowerCase() : "login";
+        if ("resetpwd".equals(scene) || "modifypwd".equals(scene)) {
+            String email = sendCodeDTO.getEmail() != null ? sendCodeDTO.getEmail().trim().toLowerCase() : "";
+            UserEntity user = userDao.findByEmail(email);
+            if (user == null) {
+                throw new BusinessException("未找到该邮箱对应的账号，请确认邮箱是否输入正确");
+            }
+            if ("DISABLE".equalsIgnoreCase(user.getStatus())) {
+                throw new BusinessException("该账号已被停用，无法找回密码，请联系管理员");
+            }
+        }
         emailCodeService.sendCode(sendCodeDTO);
     }
 
@@ -174,6 +192,73 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException("用户不存在");
         }
         return userVoAssembler.toVO(user);
+    }
+
+    @Override
+    public com.edumind.system.vo.auth.PasswordResetVerifyVO verifyResetCode(com.edumind.system.dto.auth.PasswordResetVerifyDTO dto) {
+        String email = dto.getEmail().trim().toLowerCase();
+        String code = dto.getCode().trim();
+
+        // 1. 验证用户存在性与状态
+        UserEntity user = userDao.findByEmail(email);
+        if (user == null) {
+            throw new BusinessException("未找到该邮箱对应的账号，请确认邮箱是否输入正确");
+        }
+        if ("DISABLE".equalsIgnoreCase(user.getStatus())) {
+            throw new BusinessException("该账号已被停用，无法重置密码，请联系管理员");
+        }
+
+        // 2. 校验邮箱验证码（校验成功后单次失效）
+        emailCodeService.verifyCode(email, "resetpwd", code);
+
+        // 3. 颁发临时重置票据（有效时长 10 分钟）
+        String resetToken = cn.hutool.core.util.IdUtil.fastSimpleUUID();
+        String ticketKey = com.edumind.infrastructure.redis.RedisKeyBuilder.emailResetTicket(resetToken);
+        redisService.set(ticketKey, email, com.edumind.common.constant.RedisConstant.EMAIL_RESET_TICKET_TTL_SECONDS);
+
+        log.info("找回密码身份验证通过，生成重置凭据 [userId={}, email={}, resetToken={}]", user.getId(), email, resetToken);
+
+        return com.edumind.system.vo.auth.PasswordResetVerifyVO.builder()
+                .resetToken(resetToken)
+                .build();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resetPassword(com.edumind.system.dto.auth.PasswordResetDTO dto) {
+        String targetEmail = null;
+
+        // 1. 票据模式（分步向导）
+        if (StringUtils.hasText(dto.getResetToken())) {
+            String ticketKey = com.edumind.infrastructure.redis.RedisKeyBuilder.emailResetTicket(dto.getResetToken().trim());
+            targetEmail = redisService.get(ticketKey);
+            if (!StringUtils.hasText(targetEmail)) {
+                throw new BusinessException("身份验证凭据已过期或无效，请重新验证身份");
+            }
+            // 立即单次失效防重放
+            redisService.delete(ticketKey);
+        }
+        // 2. 直填模式（email + code + newPassword，对齐 Cloud_Disk 原生模式）
+        else if (StringUtils.hasText(dto.getEmail()) && StringUtils.hasText(dto.getCode())) {
+            targetEmail = dto.getEmail().trim().toLowerCase();
+            emailCodeService.verifyCode(targetEmail, "resetpwd", dto.getCode().trim());
+        } else {
+            throw new BusinessException("缺少重置密码凭据或验证码，请重新核验身份");
+        }
+
+        // 3. 查询用户并更新密码
+        UserEntity user = userDao.findByEmail(targetEmail);
+        if (user == null) {
+            throw new BusinessException("未找到该邮箱对应的账号，请确认邮箱是否输入正确");
+        }
+        if ("DISABLE".equalsIgnoreCase(user.getStatus())) {
+            throw new BusinessException("该账号已被停用，无法重置密码");
+        }
+
+        user.setPassword(BCrypt.hashpw(dto.getNewPassword().trim()));
+        userDao.updateById(user);
+
+        log.info("用户通过邮箱验证成功重置登录密码 [userId={}, username={}, email={}]", user.getId(), user.getUsername(), targetEmail);
     }
 
     private boolean matchesPassword(String rawPassword, String storedPassword) {

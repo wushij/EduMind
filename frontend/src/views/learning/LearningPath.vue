@@ -2,7 +2,9 @@
   <div class="learning-path-page">
     <h2>学习路径</h2>
     <div class="toolbar">
-      <el-input-number v-model="courseId" :min="1" />
+      <el-select v-model="courseId" placeholder="选择课程" style="width: 220px" @change="loadPath">
+        <el-option v-for="c in courseOptions" :key="c.id" :label="c.name" :value="c.id" />
+      </el-select>
       <el-button type="primary" :loading="loading" @click="loadPath">生成路径</el-button>
     </div>
 
@@ -31,16 +33,20 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { getLearningPath } from '@/api/learning/learning-path';
+import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
+import { useAuthStore } from '@/stores/auth/auth';
 import type { LearningPathVO } from '@/types/learning/learning-path';
 
-const courseId = ref(1);
+const { courseOptions, courseId } = useTeacherCourses(102);
+const authStore = useAuthStore();
 const loading = ref(false);
 const path = ref<LearningPathVO | null>(null);
 
 async function loadPath() {
   loading.value = true;
   try {
-    const res = await getLearningPath(courseId.value);
+    const studentId = authStore.currentUser?.id;
+    const res = await getLearningPath(courseId.value, studentId);
     path.value = res?.data || null;
   } catch {
     path.value = null;

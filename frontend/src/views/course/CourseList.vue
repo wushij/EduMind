@@ -112,17 +112,13 @@
       </div>
     </div>
 
-    <!-- 底部长圆分页 -->
-    <div v-if="courses.length > 0" class="pagination-footer">
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :total="total"
-        layout="total, prev, pager, next"
-        class="custom-pagination"
-        @current-change="handlePageChange"
-      />
-    </div>
+    <!-- 底部分页 -->
+    <AppPagination
+      v-model:page-num="currentPage"
+      v-model:page-size="pageSize"
+      :total="total"
+      @change="loadData"
+    />
   </div>
 </template>
 
@@ -132,6 +128,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { CircleClose } from '@element-plus/icons-vue';
 import CourseCard from '@/components/course/CourseCard.vue';
+import AppPagination from '@/components/common/AppPagination.vue';
 import { useCourse } from '@/composables/course/useCourse';
 
 const router = useRouter();
@@ -141,7 +138,7 @@ const searchKeyword = ref('');
 const currentStatusTab = ref('ALL');
 const selectedSemester = ref('ALL');
 const currentPage = ref(1);
-const pageSize = ref(12);
+const pageSize = ref(10);
 
 const statusTabs = computed(() => [
   { label: '全部课程', value: 'ALL', count: total.value },
@@ -153,16 +150,19 @@ function loadData() {
   fetchCourses({
     keyword: searchKeyword.value,
     status: currentStatusTab.value,
-    semester: selectedSemester.value
+    page: currentPage.value,
+    pageSize: pageSize.value
   });
 }
 
 function handleStatusTabChange(tabVal: string) {
   currentStatusTab.value = tabVal;
+  currentPage.value = 1;
   loadData();
 }
 
 function handleFilterChange() {
+  currentPage.value = 1;
   loadData();
 }
 
@@ -175,11 +175,7 @@ function resetFilters() {
   searchKeyword.value = '';
   currentStatusTab.value = 'ALL';
   selectedSemester.value = 'ALL';
-  loadData();
-}
-
-function handlePageChange(page: number) {
-  currentPage.value = page;
+  currentPage.value = 1;
   loadData();
 }
 

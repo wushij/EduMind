@@ -3,8 +3,6 @@ package com.edumind.security.crypto;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.nio.charset.StandardCharsets;
-
 public class CryptoTest {
 
     private final Sm3HmacService sm3HmacService = new Sm3HmacService();

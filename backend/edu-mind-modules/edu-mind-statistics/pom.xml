@@ -15,6 +15,10 @@
     <dependencies>
         <dependency>
             <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.edumind</groupId>
             <artifactId>edu-mind-course</artifactId>
         </dependency>
         <dependency>
@@ -28,6 +32,10 @@
         <dependency>
             <groupId>com.edumind</groupId>
             <artifactId>edu-mind-ai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-knowledge</artifactId>
         </dependency>
         <dependency>
             <groupId>com.edumind</groupId>

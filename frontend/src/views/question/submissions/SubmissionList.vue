@@ -4,7 +4,7 @@
     <div class="submission-header-dock">
       <div class="header-left">
         <div class="title-with-icon">
-          <span class="header-icon">📑</span>
+          <el-icon class="header-icon"><Document /></el-icon>
           <h1 class="main-title">学生作业答卷与批改总览</h1>
           <span class="capsule-count-tag">已收录 {{ filteredSubmissions.length }} 份答卷</span>
         </div>
@@ -20,7 +20,8 @@
           :loading="batchLoading"
           @click="handleBatchAIGrading"
         >
-          🤖 启动全队列 AI 智能批改
+          <el-icon><Service /></el-icon>
+          <span>启动全队列 AI 智能批改</span>
         </el-button>
       </div>
     </div>
@@ -93,8 +94,9 @@
 
         <el-table-column label="AI智能预评" width="130">
           <template #default="{ row }">
-            <span v-if="row.aiScore !== null && row.aiScore !== undefined" class="text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded font-semibold border border-purple-200">
-              🤖 {{ row.aiScore }} 分
+            <span v-if="row.aiScore !== null && row.aiScore !== undefined" class="text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded font-semibold border border-purple-200 inline-flex items-center gap-1">
+              <el-icon><Cpu /></el-icon>
+              <span>{{ row.aiScore }} 分</span>
             </span>
             <span v-else class="text-xs text-slate-400">未调用</span>
           </template>
@@ -138,7 +140,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { Search } from '@element-plus/icons-vue';
+import { Search, Document, Service, Cpu } from '@element-plus/icons-vue';
 import { getCourseList } from '@/api/course/course';
 import { getAssignments } from '@/api/question/assignment';
 import { getSubmissionsByAssignment, gradeSubmission } from '@/api/question/submission';
@@ -290,7 +292,10 @@ async function handleBatchAIGrading() {
         gap: 12px;
 
         .header-icon {
-          font-size: 28px;
+          font-size: 26px;
+          color: #2563eb;
+          display: inline-flex;
+          align-items: center;
         }
 
         .main-title {

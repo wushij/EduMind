@@ -1,6 +1,6 @@
 package com.edumind.ai.rag.pipeline;
 
-import com.edumind.ai.integration.llm.LlmClient;
+import com.edumind.ai.gateway.AiGatewayFacade;
 import com.edumind.ai.rag.context.ContextBuilder;
 import com.edumind.ai.rag.model.RagResult;
 import com.edumind.ai.rag.model.RetrievalHit;
@@ -24,7 +24,7 @@ public class RagPipelineImpl implements RagPipeline {
     private final ScoreReranker scoreReranker;
     private final ContextBuilder contextBuilder;
     private final PromptService promptService;
-    private final LlmClient llmClient;
+    private final AiGatewayFacade aiGatewayFacade;
 
     @Override
     public String execute(String query, Long knowledgeBaseId) {
@@ -44,7 +44,7 @@ public class RagPipelineImpl implements RagPipeline {
         String promptPreview = promptService.renderTemplate("chat_rag", vars);
         String answer = null;
         if (!skipLlm) {
-            answer = llmClient.chat(promptService.getSystemPrompt("chat"), promptPreview);
+            answer = aiGatewayFacade.chat("RAG", promptService.getSystemPrompt("chat"), promptPreview);
         }
         return RagResult.builder()
                 .originalQuery(query)

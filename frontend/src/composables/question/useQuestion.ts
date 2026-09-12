@@ -9,6 +9,7 @@ import {
 import { QuestionItem } from '@/types/question/question';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_QUESTIONS } from '@/mock/questions';
+import { normalizeQuestion, normalizeQuestionList } from '@/utils/question/normalize-question';
 
 export function useQuestion() {
   const questions = ref<QuestionItem[]>([]);
@@ -20,10 +21,10 @@ export function useQuestion() {
     loading.value = true;
     try {
       const res = await getQuestions(params);
-      questions.value = res.data?.list || [];
+      questions.value = normalizeQuestionList(res.data?.list || []);
       total.value = res.data?.total ?? questions.value.length;
     } catch {
-      questions.value = USE_MOCK ? [...MOCK_QUESTIONS] : [];
+      questions.value = USE_MOCK ? normalizeQuestionList(MOCK_QUESTIONS) : [];
       total.value = questions.value.length;
     } finally {
       loading.value = false;
@@ -34,9 +35,12 @@ export function useQuestion() {
     loading.value = true;
     try {
       const res = await getQuestionDetail(id);
-      currentQuestion.value = res.data;
+      currentQuestion.value = normalizeQuestion(res.data || {});
     } catch {
-      currentQuestion.value = USE_MOCK ? MOCK_QUESTIONS.find(q => q.id === id) || null : null;
+      const fallback = USE_MOCK ? MOCK_QUESTIONS.find(q => q.id === id) || null : null;
+      currentQuestion.value = fallback
+        ? normalizeQuestion(fallback)
+        : null;
     } finally {
       loading.value = false;
     }

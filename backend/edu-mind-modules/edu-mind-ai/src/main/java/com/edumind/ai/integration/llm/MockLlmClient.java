@@ -12,10 +12,15 @@ import java.util.Map;
 public class MockLlmClient implements LlmClient {
 
     private final LlmProperties llmProperties;
+    private final String modelKey;
+
+    public MockLlmClient(LlmProperties llmProperties) {
+        this(llmProperties, "mock");
+    }
 
     @Override
     public String chat(String systemPrompt, String userPrompt) {
-        return "这是 Mock LLM 的回复。您的问题是：" + userPrompt;
+        return "[" + modelKey + "] 这是 Mock LLM 的回复。您的问题是：" + userPrompt;
     }
 
     @Override

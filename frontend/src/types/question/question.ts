@@ -28,6 +28,7 @@ export interface Question {
 }
 
 export type QuestionItem = Question;
+export type QuestionVO = Question;
 
 export interface QuestionGenerateParams {
   subject: string;

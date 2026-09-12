@@ -15,7 +15,9 @@
     <!-- 题库信息看板 -->
     <div class="bank-hero-card" v-loading="loading">
       <div class="hero-main-content">
-        <div class="bank-avatar-badge">🗂️</div>
+        <div class="bank-avatar-badge">
+          <el-icon><FolderOpened /></el-icon>
+        </div>
         <div class="hero-info">
           <div class="title-row">
             <h1 class="bank-title">{{ bankInfo?.name || '试题库详情' }}</h1>
@@ -122,9 +124,7 @@
               </div>
 
               <!-- 题干正文 -->
-              <div class="stem-content">
-                {{ item.stem }}
-              </div>
+              <MathText :text="item.stem" tag="div" custom-class="stem-content" />
 
               <!-- 选项列表（若是选择题） -->
               <div v-if="item.options && item.options.length > 0" class="options-container">
@@ -135,8 +135,8 @@
                   :class="{ 'option-pill--correct': opt.isCorrect }"
                 >
                   <span class="opt-key">{{ opt.key }}.</span>
-                  <span class="opt-text">{{ opt.content }}</span>
-                  <span v-if="opt.isCorrect" class="opt-check-icon">✓ 正确项</span>
+                  <MathText :text="opt.content" tag="span" custom-class="opt-text" />
+                  <span v-if="opt.isCorrect" class="opt-check-icon"><el-icon><Check /></el-icon> 正确项</span>
                 </div>
               </div>
 
@@ -148,7 +148,7 @@
                 </div>
                 <div class="analysis-line">
                   <span class="label">解析说明：</span>
-                  <span class="val">{{ item.analysis || '暂无详细文字解析' }}</span>
+                  <MathText :text="item.analysis || '暂无详细文字解析'" tag="span" custom-class="val" />
                 </div>
                 <div v-if="item.knowledgePointNames && item.knowledgePointNames.length > 0" class="analysis-line">
                   <span class="label">知识点：</span>
@@ -193,7 +193,9 @@
 
         <!-- 空状态 -->
         <div v-else class="empty-questions-card">
-          <div class="empty-icon">📭</div>
+          <div class="empty-icon">
+            <el-icon><Files /></el-icon>
+          </div>
           <h3 class="empty-title">当前题库暂无题目数据</h3>
           <p class="empty-sub">
             您可以从平台的公共试题库中挑选试题批量加入，或者点击上方“挑选题目入库”。
@@ -337,12 +339,14 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { ArrowLeft, Search, Plus, DocumentCopy } from '@element-plus/icons-vue';
+import { ArrowLeft, Search, Plus, DocumentCopy, FolderOpened, Files, Check } from '@element-plus/icons-vue';
 import { getQuestionBankDetail, addQuestionsToBank, removeQuestionFromBank } from '@/api/question/question-bank';
 import { getQuestions } from '@/api/question/question';
 import type { QuestionItem, QuestionType, Difficulty } from '@/types/question/question';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_QUESTIONS } from '@/mock/questions';
+import { normalizeQuestionList } from '@/utils/question/normalize-question';
+import MathText from '@/components/common/MathText.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -419,16 +423,16 @@ async function loadBankDetail() {
     const res = await getQuestionBankDetail(bankId.value);
     bankInfo.value = res.data;
     if (bankInfo.value?.questions && Array.isArray(bankInfo.value.questions)) {
-      bankQuestions.value = [...bankInfo.value.questions];
+      bankQuestions.value = normalizeQuestionList(bankInfo.value.questions as Record<string, unknown>[]);
     } else if (USE_MOCK) {
-      bankQuestions.value = MOCK_QUESTIONS.slice(0, 3);
+      bankQuestions.value = normalizeQuestionList(MOCK_QUESTIONS.slice(0, 3) as unknown as Record<string, unknown>[]);
     } else {
       bankQuestions.value = [];
     }
   } catch (err: any) {
     if (USE_MOCK) {
       bankInfo.value = getDefaultBankMock(bankId.value);
-      bankQuestions.value = MOCK_QUESTIONS.slice(0, 3);
+      bankQuestions.value = normalizeQuestionList(MOCK_QUESTIONS.slice(0, 3) as unknown as Record<string, unknown>[]);
     } else {
       bankInfo.value = null;
       bankQuestions.value = [];
@@ -443,10 +447,10 @@ async function loadBankDetail() {
 async function loadCandidatePool() {
   try {
     const res = await getQuestions({ pageSize: 50 });
-    candidatePool.value = res.data?.list || [];
+    candidatePool.value = normalizeQuestionList(res.data?.list || []);
   } catch (err: any) {
     if (USE_MOCK) {
-      candidatePool.value = MOCK_QUESTIONS;
+      candidatePool.value = normalizeQuestionList(MOCK_QUESTIONS);
     } else {
       candidatePool.value = [];
       ElMessage.error(err?.message || '获取试题池失败');
@@ -694,7 +698,8 @@ function getDifficultyTagType(diff: Difficulty | string) {
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 32px;
+        font-size: 28px;
+        color: #2563eb;
         flex-shrink: 0;
       }
 
@@ -998,7 +1003,9 @@ function getDifficultyTagType(diff: Difficulty | string) {
         text-align: center;
 
         .empty-icon {
-          font-size: 44px;
+          font-size: 48px;
+          color: #94a3b8;
+          display: inline-flex;
           margin-bottom: 12px;
         }
 

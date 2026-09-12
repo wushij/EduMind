@@ -5,7 +5,7 @@
       "name": "后端 dev",
       "type": "node-terminal",
       "request": "launch",
-      "command": "$env:SPRING_PROFILES_ACTIVE='dev'; mvn -pl edu-mind-boot spring-boot:run \"-DskipTests\"",
+      "command": "$env:SPRING_PROFILES_ACTIVE='dev'; mvn -pl edu-mind-boot -am spring-boot:run -DskipTests",
       "cwd": "${workspaceFolder}/backend"
     },
     {

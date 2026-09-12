@@ -39,9 +39,13 @@ export function useCourse() {
   async function fetchCourses(query: CourseQuery = {}) {
     loading.value = true;
     try {
-      const res = await getCourseList(query);
-      const list = (res.data?.list || []).map(mapCourse);
-      courses.value = filterCourses(list, query);
+      const res = await getCourseList({
+        keyword: query.keyword,
+        status: query.status && query.status !== 'ALL' ? query.status : undefined,
+        page: query.page ?? 1,
+        pageSize: query.pageSize ?? 10
+      });
+      courses.value = (res.data?.list || []).map(mapCourse);
       total.value = res.data?.total ?? courses.value.length;
     } catch {
       if (USE_MOCK) {

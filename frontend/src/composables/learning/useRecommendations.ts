@@ -20,10 +20,11 @@ export function useRecommendations() {
   async function fetchRecommendations(courseId?: number, chapterId?: number) {
     loading.value = true;
     usedMockFallback.value = false;
+    const targetCourseId = courseId || 101;
     try {
       const [qRes, rRes] = await Promise.all([
-        getQuestionRecommendations({ courseId, chapterId, limit: 10 }),
-        getResourceRecommendations({ courseId, chapterId, limit: 6 })
+        getQuestionRecommendations({ courseId: targetCourseId, chapterId, limit: 10 }),
+        getResourceRecommendations({ courseId: targetCourseId, chapterId, limit: 6 })
       ]);
       questions.value = qRes.data || [];
       resources.value = rRes.data || [];

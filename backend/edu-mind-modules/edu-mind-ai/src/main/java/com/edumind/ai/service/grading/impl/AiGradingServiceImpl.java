@@ -3,7 +3,7 @@ package com.edumind.ai.service.grading.impl;
 import com.edumind.ai.dao.AiCallLogDao;
 import com.edumind.ai.dto.SubjectiveGradingDTO;
 import com.edumind.ai.entity.AiCallLogEntity;
-import com.edumind.ai.integration.llm.LlmClient;
+import com.edumind.ai.gateway.AiGatewayFacade;
 import com.edumind.ai.integration.llm.LlmProperties;
 import com.edumind.ai.service.grading.AiGradingService;
 import com.edumind.ai.service.prompt.PromptService;
@@ -17,7 +17,7 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class AiGradingServiceImpl implements AiGradingService {
 
-    private final LlmClient llmClient;
+    private final AiGatewayFacade aiGatewayFacade;
     private final LlmProperties llmProperties;
     private final AiCallLogDao aiCallLogDao;
     private final PromptService promptService;
@@ -38,7 +38,7 @@ public class AiGradingServiceImpl implements AiGradingService {
                 dto.getStudentAnswer(),
                 maxScore);
 
-        String reply = llmClient.chat(promptService.getSystemPrompt("subjective_grading"), userPrompt);
+        String reply = aiGatewayFacade.chat("GRADING", promptService.getSystemPrompt("subjective_grading"), userPrompt);
         int score = estimateScore(reply, maxScore, dto.getStudentAnswer(), dto.getReferenceAnswer());
         String status = score >= maxScore * 0.6 ? "AUTO_GRADED" : "PENDING_REVIEW";
 

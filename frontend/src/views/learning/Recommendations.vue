@@ -14,6 +14,7 @@
           class="capsule-switch-btn"
           @click="router.push('/learning')"
         >
+          <el-icon class="btn-icon"><Back /></el-icon>
           <span>返回我的学习</span>
         </button>
       </template>
@@ -30,6 +31,7 @@
           :class="{ active: selectedCategory === tab.value }"
           @click="selectedCategory = tab.value"
         >
+          <el-icon v-if="tab.icon" class="tab-icon"><component :is="tab.icon" /></el-icon>
           <span>{{ tab.label }}</span>
           <span class="tab-count-pill">{{ getCategoryCount(tab.value) }}</span>
         </button>
@@ -110,7 +112,9 @@
 
     <!-- 空状态 -->
     <div v-else class="empty-recommend-panel">
-      <div class="empty-icon">🔍</div>
+      <div class="empty-icon">
+        <el-icon :size="46" color="#94A3B8"><Search /></el-icon>
+      </div>
       <h3 class="empty-title">未找到符合条件的个性化推荐</h3>
       <p class="empty-hint">建议调整上方课程、分类或难度筛选条件，或直接向课程 AI 助教提问</p>
       <button
@@ -118,6 +122,7 @@
         class="capsule-reset-btn"
         @click="resetFilters"
       >
+        <el-icon class="btn-icon"><RefreshRight /></el-icon>
         <span>重置所有筛选条件</span>
       </button>
     </div>
@@ -127,6 +132,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import {
+  Back,
+  List,
+  WarningFilled,
+  Aim,
+  VideoPlay,
+  Top,
+  Search,
+  RefreshRight
+} from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
 import RecommendationCard from '@/components/learning/RecommendationCard.vue';
 import { useRecommendations } from '@/composables/learning/useRecommendations';
@@ -147,11 +162,11 @@ const sortBy = ref<'score' | 'time'>('score');
 const searchKeyword = ref<string>('');
 
 const categoryTabs = [
-  { label: '全部精选推荐', value: 'ALL' },
-  { label: '🔥 薄弱考点巩固', value: '薄弱巩固' },
-  { label: '🎯 核心必刷题', value: '核心必刷' },
-  { label: '📦 名师精选微课', value: '精选课件' },
-  { label: '🚀 拔高进阶挑战', value: '拓展进阶' }
+  { label: '全部精选推荐', value: 'ALL', icon: List },
+  { label: '薄弱考点巩固', value: '薄弱巩固', icon: WarningFilled },
+  { label: '核心必刷题', value: '核心必刷', icon: Aim },
+  { label: '名师精选微课', value: '精选课件', icon: VideoPlay },
+  { label: '拔高进阶挑战', value: '拓展进阶', icon: Top }
 ];
 
 const courseOptions = ['全部课程', '高等数学（上）', '数据结构与算法'];
@@ -265,6 +280,9 @@ function handleDiscuss(item: RecommendationItem) {
     }
 
     .capsule-switch-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       height: 34px;
       padding: 0 18px;
       border-radius: 9999px;
@@ -275,6 +293,10 @@ function handleDiscuss(item: RecommendationItem) {
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
+
+      .btn-icon {
+        font-size: 14px;
+      }
 
       &:hover {
         background: #EFF6FF;
@@ -335,6 +357,10 @@ function handleDiscuss(item: RecommendationItem) {
         cursor: pointer;
         transition: all 0.2s ease;
         white-space: nowrap;
+
+        .tab-icon {
+          font-size: 14px;
+        }
 
         .tab-count-pill {
           padding: 1px 8px;
@@ -475,7 +501,9 @@ function handleDiscuss(item: RecommendationItem) {
     text-align: center;
 
     .empty-icon {
-      font-size: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       margin-bottom: 12px;
     }
 
@@ -493,6 +521,10 @@ function handleDiscuss(item: RecommendationItem) {
     }
 
     .capsule-reset-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
       height: 38px;
       padding: 0 24px;
       border-radius: 9999px; // 长圆按钮
@@ -504,6 +536,10 @@ function handleDiscuss(item: RecommendationItem) {
       cursor: pointer;
       box-shadow: 0 3px 10px rgba(22, 119, 255, 0.25);
       transition: all 0.2s;
+
+      .btn-icon {
+        font-size: 15px;
+      }
 
       &:hover {
         background: #4096FF;

@@ -6,7 +6,7 @@
         <div class="title-with-icon">
           <el-icon class="header-icon text-blue-600"><Tickets /></el-icon>
           <h1 class="main-title">课程作业与平时测验管理</h1>
-          <span class="capsule-count-tag">共 {{ assignments.length }} 份作业任务</span>
+          <span class="capsule-count-tag">共 {{ total }} 份作业任务</span>
         </div>
         <p class="sub-desc">
           支持基于试卷或题库按需布置在线作业，提供全自动客观题评阅、主观题AI辅助批改与学情统计跟踪。
@@ -76,8 +76,10 @@
           clearable
           class="search-input"
           :prefix-icon="Search"
+          @keyup.enter="handleSearch"
+          @clear="handleSearch"
         />
-        <el-select v-model="selectedCourseId" placeholder="所属课程" clearable class="filter-select">
+        <el-select v-model="selectedCourseId" placeholder="所属课程" clearable class="filter-select" @change="handleSearch">
           <el-option label="全部课程" :value="null" />
           <el-option
             v-for="c in courses"
@@ -86,7 +88,7 @@
             :value="c.id"
           />
         </el-select>
-        <el-select v-model="selectedStatus" placeholder="批改状态" clearable class="filter-select">
+        <el-select v-model="selectedStatus" placeholder="批改状态" clearable class="filter-select" @change="handleSearch">
           <el-option label="全部状态" value="" />
           <el-option label="待批改" value="PENDING" />
           <el-option label="已批改" value="GRADED" />
@@ -96,9 +98,9 @@
 
     <!-- 作业任务卡片列表 -->
     <div v-loading="loading" class="assignments-grid-wrapper">
-      <div v-if="filteredAssignments.length > 0" class="assignments-stack">
+      <div v-if="displayAssignments.length > 0" class="assignments-stack">
         <div
-          v-for="a in filteredAssignments"
+          v-for="a in displayAssignments"
           :key="a.id"
           class="assignment-row-card"
         >
@@ -174,6 +176,13 @@
           立即发布新作业
         </el-button>
       </div>
+
+      <AppPagination
+        v-model:page-num="pageNum"
+        v-model:page-size="pageSize"
+        :total="total"
+        @change="loadAssignments"
+      />
     </div>
   </div>
 </template>
@@ -196,17 +205,21 @@ import {
   FolderOpened
 } from '@element-plus/icons-vue';
 import { useAssignment } from '@/composables/question/useAssignment';
+import AppPagination from '@/components/common/AppPagination.vue';
 import { getCourseList } from '@/api/course/course';
 import { getSubmissionsByAssignment, gradeSubmission } from '@/api/question/submission';
 import type { Course } from '@/types/course/course';
 
 const router = useRouter();
-const { assignments, loading, fetchAssignments } = useAssignment();
+const { assignments, loading, total, fetchAssignments } = useAssignment();
 
+const pageNum = ref(1);
+const pageSize = ref(10);
 const courses = ref<Course[]>([]);
 const searchKeyword = ref('');
 const selectedCourseId = ref<number | null>(null);
 const selectedStatus = ref('');
+const usingMockFallback = ref(false);
 
 onMounted(async () => {
   await Promise.all([loadCourses(), loadAssignments()]);
@@ -230,8 +243,15 @@ async function loadCourses() {
 }
 
 async function loadAssignments() {
-  await fetchAssignments();
-  if (assignments.value.length === 0) {
+  usingMockFallback.value = false;
+  await fetchAssignments({
+    page: pageNum.value,
+    pageSize: pageSize.value,
+    courseId: selectedCourseId.value || undefined,
+    status: selectedStatus.value || undefined
+  });
+  if (assignments.value.length === 0 && !selectedCourseId.value && !selectedStatus.value) {
+    usingMockFallback.value = true;
     // 注入演示用丰富作业列表
     assignments.value = [
       {
@@ -271,20 +291,24 @@ async function loadAssignments() {
         status: 'PENDING'
       } as any
     ];
+    total.value = assignments.value.length;
   }
 }
 
-const filteredAssignments = computed(() => {
+function handleSearch() {
+  pageNum.value = 1;
+  loadAssignments();
+}
+
+const displayAssignments = computed(() => {
+  if (!searchKeyword.value.trim() || !usingMockFallback.value) {
+    return assignments.value;
+  }
+  const kw = searchKeyword.value.trim().toLowerCase();
   return assignments.value.filter((a: any) => {
-    if (selectedCourseId.value && a.courseId !== selectedCourseId.value) return false;
-    if (selectedStatus.value && a.status !== selectedStatus.value) return false;
-    if (searchKeyword.value.trim()) {
-      const kw = searchKeyword.value.trim().toLowerCase();
-      const inTitle = a.title?.toLowerCase().includes(kw);
-      const inCourse = a.courseName?.toLowerCase().includes(kw);
-      if (!inTitle && !inCourse) return false;
-    }
-    return true;
+    const inTitle = a.title?.toLowerCase().includes(kw);
+    const inCourse = a.courseName?.toLowerCase().includes(kw);
+    return inTitle || inCourse;
   });
 });
 

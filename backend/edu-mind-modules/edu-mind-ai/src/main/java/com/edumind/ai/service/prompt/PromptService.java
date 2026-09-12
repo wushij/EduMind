@@ -36,6 +36,13 @@ public class PromptService {
         return rendered;
     }
 
+    /** 发布/回滚后清除运行时缓存，确保 Chat/RAG 立即加载新版本 */
+    public void evictTemplate(String templateName) {
+        if (templateName != null) {
+            cache.remove(templateName);
+        }
+    }
+
     private String loadTemplate(String templateName) {
         PromptTemplateEntity published = promptTemplateDao.findByCode(templateName);
         if (published != null && "PUBLISHED".equals(published.getStatus())) {

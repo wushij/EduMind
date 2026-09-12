@@ -3,9 +3,12 @@ import { PromptTemplate, PromptTestRequest, PromptTestResponse } from '@/types/s
 import {
   getPromptTemplates,
   getPromptById,
+  getPromptVersions,
   savePromptTemplate,
   publishPromptTemplate,
-  testPromptTemplate
+  rollbackPromptTemplate,
+  testPromptTemplate,
+  type PromptVersionItem
 } from '@/api/system/prompt';
 import { ElMessage } from 'element-plus';
 
@@ -13,7 +16,9 @@ export function usePrompt() {
   const loading = ref(false);
   const testing = ref(false);
   const publishing = ref(false);
+  const rollingBack = ref(false);
   const promptList = ref<PromptTemplate[]>([]);
+  const versionHistory = ref<PromptVersionItem[]>([]);
   const currentPrompt = ref<PromptTemplate | null>(null);
   const testResult = ref<PromptTestResponse | null>(null);
 
@@ -63,6 +68,30 @@ export function usePrompt() {
     }
   };
 
+  const loadVersions = async (id: number) => {
+    try {
+      versionHistory.value = await getPromptVersions(id);
+    } catch (err: any) {
+      ElMessage.error(err.message || '获取版本历史失败');
+    }
+  };
+
+  const handleRollback = async (id: number, targetVersion: number) => {
+    rollingBack.value = true;
+    try {
+      const res = await rollbackPromptTemplate(id, targetVersion);
+      ElMessage.success(res.message);
+      await loadPrompt(id);
+      await loadVersions(id);
+      return true;
+    } catch (err: any) {
+      ElMessage.error(err.message || '回滚失败');
+      return false;
+    } finally {
+      rollingBack.value = false;
+    }
+  };
+
   const runTest = async (templateId: number, req: PromptTestRequest) => {
     testing.value = true;
     try {
@@ -79,13 +108,17 @@ export function usePrompt() {
     loading,
     testing,
     publishing,
+    rollingBack,
     promptList,
+    versionHistory,
     currentPrompt,
     testResult,
     fetchPrompts,
     loadPrompt,
+    loadVersions,
     handleSave,
     handlePublish,
+    handleRollback,
     runTest
   };
 }

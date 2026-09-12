@@ -4,7 +4,7 @@
     <div class="card-header-row">
       <div class="header-left-badges">
         <span class="match-score-pill">
-          <span class="sparkle-icon">⚡</span>
+          <el-icon class="sparkle-icon"><Lightning /></el-icon>
           <span>{{ item.matchScore }}% AI 智能匹配</span>
         </span>
         <span class="category-pill" :class="`category-pill--${categoryVariant}`">
@@ -13,7 +13,7 @@
       </div>
 
       <span class="type-badge-pill">
-        <span class="type-icon">{{ item.type === 'exercise' ? '📝' : '📦' }}</span>
+        <el-icon class="type-icon"><component :is="item.type === 'exercise' ? EditPen : Folder" /></el-icon>
         <span>{{ item.typeLabel }}</span>
       </span>
     </div>
@@ -25,10 +25,12 @@
     <!-- 课程与考点信息条 (药丸组合) -->
     <div class="card-course-meta">
       <span class="pill-info-tag pill-info-tag--course">
-        <span>📖 {{ item.courseName }}</span>
+        <el-icon class="tag-icon"><Reading /></el-icon>
+        <span>{{ item.courseName }}</span>
       </span>
       <span class="pill-info-tag pill-info-tag--kp">
-        <span>🧠 {{ item.knowledgePoint }}</span>
+        <el-icon class="tag-icon"><Opportunity /></el-icon>
+        <span>{{ item.knowledgePoint }}</span>
       </span>
     </div>
 
@@ -43,7 +45,10 @@
 
       <div class="param-item">
         <span class="param-label">预估耗时：</span>
-        <span class="time-capsule">⏱️ {{ item.estimatedMinutes }} 分钟</span>
+        <span class="time-capsule">
+          <el-icon class="param-icon"><Timer /></el-icon>
+          <span>{{ item.estimatedMinutes }} 分钟</span>
+        </span>
       </div>
 
       <div v-if="item.exerciseMeta" class="param-item">
@@ -70,7 +75,8 @@
         class="capsule-card-btn capsule-card-btn--secondary"
         @click="$emit('discuss', item)"
       >
-        <span>🤖 助教答疑</span>
+        <el-icon class="btn-icon"><ChatDotRound /></el-icon>
+        <span>助教答疑</span>
       </button>
 
       <button
@@ -78,7 +84,8 @@
         class="capsule-card-btn capsule-card-btn--primary"
         @click="$emit('start', item)"
       >
-        <span>{{ item.type === 'exercise' ? '立即开始巩固练习 →' : '在线研读微课资料 →' }}</span>
+        <span>{{ item.type === 'exercise' ? '立即开始巩固练习' : '在线研读微课资料' }}</span>
+        <el-icon class="btn-arrow-icon"><Right /></el-icon>
       </button>
     </div>
   </div>
@@ -86,6 +93,16 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import {
+  Lightning,
+  EditPen,
+  Folder,
+  Reading,
+  Opportunity,
+  Timer,
+  ChatDotRound,
+  Right
+} from '@element-plus/icons-vue';
 import type { RecommendationItem } from '@/types/learning/recommendation';
 
 const props = defineProps<{
@@ -239,12 +256,16 @@ const categoryVariant = computed(() => {
     .pill-info-tag {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       height: 24px;
       padding: 0 10px;
       border-radius: 9999px; // 药丸
       font-size: 11.5px;
       font-weight: 500;
+
+      .tag-icon {
+        font-size: 13px;
+      }
 
       &--course {
         background: #F1F5F9;
@@ -301,8 +322,16 @@ const categoryVariant = computed(() => {
       }
 
       .time-capsule {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
         color: #334155;
         font-weight: 500;
+
+        .param-icon {
+          font-size: 13px;
+          color: #94A3B8;
+        }
       }
 
       .stat-text {
@@ -343,6 +372,7 @@ const categoryVariant = computed(() => {
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      gap: 4px;
       height: 36px;
       padding: 0 16px;
       border-radius: 9999px; // 纯正长圆跑道
@@ -351,6 +381,14 @@ const categoryVariant = computed(() => {
       cursor: pointer;
       border: none;
       transition: all 0.2s ease;
+
+      .btn-icon {
+        font-size: 14px;
+      }
+
+      .btn-arrow-icon {
+        font-size: 13px;
+      }
 
       &--secondary {
         background: #F1F5F9;

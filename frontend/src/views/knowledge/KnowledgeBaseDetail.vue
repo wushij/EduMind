@@ -14,18 +14,6 @@
       </div>
     </div>
 
-    <!-- 知识库二级 Tab 导航 -->
-    <div class="kb-nav-tabs">
-      <el-menu :default-active="route.path" mode="horizontal" router :ellipsis="false">
-        <el-menu-item :index="`/knowledge/${kbId}/documents`">文档管理</el-menu-item>
-        <el-menu-item :index="`/knowledge/${kbId}/chunks`">切片与分块</el-menu-item>
-        <el-menu-item :index="`/knowledge/${kbId}/embeddings`">向量状态</el-menu-item>
-        <el-menu-item :index="`/knowledge/${kbId}/retrieval`">检索测试</el-menu-item>
-        <el-menu-item :index="`/knowledge/${kbId}/rag-debug`">RAG 诊断</el-menu-item>
-        <el-menu-item :index="`/knowledge/${kbId}/graph`">知识图谱</el-menu-item>
-      </el-menu>
-    </div>
-
     <div class="kb-subview-content">
       <router-view />
     </div>
@@ -34,13 +22,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { ArrowLeft, Upload } from '@element-plus/icons-vue';
 
-const route = useRoute();
 const router = useRouter();
 
-const kbId = computed(() => route.params.id || '1');
 const kbInfo = computed(() => ({
   title: '高等数学官方教学课件知识库',
   status: '已就绪 (128 个文档)',
@@ -73,14 +59,6 @@ const kbInfo = computed(() => ({
       }
       .kb-desc { margin: 8px 0 0 0; font-size: 13px; color: #64748B; }
     }
-  }
-
-  .kb-nav-tabs {
-    background: #FFFFFF;
-    border-radius: 10px;
-    padding: 0 16px;
-    border: 1px solid #E2E8F0;
-    :deep(.el-menu) { border-bottom: none; }
   }
 
   .kb-subview-content {

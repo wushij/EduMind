@@ -1,6 +1,7 @@
 package com.edumind.ai.controller.prompt;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.edumind.ai.dto.prompt.PromptRollbackDTO;
 import com.edumind.ai.dto.prompt.PromptTemplateDTO;
 import com.edumind.ai.dto.prompt.PromptTestDTO;
 import com.edumind.ai.service.prompt.PromptManageService;
@@ -66,6 +67,13 @@ public class PromptController {
     @PostMapping("/{id}/publish")
     public ApiResult<Void> publish(@PathVariable Long id) {
         promptManageService.publish(id);
+        return ApiResult.success();
+    }
+
+    @SaCheckPermission("system:prompt:edit")
+    @PostMapping("/{id}/rollback")
+    public ApiResult<Void> rollback(@PathVariable Long id, @Valid @RequestBody PromptRollbackDTO dto) {
+        promptManageService.rollback(id, dto.getTargetVersion());
         return ApiResult.success();
     }
 

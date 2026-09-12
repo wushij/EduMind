@@ -4,14 +4,14 @@
     <PageHeroBanner
       title="教学分析"
       subtitle="汇总课程学情、作业测验与 AI 助教使用数据，辅助教学决策"
-      :background-image="analyticsBannerImg"
       background-variant="default"
       :show-illustration="false"
     >
       <template #actions>
         <div class="report-actions-dock">
           <div class="semester-pill-chip">
-            <span>📅 当前评估周期：2026秋季学期 · 第3教学周</span>
+            <el-icon class="pill-prefix-icon"><Calendar /></el-icon>
+            <span>{{ evaluationPeriod }}</span>
           </div>
 
           <button
@@ -19,7 +19,8 @@
             class="capsule-btn capsule-btn--primary"
             @click="handleExportReport"
           >
-            <span>📊 导出教学质量评估周报</span>
+            <el-icon class="btn-prefix-icon"><Download /></el-icon>
+            <span>导出教学质量评估周报</span>
           </button>
         </div>
       </template>
@@ -31,56 +32,60 @@
         <div class="kpi-top">
           <span class="kpi-title">班级期末及格预测率</span>
           <span class="kpi-icon-bubble" style="background: linear-gradient(135deg, #1677FF 0%, #38BDF8 100%)">
-            🎯
+            <el-icon><Aim /></el-icon>
           </span>
         </div>
         <div class="kpi-val-row">
           <span class="kpi-number">{{ passRate }}%</span>
-          <span class="trend-pill trend-pill--up">+4.1% 环比上升</span>
+          <span :class="['trend-pill', passRate >= 80 ? 'trend-pill--up' : 'trend-pill--down']">
+            {{ passRate >= 80 ? '达成良好' : '需重点辅导' }}
+          </span>
         </div>
-        <span class="kpi-sub">根据前 3 次随堂测验与作业推演</span>
+        <span class="kpi-sub">基于已完成作业与随堂测验推演</span>
       </div>
 
       <div class="kpi-card">
         <div class="kpi-top">
           <span class="kpi-title">知识点全班平均掌握度</span>
           <span class="kpi-icon-bubble" style="background: linear-gradient(135deg, #722ED1 0%, #C084FC 100%)">
-            🧠
+            <el-icon><Reading /></el-icon>
           </span>
         </div>
         <div class="kpi-val-row">
           <span class="kpi-number">{{ masteryRate }}%</span>
-          <span class="trend-pill trend-pill--up">+6.5% 较期初</span>
+          <span :class="['trend-pill', masteryRate >= 75 ? 'trend-pill--up' : 'trend-pill--down']">
+            {{ masteryRate >= 75 ? '整体达标' : '待巩固强化' }}
+          </span>
         </div>
-        <span class="kpi-sub">核心考点 24 个已达达标线</span>
+        <span class="kpi-sub">基于当前课程考点学情统计汇总</span>
       </div>
 
       <div class="kpi-card">
         <div class="kpi-top">
           <span class="kpi-title">AI 助教分担答疑频次</span>
           <span class="kpi-icon-bubble" style="background: linear-gradient(135deg, #059669 0%, #10B981 100%)">
-            🤖
+            <el-icon><Service /></el-icon>
           </span>
         </div>
         <div class="kpi-val-row">
           <span class="kpi-number">{{ aiCallCount.toLocaleString() }} 次</span>
-          <span class="trend-pill trend-pill--up">分担 76% 咨询</span>
+          <span class="trend-pill trend-pill--up">7×24h 智能助学</span>
         </div>
-        <span class="kpi-sub">平均首字延迟 1.1s (满意度 98.6%)</span>
+        <span class="kpi-sub">全天候智能助学，分担常规教学咨询</span>
       </div>
 
       <div class="kpi-card">
         <div class="kpi-top">
           <span class="kpi-title">AI 辅助批改节约工时</span>
           <span class="kpi-icon-bubble" style="background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%)">
-            ⏱️
+            <el-icon><Timer /></el-icon>
           </span>
         </div>
         <div class="kpi-val-row">
           <span class="kpi-number">{{ savedHours }} h</span>
-          <span class="trend-pill trend-pill--up">提效 68%</span>
+          <span class="trend-pill trend-pill--up">智能量规评阅</span>
         </div>
-        <span class="kpi-sub">客观题秒级判分，主观题智能评分量规</span>
+        <span class="kpi-sub">客观题自动判分，主观题智能评分量规</span>
       </div>
     </section>
 
@@ -92,13 +97,16 @@
         <div class="report-panel-card">
           <div class="panel-header-line">
             <div class="header-left">
-              <span class="panel-icon">📊</span>
+              <el-icon class="panel-icon panel-icon--blue"><Histogram /></el-icon>
               <h3 class="panel-title">本学期核心考点掌握度热力排行榜</h3>
             </div>
-            <span class="badge-pill">基于大纲 24 个知识点</span>
+            <span class="badge-pill">覆盖 {{ knowledgeMasteryList.length }} 个薄弱知识点</span>
           </div>
 
-          <div class="kp-rank-list">
+          <div v-if="knowledgeMasteryList.length === 0" class="empty-kp-box">
+            <el-empty description="暂无考点薄弱项数据，班级整体掌握良好" :image-size="80" />
+          </div>
+          <div v-else class="kp-rank-list">
             <div
               v-for="kp in knowledgeMasteryList"
               :key="kp.id"
@@ -125,13 +133,17 @@
               </div>
 
               <div v-if="kp.status === 'danger'" class="kp-action-tip">
-                <span class="tip-text">⚠️ 该考点错误率较高，建议使用 AI 出题进行随堂 5 分钟微测验</span>
+                <div class="tip-text">
+                  <el-icon class="tip-icon"><WarningFilled /></el-icon>
+                  <span>该考点错误率较高，建议使用 AI 出题进行随堂 5 分钟微测验</span>
+                </div>
                 <button
                   type="button"
                   class="capsule-mini-btn"
                   @click="handleQuickQuiz(kp)"
                 >
-                  <span>✨ 一键生成巩固测验</span>
+                  <el-icon class="btn-inner-icon"><MagicStick /></el-icon>
+                  <span>一键生成巩固测验</span>
                 </button>
               </div>
             </div>
@@ -142,7 +154,7 @@
         <div class="report-panel-card">
           <div class="panel-header-line">
             <div class="header-left">
-              <span class="panel-icon">📈</span>
+              <el-icon class="panel-icon panel-icon--emerald"><TrendCharts /></el-icon>
               <h3 class="panel-title">近 7 日 AI 助教答疑负荷与学生提问时段分布</h3>
             </div>
           </div>
@@ -169,7 +181,7 @@
         <div class="report-panel-card">
           <div class="panel-header-line">
             <div class="header-left">
-              <span class="panel-icon">🔍</span>
+              <el-icon class="panel-icon panel-icon--amber"><PieChart /></el-icon>
               <h3 class="panel-title">AI 学情错因聚类分析</h3>
             </div>
           </div>
@@ -196,18 +208,23 @@
         <div class="report-panel-card report-panel-card--ai-suggestion">
           <div class="panel-header-line">
             <div class="header-left">
-              <span class="panel-icon">💡</span>
+              <el-icon class="panel-icon panel-icon--purple"><Opportunity /></el-icon>
               <h3 class="panel-title">AI 教学策略改进建议</h3>
             </div>
           </div>
 
           <div class="suggestion-content-box">
             <div class="suggestion-bubble">
-              <div class="bot-avatar">🤖</div>
+              <div class="bot-avatar">
+                <el-icon><Service /></el-icon>
+              </div>
               <div class="bubble-text">
-                <strong>下周课堂教学建议：</strong>
-                <p>
-                  根据本周做题轨迹分析，学生普遍在<strong>《未定式极限代换前提》</strong>与<strong>《泰勒公式高阶截断》</strong>存在理解偏差。建议在周二第 3 节课安排 <strong>10 分钟典型数形结合例题辨析</strong>。
+                <strong>课堂教学与改进建议：</strong>
+                <p v-if="reportData && reportData.weakPoints && reportData.weakPoints.length > 0">
+                  根据近期做题轨迹与错因诊断分析，学生在<strong>《{{ topWeakPointNames }}》</strong>等考点存在较集中错因。建议在下阶段教学中安排 <strong>10~15 分钟典型数形辨析与变式巩固</strong>。
+                </p>
+                <p v-else>
+                  当前课程学生知识点掌握情况总体平稳，无显著集中性错因。建议持续关注平时作业订正率，并通过课程 AI 助教保持常态化答疑支持。
                 </p>
               </div>
             </div>
@@ -218,15 +235,17 @@
                 class="capsule-card-action-btn"
                 @click="router.push('/ai/lesson-plan')"
               >
-                <span>📋 一键由 AI 自动生成针对性教案</span>
+                <el-icon class="btn-inner-icon"><DocumentAdd /></el-icon>
+                <span>一键由 AI 自动生成针对性教案</span>
               </button>
 
               <button
                 type="button"
                 class="capsule-card-action-btn capsule-card-action-btn--secondary"
-                @click="router.push('/course/101/ai')"
+                @click="router.push(`/course/${courseId}/ai`)"
               >
-                <span>💬 与课程 AI 助教研讨教学方案</span>
+                <el-icon class="btn-inner-icon"><ChatDotRound /></el-icon>
+                <span>与课程 AI 助教研讨教学方案</span>
               </button>
             </div>
           </div>
@@ -237,120 +256,110 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
+import {
+  Calendar,
+  Download,
+  Aim,
+  Reading,
+  Service,
+  Timer,
+  Histogram,
+  WarningFilled,
+  MagicStick,
+  TrendCharts,
+  PieChart,
+  Opportunity,
+  DocumentAdd,
+  ChatDotRound
+} from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
-import analyticsBannerImg from '@/assets/images/教学分析banner.png';
 import { getTeachingReport } from '@/api/analytics/report';
 import type { TeachingReportVO } from '@/types/analytics/report';
+import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
 
 const router = useRouter();
-const courseId = 1;
+
+const { courseId } = useTeacherCourses(102);
 const reportData = ref<TeachingReportVO | null>(null);
-const passRate = ref(92.4);
-const masteryRate = ref(86.8);
+const passRate = ref(0);
+const masteryRate = ref(0);
 const aiCallCount = ref(0);
-const savedHours = ref(24.5);
 
-const knowledgeMasteryList = ref([
-  {
-    id: 1,
-    index: 1,
-    name: '极限的四则运算法则与夹逼准则',
-    course: '高等数学（上）',
-    rate: 96,
-    status: 'good',
-    statusLabel: '掌握优秀'
-  },
-  {
-    id: 2,
-    index: 2,
-    name: '导数的四则运算与复合函数求导',
-    course: '高等数学（上）',
-    rate: 92,
-    status: 'good',
-    statusLabel: '掌握良好'
-  },
-  {
-    id: 3,
-    index: 3,
-    name: '二叉树非递归遍历显式栈模拟',
-    course: '数据结构与算法',
-    rate: 74,
-    status: 'normal',
-    statusLabel: '掌握中等'
-  },
-  {
-    id: 4,
-    index: 4,
-    name: '泰勒公式的高阶皮亚诺余项展开',
-    course: '高等数学（上）',
-    rate: 56,
-    status: 'warning',
-    statusLabel: '需加紧巩固'
-  },
-  {
-    id: 5,
-    index: 5,
-    name: '洛必达法则未定式前提与充要条件',
-    course: '高等数学（上）',
-    rate: 42,
-    status: 'danger',
-    statusLabel: '急需薄弱强化'
-  }
-]);
+const savedHours = computed(() => {
+  if (!reportData.value) return 0;
+  // 基于 AI 助教交互频次与作业提交动态推导节约工时
+  const calculated = Math.round((aiCallCount.value * 0.05 + (passRate.value ? 4.5 : 0)) * 10) / 10;
+  return Math.max(0.5, calculated);
+});
 
-const weeklyActivity = ref([
-  { date: '周一', count: 140 },
-  { date: '周二', count: 210 },
-  { date: '周三', count: 185 },
-  { date: '周四', count: 260 },
-  { date: '周五', count: 295 },
-  { date: '周六', count: 190 },
-  { date: '周日', count: 140 }
-]);
+const evaluationPeriod = computed(() => {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const semester = month >= 2 && month <= 7 ? '春季学期' : '秋季学期';
+  const rangeText = reportData.value?.range ? ` · 统计周期: ${reportData.value.range}` : '';
+  return `${now.getFullYear()}${semester} · 教学质量评估${rangeText}`;
+});
 
-const errorCategories = ref([
-  {
-    type: 'concept',
-    name: '定理先验条件与概念混淆',
-    percent: 42,
-    color: '#EF4444',
-    desc: '在未验证 $0/0$ 或 $\\infty/\\infty$ 时直接套用导数除法导致计算谬误。'
-  },
-  {
-    type: 'calc',
-    name: '代数计算与高阶符号失误',
-    percent: 35,
-    color: '#F59E0B',
-    desc: '负号展开、高阶展开项保留阶数不足或冗余。'
-  },
-  {
-    type: 'logic',
-    name: '解题步骤不全与逆命题推演',
-    percent: 23,
-    color: '#3B82F6',
-    desc: '主观问答题未陈述函数连续可导前提，扣除步骤分。'
-  }
-]);
+const topWeakPointNames = computed(() => {
+  if (!reportData.value?.weakPoints?.length) return '';
+  return reportData.value.weakPoints
+    .slice(0, 2)
+    .map((w) => w.title)
+    .join('》与《');
+});
+
+interface KnowledgeMasteryItem {
+  id: number;
+  index: number;
+  name: string;
+  course: string;
+  rate: number;
+  status: 'good' | 'normal' | 'warning' | 'danger';
+  statusLabel: string;
+}
+
+const knowledgeMasteryList = ref<KnowledgeMasteryItem[]>([]);
+
+const weeklyActivity = ref<Array<{ date: string; count: number }>>([]);
+
+const errorCategories = ref<Array<{ type: string; name: string; percent: number; color: string; desc: string }>>([]);
+
+const errorColorMap: Record<string, string> = {
+  CONCEPT: '#EF4444',
+  LOGIC: '#3B82F6',
+  CALC: '#F59E0B'
+};
 
 async function loadReport() {
   try {
-    const res = await getTeachingReport(courseId);
+    const res = await getTeachingReport(courseId.value);
     reportData.value = res?.data || null;
     if (reportData.value) {
-      passRate.value = reportData.value.avgSubmissionRate;
-      masteryRate.value = Math.min(99, reportData.value.totalChapters * 10 + 50);
-      aiCallCount.value = reportData.value.aiCallCount;
-      knowledgeMasteryList.value = reportData.value.weakPoints.map((item, index) => ({
+      passRate.value = reportData.value.avgSubmissionRate ?? 0;
+      masteryRate.value = Math.round((reportData.value.knowledgeMasteryAvg ?? 0) * 100);
+      aiCallCount.value = reportData.value.aiCallCount ?? 0;
+      weeklyActivity.value = (reportData.value.weeklyActivity ?? []).map((item) => ({
+        date: item.date,
+        count: item.count
+      }));
+      errorCategories.value = (reportData.value.errorCategories ?? []).map((item) => ({
+        type: item.type,
+        name: item.name,
+        percent: item.percent,
+        color: errorColorMap[item.type] ?? '#94A3B8',
+        desc: item.name
+      }));
+      knowledgeMasteryList.value = (reportData.value.weakPoints ?? []).map((item, index) => ({
         id: index + 1,
         index: index + 1,
         name: item.title,
-        course: `课程 #${courseId}`,
-        rate: Math.max(30, 100 - item.wrongCount * 12),
-        status: item.wrongCount >= 4 ? 'danger' : item.wrongCount >= 2 ? 'warning' : 'normal',
-        statusLabel: item.suggestion
+        course: `课程 #${courseId.value}`,
+        rate: Math.max(30, 100 - (item.wrongCount ?? 1) * 12),
+        status: (item.wrongCount ?? 1) >= 4 ? 'danger' : (item.wrongCount ?? 1) >= 2 ? 'warning' : 'normal',
+        statusLabel: item.suggestion || '建议巩固强化'
       }));
     }
   } catch {
@@ -403,6 +412,7 @@ function handleQuickQuiz(kp: any) {
     .semester-pill-chip {
       display: inline-flex;
       align-items: center;
+      gap: 6px;
       height: 36px;
       padding: 0 16px;
       border-radius: 9999px;
@@ -411,6 +421,11 @@ function handleQuickQuiz(kp: any) {
       color: #334155;
       font-size: 13px;
       font-weight: 600;
+
+      .pill-prefix-icon {
+        font-size: 14px;
+        color: #1677FF;
+      }
     }
 
     .capsule-btn {
@@ -425,6 +440,10 @@ function handleQuickQuiz(kp: any) {
       cursor: pointer;
       border: none;
       transition: all 0.2s ease;
+
+      .btn-prefix-icon {
+        font-size: 15px;
+      }
 
       &--primary {
         background: #1677FF;
@@ -473,8 +492,13 @@ function handleQuickQuiz(kp: any) {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 16px;
+          font-size: 18px;
           color: #FFFFFF;
+          box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+
+          .el-icon {
+            font-size: 18px;
+          }
         }
       }
 
@@ -501,6 +525,11 @@ function handleQuickQuiz(kp: any) {
           &--up {
             background: #ECFDF5;
             color: #059669;
+          }
+
+          &--down {
+            background: #FEF2F2;
+            color: #DC2626;
           }
         }
       }
@@ -539,6 +568,14 @@ function handleQuickQuiz(kp: any) {
 
           .panel-icon {
             font-size: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+
+            &--blue { color: #1677FF; }
+            &--emerald { color: #059669; }
+            &--amber { color: #D97706; }
+            &--purple { color: #722ED1; }
           }
 
           .panel-title {
@@ -556,6 +593,12 @@ function handleQuickQuiz(kp: any) {
           color: #64748B;
           font-size: 11.5px;
         }
+      }
+
+      .empty-kp-box {
+        padding: 24px 0;
+        display: flex;
+        justify-content: center;
       }
 
       // 排行榜列表
@@ -659,7 +702,22 @@ function handleQuickQuiz(kp: any) {
             font-size: 11.5px;
             color: #DC2626;
 
+            .tip-text {
+              display: flex;
+              align-items: center;
+              gap: 5px;
+
+              .tip-icon {
+                font-size: 14px;
+                color: #DC2626;
+                flex-shrink: 0;
+              }
+            }
+
             .capsule-mini-btn {
+              display: inline-flex;
+              align-items: center;
+              gap: 4px;
               padding: 3px 12px;
               border-radius: 9999px;
               background: #DC2626;
@@ -669,6 +727,10 @@ function handleQuickQuiz(kp: any) {
               font-weight: 600;
               cursor: pointer;
               transition: all 0.2s;
+
+              .btn-inner-icon {
+                font-size: 12px;
+              }
 
               &:hover {
                 background: #B91C1C;
@@ -790,13 +852,14 @@ function handleQuickQuiz(kp: any) {
               width: 38px;
               height: 38px;
               border-radius: 50%;
-              background: #722ED1;
+              background: linear-gradient(135deg, #722ED1 0%, #9333EA 100%);
               color: #FFFFFF;
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 18px;
+              font-size: 20px;
               flex-shrink: 0;
+              box-shadow: 0 4px 12px rgba(114, 46, 209, 0.25);
             }
 
             .bubble-text {
@@ -831,6 +894,14 @@ function handleQuickQuiz(kp: any) {
               cursor: pointer;
               box-shadow: 0 2px 8px rgba(114, 46, 209, 0.25);
               transition: all 0.2s;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              gap: 6px;
+
+              .btn-inner-icon {
+                font-size: 15px;
+              }
 
               &:hover {
                 background: #531DAB;

@@ -292,7 +292,7 @@ import {
 import type { CourseVO } from '@/types/course/course';
 import type { Chapter } from '@/types/course/chapter';
 import { getChapters } from '@/api/course/chapter';
-import { getModelConfigs } from '@/api/system/model';
+import { getChatModels } from '@/api/ai/chat';
 import { useAIStream } from '@/composables/ai/useAIStream';
 import ChatMessage from '@/components/ai/ChatMessage.vue';
 import ChatInput from '@/components/ai/ChatInput.vue';
@@ -428,8 +428,7 @@ const currentModelKey = ref<string | undefined>(undefined);
 
 async function loadModels() {
   try {
-    const configs = await getModelConfigs();
-    const chatModels = configs.filter((m) => m.enabled && !m.supportsEmbedding);
+    const chatModels = await getChatModels();
     modelOptions.value = chatModels.map((m) => ({
       name: m.name,
       key: m.modelKey,

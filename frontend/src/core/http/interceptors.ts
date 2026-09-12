@@ -1,1 +1,1 @@
-export {};
+export { logAppError, setupAppErrorHandlers } from './error-handler';

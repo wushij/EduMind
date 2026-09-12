@@ -376,6 +376,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  padding-bottom: 48px; // 底部预留充足留白，支持滚动露出完整阴影与间距
 }
 
 // 1. 中间核心业务区分栏 (常用功能 8 宫格 + 我的待办)
@@ -383,6 +384,7 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 7fr 3fr;
   gap: 20px;
+  margin-top: -6px; // 向上微移，消除冗余间距，使常用功能和我的待办紧凑贴合上方 Banner
 
   @media (max-width: 1100px) {
     grid-template-columns: 1fr;

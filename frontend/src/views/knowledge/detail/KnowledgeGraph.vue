@@ -2,36 +2,54 @@
   <div class="knowledge-graph-page">
     <div class="graph-header">
       <h2>课程知识图谱</h2>
-      <p>基于知识点与文档切片大纲构建的关联网络（V0.5 MVP）</p>
+      <p>深度关系图谱（V1.0）</p>
+      <el-slider v-model="depth" :min="1" :max="3" style="width: 160px" />
+      <el-select v-model="relationTypes" multiple collapse-tags placeholder="关系类型" style="width: 220px">
+        <el-option label="prerequisite" value="prerequisite" />
+        <el-option label="related" value="related" />
+        <el-option label="successor" value="successor" />
+      </el-select>
       <el-button type="primary" :loading="loading" @click="loadGraph">刷新图谱</el-button>
     </div>
 
     <div v-loading="loading" class="graph-layout">
       <div ref="chartRef" class="graph-chart"></div>
-      <el-card v-if="selectedNode" class="node-detail-card" shadow="never">
-        <h3>节点详情</h3>
-        <p><strong>名称：</strong>{{ selectedNode.label }}</p>
-        <p><strong>类型：</strong>{{ selectedNode.type }}</p>
-        <p v-if="selectedNode.refId"><strong>引用 ID：</strong>{{ selectedNode.refId }}</p>
-      </el-card>
+      <div class="side-panels">
+        <el-card v-if="selectedNode" class="node-detail-card" shadow="never">
+          <h3>节点详情</h3>
+          <p><strong>名称：</strong>{{ selectedNode.label }}</p>
+          <p><strong>类型：</strong>{{ selectedNode.type }}</p>
+          <p v-if="selectedNode.refId"><strong>引用 ID：</strong>{{ selectedNode.refId }}</p>
+        </el-card>
+        <GraphGapPanel :gaps="gaps" />
+        <GraphRelationEditor @saved="loadGraph" />
+      </div>
     </div>
     <el-empty v-if="!loading && graphData.nodes.length === 0" description="暂无图谱数据，请先完成文档切片与知识点配置" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue';
+import { useAuthStore } from '@/stores/auth/auth';
 import * as echarts from 'echarts';
 import { ElMessage } from 'element-plus';
 import { useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
-import { getKnowledgeGraph } from '@/api/knowledge/graph';
-import type { KnowledgeGraphNode, KnowledgeGraphVO } from '@/types/knowledge/graph';
+import { getGraphGaps, getKnowledgeGraph } from '@/api/knowledge/graph';
+import GraphGapPanel from '@/components/knowledge/GraphGapPanel.vue';
+import GraphRelationEditor from '@/components/knowledge/GraphRelationEditor.vue';
+import type { GraphGapVO, KnowledgeGraphNode, KnowledgeGraphVO } from '@/types/knowledge/graph';
 
 const { kbId } = useKnowledgeRoute();
+const authStore = useAuthStore();
+const studentId = computed(() => authStore.currentUser?.id ?? 3);
 const loading = ref(false);
 const chartRef = ref<HTMLDivElement | null>(null);
 const selectedNode = ref<KnowledgeGraphNode | null>(null);
 const graphData = ref<KnowledgeGraphVO>({ nodes: [], edges: [] });
+const gaps = ref<GraphGapVO[]>([]);
+const depth = ref(2);
+const relationTypes = ref<string[]>(['prerequisite', 'related']);
 let chart: echarts.ECharts | null = null;
 
 function renderChart() {
@@ -79,8 +97,11 @@ async function loadGraph() {
   if (!kbId.value) return;
   loading.value = true;
   try {
-    const res = await getKnowledgeGraph(kbId.value);
+    const types = relationTypes.value.join(',');
+    const res = await getKnowledgeGraph(kbId.value, depth.value, types);
     graphData.value = res?.data || { nodes: [], edges: [] };
+    const gapRes = await getGraphGaps(kbId.value, studentId.value, 0.6);
+    gaps.value = gapRes?.data || [];
     renderChart();
   } catch {
     graphData.value = { nodes: [], edges: [] };
@@ -91,6 +112,7 @@ async function loadGraph() {
 }
 
 watch(kbId, () => loadGraph());
+watch([depth, relationTypes], () => loadGraph(), { deep: true });
 
 onMounted(() => {
   loadGraph();
@@ -126,9 +148,15 @@ onBeforeUnmount(() => {
 
   .graph-layout {
     display: grid;
-    grid-template-columns: 1fr 280px;
+    grid-template-columns: 1fr 320px;
     gap: 16px;
     min-height: 520px;
+  }
+
+  .side-panels {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 
   .graph-chart {

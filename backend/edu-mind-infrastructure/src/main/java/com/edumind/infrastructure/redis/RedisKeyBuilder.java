@@ -79,6 +79,10 @@ public final class RedisKeyBuilder {
         return RedisConstant.EMAIL_DAILY_KEY + email.toLowerCase().trim() + ":" + date;
     }
 
+    public static String emailResetTicket(String ticket) {
+        return RedisConstant.EMAIL_RESET_TICKET_KEY + ticket.trim();
+    }
+
     public static String sysConfig(String key) {
         return RedisConstant.CONFIG_CACHE_KEY + key.trim();
     }

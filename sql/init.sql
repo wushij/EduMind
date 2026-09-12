@@ -1,7 +1,7 @@
 -- =============================================================================
 -- 智教云 · EduMind 数据库全量初始化脚本
 -- 文件：sql/init.sql
--- 说明：包含全量 33 张表结构定义 + 丰富完整的核心业务种子数据（含 V0.5 RAG/Chunk/Prompt 治理）
+-- 说明：包含全量 43 张表结构定义 + 丰富完整的核心业务种子数据（含 V0.5 RAG/Chunk/Prompt 治理 + V1.0 学情/图谱/Gateway/Agent）
 -- 适配：MySQL 8.0+ / utf8mb4 / MyBatis-Plus Java Entity 100% 对齐
 -- 执行：mysql -u root -p < sql/init.sql
 -- 默认账号：admin / teacher / student / student2，密码均为 admin123
@@ -599,6 +599,166 @@ CREATE TABLE statistics_daily_snapshot (
     KEY idx_course_id (course_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='每日学情与AI统计快照表';
 
+-- -----------------------------------------------------------------------------
+-- 九、V1.0 智能教学中枢（学情 / 图谱关系 / AI Gateway / Agent）
+-- -----------------------------------------------------------------------------
+
+DROP TABLE IF EXISTS agent_tool_call;
+DROP TABLE IF EXISTS agent_step;
+DROP TABLE IF EXISTS agent_run;
+DROP TABLE IF EXISTS ai_gateway_route;
+DROP TABLE IF EXISTS ai_model_config;
+DROP TABLE IF EXISTS knowledge_point_relation;
+DROP TABLE IF EXISTS course_statistics;
+DROP TABLE IF EXISTS wrong_question_record;
+DROP TABLE IF EXISTS knowledge_mastery;
+DROP TABLE IF EXISTS learning_record;
+
+CREATE TABLE learning_record (
+    id              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '记录ID',
+    student_id      BIGINT       NOT NULL COMMENT '学生ID',
+    course_id       BIGINT       NOT NULL COMMENT '课程ID',
+    action_type     VARCHAR(32)  NOT NULL COMMENT 'LOGIN/STUDY/RESOURCE_VIEW/AI_CHAT',
+    duration_minutes INT         DEFAULT 0 COMMENT '学习时长（分钟）',
+    resource_id     BIGINT       DEFAULT NULL COMMENT '关联资源ID',
+    create_time     DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (id),
+    KEY idx_student_course (student_id, course_id),
+    KEY idx_course_time (course_id, create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学习行为明细';
+
+CREATE TABLE knowledge_mastery (
+    id                  BIGINT        NOT NULL AUTO_INCREMENT COMMENT '掌握度ID',
+    student_id          BIGINT        NOT NULL COMMENT '学生ID',
+    course_id           BIGINT        NOT NULL COMMENT '课程ID',
+    knowledge_point_id  BIGINT        NOT NULL COMMENT '知识点ID',
+    mastery_score       DECIMAL(5,4)  NOT NULL DEFAULT 0 COMMENT '掌握度得分 0~1',
+    sample_count        INT           NOT NULL DEFAULT 0 COMMENT '评估样本数',
+    last_assessed_at    DATETIME      DEFAULT NULL COMMENT '最近评估时间',
+    create_time         DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_student_kp (student_id, knowledge_point_id),
+    KEY idx_course_kp (course_id, knowledge_point_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识点掌握度';
+
+CREATE TABLE wrong_question_record (
+    id                  BIGINT       NOT NULL AUTO_INCREMENT COMMENT '错题记录ID',
+    student_id          BIGINT       NOT NULL COMMENT '学生ID',
+    course_id           BIGINT       NOT NULL COMMENT '课程ID',
+    question_id         BIGINT       NOT NULL COMMENT '题目ID',
+    knowledge_point_id  BIGINT       DEFAULT NULL COMMENT '关联知识点ID',
+    error_types         VARCHAR(128) DEFAULT NULL COMMENT 'CONCEPT,LOGIC,CALC',
+    diagnosis           VARCHAR(512) DEFAULT NULL COMMENT '错因诊断',
+    variant_question_ids VARCHAR(256) DEFAULT NULL COMMENT '变式题ID列表',
+    wrong_count         INT          NOT NULL DEFAULT 1 COMMENT '累计错误次数',
+    create_time         DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    KEY idx_course_question (course_id, question_id),
+    KEY idx_student (student_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='错题记录';
+
+CREATE TABLE course_statistics (
+    id              BIGINT        NOT NULL AUTO_INCREMENT COMMENT '统计ID',
+    course_id       BIGINT        NOT NULL COMMENT '课程ID',
+    stat_date       DATE          NOT NULL COMMENT '统计日期',
+    active_users    INT           DEFAULT 0 COMMENT '活跃用户数',
+    avg_score       DECIMAL(5,2)  DEFAULT NULL COMMENT '平均分',
+    completion_rate DECIMAL(5,4)  DEFAULT NULL COMMENT '完成率',
+    create_time     DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_course_date (course_id, stat_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程日聚合';
+
+CREATE TABLE knowledge_point_relation (
+    id                      BIGINT       NOT NULL AUTO_INCREMENT COMMENT '关系ID',
+    source_knowledge_point_id BIGINT       NOT NULL COMMENT '源知识点ID',
+    target_knowledge_point_id BIGINT       NOT NULL COMMENT '目标知识点ID',
+    relation_type           VARCHAR(32)  NOT NULL COMMENT 'prerequisite/successor/related/assessed_by/supported_by',
+    properties              JSON         DEFAULT NULL COMMENT '扩展属性',
+    create_time             DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_relation (source_knowledge_point_id, target_knowledge_point_id, relation_type),
+    KEY idx_source (source_knowledge_point_id),
+    KEY idx_target (target_knowledge_point_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识点关系边';
+
+CREATE TABLE ai_model_config (
+    id                  BIGINT       NOT NULL AUTO_INCREMENT COMMENT '配置ID',
+    model_key           VARCHAR(64)  NOT NULL COMMENT '模型标识',
+    provider            VARCHAR(32)  NOT NULL COMMENT '提供商',
+    enabled             TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '是否启用',
+    priority            INT          NOT NULL DEFAULT 1 COMMENT '路由优先级',
+    fallback_model_key  VARCHAR(64)  DEFAULT NULL COMMENT '降级模型',
+    max_tokens          INT          DEFAULT 4096 COMMENT '最大 Token',
+    temperature         DECIMAL(3,2) DEFAULT 0.70 COMMENT '温度参数',
+    create_time         DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_model_key (model_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 模型配置';
+
+CREATE TABLE ai_gateway_route (
+    id                  BIGINT       NOT NULL AUTO_INCREMENT COMMENT '路由ID',
+    scene               VARCHAR(32)  NOT NULL COMMENT 'CHAT/RAG/AGENT/GRADING',
+    primary_model_key   VARCHAR(64)  NOT NULL COMMENT '主模型',
+    fallback_model_key  VARCHAR(64)  DEFAULT NULL COMMENT '降级模型',
+    create_time         DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_scene (scene)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Gateway 场景路由';
+
+CREATE TABLE agent_run (
+    id              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    run_id          VARCHAR(64)  NOT NULL COMMENT '运行实例ID',
+    agent_code      VARCHAR(32)  NOT NULL COMMENT 'Agent 编码',
+    user_id         BIGINT       NOT NULL COMMENT '发起用户ID',
+    course_id       BIGINT       DEFAULT NULL COMMENT '关联课程ID',
+    goal            TEXT         NOT NULL COMMENT '执行目标',
+    status          VARCHAR(16)  NOT NULL DEFAULT 'RUNNING' COMMENT '运行状态',
+    result_json     JSON         DEFAULT NULL COMMENT '结果 JSON',
+    model_key       VARCHAR(64)  DEFAULT NULL COMMENT '使用模型',
+    token_usage     INT          DEFAULT 0 COMMENT 'Token 消耗',
+    create_time     DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_run_id (run_id),
+    KEY idx_user (user_id),
+    KEY idx_agent (agent_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Agent 执行实例';
+
+CREATE TABLE agent_step (
+    id              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '步骤ID',
+    run_id          VARCHAR(64)  NOT NULL COMMENT '运行实例ID',
+    step_index      INT          NOT NULL COMMENT '步骤序号',
+    step_type       VARCHAR(16)  NOT NULL COMMENT 'INTENT/PLAN/TOOL/LLM/RESULT',
+    title           VARCHAR(256) NOT NULL COMMENT '步骤标题',
+    tool_name       VARCHAR(64)  DEFAULT NULL COMMENT '工具名称',
+    status          VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT '步骤状态',
+    input_preview   TEXT         DEFAULT NULL COMMENT '输入预览',
+    output_preview  TEXT         DEFAULT NULL COMMENT '输出预览',
+    create_time     DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    KEY idx_run (run_id, step_index)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Agent 步骤';
+
+CREATE TABLE agent_tool_call (
+    id              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '调用ID',
+    run_id          VARCHAR(64)  NOT NULL COMMENT '运行实例ID',
+    step_id         BIGINT       DEFAULT NULL COMMENT '关联步骤ID',
+    tool_name       VARCHAR(64)  NOT NULL COMMENT '工具名称',
+    input_json      JSON         DEFAULT NULL COMMENT '输入 JSON',
+    output_json     JSON         DEFAULT NULL COMMENT '输出 JSON',
+    status          VARCHAR(16)  NOT NULL DEFAULT 'RUNNING' COMMENT '调用状态',
+    duration_ms     INT          DEFAULT 0 COMMENT '耗时（毫秒）',
+    create_time     DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (id),
+    KEY idx_run_tool (run_id, tool_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Tool 调用日志';
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- =============================================================================
@@ -653,7 +813,8 @@ INSERT INTO sys_permission (id, permission_code, permission_name, parent_id) VAL
 (27, 'system:prompt:edit',    'Prompt编辑', 0),
 (28, 'system:audit:view',     'AI审计查看', 0),
 (29, 'system:quota:view',     'AI配额查看', 0),
-(30, 'system:quota:edit',     'AI配额编辑', 0);
+(30, 'system:quota:edit',     'AI配额编辑', 0),
+(31, 'ai:tool:use',           'Agent工具调用', 0);
 
 -- 管理员全量权限
 INSERT INTO sys_role_permission (role_id, permission_id)
@@ -913,6 +1074,37 @@ INSERT INTO statistics_daily_snapshot (id, stat_date, course_id, active_student_
 (6, DATE_SUB(CURDATE(), INTERVAL 1 DAY), 101, 78, 235, 182000, 88.0),
 (7, CURDATE(),                           101, 85, 260, 205000, 88.5);
 
+-- 30. AI Gateway 默认模型与场景路由（V1.0）
+INSERT INTO ai_model_config (model_key, provider, enabled, priority, fallback_model_key, max_tokens, temperature) VALUES
+('deepseek-chat', 'deepseek', 1, 1, 'mock', 4096, 0.70),
+('qwen-turbo', 'qwen', 1, 2, 'mock', 4096, 0.70),
+('mock', 'mock', 1, 99, NULL, 4096, 0.70);
+
+INSERT INTO ai_gateway_route (scene, primary_model_key, fallback_model_key) VALUES
+('CHAT', 'deepseek-chat', 'mock'),
+('RAG', 'deepseek-chat', 'mock'),
+('AGENT', 'deepseek-chat', 'mock'),
+('GRADING', 'deepseek-chat', 'mock');
+
+-- 31. V1.0 学情与掌握度样本（课程 102 Java，供学情分析与 Gate G 演示）
+INSERT INTO knowledge_mastery (student_id, course_id, knowledge_point_id, mastery_score, sample_count, last_assessed_at) VALUES
+(3, 102, 14, 0.8500, 5, NOW()),
+(3, 102, 15, 0.6400, 4, NOW()),
+(3, 102, 16, 0.7800, 3, NOW()),
+(4, 102, 14, 0.8200, 4, NOW()),
+(4, 102, 15, 0.7000, 3, NOW()),
+(4, 102, 16, 0.7500, 3, NOW());
+
+INSERT INTO knowledge_point_relation (source_knowledge_point_id, target_knowledge_point_id, relation_type) VALUES
+(15, 14, 'prerequisite');
+
+INSERT INTO wrong_question_record (student_id, course_id, question_id, knowledge_point_id, error_types, diagnosis, wrong_count) VALUES
+(3, 102, 1007, 16, 'CONCEPT,LOGIC', '混淆编译期与运行期绑定', 3);
+
+INSERT INTO learning_record (student_id, course_id, action_type, duration_minutes) VALUES
+(3, 102, 'STUDY', 45),
+(4, 102, 'STUDY', 60);
+
 -- =============================================================================
--- 初始化完成：包含全量 30 张业务表结构与完整种子数据
+-- 初始化完成：包含全量 43 张业务表结构与完整种子数据
 -- =============================================================================

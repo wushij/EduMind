@@ -66,8 +66,14 @@
           <div class="left-toggles">
             <span class="dock-label">卷面视图模式：</span>
             <el-radio-group v-model="viewMode" size="small">
-              <el-radio-button label="PAPER">📄 标准考生纸质试卷</el-radio-button>
-              <el-radio-button label="ANSWER_KEY">🔍 含参考答案及评分细则</el-radio-button>
+              <el-radio-button label="PAPER">
+                <el-icon class="mr-1"><Document /></el-icon>
+                <span>标准考生纸质试卷</span>
+              </el-radio-button>
+              <el-radio-button label="ANSWER_KEY">
+                <el-icon class="mr-1"><View /></el-icon>
+                <span>含参考答案及评分细则</span>
+              </el-radio-button>
             </el-radio-group>
           </div>
 
@@ -147,7 +153,7 @@
                           v-if="viewMode === 'ANSWER_KEY' && (opt.isCorrect || opt.key === q.correctAnswer)"
                           class="correct-badge"
                         >
-                          ✓ 正确选项
+                          <el-icon><Check /></el-icon> 正确选项
                         </span>
                       </div>
                     </div>
@@ -194,7 +200,10 @@
       <!-- 右侧试卷统计与考点覆盖 (Sticky) -->
       <div class="paper-sidebar-area">
         <el-card shadow="never" class="sidebar-card">
-          <h3 class="side-card-title">📊 试卷难度与考点画像</h3>
+          <h3 class="side-card-title">
+            <el-icon class="title-icon"><TrendCharts /></el-icon>
+            <span>试卷难度与考点画像</span>
+          </h3>
 
           <div class="side-stat-row">
             <span class="label">试卷大题类别</span>
@@ -289,7 +298,11 @@ import {
   ArrowLeft,
   Promotion,
   Download,
-  Printer
+  Printer,
+  Document,
+  View,
+  TrendCharts,
+  Check
 } from '@element-plus/icons-vue';
 import { getExamDetail, exportExam } from '@/api/question/exam';
 import type { ExamPaper } from '@/types/question/exam';
@@ -833,6 +846,14 @@ function getChineseNumber(num: number) {
           font-weight: 700;
           color: #0f172a;
           margin: 0 0 16px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+
+          .title-icon {
+            font-size: 17px;
+            color: #2563eb;
+          }
         }
 
         .side-stat-row {

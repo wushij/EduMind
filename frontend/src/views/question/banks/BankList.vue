@@ -4,9 +4,9 @@
     <div class="bank-header-dock">
       <div class="header-left">
         <div class="title-with-icon">
-          <span class="header-icon">🗂️</span>
+          <el-icon class="header-icon"><FolderOpened /></el-icon>
           <h1 class="main-title">课程与通用题库中心</h1>
-          <span class="capsule-count-tag">共 {{ banks.length }} 个精选题库</span>
+          <span class="capsule-count-tag">共 {{ total }} 个精选题库</span>
         </div>
         <p class="sub-desc">
           归纳整理各课程专项试题集、历年统考与期中期末题库，支持快捷组卷与试题穿梭调度。
@@ -19,7 +19,8 @@
           class="capsule-btn capsule-btn--primary"
           @click="showCreateDialog = true"
         >
-          <span>➕ 新建题库</span>
+          <el-icon><Plus /></el-icon>
+          <span>新建题库</span>
         </button>
       </div>
     </div>
@@ -32,7 +33,7 @@
           <span
             class="filter-pill-tag"
             :class="{ active: selectedCourseId === null }"
-            @click="selectedCourseId = null"
+            @click="handleCourseFilter(null)"
           >
             全部课程
           </span>
@@ -41,7 +42,7 @@
             :key="c.id"
             class="filter-pill-tag"
             :class="{ active: selectedCourseId === c.id }"
-            @click="selectedCourseId = c.id"
+            @click="handleCourseFilter(c.id)"
           >
             {{ c.title }}
           </span>
@@ -51,9 +52,9 @@
 
     <!-- 题库卡片网格 -->
     <div v-loading="loading" class="banks-grid-wrapper">
-      <div v-if="filteredBanks.length > 0" class="banks-grid">
+      <div v-if="banks.length > 0" class="banks-grid">
         <div
-          v-for="b in filteredBanks"
+          v-for="b in banks"
           :key="b.id"
           class="bank-card-item"
           @click="router.push(`/question/banks/${b.id}`)"
@@ -69,7 +70,8 @@
           <div class="card-footer">
             <span class="date-text">更新于 {{ b.updateTime ? b.updateTime.slice(0, 10) : '近期' }}</span>
             <el-button type="primary" link size="small">
-              进入题库维护 ➔
+              <span>进入题库维护</span>
+              <el-icon class="ml-1"><ArrowRight /></el-icon>
             </el-button>
           </div>
         </div>
@@ -77,11 +79,18 @@
 
       <!-- 空状态 -->
       <div v-else class="empty-state-panel">
-        <span class="empty-icon">🗂️</span>
+        <el-icon class="empty-icon"><FolderOpened /></el-icon>
         <h3>暂无匹配的题库</h3>
         <p>您可以点击右上角“新建题库”为您的课程创建首个专属试题库。</p>
         <el-button type="primary" @click="showCreateDialog = true">立即新建题库</el-button>
       </div>
+
+      <AppPagination
+        v-model:page-num="pageNum"
+        v-model:page-size="pageSize"
+        :total="total"
+        @change="loadBanks"
+      />
     </div>
 
     <!-- 新建题库对话框 -->
@@ -128,11 +137,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
+import { FolderOpened, Plus, ArrowRight } from '@element-plus/icons-vue';
 import { getQuestionBanks, createQuestionBank } from '@/api/question/question-bank';
 import { getCourseList } from '@/api/course/course';
+import AppPagination from '@/components/common/AppPagination.vue';
 import type { Course } from '@/types/course/course';
 
 const router = useRouter();
@@ -144,6 +155,9 @@ const dialogFormRef = ref<FormInstance>();
 const banks = ref<any[]>([]);
 const courses = ref<Course[]>([]);
 const selectedCourseId = ref<number | null>(null);
+const pageNum = ref(1);
+const pageSize = ref(10);
+const total = ref(0);
 
 const newBankForm = reactive({
   name: '',
@@ -156,12 +170,11 @@ const dialogRules: FormRules = {
   courseId: [{ required: true, message: '请选择关联课程', trigger: 'change' }]
 };
 
-const filteredBanks = computed(() => {
-  if (selectedCourseId.value === null) {
-    return banks.value;
-  }
-  return banks.value.filter(b => b.courseId === selectedCourseId.value);
-});
+function handleCourseFilter(courseId: number | null) {
+  selectedCourseId.value = courseId;
+  pageNum.value = 1;
+  loadBanks();
+}
 
 onMounted(async () => {
   await Promise.all([loadCourses(), loadBanks()]);
@@ -179,43 +192,20 @@ async function loadCourses() {
 async function loadBanks() {
   loading.value = true;
   try {
-    const res = await getQuestionBanks({ page: 1, pageSize: 50 });
-    banks.value = res.data?.list || [
-      {
-        id: 1,
-        name: '数据结构核心真题库',
-        courseId: 101,
-        courseName: '数据结构与算法',
-        questionCount: 5,
-        description: '涵盖全国统考408与期末高频真题，包括线性表、树与排序算法',
-        updateTime: '2026-09-10'
-      },
-      {
-        id: 2,
-        name: 'Java面向对象精选题集',
-        courseId: 102,
-        courseName: 'Java程序设计',
-        questionCount: 3,
-        description: 'Java基础语法、面向对象、集合框架与异常处理典型题型',
-        updateTime: '2026-09-09'
-      },
-      {
-        id: 3,
-        name: '高等数学期末测试真题库',
-        courseId: 103,
-        courseName: '高等数学（上）',
-        questionCount: 3,
-        description: '极限、连续、导数与微积分计算经典测试题',
-        updateTime: '2026-09-08'
-      }
-    ];
+    const res = await getQuestionBanks({
+      page: pageNum.value,
+      pageSize: pageSize.value,
+      courseId: selectedCourseId.value || undefined
+    });
+    banks.value = res.data?.list || [];
+    total.value = res.data?.total ?? banks.value.length;
   } catch {
-    // 降级演示数据
     banks.value = [
       { id: 1, name: '数据结构核心真题库', courseId: 101, questionCount: 5, description: '涵盖408与期末高频真题', updateTime: '2026-09-10' },
       { id: 2, name: 'Java面向对象精选题集', courseId: 102, questionCount: 3, description: 'Java核心典型题型', updateTime: '2026-09-09' },
       { id: 3, name: '高等数学期末测试真题库', courseId: 103, questionCount: 3, description: '微积分计算经典测试题', updateTime: '2026-09-08' }
     ];
+    total.value = banks.value.length;
   } finally {
     loading.value = false;
   }
@@ -237,6 +227,7 @@ async function handleCreateBank() {
         showCreateDialog.value = false;
         newBankForm.name = '';
         newBankForm.description = '';
+        pageNum.value = 1;
         await loadBanks();
       } catch (err: any) {
         ElMessage.error(err?.message || '创建题库失败');
@@ -273,6 +264,9 @@ async function handleCreateBank() {
 
         .header-icon {
           font-size: 24px;
+          color: #2563eb;
+          display: inline-flex;
+          align-items: center;
         }
 
         .main-title {

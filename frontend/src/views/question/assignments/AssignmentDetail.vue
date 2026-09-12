@@ -34,10 +34,12 @@
             :loading="batchAILoading"
             @click="handleBatchAIGrade"
           >
-            🤖 一键全班 AI 智能预批改
+            <el-icon><Service /></el-icon>
+            <span>一键全班 AI 智能预批改</span>
           </el-button>
           <el-button class="action-btn" @click="handleRemindUnsubmitted">
-            📢 一键催交未交学生
+            <el-icon><Bell /></el-icon>
+            <span>一键催交未交学生</span>
           </el-button>
         </div>
       </div>
@@ -130,8 +132,9 @@
             <el-table-column label="AI智能预评" width="140">
               <template #default="{ row }">
                 <div v-if="row.aiGraded" class="ai-grade-tag">
-                  <span class="text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded font-semibold border border-purple-200">
-                    🤖 预评 {{ row.aiScore }}分
+                  <span class="text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded font-semibold border border-purple-200 inline-flex items-center gap-1">
+                    <el-icon><Cpu /></el-icon>
+                    <span>预评 {{ row.aiScore }}分</span>
                   </span>
                 </div>
                 <span v-else class="text-xs text-slate-400">未触发AI</span>
@@ -231,7 +234,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { ArrowLeft, Search } from '@element-plus/icons-vue';
+import { ArrowLeft, Search, Service, Bell, Cpu } from '@element-plus/icons-vue';
 import { getAssignmentDetail } from '@/api/question/assignment';
 import { getSubmissionsByAssignment, gradeSubmission } from '@/api/question/submission';
 import { getExamDetail } from '@/api/question/exam';
@@ -451,7 +454,7 @@ async function handleBatchAIGrade() {
       }
     }
     if (successCount > 0) {
-      ElMessage.success(`🎉 已成功为 ${successCount} 份答卷完成AI智能辅助预批改！`);
+      ElMessage.success(`已成功为 ${successCount} 份答卷完成AI智能辅助预批改！`);
     } else {
       ElMessage.warning('批量AI批改未完成，请检查答卷状态与后端接口');
     }

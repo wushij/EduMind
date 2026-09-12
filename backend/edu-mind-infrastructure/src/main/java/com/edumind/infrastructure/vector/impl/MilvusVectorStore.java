@@ -10,6 +10,7 @@ import io.milvus.param.ConnectParam;
 import io.milvus.param.IndexType;
 import io.milvus.param.MetricType;
 import io.milvus.param.R;
+import io.milvus.param.collection.CollectionSchemaParam;
 import io.milvus.param.collection.CreateCollectionParam;
 import io.milvus.param.collection.FieldType;
 import io.milvus.param.collection.HasCollectionParam;
@@ -90,7 +91,7 @@ public class MilvusVectorStore implements VectorStore {
                 .withCollectionName(collectionName)
                 .withMetricType(MetricType.COSINE)
                 .withTopK(topK)
-                .withVectors(List.of(queryVector))
+                .withFloatVectors(List.of(queryVector))
                 .withVectorFieldName(VECTOR_FIELD)
                 .withOutFields(List.of(ID_FIELD, KB_FIELD, DOC_FIELD))
                 .withExpr(expr)
@@ -148,9 +149,12 @@ public class MilvusVectorStore implements VectorStore {
                 FieldType.newBuilder().withName(KB_FIELD).withDataType(DataType.Int64).build(),
                 FieldType.newBuilder().withName(DOC_FIELD).withDataType(DataType.Int64).build()
         );
+        CollectionSchemaParam schema = CollectionSchemaParam.newBuilder()
+                .withFieldTypes(fields)
+                .build();
         client.createCollection(CreateCollectionParam.newBuilder()
                 .withCollectionName(collectionName)
-                .withFieldTypes(fields)
+                .withSchema(schema)
                 .build());
         client.createIndex(CreateIndexParam.newBuilder()
                 .withCollectionName(collectionName)

@@ -48,7 +48,8 @@ INSERT IGNORE INTO sys_permission (id, permission_code, permission_name, parent_
 (21, 'analytics:view',      '学情分析查看', 0),
 (22, 'resource:view',       '资源查看', 0),
 (23, 'resource:upload',     '资源上传', 0),
-(24, 'notice:view',         '通知查看', 0);
+(24, 'notice:view',         '通知查看', 0),
+(31, 'ai:tool:use',         'Agent工具调用', 0);
 
 -- 管理员具备所有权限
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)

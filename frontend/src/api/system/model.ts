@@ -83,7 +83,7 @@ export const mockModelConfigs: ModelProviderConfig[] = [
 
 export const getModelConfigs = async (): Promise<ModelProviderConfig[]> => {
   try {
-    const res = await get<ModelProviderConfig[]>('/system/models');
+    const res = await get<ModelProviderConfig[]>('/system/ai-models');
     const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
     if (list.length > 0) return list;
     if (!USE_MOCK) return [];
@@ -96,7 +96,7 @@ export const getModelConfigs = async (): Promise<ModelProviderConfig[]> => {
 
 export const updateModelConfig = async (id: number, data: Partial<ModelProviderConfig>): Promise<boolean> => {
   try {
-    await put(`/system/models/${id}`, data);
+    await put(`/system/ai-models/${id}`, data);
     return true;
   } catch (err) {
     if (!USE_MOCK) throw err;

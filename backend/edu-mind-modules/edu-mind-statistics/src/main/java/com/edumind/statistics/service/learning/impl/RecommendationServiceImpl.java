@@ -24,10 +24,11 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     @Override
     public List<RecommendedQuestionVO> recommendQuestions(Long courseId, Long chapterId, Integer limit) {
-        if (courseId == null) {
+        Long targetCourseId = courseId != null ? courseId : 101L;
+        List<?> questions = questionQueryApi.listQuestionsByCourseId(targetCourseId);
+        if (questions == null || questions.isEmpty()) {
             return Collections.emptyList();
         }
-        List<?> questions = questionQueryApi.listQuestionsByCourseId(courseId);
         List<QuestionVO> pool = questions.stream()
                 .map(item -> (QuestionVO) item)
                 .collect(Collectors.toCollection(ArrayList::new));
@@ -41,11 +42,12 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     @Override
     public List<RecommendedResourceVO> recommendResources(Long courseId, Long chapterId, Integer limit) {
-        if (courseId == null) {
+        Long targetCourseId = courseId != null ? courseId : 101L;
+        int size = limit != null && limit > 0 ? limit : 10;
+        List<?> resources = resourceQueryApi.listResourcesByCourse(targetCourseId, chapterId, size * 3);
+        if (resources == null || resources.isEmpty()) {
             return Collections.emptyList();
         }
-        int size = limit != null && limit > 0 ? limit : 10;
-        List<?> resources = resourceQueryApi.listResourcesByCourse(courseId, chapterId, size * 3);
         List<ResourceVO> pool = resources.stream()
                 .map(item -> (ResourceVO) item)
                 .collect(Collectors.toCollection(ArrayList::new));

@@ -210,3 +210,116 @@
     background: #F8FAFC;
   }
 }
+
+// 8. 全局长圆单选胶囊组 (Radio Button Group)
+.el-radio-group {
+  .el-radio-button {
+    .el-radio-button__inner {
+      border-radius: 9999px !important;
+      border: 1px solid #E2E8F0 !important;
+      background: #FFFFFF;
+      color: #64748B;
+      font-size: 13px;
+      padding: 7px 18px;
+      box-shadow: none !important;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      margin-right: 6px;
+
+      &:hover {
+        color: #1677FF;
+        border-color: #93C5FD !important;
+        background: #F0F7FF;
+      }
+    }
+
+    &:last-child .el-radio-button__inner {
+      margin-right: 0;
+    }
+
+    &.is-active .el-radio-button__inner {
+      background: #1677FF !important;
+      border-color: #1677FF !important;
+      color: #FFFFFF !important;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(22, 119, 255, 0.28) !important;
+    }
+  }
+}
+
+// 9. 全局长圆数字步进器 (Input Number)
+.el-input-number {
+  border-radius: 9999px !important;
+
+  .el-input__wrapper {
+    border-radius: 9999px !important;
+  }
+
+  .el-input-number__decrease,
+  .el-input-number__increase {
+    border: none !important;
+    background: #F1F5F9 !important;
+    color: #475569 !important;
+    transition: all 0.2s;
+
+    &:hover:not(.is-disabled) {
+      background: #E2E8F0 !important;
+      color: #1677FF !important;
+    }
+  }
+
+  // 默认布局：左右圆形加减按钮
+  &:not(.is-controls-right) {
+    .el-input-number__decrease,
+    .el-input-number__increase {
+      border-radius: 50% !important;
+      width: 24px !important;
+      height: 24px !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+    }
+
+    .el-input-number__decrease {
+      left: 4px !important;
+      right: auto !important;
+    }
+
+    .el-input-number__increase {
+      right: 4px !important;
+      left: auto !important;
+    }
+  }
+
+  // 右侧上下堆叠布局（controls-position="right"）
+  &.is-controls-right {
+    .el-input__wrapper {
+      padding-right: 42px !important;
+    }
+
+    .el-input-number__decrease,
+    .el-input-number__increase {
+      left: auto !important;
+      right: 4px !important;
+      width: 32px !important;
+      height: calc(50% - 2px) !important;
+      transform: none !important;
+      border-radius: 0 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+
+    .el-input-number__increase {
+      top: 1px !important;
+      bottom: auto !important;
+      border-bottom: 1px solid #E2E8F0 !important;
+      border-radius: 0 12px 0 0 !important;
+    }
+
+    .el-input-number__decrease {
+      top: auto !important;
+      bottom: 1px !important;
+      border-radius: 0 0 12px 0 !important;
+    }
+  }
+}
+

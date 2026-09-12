@@ -23,7 +23,7 @@ public class RecommendationController {
     @SaCheckPermission("course:view")
     @GetMapping("/questions")
     public ApiResult<List<RecommendedQuestionVO>> recommendQuestions(
-            @RequestParam("courseId") Long courseId,
+            @RequestParam(value = "courseId", required = false) Long courseId,
             @RequestParam(value = "chapterId", required = false) Long chapterId,
             @RequestParam(value = "limit", defaultValue = "10") Integer limit) {
         return ApiResult.success(recommendationService.recommendQuestions(courseId, chapterId, limit));
@@ -32,7 +32,7 @@ public class RecommendationController {
     @SaCheckPermission("course:view")
     @GetMapping("/resources")
     public ApiResult<List<RecommendedResourceVO>> recommendResources(
-            @RequestParam("courseId") Long courseId,
+            @RequestParam(value = "courseId", required = false) Long courseId,
             @RequestParam(value = "chapterId", required = false) Long chapterId,
             @RequestParam(value = "limit", defaultValue = "10") Integer limit) {
         return ApiResult.success(recommendationService.recommendResources(courseId, chapterId, limit));

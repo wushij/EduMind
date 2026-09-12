@@ -1,6 +1,6 @@
 <template>
   <div class="question-generate-page">
-    <!-- 顶部专属 3D 视觉大 Banner (严格对齐原型图 2 与 ai智能出题banner.png，比例 2172×724) -->
+    <!-- 顶部专属 3D 视觉大 Banner (ai智能出题.png，比例 2508×627) -->
     <div class="question-banner-stage">
       <div class="banner-ratio-box">
         <img
@@ -14,26 +14,26 @@
             <span>← 返回 AI 广场</span>
           </button>
         </div>
-      </div>
-    </div>
 
-    <!-- 5 步向导步骤进度条 (纯正长圆跑道指示条) -->
-    <div class="wizard-steps-container">
-      <div
-        v-for="step in steps"
-        :key="step.index"
-        class="wizard-step-item"
-        :class="{
-          active: currentStep === step.index,
-          completed: currentStep > step.index
-        }"
-        @click="goToStep(step.index)"
-      >
-        <span class="step-num">
-          <el-icon v-if="currentStep > step.index"><Check /></el-icon>
-          <span v-else>{{ step.index }}</span>
-        </span>
-        <span class="step-name">{{ step.name }}</span>
+        <!-- 5 步向导步骤进度条 (嵌入 Banner 内部左下方，紧凑长圆跑道胶囊) -->
+        <div class="banner-wizard-dock">
+          <div
+            v-for="step in steps"
+            :key="step.index"
+            class="wizard-step-item"
+            :class="{
+              active: currentStep === step.index,
+              completed: currentStep > step.index
+            }"
+            @click="goToStep(step.index)"
+          >
+            <span class="step-num">
+              <el-icon v-if="currentStep > step.index"><Check /></el-icon>
+              <span v-else>{{ step.index }}</span>
+            </span>
+            <span class="step-name">{{ step.name }}</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -307,7 +307,7 @@ import { USE_MOCK } from '@/config/mock';
 import { MOCK_COURSES } from '@/mock/courses';
 import { MOCK_CHAPTERS } from '@/mock/chapters';
 import { QuestionType, Difficulty } from '@/mock/questions';
-import questionBannerImg from '@/assets/images/ai智能出题banner.png';
+import questionBannerImg from '@/assets/images/ai智能出题.png';
 
 const router = useRouter();
 const { currentStep, generating, formState, nextStep, prevStep, generate } = useQuestionGenerate();
@@ -435,7 +435,7 @@ async function handleGenerateSubmit() {
   min-height: calc(100vh - 64px);
   box-sizing: border-box;
 
-  // 顶部专属 3D 视觉大 Banner (比例 2172×724)
+  // 顶部专属 3D 视觉大 Banner (比例 2508×627)
   .question-banner-stage {
     width: 100%;
     margin-bottom: 20px;
@@ -443,7 +443,7 @@ async function handleGenerateSubmit() {
     .banner-ratio-box {
       position: relative;
       width: 100%;
-      aspect-ratio: 2172 / 724;
+      aspect-ratio: 2508 / 627;
       border-radius: 16px;
       overflow: hidden;
       box-shadow: 0 6px 24px rgba(22, 119, 255, 0.08);
@@ -486,66 +486,121 @@ async function handleGenerateSubmit() {
           }
         }
       }
-    }
-  }
 
-  // 1. 5步向导长圆指示条
-  .wizard-steps-container {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #FFFFFF;
-    border-radius: 9999px; // 长圆跑道进度条
-    padding: 6px 12px;
-    border: 1px solid #EBF1F7;
-    box-shadow: 0 4px 16px rgba(30, 80, 150, 0.04);
-    margin-bottom: 24px;
+      // 2. 嵌入 Banner 内部左下方的 5 步向导紧凑长圆跑道指示条
+      .banner-wizard-dock {
+          position: absolute;
+          left: 4.27%;
+          top: 83%;
+          z-index: 2;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px 6px;
+          border-radius: 9999px;
+          background: rgba(255, 255, 255, 0.94);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.9);
+          box-shadow: 0 4px 18px rgba(22, 119, 255, 0.12);
 
-    .wizard-step-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 18px;
-      border-radius: 9999px;
-      font-size: 13.5px;
-      font-weight: 500;
-      color: #64748B;
-      cursor: pointer;
-      transition: all 0.2s;
+          .wizard-step-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #64748B;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
 
-      .step-num {
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        background: #F1F5F9;
-        color: #475569;
-        font-size: 12px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
+            .step-num {
+              width: 20px;
+              height: 20px;
+              border-radius: 50%;
+              background: #F1F5F9;
+              color: #475569;
+              font-size: 11.5px;
+              font-weight: 700;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              transition: all 0.2s ease;
+            }
 
-      &.active {
-        background: #1677FF;
-        color: #FFFFFF;
-        font-weight: 600;
+            &:hover:not(.active) {
+              color: #1677FF;
+              background: rgba(239, 246, 255, 0.6);
+            }
 
-        .step-num {
-          background: #FFFFFF;
-          color: #1677FF;
+            &.active {
+              background: #1677FF;
+              color: #FFFFFF;
+              font-weight: 600;
+              box-shadow: 0 2px 8px rgba(22, 119, 255, 0.28);
+
+              .step-num {
+                background: #FFFFFF;
+                color: #1677FF;
+              }
+            }
+
+            &.completed {
+              color: #1677FF;
+
+              .step-num {
+                background: #EFF6FF;
+                color: #1677FF;
+              }
+            }
+          }
+        }
+
+        @media (max-width: 1400px) {
+          .banner-wizard-dock {
+            top: 81%;
+            gap: 2px;
+            padding: 3px 4px;
+
+            .wizard-step-item {
+              padding: 5px 10px;
+              font-size: 12px;
+              gap: 5px;
+
+              .step-num {
+                width: 18px;
+                height: 18px;
+                font-size: 11px;
+              }
+            }
+          }
+        }
+
+        @media (max-width: 1100px) {
+          .banner-wizard-dock {
+            top: 79%;
+            left: 4.27%;
+            gap: 2px;
+            padding: 2px 4px;
+
+            .wizard-step-item {
+              padding: 4px 8px;
+              font-size: 11px;
+              gap: 4px;
+
+              .step-num {
+                width: 16px;
+                height: 16px;
+                font-size: 10px;
+              }
+            }
+          }
         }
       }
-
-      &.completed {
-        color: #1677FF;
-        .step-num {
-          background: #EAF3FF;
-          color: #1677FF;
-        }
-      }
     }
-  }
 
   // 2. 主体卡片
   .wizard-body-card {

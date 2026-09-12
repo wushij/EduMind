@@ -47,7 +47,7 @@
 
     <!-- 若被全部剔除时的空状态 -->
     <div v-else class="empty-questions-box">
-      <span class="empty-emoji">📝</span>
+      <el-icon class="empty-icon"><EditPen /></el-icon>
       <h3>当前暂无生成的题目</h3>
       <p>所有题目已被剔除，可点击下方返回重新配置生成</p>
       <button
@@ -72,7 +72,7 @@
           @click="handleBatchSave"
         >
           <span>一键批量入库</span>
-          <span>✓</span>
+          <el-icon class="btn-check-icon"><Check /></el-icon>
         </button>
       </div>
     </div>
@@ -82,6 +82,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { EditPen, Check } from '@element-plus/icons-vue';
 import QuestionCard from '@/components/question/QuestionCard.vue';
 import { useQuestionGenerate } from '@/composables/ai/useQuestionGenerate';
 
@@ -231,9 +232,10 @@ async function handleBatchSave() {
     border-radius: 20px;
     border: 1px solid #EBF1F7;
 
-    .empty-emoji {
-      font-size: 40px;
-      display: block;
+    .empty-icon {
+      font-size: 44px;
+      color: #94A3B8;
+      display: inline-flex;
       margin-bottom: 12px;
     }
 

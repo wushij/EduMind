@@ -4,3 +4,5 @@
  */
 export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || '/api';
 export const API_TIMEOUT: number = Number(import.meta.env.VITE_API_TIMEOUT) || 30000;
+export const SM_ENABLED: boolean = import.meta.env.VITE_SM_ENABLED === 'true';
+export const SM_HMAC_SECRET: string = import.meta.env.VITE_SM_HMAC_SECRET || 'EduMind_Platform_SecretKey_2026';

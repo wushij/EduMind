@@ -1,6 +1,8 @@
 package com.edumind.security.ratelimit;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.edumind.common.api.ApiResponseWriter;
+import com.edumind.common.api.ResultCode;
 import com.edumind.infrastructure.redis.RateLimitService;
 import com.edumind.infrastructure.redis.RedisKeyBuilder;
 import jakarta.servlet.FilterChain;
@@ -38,9 +40,7 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
             }
             String key = buildKey(rule, request);
             if (!rateLimitService.allow(key, rule.getLimit(), rule.getWindowSeconds())) {
-                response.setStatus(429);
-                response.setContentType("application/json;charset=UTF-8");
-                response.getWriter().write("{\"code\":429,\"message\":\"请求过于频繁，请稍后再试\"}");
+                ApiResponseWriter.write(response, ResultCode.TOO_MANY_REQUESTS);
                 return;
             }
         }

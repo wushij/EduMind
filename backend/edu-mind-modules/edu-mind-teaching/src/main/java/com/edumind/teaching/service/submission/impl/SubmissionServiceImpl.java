@@ -1,5 +1,6 @@
 package com.edumind.teaching.service.submission.impl;
 
+import com.edumind.common.event.LearningActivityEvent;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.common.model.UserContext;
 import com.edumind.infrastructure.redis.DistributedLockService;
@@ -17,6 +18,7 @@ import com.edumind.teaching.service.submission.SubmissionService;
 import com.edumind.teaching.vo.submission.SubmissionAnswerVO;
 import com.edumind.teaching.vo.submission.SubmissionVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -34,6 +36,7 @@ public class SubmissionServiceImpl implements SubmissionService {
     private final GradingService gradingService;
     private final DistributedLockService distributedLockService;
     private final TransactionTemplate transactionTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public SubmissionVO submit(Long assignmentId, SubmissionCreateDTO dto) {
@@ -75,6 +78,8 @@ public class SubmissionServiceImpl implements SubmissionService {
         submissionDao.updateById(submission);
 
         gradingService.gradeSubmission(submission.getId());
+        eventPublisher.publishEvent(new LearningActivityEvent(
+                this, studentId, assignment.getCourseId(), "STUDY", 30, null));
         return getById(submission.getId());
     }
 

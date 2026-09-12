@@ -183,12 +183,14 @@ async function handleSubmit() {
 
 <style scoped lang="scss">
 .course-create-page {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 10px 0 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  padding: 6px 0 40px;
 
   .create-header {
-    margin-bottom: 24px;
+    padding: 6px 0;
 
     .back-link-btn {
       display: inline-flex;
@@ -228,13 +230,13 @@ async function handleSubmit() {
     }
   }
 
-  // 表单主体卡片
+  // 表单主体卡片（与课程中心筛选面板/列表区保持同款全宽容器）
   .form-container-card {
     background: #FFFFFF;
-    border-radius: 20px;
-    padding: 36px 40px;
+    border-radius: 18px;
+    padding: 28px 32px 32px;
     border: 1px solid #EBF1F7;
-    box-shadow: 0 4px 24px rgba(30, 80, 150, 0.06);
+    box-shadow: 0 4px 16px rgba(30, 80, 150, 0.04);
 
     .capsule-form {
       :deep(.el-form-item__label) {

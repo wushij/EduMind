@@ -52,3 +52,20 @@ export interface RegisterParams {
   phone?: string;
   department?: string;
 }
+
+export interface PasswordResetVerifyRequest {
+  email: string;
+  code: string;
+}
+
+export interface PasswordResetVerifyResult {
+  resetToken: string;
+}
+
+export interface PasswordResetRequest {
+  resetToken?: string;
+  email?: string;
+  code?: string;
+  newPassword: string;
+}
+

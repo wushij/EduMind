@@ -44,9 +44,12 @@
 
     <!-- 题干编辑或展示 -->
     <div class="stem-section">
-      <div v-if="!isEditing" class="stem-content">
-        {{ question.stem }}
-      </div>
+      <MathText
+        v-if="!isEditing"
+        :text="question.stem"
+        tag="div"
+        custom-class="stem-content"
+      />
       <el-input
         v-else
         v-model="question.stem"
@@ -57,15 +60,15 @@
     </div>
 
     <!-- 选项列表 (选择题) -->
-    <div v-if="question.options && question.options.length > 0" class="options-container">
+    <div v-if="displayOptions.length > 0" class="options-container">
       <div
-        v-for="opt in question.options"
+        v-for="opt in displayOptions"
         :key="opt.key"
         class="option-pill-row"
         :class="{ 'is-correct': opt.isCorrect }"
       >
         <span class="opt-key-circle">{{ opt.key }}</span>
-        <span class="opt-content">{{ opt.content }}</span>
+        <MathText :text="opt.content" tag="span" custom-class="opt-content" />
         <span v-if="opt.isCorrect" class="correct-tag">正确答案</span>
       </div>
     </div>
@@ -79,19 +82,27 @@
     <!-- 展开的解析与知识点卡片 -->
     <div v-show="showAnalysis" class="analysis-expanded-card">
       <div class="analysis-row">
-        <strong class="analysis-title">💡 权威解析与考点点拨：</strong>
-        <p class="analysis-body">{{ question.analysis }}</p>
+        <strong class="analysis-title">
+          <el-icon class="analysis-icon"><Opportunity /></el-icon>
+          <span>权威解析与考点点拨：</span>
+        </strong>
+        <MathText
+          :text="question.analysis"
+          tag="p"
+          custom-class="analysis-body"
+        />
       </div>
 
       <div class="kp-row">
         <span class="kp-label">关联知识点：</span>
         <div class="kp-tags">
           <span
-            v-for="kp in question.knowledgePointNames"
+            v-for="kp in question.knowledgePointNames || []"
             :key="kp"
             class="pill-kp-badge"
           >
-            🧠 {{ kp }}
+            <el-icon class="kp-icon"><Reading /></el-icon>
+            <span>{{ kp }}</span>
           </span>
         </div>
       </div>
@@ -101,6 +112,8 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { Opportunity, Reading } from '@element-plus/icons-vue';
+import MathText from '@/components/common/MathText.vue';
 import { Question } from '@/types/question/question';
 
 const props = withDefaults(
@@ -151,6 +164,11 @@ const difficultyClass = computed(() => {
   if (props.question.difficulty === 'EASY') return 'diff-easy';
   if (props.question.difficulty === 'HARD') return 'diff-hard';
   return 'diff-medium';
+});
+
+const displayOptions = computed(() => {
+  const options = props.question.options;
+  return Array.isArray(options) ? options : [];
 });
 
 function toggleEdit() {
@@ -364,8 +382,15 @@ function toggleEdit() {
       .analysis-title {
         font-size: 13px;
         color: #0F172A;
-        display: block;
+        display: flex;
+        align-items: center;
+        gap: 4px;
         margin-bottom: 4px;
+
+        .analysis-icon {
+          font-size: 15px;
+          color: #D97706;
+        }
       }
 
       .analysis-body {
@@ -393,6 +418,9 @@ function toggleEdit() {
         gap: 6px;
 
         .pill-kp-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
           padding: 2px 10px;
           border-radius: 9999px; // 长圆药丸
           background: #EFF6FF;
@@ -400,6 +428,10 @@ function toggleEdit() {
           color: #1D4ED8;
           font-size: 11.5px;
           font-weight: 500;
+
+          .kp-icon {
+            font-size: 12px;
+          }
         }
       }
     }

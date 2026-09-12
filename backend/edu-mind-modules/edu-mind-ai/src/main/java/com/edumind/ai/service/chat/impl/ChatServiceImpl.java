@@ -8,6 +8,7 @@ import com.edumind.ai.dto.ChatStreamDTO;
 import com.edumind.ai.entity.AiCallLogEntity;
 import com.edumind.ai.entity.ConversationEntity;
 import com.edumind.ai.entity.MessageEntity;
+import com.edumind.ai.gateway.AiGatewayFacade;
 import com.edumind.ai.integration.llm.LlmClient;
 import com.edumind.ai.integration.llm.LlmProperties;
 import com.edumind.ai.rag.model.RagResult;
@@ -17,13 +18,15 @@ import com.edumind.ai.service.chat.ChatService;
 import com.edumind.ai.service.chat.ChatStreamRegistry;
 import com.edumind.ai.service.prompt.PromptService;
 import com.edumind.ai.vo.rag.CitationVO;
+import com.edumind.common.event.LearningActivityEvent;
 import com.edumind.common.exception.BusinessException;
-import com.edumind.common.model.UserContext;
 import com.edumind.infrastructure.redis.cache.AiSessionCacheService;
+import com.edumind.security.context.LoginUserResolver;
 import com.edumind.knowledge.api.KnowledgeQueryApi;
 import com.edumind.knowledge.service.knowledge.KnowledgeAccessService;
 import com.edumind.knowledge.vo.knowledge.KnowledgeBaseVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -41,7 +44,7 @@ public class ChatServiceImpl implements ChatService {
 
     private final ConversationDao conversationDao;
     private final MessageDao messageDao;
-    private final LlmClient llmClient;
+    private final AiGatewayFacade aiGatewayFacade;
     private final LlmProperties llmProperties;
     private final AiCallLogDao aiCallLogDao;
     private final PromptService promptService;
@@ -50,13 +53,11 @@ public class ChatServiceImpl implements ChatService {
     private final ChatStreamRegistry chatStreamRegistry;
     private final KnowledgeQueryApi knowledgeQueryApi;
     private final KnowledgeAccessService knowledgeAccessService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public SseEmitter streamChat(ChatStreamDTO dto) {
-        Long userId = UserContext.getUserId();
-        if (userId == null) {
-            throw new BusinessException("未登录");
-        }
+        Long userId = LoginUserResolver.requireUserId();
 
         ConversationEntity conversation = resolveConversation(dto, userId);
         saveMessage(conversation.getId(), "user", dto.getMessage(), null);
@@ -127,7 +128,7 @@ public class ChatServiceImpl implements ChatService {
             }
             final String promptForLog = userPrompt;
             final List<CitationVO> citationsForSave = citations;
-            llmClient.streamChat(systemPrompt, userPrompt, new LlmClient.StreamCallback() {
+            aiGatewayFacade.streamChat("CHAT", systemPrompt, userPrompt, new LlmClient.StreamCallback() {
                 @Override
                 public void onChunk(String content) {
                     if (chatStreamRegistry.isCancelled(streamId)) {
@@ -158,6 +159,7 @@ public class ChatServiceImpl implements ChatService {
                     sendEvent(emitter, "done", done);
                     emitter.complete();
                     logCall(start, useRag, knowledgeBaseId, promptForLog, assistantContent.toString(), ragHolder[0]);
+                    publishChatActivity(conversation);
                     chatStreamRegistry.remove(streamId);
                 }
 
@@ -252,7 +254,7 @@ public class ChatServiceImpl implements ChatService {
     private void logCall(long start, boolean useRag, Long knowledgeBaseId, String prompt, String completion,
                          RagResult ragResult) {
         AiCallLogEntity log = new AiCallLogEntity();
-        log.setUserId(UserContext.getUserId());
+        log.setUserId(LoginUserResolver.resolveUserId());
         log.setModel(llmProperties.getModel());
         log.setScene(useRag ? "CHAT_RAG" : "chat_stream");
         log.setLatencyMs((int) (System.currentTimeMillis() - start));
@@ -282,5 +284,18 @@ public class ChatServiceImpl implements ChatService {
             return "新会话";
         }
         return text.length() <= maxLen ? text : text.substring(0, maxLen) + "...";
+    }
+
+    private void publishChatActivity(ConversationEntity conversation) {
+        if (conversation.getUserId() == null || conversation.getCourseId() == null) {
+            return;
+        }
+        eventPublisher.publishEvent(new LearningActivityEvent(
+                this,
+                conversation.getUserId(),
+                conversation.getCourseId(),
+                "AI_CHAT",
+                1,
+                null));
     }
 }

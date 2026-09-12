@@ -121,5 +121,16 @@ export const aiRoutes: RouteRecordRaw[] = [
     name: 'AIAgentCenter',
     component: () => import('@/views/ai/agent/AgentCenter.vue'),
     meta: { title: 'AI Agent 中心', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
+  },
+  {
+    path: '/ai/agent/workflow',
+    name: 'AIAgentWorkflow',
+    component: () => import('@/views/ai/agent/AgentWorkflow.vue'),
+    meta: {
+      title: 'Agent 工作流',
+      requiresAuth: true,
+      roles: ['ADMIN', 'TEACHER'],
+      activeMenu: '/ai/agent'
+    }
   }
 ];

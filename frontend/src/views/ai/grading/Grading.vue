@@ -1,6 +1,6 @@
 <template>
   <div class="ai-grading-container">
-    <!-- 1. 顶部专属 3D 视觉大 Banner (严格对齐原型图 2 与 ai智能批改banner.png，比例 2172×724) -->
+    <!-- 1. 顶部专属 3D 视觉大 Banner (批改.png，比例 2508×627) -->
     <div class="grading-banner-stage">
       <div class="banner-ratio-box">
         <img
@@ -185,7 +185,7 @@ import {
 import { useGrading } from '@/composables/ai/useGrading';
 import { getAssignments } from '@/api/question/assignment';
 import { getSubmissionsByAssignment } from '@/api/question/submission';
-import gradingBannerImg from '@/assets/images/ai智能批改banner.png';
+import gradingBannerImg from '@/assets/images/批改.png';
 
 const router = useRouter();
 const { startGrading, batchGrade, loading: gradingLoading } = useGrading();
@@ -330,7 +330,7 @@ function viewGradingResults(row: GradingTaskRow) {
   background: #f8fafc;
   min-height: calc(100vh - 64px);
 
-  // 顶部专属 3D 视觉大 Banner (比例 2172×724)
+  // 顶部专属 3D 视觉大 Banner (比例 2508×627)
   .grading-banner-stage {
     width: 100%;
     margin-bottom: 22px;
@@ -338,7 +338,7 @@ function viewGradingResults(row: GradingTaskRow) {
     .banner-ratio-box {
       position: relative;
       width: 100%;
-      aspect-ratio: 2172 / 724;
+      aspect-ratio: 2508 / 627;
       border-radius: 16px;
       overflow: hidden;
       box-shadow: 0 6px 24px rgba(22, 119, 255, 0.08);

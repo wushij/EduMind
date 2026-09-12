@@ -2,6 +2,7 @@ package com.edumind.infrastructure.redis;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -12,7 +13,7 @@ public class RedisSupport {
     private final Environment environment;
 
     public boolean isDevProfile() {
-        return environment.acceptsProfiles("dev");
+        return environment.acceptsProfiles(Profiles.of("dev"));
     }
 
     public boolean requireRedis() {

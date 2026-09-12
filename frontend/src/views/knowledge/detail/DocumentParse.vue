@@ -32,7 +32,9 @@
 
     <div v-loading="loading" class="doc-hero-card">
       <div class="doc-info-left">
-        <div class="doc-icon">📄</div>
+        <div class="doc-icon">
+          <el-icon><Document /></el-icon>
+        </div>
         <div>
           <div class="doc-title-row">
             <h2 class="doc-title">{{ docInfo.fileName || '请选择文档' }}</h2>
@@ -62,7 +64,7 @@
             <span class="step-status">{{ stepDone(1) ? '已完成' : '待执行' }}</span>
           </div>
         </div>
-        <div class="step-arrow">➔</div>
+        <el-icon class="step-arrow"><ArrowRight /></el-icon>
         <div class="step-node" :class="{ active: stepDone(2) }">
           <div class="step-circle">2</div>
           <div class="step-text">
@@ -70,7 +72,7 @@
             <span class="step-status">{{ chunks.length }} 个分块</span>
           </div>
         </div>
-        <div class="step-arrow">➔</div>
+        <el-icon class="step-arrow"><ArrowRight /></el-icon>
         <div class="step-node" :class="{ active: stepDone(3) }">
           <div class="step-circle">3</div>
           <div class="step-text">
@@ -118,7 +120,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { ArrowLeft } from '@element-plus/icons-vue';
+import { ArrowLeft, ArrowRight, Document } from '@element-plus/icons-vue';
 import { useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
 import { getDocuments, parseDocument } from '@/api/knowledge/document';
 import { getChunks, triggerChunk } from '@/api/knowledge/chunk';
@@ -319,7 +321,8 @@ onMounted(async () => {
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 28px;
+        font-size: 26px;
+        color: #1677FF;
       }
 
       .doc-title-row {

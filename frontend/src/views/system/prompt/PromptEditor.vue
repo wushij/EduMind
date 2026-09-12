@@ -103,6 +103,29 @@
             />
           </el-form-item>
         </el-form>
+
+        <div v-if="promptId && versionHistory.length" class="version-history-section">
+          <div class="section-title">版本历史</div>
+          <div
+            v-for="item in versionHistory"
+            :key="item.id"
+            class="version-row"
+          >
+            <span class="version-label">v{{ item.version }}</span>
+            <span class="version-time">{{ item.createTime || '—' }}</span>
+            <el-button
+              v-if="item.version !== Number(String(form.version).replace(/^v/, ''))"
+              type="warning"
+              link
+              size="small"
+              :loading="rollingBack"
+              @click="rollbackVersion(item.version)"
+            >
+              回滚到此版本
+            </el-button>
+            <el-tag v-else size="small" type="success">当前</el-tag>
+          </div>
+        </div>
       </div>
 
       <!-- 右栏：变量在线填参与即时调试台 -->
@@ -183,11 +206,15 @@ const promptId = route.params.id ? Number(route.params.id) : null;
 const {
   testing,
   publishing,
+  rollingBack,
   currentPrompt,
+  versionHistory,
   testResult,
   loadPrompt,
+  loadVersions,
   handleSave,
   handlePublish,
+  handleRollback,
   runTest
 } = usePrompt();
 
@@ -249,12 +276,22 @@ const publishForm = async () => {
   await saveForm();
   if (form.value.id) {
     await handlePublish(form.value.id);
+    await loadVersions(form.value.id);
+  }
+};
+
+const rollbackVersion = async (targetVersion: number) => {
+  if (!form.value.id) return;
+  const ok = await handleRollback(form.value.id, targetVersion);
+  if (ok && currentPrompt.value) {
+    form.value = JSON.parse(JSON.stringify(currentPrompt.value));
   }
 };
 
 onMounted(async () => {
   if (promptId) {
     await loadPrompt(promptId);
+    await loadVersions(promptId);
     if (currentPrompt.value) {
       form.value = JSON.parse(JSON.stringify(currentPrompt.value));
       form.value.variables.forEach(v => {
@@ -370,6 +407,40 @@ onMounted(async () => {
             font-size: 12.5px;
             line-height: 1.6;
             background: #FAFBFC;
+          }
+        }
+      }
+
+      .version-history-section {
+        margin-top: 8px;
+        padding-top: 14px;
+        border-top: 1px solid #F1F5F9;
+
+        .section-title {
+          font-size: 12px;
+          font-weight: 700;
+          color: #475569;
+          margin-bottom: 10px;
+        }
+
+        .version-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 0;
+          border-bottom: 1px dashed #E2E8F0;
+
+          .version-label {
+            font-family: ui-monospace, monospace;
+            font-size: 12px;
+            color: #2563EB;
+            min-width: 36px;
+          }
+
+          .version-time {
+            flex: 1;
+            font-size: 12px;
+            color: #94A3B8;
           }
         }
       }

@@ -2,12 +2,16 @@ package com.edumind.ai.converter;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
+import com.edumind.ai.entity.AiCallLogEntity;
 import com.edumind.ai.entity.AiToolEntity;
 import com.edumind.ai.entity.ConversationEntity;
 import com.edumind.ai.entity.MessageEntity;
+import com.edumind.ai.entity.SysAiQuotaEntity;
 import com.edumind.ai.vo.AiToolVO;
 import com.edumind.ai.vo.ConversationVO;
 import com.edumind.ai.vo.MessageVO;
+import com.edumind.ai.vo.audit.AiCallLogVO;
+import com.edumind.ai.vo.quota.SysAiQuotaVO;
 import com.edumind.ai.vo.rag.CitationVO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Component;
@@ -44,6 +48,21 @@ public class AiConverter {
         } else {
             vo.setCitations(Collections.emptyList());
         }
+        return vo;
+    }
+
+    public AiCallLogVO toCallLogVO(AiCallLogEntity entity) {
+        AiCallLogVO vo = new AiCallLogVO();
+        BeanUtils.copyProperties(entity, vo);
+        int prompt = entity.getPromptTokens() != null ? entity.getPromptTokens() : 0;
+        int completion = entity.getCompletionTokens() != null ? entity.getCompletionTokens() : 0;
+        vo.setTotalTokens(prompt + completion);
+        return vo;
+    }
+
+    public SysAiQuotaVO toQuotaVO(SysAiQuotaEntity entity) {
+        SysAiQuotaVO vo = new SysAiQuotaVO();
+        BeanUtils.copyProperties(entity, vo);
         return vo;
     }
 }

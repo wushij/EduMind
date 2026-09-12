@@ -1,28 +1,163 @@
 <template>
-  <div class="page-container">
+  <div class="wrong-question-page" v-loading="loading">
     <div class="page-header">
-      <h2>WrongQuestionAnalysis</h2>
+      <div>
+        <h2>错题归因分析</h2>
+        <p>聚合高频错题、错因类型与 AI 诊断建议</p>
+      </div>
+      <el-select v-model="courseId" placeholder="选择课程" style="width: 220px" @change="reload">
+        <el-option v-for="c in courseOptions" :key="c.id" :label="c.name" :value="c.id" />
+      </el-select>
     </div>
-    <div class="page-content">
-      <el-card shadow="never">
-        <p>WrongQuestionAnalysis 页面正在建设中...</p>
-      </el-card>
-    </div>
+
+    <el-alert
+      v-if="usedMockFallback"
+      type="info"
+      :closable="false"
+      show-icon
+      title="当前展示 Mock 数据"
+      class="mock-alert"
+    />
+
+    <el-card shadow="never" class="table-card">
+      <el-table :data="wrongQuestions?.list ?? []" stripe>
+        <el-table-column prop="questionId" label="题目 ID" width="100" />
+        <el-table-column prop="wrongCount" label="错误次数" width="100" />
+        <el-table-column label="错因类型" min-width="180">
+          <template #default="{ row }">
+            <el-tag
+              v-for="type in row.errorTypes"
+              :key="type"
+              size="small"
+              effect="plain"
+              class="error-tag"
+            >
+              {{ type }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="diagnosis" label="AI 诊断" min-width="260" show-overflow-tooltip />
+        <el-table-column label="变式题" width="120">
+          <template #default="{ row }">
+            {{ row.variantQuestionIds?.length ?? 0 }} 道
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              link
+              type="primary"
+              :loading="diagnosingId === row.id"
+              @click="handleDiagnose(row)"
+            >
+              AI 诊断
+            </el-button>
+            <el-button link type="primary" @click="goGenerate(row)">生成巩固题</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <AppPagination
+        v-model:page-num="page"
+        v-model:page-size="pageSize"
+        :total="wrongQuestions?.total ?? 0"
+        @change="reload"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
+import { useLearningAnalytics } from '@/composables/analytics/useLearningAnalytics';
+import { diagnoseWrongQuestion } from '@/api/analytics/knowledge';
+import type { WrongQuestionItemVO } from '@/types/analytics/mastery';
+import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
+import AppPagination from '@/components/common/AppPagination.vue';
+
+const router = useRouter();
+
+const { courseOptions, courseId } = useTeacherCourses(102);
+const page = ref(1);
+const pageSize = ref(10);
+const diagnosingId = ref<number | null>(null);
+
+const { loading, usedMockFallback, wrongQuestions, fetchWrongQuestions } = useLearningAnalytics();
+
+async function reload() {
+  await fetchWrongQuestions(courseId.value, page.value, pageSize.value);
+}
+
+async function handleDiagnose(row: WrongQuestionItemVO) {
+  if (!row.id) {
+    ElMessage.warning('错题记录 ID 缺失，无法诊断');
+    return;
+  }
+  diagnosingId.value = row.id;
+  try {
+    const res = await diagnoseWrongQuestion(row.id);
+    const variantIds = res.data?.variantQuestionIds?.split(',').filter(Boolean) ?? [];
+    row.diagnosis = res.data?.diagnosis ?? row.diagnosis;
+    row.variantQuestionIds = variantIds.map((id) => Number(id));
+    ElMessage.success(`诊断完成，已生成 ${variantIds.length} 道变式题`);
+  } catch {
+    ElMessage.error('错题诊断失败');
+  } finally {
+    diagnosingId.value = null;
+  }
+}
+
+function goGenerate(row: WrongQuestionItemVO) {
+  router.push({
+    path: '/ai/question/generate',
+    query: { questionId: String(row.questionId) }
+  });
+}
+
+onMounted(reload);
 </script>
 
 <style scoped lang="scss">
-.page-container {
+.wrong-question-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
   .page-header {
-    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+
     h2 {
-      font-size: 20px;
-      font-weight: 600;
-      color: #1F2937;
+      margin: 0 0 6px;
+      font-size: 22px;
+      font-weight: 700;
+      color: #0F172A;
     }
+
+    p {
+      margin: 0;
+      color: #64748B;
+      font-size: 14px;
+    }
+  }
+
+  .table-card {
+    border-radius: 14px;
+  }
+
+  .error-tag {
+    margin-right: 6px;
+  }
+
+  .pagination-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
   }
 }
 </style>

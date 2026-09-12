@@ -45,7 +45,8 @@
           class="mr-4"
           @click="handleTriggerGradeNow"
         >
-          🤖 立即触发该答卷 AI 预评
+          <el-icon><Cpu /></el-icon>
+          <span>立即触发该答卷 AI 预评</span>
         </el-button>
         <div class="score-pill">
           <span class="score-num">{{ calculatedTotalScore }}</span>
@@ -84,9 +85,16 @@
         <!-- 学生作答呈现区 -->
         <div class="student-answer-panel">
           <div class="panel-header">
-            <span class="panel-tag">🧑‍🎓 考生提交作答：</span>
+            <span class="panel-tag">
+              <el-icon><User /></el-icon>
+              <span>考生提交作答：</span>
+            </span>
             <span v-if="item.isObjective" class="objective-result-tag" :class="{ pass: item.isCorrect }">
-              {{ item.isCorrect ? '✓ 客观比对正确' : '✗ 客观比对错误' }}
+              <el-icon class="mr-1">
+                <Check v-if="item.isCorrect" />
+                <Close v-else />
+              </el-icon>
+              <span>{{ item.isCorrect ? '客观比对正确' : '客观比对错误' }}</span>
             </span>
           </div>
           <div class="answer-content">
@@ -97,7 +105,10 @@
         <!-- 标准参考答案与解析 -->
         <div class="standard-answer-panel">
           <div class="panel-header">
-            <span class="panel-tag">📖 标准参考答案与考查重点：</span>
+            <span class="panel-tag">
+              <el-icon><Reading /></el-icon>
+              <span>标准参考答案与考查重点：</span>
+            </span>
           </div>
           <div class="std-content">
             <div class="ans-line">
@@ -115,7 +126,7 @@
         <div class="ai-review-copilot-box">
           <div class="copilot-header">
             <div class="copilot-title">
-              <span class="ai-spark">🤖</span>
+              <el-icon class="ai-spark"><MagicStick /></el-icon>
               <span>EduMind AI 智能辅助评阅研判</span>
               <span class="confidence-tag">置信度 96%</span>
             </div>
@@ -172,7 +183,8 @@
             :loading="gradingInProgress"
             @click="handleTriggerGradeNow"
           >
-            🤖 立即执行 AI 智能批改
+            <el-icon><Service /></el-icon>
+            <span>立即执行 AI 智能批改</span>
           </el-button>
         </el-empty>
       </div>
@@ -182,7 +194,8 @@
     <div class="bottom-sticky-bar">
       <div class="bar-left">
         <el-button @click="adoptAllAIScores">
-          🤖 一键采纳全卷 AI 智能建议得分
+          <el-icon><Select /></el-icon>
+          <span>一键采纳全卷 AI 智能建议得分</span>
         </el-button>
       </div>
 
@@ -200,7 +213,8 @@
           :loading="saving"
           @click="handleSaveGrading"
         >
-          💾 保存并确认评阅最终成绩
+          <el-icon><Finished /></el-icon>
+          <span>保存并确认评阅最终成绩</span>
         </el-button>
       </div>
     </div>
@@ -211,7 +225,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { ArrowLeft } from '@element-plus/icons-vue';
+import { ArrowLeft, Cpu, User, Reading, MagicStick, Service, Select, Finished, Check, Close } from '@element-plus/icons-vue';
 import {
   getSubmissionDetail,
   getSubmissionGrading,
@@ -369,7 +383,7 @@ async function handleSaveGrading() {
     if (submissionData.value) {
       submissionData.value.status = 'GRADED';
     }
-    ElMessage.success('🎉 评阅成绩已正式确认并发布！总成绩：' + calculatedTotalScore.value + ' 分');
+    ElMessage.success('评阅成绩已正式确认并发布！总成绩：' + calculatedTotalScore.value + ' 分');
     setTimeout(() => {
       router.push('/question/submissions');
     }, 800);
@@ -579,6 +593,12 @@ function getTypeTagType(type: QuestionType | string) {
           color: #1d4ed8;
           margin-bottom: 8px;
 
+          .panel-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+          }
+
           .objective-result-tag {
             font-size: 12px;
             padding: 2px 8px;
@@ -610,10 +630,18 @@ function getTypeTagType(type: QuestionType | string) {
         margin-bottom: 14px;
 
         .panel-header {
+          display: flex;
+          align-items: center;
           font-size: 13px;
           font-weight: 700;
           color: #475569;
           margin-bottom: 8px;
+
+          .panel-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+          }
         }
 
         .std-content {

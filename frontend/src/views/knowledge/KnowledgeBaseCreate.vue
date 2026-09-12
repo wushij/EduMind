@@ -240,33 +240,37 @@ async function handleSubmit() {
 
 <style scoped lang="scss">
 .kb-create-container {
-  padding: 24px;
-  background: #f8fafc;
-  min-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
 
   .top-nav-bar {
     display: flex;
     align-items: center;
     gap: 16px;
-    margin-bottom: 20px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 9999px;
+    padding: 10px 24px;
 
     .back-link {
-      font-size: 14px;
+      font-size: 13.5px;
       font-weight: 500;
-      color: #3b82f6;
+      color: #1677FF;
+      padding: 0;
     }
   }
 
   .form-wrapper {
-    max-width: 900px;
-    margin: 0 auto;
+    width: 100%;
 
     .main-card {
       background: #ffffff;
-      border-radius: 16px;
+      border-radius: 18px;
       border: 1px solid #e2e8f0;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
-      padding: 16px 24px;
+      padding: 8px 12px;
 
       .card-header-title {
         display: flex;

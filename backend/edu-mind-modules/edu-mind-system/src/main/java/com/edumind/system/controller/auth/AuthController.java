@@ -39,6 +39,19 @@ public class AuthController {
         return ApiResult.success();
     }
 
+    @PostMapping("/verify-reset-code")
+    public ApiResult<com.edumind.system.vo.auth.PasswordResetVerifyVO> verifyResetCode(
+            @Valid @RequestBody com.edumind.system.dto.auth.PasswordResetVerifyDTO verifyDTO) {
+        return ApiResult.success(authService.verifyResetCode(verifyDTO));
+    }
+
+    @PostMapping("/reset-password")
+    public ApiResult<Void> resetPassword(
+            @Valid @RequestBody com.edumind.system.dto.auth.PasswordResetDTO resetDTO) {
+        authService.resetPassword(resetDTO);
+        return ApiResult.success();
+    }
+
     @PostMapping("/register")
     public ApiResult<Map<String, Long>> register(@Valid @RequestBody RegisterDTO registerDTO) {
         Long userId = authService.register(registerDTO);

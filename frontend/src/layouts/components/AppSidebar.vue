@@ -226,7 +226,7 @@ function buildModuleDefinitions(): NavModule[] {
       name: 'AI 教学',
       icon: MagicStick,
       roles: ['ADMIN', 'TEACHER'],
-      permissions: ['ai:question', 'ai:exam', 'ai:grading', 'ai:chat'],
+      permissions: ['ai:question', 'ai:exam', 'ai:grading', 'ai:chat', 'ai:tool:use'],
       children: [
         { path: '/ai/assistant/chat', name: 'AI 助手', icon: Service, permissions: ['ai:chat'] },
         { path: '/ai/question/generate', name: 'AI 出题', icon: EditPen, permissions: ['ai:question'] },
@@ -234,7 +234,8 @@ function buildModuleDefinitions(): NavModule[] {
         { path: '/ai/grading', name: 'AI 批改', icon: CircleCheck, permissions: ['ai:grading'] },
         { path: '/ai/lesson', name: 'AI 教案', icon: Notebook },
         { path: '/ai/summary', name: 'AI 总结', icon: DocumentCopy },
-        { path: '/ai/recommendation', name: 'AI 推荐', icon: Promotion }
+        { path: '/ai/recommendation', name: 'AI 推荐', icon: Promotion },
+        { path: '/ai/agent', name: 'Agent 中心', icon: Cpu, permissions: ['ai:tool:use'] }
       ]
     },
 
@@ -322,7 +323,8 @@ function buildModuleDefinitions(): NavModule[] {
         { path: '/system/prompts', name: 'Prompt', icon: ChatLineSquare },
         { path: '/system/quotas', name: 'AI 配额', icon: Money },
         { path: '/system/audit', name: '审计日志', icon: Clock },
-        { path: '/system/config', name: '系统配置', icon: Monitor }
+        { path: '/system/config', name: '系统配置', icon: Monitor },
+        { path: '/system/gateway', name: 'AI 网关', icon: Connection }
       ]
     },
 

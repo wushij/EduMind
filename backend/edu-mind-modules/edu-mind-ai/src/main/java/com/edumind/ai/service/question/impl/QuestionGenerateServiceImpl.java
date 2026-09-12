@@ -6,7 +6,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.edumind.ai.dao.AiCallLogDao;
 import com.edumind.ai.dto.QuestionGenerateDTO;
 import com.edumind.ai.entity.AiCallLogEntity;
-import com.edumind.ai.integration.llm.LlmClient;
+import com.edumind.ai.gateway.AiGatewayFacade;
 import com.edumind.ai.integration.llm.LlmProperties;
 import com.edumind.ai.service.prompt.PromptService;
 import com.edumind.ai.service.question.QuestionGenerateService;
@@ -28,7 +28,7 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
 
     private static final long GENERATING_TTL_SECONDS = 120L;
 
-    private final LlmClient llmClient;
+    private final AiGatewayFacade aiGatewayFacade;
     private final LlmProperties llmProperties;
     private final AiCallLogDao aiCallLogDao;
     private final PromptService promptService;
@@ -57,7 +57,7 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
                     + ", 题型=" + dto.getQuestionTypes()
                     + ", 数量=" + dto.getCount();
 
-            String json = llmClient.generateQuestions(
+            String json = aiGatewayFacade.generateQuestions("AGENT", null,
                     promptService.getSystemPrompt("question_generate") + "\n" + userPrompt, params);
 
             List<QuestionVO> result = parseQuestions(json, dto);

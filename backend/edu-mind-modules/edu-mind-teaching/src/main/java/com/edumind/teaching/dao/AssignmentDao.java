@@ -51,4 +51,13 @@ public class AssignmentDao {
                 new LambdaQueryWrapper<AssignmentEntity>().eq(AssignmentEntity::getStatus, status)
         );
     }
+
+    public java.util.List<AssignmentEntity> listByCourseId(Long courseId) {
+        if (courseId == null) {
+            return java.util.Collections.emptyList();
+        }
+        return assignmentMapper.selectList(
+                new LambdaQueryWrapper<AssignmentEntity>().eq(AssignmentEntity::getCourseId, courseId)
+        );
+    }
 }

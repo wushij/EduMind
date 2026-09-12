@@ -3,6 +3,7 @@ import { getExams, getExamDetail, createExam, updateExam, deleteExam, exportExam
 import { ExamPaper } from '@/types/question/exam';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_EXAMS } from '@/mock/exams';
+import { normalizeExamList, normalizeExamPaper } from '@/utils/question/normalize-exam';
 
 export function useExam() {
   const exams = ref<ExamPaper[]>([]);
@@ -14,10 +15,10 @@ export function useExam() {
     loading.value = true;
     try {
       const res = await getExams(params);
-      exams.value = (res.data?.list || []) as ExamPaper[];
+      exams.value = normalizeExamList((res.data?.list || []) as Record<string, any>[]);
       total.value = res.data?.total ?? exams.value.length;
     } catch {
-      exams.value = USE_MOCK ? [...MOCK_EXAMS] : [];
+      exams.value = USE_MOCK ? normalizeExamList(MOCK_EXAMS as unknown as Record<string, any>[]) : [];
       total.value = exams.value.length;
     } finally {
       loading.value = false;
@@ -28,9 +29,10 @@ export function useExam() {
     loading.value = true;
     try {
       const res = await getExamDetail(id);
-      currentExam.value = res.data as ExamPaper;
+      currentExam.value = normalizeExamPaper((res.data || {}) as Record<string, any>);
     } catch {
-      currentExam.value = USE_MOCK ? MOCK_EXAMS.find(e => e.id === id) || null : null;
+      const fallback = USE_MOCK ? MOCK_EXAMS.find(e => e.id === id) || null : null;
+      currentExam.value = fallback ? normalizeExamPaper(fallback as unknown as Record<string, any>) : null;
     } finally {
       loading.value = false;
     }

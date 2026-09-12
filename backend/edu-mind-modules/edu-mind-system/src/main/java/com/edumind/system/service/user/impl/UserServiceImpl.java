@@ -15,7 +15,6 @@ import com.edumind.system.dto.user.UserProfileUpdateDTO;
 import com.edumind.system.dto.user.UserQueryDTO;
 import com.edumind.system.dto.user.UserStatusUpdateDTO;
 import com.edumind.system.dto.user.UserUpdateDTO;
-import com.edumind.system.entity.RoleEntity;
 import com.edumind.system.entity.UserEntity;
 import com.edumind.system.service.user.UserService;
 import com.edumind.system.vo.user.UserVO;

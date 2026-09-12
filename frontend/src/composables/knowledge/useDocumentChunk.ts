@@ -37,7 +37,7 @@ export function useDocumentChunk(initialDocId?: number) {
       };
       chunks.value = await getChunks(selectedDocumentId.value, params);
     } catch (err: any) {
-      ElMessage.error(err.message || '获取切片列表失败');
+      console.warn('[useDocumentChunk] fetchChunks failed:', err);
     } finally {
       loading.value = false;
     }

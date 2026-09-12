@@ -20,5 +20,7 @@ public interface PromptManageService {
 
     void publish(Long id);
 
+    void rollback(Long id, Integer targetVersion);
+
     String test(Long id, PromptTestDTO dto);
 }

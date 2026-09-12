@@ -126,6 +126,44 @@ export const publishPromptTemplate = async (id: number): Promise<{ success: bool
   return { success: true, message: '提示词模板已成功发布' };
 };
 
+export interface PromptVersionItem {
+  id: number;
+  templateId: number;
+  version: number;
+  content: string;
+  variables?: string;
+  publishedBy?: number;
+  createTime?: string;
+}
+
+export const getPromptVersions = async (id: number): Promise<PromptVersionItem[]> => {
+  try {
+    const res = await get<PromptVersionItem[]>(`/system/prompts/${id}/versions`);
+    if (res?.data && Array.isArray(res.data)) {
+      return res.data;
+    }
+    if (!USE_MOCK) return [];
+  } catch (err) {
+    if (!USE_MOCK) throw err;
+    console.warn('[Prompt API] Fallback versions mock', err);
+  }
+  return [];
+};
+
+export const rollbackPromptTemplate = async (
+  id: number,
+  targetVersion: number
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    await post(`/system/prompts/${id}/rollback`, { targetVersion });
+    return { success: true, message: `已回滚至 v${targetVersion}` };
+  } catch (err) {
+    if (!USE_MOCK) throw err;
+    console.warn('[Prompt API] Fallback rollback mock', err);
+  }
+  return { success: true, message: `已回滚至 v${targetVersion}` };
+};
+
 export const testPromptTemplate = async (
   templateId: number,
   req: PromptTestRequest
