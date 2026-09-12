@@ -33,4 +33,20 @@ public class AiToolDao {
         wrapper.orderByDesc(AiToolEntity::getUseCount);
         return aiToolMapper.selectList(wrapper);
     }
+
+    public AiToolEntity findById(String id) {
+        return aiToolMapper.selectById(id);
+    }
+
+    public void incrementUseCount(String id) {
+        AiToolEntity entity = aiToolMapper.selectById(id);
+        if (entity == null) {
+            return;
+        }
+        int current = entity.getUseCount() == null ? 0 : entity.getUseCount();
+        AiToolEntity update = new AiToolEntity();
+        update.setId(id);
+        update.setUseCount(current + 1);
+        aiToolMapper.updateById(update);
+    }
 }

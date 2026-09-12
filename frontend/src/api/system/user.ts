@@ -18,3 +18,9 @@ export const updateUserStatus = (id: number, status: string) =>
 export const getProfile = () => get<UserInfo>('/users/profile');
 
 export const updateProfile = (data: Partial<UserInfo>) => put<UserInfo>('/users/profile', data);
+
+export const sendBindEmailCode = (email: string) =>
+  post<void>('/users/send-bind-code', { email, scene: 'bind' });
+
+export const bindEmail = (data: { email: string; code: string }) =>
+  post<UserInfo>('/users/bind-email', data);

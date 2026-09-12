@@ -15,6 +15,10 @@ public interface UserService {
 
     UserVO updateProfile(UserProfileUpdateDTO dto);
 
+    void sendBindEmailCode(String email);
+
+    UserVO bindEmail(com.edumind.system.dto.user.EmailBindDTO dto);
+
     void changePassword(PasswordChangeDTO dto);
 
     PageResult<UserVO> pageUsers(UserQueryDTO query);

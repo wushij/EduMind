@@ -1,6 +1,5 @@
 <template>
   <div class="document-parse-container">
-    <!-- 顶部导航 -->
     <div class="top-nav-bar">
       <el-button :icon="ArrowLeft" link class="back-link" @click="router.back()">
         返回知识库详情
@@ -12,134 +11,101 @@
       </el-breadcrumb>
     </div>
 
-    <!-- V0.5 规划能力交互原型提示 -->
-    <el-alert
-      title="【V0.5 规划能力交互原型】本页面为文档智能切片分块、大纲树提取与嵌入向量入库工作台展示。生产级 OCR 深度解析流水线与 Milvus 向量库联动将于 V0.5 正式上线。"
-      type="warning"
-      effect="light"
-      show-icon
-      :closable="false"
-      class="mb-4"
-    />
+    <div class="filter-panel-card mb-4">
+      <el-select
+        v-model="selectedDocumentId"
+        placeholder="选择要解析的文档"
+        style="width: 320px"
+        @change="handleDocumentChange"
+      >
+        <el-option
+          v-for="doc in documents"
+          :key="doc.id"
+          :label="doc.name"
+          :value="doc.id"
+        />
+      </el-select>
+      <el-button type="primary" :loading="pipelineRunning" @click="handleRunPipeline">
+        执行解析 → 切片 → 向量化
+      </el-button>
+    </div>
 
-    <!-- 文档状态大看板 -->
-    <div class="doc-hero-card">
+    <div v-loading="loading" class="doc-hero-card">
       <div class="doc-info-left">
         <div class="doc-icon">📄</div>
         <div>
           <div class="doc-title-row">
-            <h2 class="doc-title">{{ docInfo.fileName }}</h2>
-            <el-tag type="success" size="small">解析完成 · 向量就绪</el-tag>
+            <h2 class="doc-title">{{ docInfo.fileName || '请选择文档' }}</h2>
+            <el-tag :type="statusTagType" size="small">{{ statusLabel }}</el-tag>
           </div>
           <div class="doc-meta-row">
             <span>文件大小：{{ docInfo.fileSize }}</span>
             <span>文档格式：{{ docInfo.fileType }}</span>
             <span>切分块数：<strong class="text-blue-600">{{ chunks.length }} 块</strong></span>
-            <span>向量维度：<strong>1024 维 (bge-large-zh)</strong></span>
+            <span>已向量化：<strong>{{ indexStatus.indexedChunks ?? 0 }}</strong></span>
           </div>
         </div>
       </div>
-
       <div class="doc-actions-right">
-        <el-button type="primary" plain @click="handleReParse">
-          🔄 重新执行切片与向量化
+        <el-button type="primary" plain :loading="pipelineRunning" @click="handleRunPipeline">
+          重新执行流水线
         </el-button>
       </div>
     </div>
 
-    <!-- 解析流程流水线可视化步骤条 -->
     <div class="pipeline-card">
       <div class="pipeline-steps">
-        <div class="step-node active">
+        <div class="step-node" :class="{ active: stepDone(1) }">
           <div class="step-circle">1</div>
           <div class="step-text">
-            <span class="step-name">格式清洗与 OCR 提取</span>
-            <span class="step-status">100% 完成</span>
+            <span class="step-name">文本解析</span>
+            <span class="step-status">{{ stepDone(1) ? '已完成' : '待执行' }}</span>
           </div>
         </div>
         <div class="step-arrow">➔</div>
-
-        <div class="step-node active">
+        <div class="step-node" :class="{ active: stepDone(2) }">
           <div class="step-circle">2</div>
           <div class="step-text">
-            <span class="step-name">标题大纲结构化重构</span>
-            <span class="step-status">识别 4 级目录</span>
+            <span class="step-name">语义分块</span>
+            <span class="step-status">{{ chunks.length }} 个分块</span>
           </div>
         </div>
         <div class="step-arrow">➔</div>
-
-        <div class="step-node active">
+        <div class="step-node" :class="{ active: stepDone(3) }">
           <div class="step-circle">3</div>
           <div class="step-text">
-            <span class="step-name">语义段落分块 (Chunking)</span>
-            <span class="step-status">生成 {{ chunks.length }} 个独立分块</span>
-          </div>
-        </div>
-        <div class="step-arrow">➔</div>
-
-        <div class="step-node active">
-          <div class="step-circle">4</div>
-          <div class="step-text">
-            <span class="step-name">嵌入向量入库 (VectorStore)</span>
-            <span class="step-status">Milvus 检索就绪</span>
+            <span class="step-name">向量索引</span>
+            <span class="step-status">{{ indexStatus.status || '待索引' }}</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 左右双栏：左侧文档目录大纲与原文摘要，右侧已切分 Chunks 细化审查 -->
     <div class="workspace-grid">
-      <!-- 左栏：大纲索引 -->
       <div class="outline-col">
         <el-card shadow="never" class="panel-card">
-          <h3 class="panel-title">📑 文档结构化目录大纲</h3>
-          <div class="outline-tree-wrapper">
-            <el-tree
-              :data="outlineData"
-              default-expand-all
-              node-key="id"
-              highlight-current
-              @node-click="handleOutlineClick"
-            />
+          <h3 class="panel-title">文档目录大纲</h3>
+          <el-empty v-if="outlineData.length === 0" description="暂无大纲，请先完成切片" />
+          <div v-else class="outline-tree-wrapper">
+            <el-tree :data="outlineData" default-expand-all node-key="id" />
           </div>
         </el-card>
       </div>
 
-      <!-- 右栏：切片分块详情流 -->
       <div class="chunks-col">
         <el-card shadow="never" class="panel-card">
-          <div class="chunks-header">
-            <h3 class="panel-title">🧩 已生成的切片分块 (Chunks)</h3>
-            <span class="text-xs text-slate-500">点击分块可高亮审查对应上下文或微调边界</span>
-          </div>
-
-          <div class="chunks-flow">
-            <div
-              v-for="(chunk, cIdx) in chunks"
-              :key="chunk.id"
-              class="chunk-card"
-            >
+          <h3 class="panel-title">已生成的切片分块</h3>
+          <el-empty v-if="chunks.length === 0" description="暂无切片数据" />
+          <div v-else class="chunks-flow">
+            <div v-for="(chunk, cIdx) in chunks" :key="chunk.id" class="chunk-card">
               <div class="chunk-top">
                 <div class="chunk-index-badge">
                   <span>#Chunk {{ cIdx + 1 }}</span>
                   <span class="tokens-tag">{{ chunk.tokenCount }} Tokens</span>
                 </div>
-                <div class="chunk-meta-tags">
-                  <span class="score-tag">权重：1.0</span>
-                  <el-button link type="primary" size="small" @click="handleEditChunk(chunk)">
-                    编辑分块
-                  </el-button>
-                </div>
+                <el-tag size="small">{{ chunk.status }}</el-tag>
               </div>
-
-              <div class="chunk-content">
-                {{ chunk.content }}
-              </div>
-
-              <div class="chunk-footer">
-                <span class="vector-hash">向量标识：{{ chunk.vectorId }}</span>
-                <span class="time-tag">提取于 {{ chunk.createTime }}</span>
-              </div>
+              <div class="chunk-content">{{ chunk.content }}</div>
             </div>
           </div>
         </el-card>
@@ -149,75 +115,154 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { ArrowLeft } from '@element-plus/icons-vue';
+import { useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
+import { getDocuments, parseDocument } from '@/api/knowledge/document';
+import { getChunks, triggerChunk } from '@/api/knowledge/chunk';
+import { getVectorStats, triggerReindex } from '@/api/knowledge/embedding';
+import type { KBDocument } from '@/types/knowledge/document';
+import type { DocumentChunk } from '@/types/knowledge/chunk';
 
 const router = useRouter();
+const route = useRoute();
+const { kbId } = useKnowledgeRoute();
 
-const docInfo = ref({
-  fileName: '数据结构与算法_第3章_树与二叉树遍历深度解析.pdf',
-  fileSize: '4.2 MB',
-  fileType: 'PDF',
-  status: 'PARSED'
+const documents = ref<KBDocument[]>([]);
+const selectedDocumentId = ref<number | undefined>();
+const chunks = ref<DocumentChunk[]>([]);
+const loading = ref(false);
+const pipelineRunning = ref(false);
+const indexStatus = ref<{ status?: string; indexedChunks?: number; totalChunks?: number }>({});
+
+const docInfo = computed(() => {
+  const doc = documents.value.find((d) => d.id === selectedDocumentId.value);
+  if (!doc) {
+    return { fileName: '', fileSize: '-', fileType: '-', status: 'PENDING' };
+  }
+  const sizeMb = doc.size ? `${(doc.size / 1024 / 1024).toFixed(2)} MB` : '-';
+  return {
+    fileName: doc.name,
+    fileSize: sizeMb,
+    fileType: doc.type || 'FILE',
+    status: doc.status
+  };
 });
 
-const outlineData = ref([
-  {
-    id: 1,
-    label: '第3章 树与二叉树基本概念',
-    children: [
-      { id: 11, label: '3.1 树的定义与抽象数据类型' },
-      { id: 12, label: '3.2 二叉树的性质与满二叉树' }
-    ]
-  },
-  {
-    id: 2,
-    label: '第4章 二叉树的遍历与线索化',
-    children: [
-      { id: 21, label: '4.1 先序、中序与后序递归算法' },
-      { id: 22, label: '4.2 基于辅助栈的非递归遍历实现' },
-      { id: 23, label: '4.3 层次遍历与广度优先搜索队列' }
-    ]
+const statusLabel = computed(() => {
+  const s = docInfo.value.status;
+  if (s === 'COMPLETED') return '解析完成';
+  if (s === 'PARSING') return '解析中';
+  if (s === 'FAILED') return '解析失败';
+  return '待处理';
+});
+
+const statusTagType = computed(() => {
+  const s = docInfo.value.status;
+  if (s === 'COMPLETED') return 'success';
+  if (s === 'FAILED') return 'danger';
+  if (s === 'PARSING') return 'warning';
+  return 'info';
+});
+
+const outlineData = computed(() => {
+  const headings = chunks.value
+    .filter((c) => c.heading)
+    .map((c, idx) => ({ id: idx + 1, label: c.heading as string }));
+  return headings.length > 0 ? headings : [];
+});
+
+function stepDone(step: number) {
+  if (step === 1) return docInfo.value.status === 'COMPLETED';
+  if (step === 2) return chunks.value.length > 0;
+  if (step === 3) return (indexStatus.value.indexedChunks ?? 0) > 0;
+  return false;
+}
+
+async function loadDocuments() {
+  if (!kbId.value) return;
+  try {
+    const res = await getDocuments(kbId.value);
+    documents.value = Array.isArray(res?.data) ? res.data : [];
+    const queryDocId = Number(route.query.documentId);
+    if (queryDocId && documents.value.some((d) => d.id === queryDocId)) {
+      selectedDocumentId.value = queryDocId;
+    } else if (documents.value.length > 0) {
+      selectedDocumentId.value = documents.value[0].id;
+    }
+  } catch {
+    ElMessage.error('加载文档列表失败');
   }
-]);
+}
 
-const chunks = ref([
-  {
-    id: 101,
-    tokenCount: 428,
-    vectorId: 'vec_bge_0x7fa89012',
-    createTime: '2026-09-11 12:30:10',
-    content: '二叉树（Binary Tree）是 n (n >= 0) 个结点的有限集合，该集合或者为空集（称为空二叉树），或者由一个根结点和两棵互不相交的、分别称为根结点的左子树和右子树的二叉树组成。二叉树的第 i 层上至多有 2^(i-1) 个结点（i >= 1）。深度为 k 的二叉树至多有 2^k - 1 个结点。'
-  },
-  {
-    id: 102,
-    tokenCount: 480,
-    vectorId: 'vec_bge_0x7fa89013',
-    createTime: '2026-09-11 12:30:12',
-    content: '先序遍历（Preorder Traversal）的操作过程为：若二叉树为空，则空操作返回；否则：1. 访问根结点；2. 先序遍历左子树；3. 先序遍历右子树。代码核心在于递归基的判断 if (root == NULL) return; 随后执行 visit(root) 并继续向下探查。'
-  },
-  {
-    id: 103,
-    tokenCount: 512,
-    vectorId: 'vec_bge_0x7fa89014',
-    createTime: '2026-09-11 12:30:15',
-    content: '非递归中序遍历算法核心思想：利用辅助栈显式模拟系统调用栈。沿着根结点的左子树一路将结点入栈，直到左子树为空；然后弹出栈顶结点访问之，再转向其右子树重复该流程。时间复杂度为 O(n)，空间复杂度取决于二叉树的高度 O(h)。'
+async function loadChunks() {
+  if (!selectedDocumentId.value) {
+    chunks.value = [];
+    return;
   }
-]);
-
-function handleOutlineClick(data: any) {
-  ElMessage.info(`已定位到目录：${data.label}`);
+  loading.value = true;
+  try {
+    chunks.value = await getChunks(selectedDocumentId.value, { page: 1, pageSize: 100 });
+  } catch {
+    chunks.value = [];
+    ElMessage.error('加载切片失败');
+  } finally {
+    loading.value = false;
+  }
 }
 
-function handleEditChunk(chunk: any) {
-  ElMessage.info(`正在准备编辑 Chunk #${chunk.id} 内容与边界`);
+async function loadIndexStatus() {
+  if (!kbId.value) return;
+  try {
+    const stats = await getVectorStats(kbId.value);
+    indexStatus.value = {
+      status: stats.connectionStatus === 'ONLINE' ? 'INDEXED' : 'INDEXING',
+      indexedChunks: stats.totalVectors,
+      totalChunks: stats.expectedVectors
+    };
+  } catch {
+    indexStatus.value = {};
+  }
 }
 
-function handleReParse() {
-  ElMessage.success('已重新下发大文档语义分块与高维向量重新计算任务！');
+async function handleDocumentChange() {
+  await loadChunks();
+  await loadIndexStatus();
 }
+
+async function handleRunPipeline() {
+  if (!kbId.value || !selectedDocumentId.value) {
+    ElMessage.warning('请先选择文档');
+    return;
+  }
+  pipelineRunning.value = true;
+  try {
+    await parseDocument(kbId.value, selectedDocumentId.value);
+    await triggerChunk(selectedDocumentId.value);
+    await triggerReindex(kbId.value, 'INCREMENTAL');
+    ElMessage.success('文档流水线已启动：解析 → 切片 → 向量化');
+    await loadDocuments();
+    await loadChunks();
+    await loadIndexStatus();
+  } catch (err) {
+    ElMessage.error(err instanceof Error ? err.message : '流水线执行失败');
+  } finally {
+    pipelineRunning.value = false;
+  }
+}
+
+watch(kbId, () => {
+  loadDocuments();
+  loadIndexStatus();
+});
+
+onMounted(async () => {
+  await loadDocuments();
+  await loadChunks();
+  await loadIndexStatus();
+});
 </script>
 
 <style scoped lang="scss">
@@ -225,6 +270,16 @@ function handleReParse() {
   padding: 24px;
   background: #f8fafc;
   min-height: calc(100vh - 64px);
+
+  .filter-panel-card {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    background: #fff;
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+  }
 
   .top-nav-bar {
     display: flex;
@@ -300,151 +355,109 @@ function handleReParse() {
     .pipeline-steps {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
 
-      .step-node {
+    .step-node {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      opacity: 0.5;
+
+      &.active {
+        opacity: 1;
+      }
+
+      .step-circle {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #e2e8f0;
         display: flex;
         align-items: center;
-        gap: 12px;
-
-        .step-circle {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          background: #2563eb;
-          color: #ffffff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 700;
-          font-size: 14px;
-        }
-
-        .step-text {
-          display: flex;
-          flex-direction: column;
-
-          .step-name {
-            font-size: 13px;
-            font-weight: 700;
-            color: #1e293b;
-          }
-
-          .step-status {
-            font-size: 12px;
-            color: #10b981;
-          }
-        }
+        justify-content: center;
+        font-weight: 700;
+        font-size: 12px;
       }
 
-      .step-arrow {
-        color: #94a3b8;
-        font-size: 16px;
+      &.active .step-circle {
+        background: #3b82f6;
+        color: #fff;
       }
+
+      .step-text {
+        display: flex;
+        flex-direction: column;
+
+        .step-name {
+          font-size: 13px;
+          font-weight: 600;
+        }
+
+        .step-status {
+          font-size: 12px;
+          color: #64748b;
+        }
+      }
+    }
+
+    .step-arrow {
+      color: #94a3b8;
     }
   }
 
   .workspace-grid {
     display: grid;
     grid-template-columns: 320px 1fr;
-    gap: 24px;
+    gap: 20px;
 
     .panel-card {
-      background: #ffffff;
       border-radius: 14px;
       border: 1px solid #e2e8f0;
-      padding: 18px 20px;
+    }
 
-      .panel-title {
-        font-size: 15px;
-        font-weight: 700;
-        color: #0f172a;
-        margin: 0 0 16px;
-      }
-
-      .chunks-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 16px;
-
-        .panel-title {
-          margin: 0;
-        }
-      }
+    .panel-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin: 0 0 16px;
     }
 
     .chunks-flow {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
+      max-height: 600px;
+      overflow-y: auto;
+    }
 
-      .chunk-card {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 16px 18px;
-        transition: all 0.2s;
+    .chunk-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px;
+      background: #f8fafc;
 
-        &:hover {
-          border-color: #cbd5e1;
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
-        }
+      .chunk-top {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
 
-        .chunk-top {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 10px;
+      .chunk-index-badge {
+        display: flex;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 600;
+      }
 
-          .chunk-index-badge {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 700;
-            color: #2563eb;
-            font-size: 14px;
+      .tokens-tag {
+        color: #64748b;
+      }
 
-            .tokens-tag {
-              font-size: 11px;
-              background: #eff6ff;
-              color: #2563eb;
-              padding: 1px 6px;
-              border-radius: 4px;
-              font-weight: normal;
-            }
-          }
-
-          .chunk-meta-tags {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-
-            .score-tag {
-              font-size: 11px;
-              color: #64748b;
-            }
-          }
-        }
-
-        .chunk-content {
-          font-size: 13px;
-          line-height: 1.6;
-          color: #334155;
-          margin-bottom: 10px;
-          background: #ffffff;
-          padding: 10px 12px;
-          border-radius: 6px;
-          border: 1px solid #edf2f7;
-        }
-
-        .chunk-footer {
-          display: flex;
-          justify-content: space-between;
-          font-size: 11px;
-          color: #94a3b8;
-          font-family: monospace;
-        }
+      .chunk-content {
+        font-size: 13px;
+        line-height: 1.6;
+        color: #334155;
       }
     }
   }

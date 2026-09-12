@@ -18,4 +18,6 @@ public interface ConversationService {
     void renameConversation(String conversationId, ConversationRenameDTO dto);
 
     void deleteConversation(String conversationId);
+
+    String generateTitle(String conversationId);
 }

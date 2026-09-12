@@ -19,6 +19,8 @@ public class KnowledgeBaseEntity implements Serializable {
     private Long courseId;
     @TableField("document_count")
     private Integer docCount;
+    private Integer chunkCount;
+    private String indexStatus;
     private Integer status;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

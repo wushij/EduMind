@@ -78,6 +78,12 @@
         </div>
       </div>
 
+      <!-- 知识库精准出处溯源列表 -->
+      <CitationList
+        v-if="message.role === 'assistant' && message.citations && message.citations.length > 0"
+        :citations="message.citations"
+      />
+
       <!-- 底部辅助长圆小工具条 (AI 回复特有) -->
       <div v-if="message.role === 'assistant' && !message.isStreaming" class="msg-actions-bar">
         <button type="button" class="pill-action-btn" title="复制回答" @click="handleCopy">
@@ -104,6 +110,7 @@ import { ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { DocumentCopy, Star } from '@element-plus/icons-vue';
 import type { ChatMessage } from '@/composables/ai/useAIStream';
+import CitationList from '@/components/knowledge/CitationList.vue';
 
 const props = defineProps<{
   message: ChatMessage;

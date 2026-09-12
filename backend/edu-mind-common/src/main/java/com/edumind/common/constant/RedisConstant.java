@@ -18,6 +18,10 @@ public final class RedisConstant {
     public static final String AI_QUOTA_KEY = PREFIX + "ai:quota:";
     public static final String DASHBOARD_KEY = PREFIX + "stats:dashboard:";
     public static final String LOCK_KEY = PREFIX + "lock:";
+    public static final String EMAIL_CODE_KEY = PREFIX + "email:code:";
+    public static final String EMAIL_LIMIT_KEY = PREFIX + "email:limit:";
+    public static final String EMAIL_DAILY_KEY = PREFIX + "email:daily:";
+    public static final String CONFIG_CACHE_KEY = PREFIX + "sys:config:";
 
     public static final long CAPTCHA_TTL_SECONDS = 300L;
     public static final long NONCE_TTL_SECONDS = 300L;

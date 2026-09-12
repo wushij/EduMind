@@ -4,6 +4,7 @@ import com.edumind.common.exception.BusinessException;
 import com.edumind.infrastructure.oss.FileStorageService;
 import com.edumind.knowledge.converter.KnowledgeBaseConverter;
 import com.edumind.knowledge.dao.KnowledgeBaseDao;
+import com.edumind.knowledge.dao.KnowledgeDocumentChunkDao;
 import com.edumind.knowledge.dao.KnowledgeDocumentDao;
 import com.edumind.knowledge.dao.KnowledgeDocumentTextDao;
 import com.edumind.knowledge.entity.KnowledgeBaseEntity;
@@ -30,6 +31,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final KnowledgeBaseDao knowledgeBaseDao;
     private final KnowledgeDocumentDao knowledgeDocumentDao;
     private final KnowledgeDocumentTextDao knowledgeDocumentTextDao;
+    private final KnowledgeDocumentChunkDao knowledgeDocumentChunkDao;
     private final KnowledgeBaseConverter knowledgeBaseConverter;
     private final DocumentParseService documentParseService;
     private final FileStorageService fileStorageService;
@@ -73,13 +75,13 @@ public class DocumentServiceImpl implements DocumentService {
         if (entity == null) {
             throw new BusinessException("文档不存在");
         }
-        return knowledgeBaseConverter.toDocumentVO(entity);
+        return toDocumentVO(entity);
     }
 
     @Override
     public List<KnowledgeDocumentVO> list(Long knowledgeBaseId) {
         return knowledgeDocumentDao.findByKnowledgeBaseId(knowledgeBaseId).stream()
-                .map(knowledgeBaseConverter::toDocumentVO)
+                .map(this::toDocumentVO)
                 .collect(Collectors.toList());
     }
 
@@ -93,6 +95,7 @@ public class DocumentServiceImpl implements DocumentService {
         if (entity.getObjectKey() != null) {
             fileStorageService.deleteFile(bucketName, entity.getObjectKey());
         }
+        knowledgeDocumentChunkDao.deleteByDocumentId(documentId);
         knowledgeDocumentTextDao.deleteByDocumentId(documentId);
         knowledgeDocumentDao.deleteById(documentId);
         refreshDocCount(entity.getKnowledgeBaseId());
@@ -105,6 +108,9 @@ public class DocumentServiceImpl implements DocumentService {
         if (entity == null) {
             throw new BusinessException("文档不存在");
         }
+        entity.setParseStatus("PARSING");
+        entity.setErrorMessage(null);
+        knowledgeDocumentDao.updateById(entity);
         try {
             var inputStream = fileStorageService.getFile(bucketName, entity.getObjectKey());
             if (inputStream == null) {
@@ -129,6 +135,32 @@ public class DocumentServiceImpl implements DocumentService {
             entity.setErrorMessage(ex.getMessage());
         }
         knowledgeDocumentDao.updateById(entity);
+    }
+
+    private KnowledgeDocumentVO toDocumentVO(KnowledgeDocumentEntity entity) {
+        KnowledgeDocumentVO vo = knowledgeBaseConverter.toDocumentVO(entity);
+        if (vo != null && entity.getId() != null) {
+            long count = knowledgeDocumentChunkDao.countByDocumentId(entity.getId());
+            vo.setChunkCount((int) count);
+            vo.setChunkStatus(resolveChunkStatus(entity.getParseStatus(), count));
+        }
+        return vo;
+    }
+
+    private String resolveChunkStatus(String parseStatus, long chunkCount) {
+        if ("CHUNKING".equals(parseStatus)) {
+            return "CHUNKING";
+        }
+        if ("CHUNK_FAILED".equals(parseStatus)) {
+            return "CHUNK_FAILED";
+        }
+        if ("CHUNKED".equals(parseStatus) || chunkCount > 0) {
+            return "CHUNKED";
+        }
+        if ("SUCCESS".equals(parseStatus)) {
+            return "PARSED";
+        }
+        return parseStatus;
     }
 
     private void refreshDocCount(Long knowledgeBaseId) {

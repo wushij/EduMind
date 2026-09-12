@@ -16,6 +16,14 @@
           </div>
           <div
             class="tab-btn"
+            :class="{ active: activeTab === 'email' }"
+            @click="activeTab = 'email'"
+          >
+            <span>邮箱登录</span>
+            <div v-if="activeTab === 'email'" class="tab-indicator"></div>
+          </div>
+          <div
+            class="tab-btn"
             :class="{ active: activeTab === 'qrcode' }"
             @click="activeTab = 'qrcode'"
           >
@@ -143,6 +151,107 @@
           </div>
         </div>
 
+        <!-- 模式 C：邮箱验证码快捷登录 -->
+        <div v-show="activeTab === 'email'" class="tab-body">
+          <div class="card-title-section">
+            <p class="card-welcome-title">欢迎使用邮箱验证码安全快捷登录</p>
+          </div>
+
+          <!-- 邮箱登录表单 -->
+          <el-form class="login-main-form" @keyup.enter="handleEmailLogin">
+            <!-- 邮箱输入框 -->
+            <el-form-item>
+              <div class="input-container">
+                <span class="field-icon">
+                  <svg viewBox="0 0 24 24" class="svg-icon" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                    <polyline points="22,6 12,13 2,6"></polyline>
+                  </svg>
+                </span>
+                <input
+                  v-model="emailForm.email"
+                  type="email"
+                  class="native-input"
+                  placeholder="请输入绑定的电子邮箱"
+                  autocomplete="email"
+                />
+              </div>
+            </el-form-item>
+
+            <!-- 邮箱验证码输入框 + 获取验证码组件 -->
+            <el-form-item>
+              <div class="input-container code-input-container">
+                <span class="field-icon">
+                  <svg viewBox="0 0 24 24" class="svg-icon" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                </span>
+                <input
+                  v-model="emailForm.code"
+                  type="text"
+                  maxlength="6"
+                  class="native-input"
+                  placeholder="请输入 6 位邮箱验证码"
+                  autocomplete="one-time-code"
+                />
+                <EmailCodeBtn
+                  :email="emailForm.email"
+                  scene="login"
+                  class="login-email-btn"
+                />
+              </div>
+            </el-form-item>
+
+            <!-- 记住邮箱与切换模式 -->
+            <div class="form-util-row">
+              <label class="remember-label">
+                <input v-model="rememberMe" type="checkbox" class="remember-check" />
+                <span class="remember-text">记住邮箱</span>
+              </label>
+              <span class="forgot-pwd-link pointer" @click="activeTab = 'account'">
+                使用账号密码登录
+              </span>
+            </div>
+
+            <!-- 邮箱登录主按钮 -->
+            <button
+              type="button"
+              class="primary-login-btn"
+              :disabled="loading"
+              @click="handleEmailLogin"
+            >
+              <span v-if="!loading">快速登录</span>
+              <span v-else class="btn-loading-text">登录核验中...</span>
+            </button>
+          </el-form>
+
+          <!-- 底部其他登录方式 -->
+          <div class="third-login-wrapper">
+            <div class="divider-header">
+              <span class="divider-dash"></span>
+              <span class="divider-title">其他登录方式</span>
+              <span class="divider-dash"></span>
+            </div>
+
+            <div class="third-platforms">
+              <div class="platform-item wechat" @click="handleThirdLogin('微信')">
+                <div class="platform-circle wechat-bg">
+                  <img :src="wechatIcon" alt="" class="platform-svg" aria-hidden="true" />
+                </div>
+                <span class="platform-label">微信</span>
+              </div>
+
+              <div class="platform-item qywx" @click="handleThirdLogin('企业微信')">
+                <div class="platform-circle qywx-bg">
+                  <img :src="wecomIcon" alt="" class="platform-svg" aria-hidden="true" />
+                </div>
+                <span class="platform-label">企业微信</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 模式 B：扫码登录 -->
         <div v-show="activeTab === 'qrcode'" class="tab-body qrcode-body">
           <p class="card-sub-title qrcode-sub-title">使用手机微信或企业微信扫一扫快速登录</p>
@@ -186,7 +295,8 @@ import { useAuthStore } from '@/stores/auth/auth';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_USERS } from '@/mock/users';
 import AuthCaptchaField from '@/components/common/AuthCaptchaField.vue';
-import { getCaptcha, login as loginApi } from '@/api/auth/auth';
+import EmailCodeBtn from '@/components/common/EmailCodeBtn.vue';
+import { getCaptcha, login as loginApi, emailLogin as emailLoginApi } from '@/api/auth/auth';
 import { toCaptchaDataUrl } from '@/utils/captcha';
 
 const router = useRouter();
@@ -194,7 +304,7 @@ const route = useRoute();
 const authStore = useAuthStore();
 
 // 状态管理
-const activeTab = ref<'account' | 'qrcode'>('account');
+const activeTab = ref<'account' | 'email' | 'qrcode'>('account');
 const rememberMe = ref(false);
 const showPassword = ref(false);
 const loading = ref(false);
@@ -203,11 +313,17 @@ const loading = ref(false);
 const captchaId = ref('');
 const captchaImg = ref('');
 
-// 表单数据 (默认全部置空，由用户手动输入)
+// 账号密码登录表单数据
 const loginForm = reactive({
   username: '',
   password: '',
   captcha: ''
+});
+
+// 邮箱验证码登录表单数据
+const emailForm = reactive({
+  email: '',
+  code: ''
 });
 
 // 刷新验证码 (云盘同款：仅走后端 Hutool LineCaptcha)
@@ -297,6 +413,67 @@ const handleLogin = async () => {
   }
 };
 
+// 邮箱验证码快捷登录提交
+const handleEmailLogin = async () => {
+  if (loading.value) return;
+
+  const email = emailForm.email.trim().toLowerCase();
+  const code = emailForm.code.trim();
+
+  if (!email) {
+    ElMessage.warning('请输入绑定的电子邮箱地址');
+    return;
+  }
+  if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
+    ElMessage.warning('请输入有效的电子邮箱格式');
+    return;
+  }
+  if (!code) {
+    ElMessage.warning('请输入 6 位邮箱验证码');
+    return;
+  }
+
+  loading.value = true;
+  try {
+    const res = await emailLoginApi({ email, code });
+    if (res?.data?.token) {
+      authStore.setToken(res.data.token);
+      if (res.data.userInfo) {
+        authStore.setUser({
+          id: res.data.userInfo.id,
+          username: res.data.userInfo.username,
+          realName: res.data.userInfo.realName || res.data.userInfo.username,
+          avatar: res.data.userInfo.avatar || '',
+          roles: (res.data.userInfo.roles || []) as any,
+          permissions: res.data.userInfo.permissions || [],
+          department: res.data.userInfo.department,
+          email: res.data.userInfo.email
+        });
+      } else {
+        await authStore.fetchUserInfo();
+      }
+
+      if (rememberMe.value) {
+        localStorage.setItem('edumind_saved_email', email);
+      } else {
+        localStorage.removeItem('edumind_saved_email');
+      }
+
+      ElMessage.success({
+        message: `邮箱验证授权成功！欢迎使用 EduMind 平台，${authStore.currentUser?.realName || ''}`,
+        type: 'success'
+      });
+
+      const redirect = (route.query.redirect as string) || '/dashboard';
+      router.push(redirect);
+    }
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.message || err?.message || '邮箱登录失败，请重试');
+  } finally {
+    loading.value = false;
+  }
+};
+
 const handleMockQrLogin = async () => {
   if (loading.value) return;
   loading.value = true;
@@ -353,6 +530,15 @@ const handleThirdLogin = (platform: string) => {
 };
 
 onMounted(() => {
+  const savedUsername = localStorage.getItem('edumind_saved_username');
+  if (savedUsername) {
+    loginForm.username = savedUsername;
+    rememberMe.value = true;
+  }
+  const savedEmail = localStorage.getItem('edumind_saved_email');
+  if (savedEmail) {
+    emailForm.email = savedEmail;
+  }
   refreshCaptcha();
 });
 </script>
@@ -523,6 +709,20 @@ onMounted(() => {
             height: 18px;
           }
         }
+
+        &.code-input-container {
+          padding-right: 6px;
+
+          .login-email-btn {
+            margin-left: 8px;
+            height: 38px;
+            border-radius: 9999px;
+          }
+        }
+      }
+
+      .pointer {
+        cursor: pointer;
       }
 
       /* 记住账号与忘记密码行 */

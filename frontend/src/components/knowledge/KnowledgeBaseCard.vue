@@ -15,12 +15,13 @@
     <!-- 知识库标题与图标 -->
     <div class="kb-title-block">
       <div class="kb-icon-box" :style="{ background: item.colorGradient || defaultGradient }">
-        <span>🧠</span>
+        <el-icon class="kb-glyph-icon"><Cpu /></el-icon>
       </div>
       <div class="kb-title-info">
         <h3 class="kb-name" :title="item.name">{{ item.name }}</h3>
         <span v-if="item.courseName" class="course-link-pill">
-          <span>📖 {{ item.courseName }}</span>
+          <el-icon class="course-icon"><Reading /></el-icon>
+          <span>{{ item.courseName }}</span>
         </span>
       </div>
     </div>
@@ -42,15 +43,15 @@
     <!-- 统计指标药丸组合 -->
     <div class="kb-stats-row">
       <div class="stat-pill-chip">
-        <span class="stat-icon">📄</span>
+        <el-icon class="stat-icon stat-icon--doc"><Document /></el-icon>
         <span class="stat-text"><strong>{{ item.documentCount }}</strong> 篇文档</span>
       </div>
       <div class="stat-pill-chip">
-        <span class="stat-icon">🧩</span>
+        <el-icon class="stat-icon stat-icon--chunk"><Coin /></el-icon>
         <span class="stat-text"><strong>{{ item.chunkCount }}</strong> 个切片</span>
       </div>
       <div class="stat-pill-chip">
-        <span class="stat-icon">⚡</span>
+        <el-icon class="stat-icon stat-icon--model"><Lightning /></el-icon>
         <span class="stat-text">{{ item.embeddingModel.split(' ')[0] }}</span>
       </div>
     </div>
@@ -62,7 +63,8 @@
         class="capsule-btn capsule-btn--upload"
         @click="$emit('upload', item)"
       >
-        <span>📤 上传文档</span>
+        <el-icon class="btn-icon"><Upload /></el-icon>
+        <span>上传文档</span>
       </button>
 
       <button
@@ -70,13 +72,15 @@
         class="capsule-btn capsule-btn--enter"
         @click="$emit('open', item)"
       >
-        <span>管理与检索 →</span>
+        <span>管理与检索</span>
+        <el-icon class="btn-icon"><Right /></el-icon>
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { Cpu, Reading, Document, Coin, Lightning, Upload, Right } from '@element-plus/icons-vue';
 import type { KnowledgeBase } from '@/types/knowledge/knowledge-base';
 
 defineProps<{
@@ -213,10 +217,13 @@ const defaultGradient = 'linear-gradient(135deg, #1677FF 0%, #722ED1 100%)';
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
-      color: #FFFFFF;
       flex-shrink: 0;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+      .kb-glyph-icon {
+        font-size: 22px;
+        color: #FFFFFF;
+      }
     }
 
     .kb-title-info {
@@ -241,8 +248,13 @@ const defaultGradient = 'linear-gradient(135deg, #1677FF 0%, #722ED1 100%)';
         font-size: 11.5px;
         color: #64748B;
         background: #F8FAFC;
-        padding: 1px 8px;
+        padding: 2px 9px;
         border-radius: 9999px;
+
+        .course-icon {
+          font-size: 12px;
+          color: #64748B;
+        }
       }
     }
   }
@@ -310,6 +322,16 @@ const defaultGradient = 'linear-gradient(135deg, #1677FF 0%, #722ED1 100%)';
       font-size: 11.5px;
       color: #475569;
 
+      .stat-icon {
+        font-size: 13px;
+        display: inline-flex;
+        align-items: center;
+
+        &--doc { color: #2563EB; }
+        &--chunk { color: #059669; }
+        &--model { color: #D97706; }
+      }
+
       strong {
         color: #1E293B;
       }
@@ -329,6 +351,7 @@ const defaultGradient = 'linear-gradient(135deg, #1677FF 0%, #722ED1 100%)';
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      gap: 6px;
       height: 36px;
       border-radius: 9999px; // 纯正长圆跑道
       font-size: 13px;
@@ -336,6 +359,10 @@ const defaultGradient = 'linear-gradient(135deg, #1677FF 0%, #722ED1 100%)';
       cursor: pointer;
       border: none;
       transition: all 0.2s ease;
+
+      .btn-icon {
+        font-size: 14px;
+      }
 
       &--upload {
         padding: 0 16px;

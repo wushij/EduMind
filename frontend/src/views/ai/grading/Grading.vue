@@ -1,28 +1,25 @@
 <template>
   <div class="ai-grading-container">
-    <!-- 顶部操作头区 -->
-    <div class="grading-header-dock">
-      <div class="header-left">
-        <div class="title-with-icon">
-          <el-icon class="header-icon text-blue-600"><Cpu /></el-icon>
-          <h1 class="main-title">AI 智能辅助评阅中心</h1>
-          <span class="capsule-count-tag">大模型驱动 · 毫秒级预判</span>
+    <!-- 1. 顶部专属 3D 视觉大 Banner (严格对齐原型图 2 与 ai智能批改banner.png，比例 2172×724) -->
+    <div class="grading-banner-stage">
+      <div class="banner-ratio-box">
+        <img
+          class="banner-image"
+          :src="gradingBannerImg"
+          alt="AI 智能批改"
+          draggable="false"
+        />
+        <div class="banner-float-actions">
+          <el-button
+            type="primary"
+            class="capsule-btn-primary"
+            :icon="Lightning"
+            :loading="batchRunning || gradingLoading"
+            @click="handleRunAllPending"
+          >
+            立即启动全队列并发批改
+          </el-button>
         </div>
-        <p class="sub-desc">
-          基于领域大语言模型与教学知识库，支持多题型全自动评分、要点匹配、错因归因诊断与评语生成，极大减轻教师批改负荷。
-        </p>
-      </div>
-
-      <div class="header-right-actions">
-        <el-button
-          type="primary"
-          class="capsule-btn-primary"
-          :icon="Lightning"
-          :loading="batchRunning || gradingLoading"
-          @click="handleRunAllPending"
-        >
-          立即启动全队列并发批改
-        </el-button>
       </div>
     </div>
 
@@ -188,6 +185,7 @@ import {
 import { useGrading } from '@/composables/ai/useGrading';
 import { getAssignments } from '@/api/question/assignment';
 import { getSubmissionsByAssignment } from '@/api/question/submission';
+import gradingBannerImg from '@/assets/images/ai智能批改banner.png';
 
 const router = useRouter();
 const { startGrading, batchGrade, loading: gradingLoading } = useGrading();
@@ -332,59 +330,50 @@ function viewGradingResults(row: GradingTaskRow) {
   background: #f8fafc;
   min-height: calc(100vh - 64px);
 
-  .grading-header-dock {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 24px;
+  // 顶部专属 3D 视觉大 Banner (比例 2172×724)
+  .grading-banner-stage {
+    width: 100%;
+    margin-bottom: 22px;
 
-    .header-left {
-      .title-with-icon {
-        display: flex;
-        align-items: center;
-        gap: 12px;
+    .banner-ratio-box {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 2172 / 724;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 6px 24px rgba(22, 119, 255, 0.08);
+      border: 1px solid #E2E8F0;
 
-        .header-icon {
-          font-size: 28px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
+      .banner-image {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        user-select: none;
+      }
 
-        .main-title {
-          font-size: 22px;
-          font-weight: 800;
-          color: #0f172a;
-          margin: 0;
-        }
+      .banner-float-actions {
+        position: absolute;
+        top: 20px;
+        right: 24px;
+        z-index: 2;
 
-        .capsule-count-tag {
-          font-size: 12px;
-          background: #eff6ff;
-          color: #2563eb;
-          border: 1px solid #bfdbfe;
+        .capsule-btn-primary {
+          background: #1677FF;
+          border-color: #1677FF;
           border-radius: 9999px;
-          padding: 2px 10px;
-          font-weight: 500;
+          font-weight: 600;
+          padding: 10px 22px;
+          box-shadow: 0 4px 16px rgba(22, 119, 255, 0.3);
+          transition: all 0.2s;
+
+          &:hover {
+            background: #0958d9;
+            border-color: #0958d9;
+          }
         }
-      }
-
-      .sub-desc {
-        margin: 6px 0 0;
-        font-size: 14px;
-        color: #64748b;
-      }
-    }
-
-    .header-right-actions {
-      .capsule-btn-primary {
-        background: #2563eb;
-        border-color: #2563eb;
-        border-radius: 8px;
-        font-weight: 500;
-        padding: 9px 20px;
       }
     }
   }

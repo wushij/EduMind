@@ -11,6 +11,10 @@ public class KnowledgeBaseVO {
     private String description;
     private Long courseId;
     private Integer docCount;
+    private Integer chunkCount;
+    private String indexStatus;
+    private Integer vectorCount;
+    private String embeddingModel;
     private Integer status;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

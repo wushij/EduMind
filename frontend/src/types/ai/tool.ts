@@ -1,3 +1,5 @@
+export type AIToolExecutionMode = 'ROUTE' | 'V05_NOTICE';
+
 export interface AITool {
   id: string;
   name: string;
@@ -9,10 +11,12 @@ export interface AITool {
   iconName?: string;
   iconTheme?: string;
   iconEmoji?: string;
+  modelId?: string;
   route: string;
+  executionMode: AIToolExecutionMode;
   tags: string[];
   isRecommended: boolean;
+  isHot: boolean;
   isFavorite: boolean;
   usageCount: number;
-  rating: number;
 }

@@ -13,6 +13,8 @@ public class KnowledgeDocumentVO {
     private Long fileSize;
     private String objectKey;
     private String parseStatus;
+    private String chunkStatus;
+    private Integer chunkCount;
     private String errorMessage;
     private Integer status;
     private LocalDateTime createTime;

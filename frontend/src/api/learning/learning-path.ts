@@ -1,4 +1,5 @@
 import { get } from '@/core/http/request';
-import { LearningStep } from '@/types/learning/learning-path';
+import type { LearningPathVO } from '@/types/learning/learning-path';
 
-export const getLearningPath = () => get<LearningStep[]>('/learning/path');
+export const getLearningPath = (courseId: number) =>
+  get<LearningPathVO>('/learning/path', { courseId });

@@ -18,6 +18,10 @@
             <artifactId>edu-mind-course</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-notification</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>
         </dependency>

@@ -7,28 +7,35 @@
     class="ai-tool-drawer"
   >
     <div v-if="tool" class="drawer-content">
-      <!-- 头部信息 -->
       <div class="drawer-header-box">
-        <div class="drawer-icon-box" :style="{ background: tool.iconBg }">
-          <span class="drawer-emoji">{{ tool.iconEmoji }}</span>
-        </div>
+        <ColorIcon
+          :name="tool.iconName || 'MagicStick'"
+          :theme="(tool.iconTheme as IconTheme) || 'blue'"
+          :custom-bg="tool.iconBg"
+          size="lg"
+          rounded="xl"
+        />
         <div class="drawer-header-meta">
           <h3 class="drawer-title">{{ tool.name }}</h3>
           <div class="drawer-tags-row">
             <span class="pill-badge pill-badge--cat">{{ tool.categoryLabel }}</span>
-            <span v-if="tool.isRecommended" class="pill-badge pill-badge--hot">平台精选</span>
-            <span class="stats-text">⭐ {{ tool.rating }} 评分</span>
+            <span v-if="tool.isHot" class="pill-badge pill-badge--fire">热门</span>
+            <span v-if="tool.isRecommended" class="pill-badge pill-badge--rec">平台精选</span>
           </div>
+          <p class="usage-line">{{ tool.usageCount }} 次调用</p>
         </div>
       </div>
 
-      <!-- 功能详述 -->
       <div class="drawer-section">
         <h4 class="section-title">功能场景与特点</h4>
         <p class="section-p">{{ tool.detailedIntro || tool.description }}</p>
       </div>
 
-      <!-- 适用学科范围 -->
+      <div v-if="tool.modelId" class="drawer-section">
+        <h4 class="section-title">绑定模型</h4>
+        <p class="section-p model-id">{{ tool.modelId }}</p>
+      </div>
+
       <div class="drawer-section">
         <h4 class="section-title">适用场景与标签</h4>
         <div class="drawer-tags-grid">
@@ -38,29 +45,29 @@
         </div>
       </div>
 
-      <!-- 预期产出模式 -->
       <div class="drawer-section">
-        <h4 class="section-title">AI 驱动模型与交互模式</h4>
-        <div class="feature-item">
-          <span class="feature-bullet">⚡</span>
-          <div class="feature-info">
-            <strong>DeepSeek-R1 / V3 教学大模型加速</strong>
-            <p>针对理工与文史高教题目深度微调，具备思维链推理与公式逆向解析能力。</p>
-          </div>
-        </div>
-        <div class="feature-item">
-          <span class="feature-bullet">🔒</span>
-          <div class="feature-info">
-            <strong>高校私域知识库隔离</strong>
-            <p>出题与批改严格限定在课程课件与指定知识点大纲内，保障学术合规。</p>
-          </div>
-        </div>
+        <h4 class="section-title">输入说明</h4>
+        <p class="section-p">{{ inputHint }}</p>
       </div>
 
-      <!-- 底部启动按钮 (长圆跑道) -->
+      <div class="drawer-section">
+        <h4 class="section-title">输出说明</h4>
+        <p class="section-p">{{ outputHint }}</p>
+      </div>
+
+      <div v-if="tool.executionMode === 'V05_NOTICE'" class="drawer-section">
+        <el-alert
+          title="该工具完整能力将于 V0.5 正式上线，当前可先使用下方替代入口体验相关能力。"
+          type="warning"
+          effect="light"
+          :closable="false"
+          show-icon
+        />
+      </div>
+
       <div class="drawer-footer">
         <button type="button" class="capsule-launch-btn" @click="handleLaunch">
-          <span>立即启动使用该工具</span>
+          <span>{{ tool.executionMode === 'V05_NOTICE' ? '查看 V0.5 规划说明' : '立即启动使用该工具' }}</span>
           <span>→</span>
         </button>
       </div>
@@ -71,7 +78,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { AITool } from '@/types/ai/tool';
+import ColorIcon, { type IconTheme } from '@/components/common/ColorIcon.vue';
+import type { AITool } from '@/types/ai/tool';
+import { launchAITool } from '@/utils/ai/launch-tool';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -89,10 +98,26 @@ const visible = computed({
   set: (val: boolean) => emit('update:modelValue', val)
 });
 
+const inputHint = computed(() => {
+  if (!props.tool) return '';
+  if (props.tool.executionMode === 'V05_NOTICE') {
+    return 'V0.5 将支持在抽屉内直接输入教学文本、课件摘要或学习问题，并流式返回结果。';
+  }
+  return '点击「立即使用」进入专用工作台，按页面向导填写课程、章节、题型等参数后提交。';
+});
+
+const outputHint = computed(() => {
+  if (!props.tool) return '';
+  if (props.tool.executionMode === 'V05_NOTICE') {
+    return 'V0.5 将输出结构化 Markdown 结果，支持复制、导出与一键入库。';
+  }
+  return '生成结构化题目、试卷、批改结果或对话内容，可在页面内预览、编辑并保存。';
+});
+
 function handleLaunch() {
   if (props.tool) {
     visible.value = false;
-    router.push(props.tool.route);
+    launchAITool(props.tool, router);
   }
 }
 </script>
@@ -102,7 +127,7 @@ function handleLaunch() {
   .drawer-content {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 20px;
     padding: 10px 4px 40px;
 
     .drawer-header-box {
@@ -110,67 +135,59 @@ function handleLaunch() {
       align-items: center;
       gap: 16px;
       padding-bottom: 20px;
-      border-bottom: 1px solid #F1F5F9;
-
-      .drawer-icon-box {
-        width: 56px;
-        height: 56px;
-        border-radius: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
-
-        .drawer-emoji {
-          font-size: 26px;
-        }
-      }
+      border-bottom: 1px solid #f1f5f9;
 
       .drawer-header-meta {
         .drawer-title {
-          margin: 0 0 6px 0;
+          margin: 0 0 6px;
           font-size: 18px;
           font-weight: 700;
-          color: #0F172A;
+          color: #0f172a;
         }
 
         .drawer-tags-row {
           display: flex;
           align-items: center;
           gap: 8px;
+          flex-wrap: wrap;
 
           .pill-badge {
             padding: 2px 10px;
-            border-radius: 9999px; // 长圆药丸
+            border-radius: 9999px;
             font-size: 11.5px;
             font-weight: 600;
 
             &--cat {
-              background: #EFF6FF;
-              color: #1677FF;
+              background: #eff6ff;
+              color: #1677ff;
             }
 
-            &--hot {
-              background: #FEE2E2;
-              color: #EF4444;
+            &--fire {
+              background: #fff7ed;
+              color: #ea580c;
+            }
+
+            &--rec {
+              background: #fee2e2;
+              color: #ef4444;
             }
           }
+        }
 
-          .stats-text {
-            font-size: 12px;
-            color: #94A3B8;
-          }
+        .usage-line {
+          margin: 8px 0 0;
+          font-size: 12px;
+          color: #94a3b8;
         }
       }
     }
 
     .drawer-section {
       .section-title {
-        margin: 0 0 10px 0;
+        margin: 0 0 10px;
         font-size: 14.5px;
         font-weight: 600;
-        color: #1E293B;
+        color: #1e293b;
       }
 
       .section-p {
@@ -178,6 +195,11 @@ function handleLaunch() {
         font-size: 13.5px;
         line-height: 1.7;
         color: #475569;
+
+        &.model-id {
+          font-family: ui-monospace, monospace;
+          color: #1677ff;
+        }
       }
 
       .drawer-tags-grid {
@@ -187,52 +209,24 @@ function handleLaunch() {
 
         .pill-tag-large {
           padding: 4px 12px;
-          border-radius: 9999px; // 长圆
-          background: #F8FAFC;
-          border: 1px solid #E2E8F0;
+          border-radius: 9999px;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
           font-size: 12.5px;
           color: #475569;
-        }
-      }
-
-      .feature-item {
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
-        padding: 12px 14px;
-        background: #F8FAFC;
-        border-radius: 12px;
-        margin-top: 10px;
-        border: 1px solid #F1F5F9;
-
-        .feature-bullet {
-          font-size: 16px;
-        }
-
-        .feature-info {
-          strong {
-            font-size: 13px;
-            color: #1E293B;
-          }
-          p {
-            margin: 2px 0 0 0;
-            font-size: 12px;
-            color: #64748B;
-            line-height: 1.4;
-          }
         }
       }
     }
 
     .drawer-footer {
-      margin-top: 20px;
+      margin-top: 12px;
 
       .capsule-launch-btn {
         width: 100%;
         height: 44px;
-        border-radius: 9999px; // 纯正长圆胶囊
-        background: #1677FF;
-        color: #FFFFFF;
+        border-radius: 9999px;
+        background: #1677ff;
+        color: #ffffff;
         border: none;
         font-size: 14.5px;
         font-weight: 600;
@@ -245,7 +239,7 @@ function handleLaunch() {
         transition: all 0.22s ease;
 
         &:hover {
-          background: #4096FF;
+          background: #4096ff;
           transform: translateY(-1px);
         }
       }

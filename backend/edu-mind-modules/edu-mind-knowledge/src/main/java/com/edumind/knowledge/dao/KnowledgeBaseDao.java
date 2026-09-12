@@ -37,6 +37,17 @@ public class KnowledgeBaseDao {
         );
     }
 
+    public List<KnowledgeBaseEntity> findByCourseIds(List<Long> courseIds) {
+        if (courseIds == null || courseIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return knowledgeBaseMapper.selectList(
+                new LambdaQueryWrapper<KnowledgeBaseEntity>()
+                        .in(KnowledgeBaseEntity::getCourseId, courseIds)
+                        .orderByDesc(KnowledgeBaseEntity::getUpdateTime)
+        );
+    }
+
     public int insert(KnowledgeBaseEntity entity) {
         return knowledgeBaseMapper.insert(entity);
     }

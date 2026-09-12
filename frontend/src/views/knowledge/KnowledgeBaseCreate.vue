@@ -16,7 +16,7 @@
       <el-card shadow="never" class="main-card">
         <template #header>
           <div class="card-header-title">
-            <span class="icon">📚</span>
+            <el-icon class="header-icon"><Collection /></el-icon>
             <div>
               <h3>创建课程/学科专业知识库</h3>
               <p>配置知识库的基本归属、语义分块策略与向量化嵌入模型，用于支持平台智能检索与 RAG 问答。</p>
@@ -153,7 +153,8 @@
               class="submit-btn"
               @click="handleSubmit"
             >
-              🚀 确认创建并初始化知识库
+              <el-icon class="btn-icon"><Promotion /></el-icon>
+              <span>确认创建并初始化知识库</span>
             </el-button>
           </div>
         </el-form>
@@ -166,7 +167,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
-import { ArrowLeft, UploadFilled } from '@element-plus/icons-vue';
+import { ArrowLeft, UploadFilled, Collection, Promotion } from '@element-plus/icons-vue';
 import { createKnowledgeBase } from '@/api/knowledge/knowledge-base';
 import { getCourseList } from '@/api/course/course';
 import type { Course } from '@/types/course/course';
@@ -220,13 +221,13 @@ async function handleSubmit() {
     try {
       const res = await createKnowledgeBase(formData);
       const newId = res.data || 1;
-      ElMessage.success('🎉 知识库已成功创建！正在为您跳转到文档维护详情页...');
+      ElMessage.success('知识库已成功创建！正在为您跳转到文档维护详情页...');
       setTimeout(() => {
         router.push(`/knowledge/${newId}`);
       }, 600);
     } catch (err) {
       console.error(err);
-      ElMessage.success('🎉 知识库已成功创建！');
+      ElMessage.success('知识库已成功创建！');
       setTimeout(() => {
         router.push('/knowledge');
       }, 600);
@@ -272,8 +273,10 @@ async function handleSubmit() {
         align-items: center;
         gap: 16px;
 
-        .icon {
+        .header-icon {
           font-size: 32px;
+          color: #2563EB;
+          flex-shrink: 0;
         }
 
         h3 {

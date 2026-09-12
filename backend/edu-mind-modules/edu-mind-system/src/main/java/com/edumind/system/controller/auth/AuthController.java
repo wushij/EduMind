@@ -28,6 +28,17 @@ public class AuthController {
         return ApiResult.success(authService.login(loginDTO));
     }
 
+    @PostMapping("/email-login")
+    public ApiResult<LoginVO> emailLogin(@Valid @RequestBody com.edumind.system.dto.auth.EmailLoginDTO emailLoginDTO) {
+        return ApiResult.success(authService.emailLogin(emailLoginDTO));
+    }
+
+    @PostMapping("/send-email-code")
+    public ApiResult<Void> sendEmailCode(@Valid @RequestBody com.edumind.system.dto.auth.EmailSendCodeDTO sendCodeDTO) {
+        authService.sendEmailCode(sendCodeDTO);
+        return ApiResult.success();
+    }
+
     @PostMapping("/register")
     public ApiResult<Map<String, Long>> register(@Valid @RequestBody RegisterDTO registerDTO) {
         Long userId = authService.register(registerDTO);

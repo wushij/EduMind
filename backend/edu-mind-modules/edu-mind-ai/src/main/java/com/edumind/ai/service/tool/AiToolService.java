@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface AiToolService {
     List<AiToolVO> listTools(String category, String keyword);
+
+    void recordToolUse(String id);
 }

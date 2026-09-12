@@ -91,6 +91,23 @@ public class CourseQueryApiImpl implements CourseQueryApi {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public boolean isCourseMember(Long courseId, Long userId) {
+        if (courseId == null || userId == null) {
+            return false;
+        }
+        CourseEntity course = courseDao.findById(courseId);
+        if (course != null && userId.equals(course.getTeacherId())) {
+            return true;
+        }
+        return courseMemberDao.findByCourseIdAndUserId(courseId, userId) != null;
+    }
+
+    @Override
+    public List<Long> listCourseIdsByUserId(Long userId) {
+        return courseMemberDao.findCourseIdsByUserId(userId);
+    }
+
     private String resolveTeacherName(Long teacherId) {
         if (teacherId == null) {
             return "";

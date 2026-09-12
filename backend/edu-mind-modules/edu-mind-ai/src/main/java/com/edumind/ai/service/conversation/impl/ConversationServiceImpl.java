@@ -6,7 +6,9 @@ import com.edumind.ai.dao.MessageDao;
 import com.edumind.ai.dto.ConversationCreateDTO;
 import com.edumind.ai.dto.ConversationRenameDTO;
 import com.edumind.ai.entity.ConversationEntity;
+import com.edumind.ai.integration.llm.LlmClient;
 import com.edumind.ai.service.conversation.ConversationService;
+import com.edumind.ai.entity.MessageEntity;
 import com.edumind.ai.vo.ConversationVO;
 import com.edumind.ai.vo.MessageVO;
 import com.edumind.common.exception.BusinessException;
@@ -27,6 +29,7 @@ public class ConversationServiceImpl implements ConversationService {
     private final MessageDao messageDao;
     private final AiConverter aiConverter;
     private final AiSessionCacheService aiSessionCacheService;
+    private final LlmClient llmClient;
 
     @Override
     public List<ConversationVO> listConversations(Long courseId) {
@@ -69,6 +72,26 @@ public class ConversationServiceImpl implements ConversationService {
         assertConversationOwner(conversationId);
         conversationDao.softDeleteById(conversationId);
         aiSessionCacheService.deleteSession(conversationId);
+    }
+
+    @Override
+    public String generateTitle(String conversationId) {
+        ConversationEntity entity = assertConversationOwner(conversationId);
+        List<MessageEntity> messages = messageDao.listByConversationId(conversationId);
+        String firstUser = messages.stream()
+                .filter(msg -> "user".equals(msg.getRole()))
+                .map(MessageEntity::getContent)
+                .findFirst()
+                .orElse("新会话");
+        String title = llmClient.chat(
+                "你是会话标题生成器，请用不超过12个字概括用户问题。",
+                firstUser
+        );
+        if (StringUtils.hasText(title)) {
+            entity.setTitle(title.trim().replace("\"", ""));
+            conversationDao.updateById(entity);
+        }
+        return entity.getTitle();
     }
 
     private Long requireUserId() {

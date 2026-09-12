@@ -19,5 +19,8 @@ public class AiCallLogEntity implements Serializable {
     private Integer completionTokens;
     private Integer latencyMs;
     private String scene;
+    private Long knowledgeBaseId;
+    private Integer retrievalHitCount;
+    private String citationDocIds;
     private LocalDateTime createTime;
 }

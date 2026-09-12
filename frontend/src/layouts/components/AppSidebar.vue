@@ -232,9 +232,9 @@ function buildModuleDefinitions(): NavModule[] {
         { path: '/ai/question/generate', name: 'AI 出题', icon: EditPen, permissions: ['ai:question'] },
         { path: '/ai/exam/generate', name: 'AI 组卷', icon: Tickets, permissions: ['ai:exam'] },
         { path: '/ai/grading', name: 'AI 批改', icon: CircleCheck, permissions: ['ai:grading'] },
-        { path: '/ai/lesson', name: 'AI 教案', icon: Notebook, badge: 'V0.5' },
-        { path: '/ai/summary', name: 'AI 总结', icon: DocumentCopy, badge: 'V0.5' },
-        { path: '/ai/recommendation', name: 'AI 推荐', icon: Promotion, badge: 'V0.5' }
+        { path: '/ai/lesson', name: 'AI 教案', icon: Notebook },
+        { path: '/ai/summary', name: 'AI 总结', icon: DocumentCopy },
+        { path: '/ai/recommendation', name: 'AI 推荐', icon: Promotion }
       ]
     },
 
@@ -249,9 +249,12 @@ function buildModuleDefinitions(): NavModule[] {
         { path: '/knowledge', name: '知识库', icon: Folder, permissions: ['knowledge:view'] },
         { path: '/knowledge/create', name: '创建知识库', icon: FolderAdd },
         { path: `/knowledge/${kbId}/documents`, name: '文档管理', icon: Files },
-        { path: `/knowledge/${kbId}/parse`, name: '文档解析', icon: SetUp, badge: 'V0.5' },
-        { path: `/knowledge/${kbId}/rag-debug`, name: 'RAG 检索', icon: Search, badge: 'V0.5' },
-        { path: `/knowledge/${kbId}/graph`, name: '知识图谱', icon: Connection, badge: 'V0.5' }
+        { path: `/knowledge/${kbId}/chunks`, name: '切片管理', icon: Grid },
+        { path: `/knowledge/${kbId}/embeddings`, name: '向量状态', icon: PieChart },
+        { path: `/knowledge/${kbId}/parse`, name: '文档解析', icon: SetUp },
+        { path: `/knowledge/${kbId}/retrieval`, name: '检索测试', icon: Search },
+        { path: `/knowledge/${kbId}/rag-debug`, name: 'RAG 诊断', icon: Operation },
+        { path: `/knowledge/${kbId}/graph`, name: '知识图谱', icon: Connection }
       ]
     },
 
@@ -283,7 +286,7 @@ function buildModuleDefinitions(): NavModule[] {
         { path: '/learning/practice', name: 'AI 练习', icon: MagicStick },
         { path: '/learning/wrong-questions', name: '错题本', icon: Warning },
         { path: '/learning/report', name: '学习报告', icon: DataLine },
-        { path: '/learning/path', name: '学习路径', icon: MapLocation, badge: 'V0.5' }
+        { path: '/learning/path', name: '学习路径', icon: MapLocation }
       ]
     },
 
@@ -299,7 +302,7 @@ function buildModuleDefinitions(): NavModule[] {
         { path: '/analytics/mastery', name: '知识点掌握', icon: PieChart },
         { path: '/analytics/wrong-questions', name: '错题分析', icon: QuestionFilled },
         { path: '/analytics/ai-usage', name: 'AI 使用分析', icon: Coin },
-        { path: '/analytics/teaching-report', name: '教学报告', icon: DocumentCopy, badge: 'V0.5' }
+        { path: '/analytics/teaching-report', name: '教学报告', icon: DocumentCopy }
       ]
     },
 
@@ -317,7 +320,7 @@ function buildModuleDefinitions(): NavModule[] {
         { path: '/system/tools', name: 'AI 工具', icon: Operation },
         { path: '/system/models', name: 'AI 模型', icon: Cpu },
         { path: '/system/prompts', name: 'Prompt', icon: ChatLineSquare },
-        { path: '/system/quotas', name: 'AI 配额', icon: Money, badge: 'V0.5' },
+        { path: '/system/quotas', name: 'AI 配额', icon: Money },
         { path: '/system/audit', name: '审计日志', icon: Clock },
         { path: '/system/config', name: '系统配置', icon: Monitor }
       ]

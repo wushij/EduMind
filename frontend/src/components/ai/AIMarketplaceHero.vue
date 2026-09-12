@@ -23,14 +23,15 @@
             placeholder="搜索AI工具、应用场景、教学资源..."
             @focus="isFocused = true"
             @blur="isFocused = false"
-            @keyup.enter="emitSearch"
+            @input="handleInput"
+            @keyup.enter="emitSearch(true)"
           />
           <!-- 右侧蓝色按钮点击热区：点击才开始搜索 -->
           <button
             type="button"
             class="banner-search-submit"
             aria-label="搜索"
-            @click="emitSearch"
+            @click="emitSearch(true)"
           />
         </div>
       </div>
@@ -40,7 +41,7 @@
     <div class="marketplace-filter-dock">
       <div class="pill-category-tabs">
         <button
-          v-for="cat in filterCategories"
+          v-for="cat in visibleFilterCategories"
           :key="cat.value"
           type="button"
           class="pill-cat-btn"
@@ -58,7 +59,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, type Component } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { Grid, School, Reading, Tools, StarFilled } from '@element-plus/icons-vue';
+import { Grid, School, Reading, Star, StarFilled } from '@element-plus/icons-vue';
+import { useAuthStore } from '@/stores/auth/auth';
+import { canAccessMarketplaceCategory } from '@/utils/ai/tool-role-access';
 import marketplaceBannerImg from '@/assets/images/ai工具广场的banner1.png';
 
 type CategoryItem = {
@@ -77,11 +80,15 @@ const emit = defineEmits<{
   (e: 'update:searchKeyword', val: string): void;
   (e: 'update:activeCategory', val: string): void;
   (e: 'search', val: string): void;
+  (e: 'instant-search', val: string): void;
   (e: 'category-change', val: string): void;
 }>();
 
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
 const router = useRouter();
 const route = useRoute();
+const authStore = useAuthStore();
 
 const searchInputRef = ref<HTMLInputElement | null>(null);
 const isFocused = ref(false);
@@ -100,9 +107,15 @@ const filterCategories: CategoryItem[] = [
   { label: '全部', value: 'ALL', icon: Grid, route: '/ai/marketplace' },
   { label: '教师提效', value: 'TEACHER', icon: School, route: '/ai/marketplace/teacher' },
   { label: '学生助学', value: 'STUDENT', icon: Reading, route: '/ai/marketplace/student' },
-  { label: '通用工具', value: 'RECOMMENDED', icon: Tools, route: '/ai/marketplace/recommended' },
+  { label: '推荐工具', value: 'RECOMMENDED', icon: Star, route: '/ai/marketplace/recommended' },
   { label: '我的常用', value: 'MY_TOOLS', icon: StarFilled, route: '/ai/marketplace/my-tools' }
 ];
+
+const visibleFilterCategories = computed(() =>
+  filterCategories.filter((cat) =>
+    canAccessMarketplaceCategory(cat.value, authStore.currentRole)
+  )
+);
 
 const currentCategory = computed(() => {
   if (props.activeCategory) return props.activeCategory;
@@ -113,11 +126,23 @@ const currentCategory = computed(() => {
   return 'ALL';
 });
 
-// 只有点击搜索按钮或回车才触发搜索
-function emitSearch() {
+function handleInput() {
+  const val = inputValue.value;
+  emit('update:searchKeyword', val);
+  emit('instant-search', val);
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    emit('search', val.trim());
+  }, 300);
+}
+
+function emitSearch(triggerBackend = true) {
   const val = inputValue.value.trim();
   emit('update:searchKeyword', val);
-  emit('search', val);
+  emit('instant-search', val);
+  if (triggerBackend) {
+    emit('search', val);
+  }
 }
 
 function handleCategoryClick(cat: CategoryItem) {

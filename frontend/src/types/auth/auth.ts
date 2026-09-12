@@ -24,6 +24,20 @@ export interface LoginParams {
   role?: RoleEnum;
 }
 
+export type EmailScene = 'login' | 'bind' | 'resetpwd' | 'test';
+
+export interface EmailSendCodeRequest {
+  email: string;
+  scene?: EmailScene;
+  captchaId?: string;
+  captcha?: string;
+}
+
+export interface EmailLoginRequest {
+  email: string;
+  code: string;
+}
+
 export interface LoginResult {
   token: string;
   userInfo: UserInfo;

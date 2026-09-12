@@ -4,7 +4,7 @@
     <div class="perm-header-dock">
       <div class="header-left">
         <div class="title-with-icon">
-          <span class="header-icon">🛡️</span>
+          <el-icon class="header-icon"><Key /></el-icon>
           <h1 class="main-title">系统权限与功能资源树</h1>
           <span class="capsule-count-tag">细粒度 RBAC 授权体系统</span>
         </div>
@@ -57,7 +57,7 @@
           <template #default="{ data }">
             <div class="custom-tree-node">
               <div class="node-left">
-                <span class="node-icon">{{ getNodeIcon(data.permissionType) }}</span>
+                <el-icon class="node-icon"><component :is="getNodeIcon(data.permissionType)" /></el-icon>
                 <span class="node-name">{{ data.permissionName }}</span>
                 <span class="node-code font-mono">{{ data.permissionCode }}</span>
               </div>
@@ -77,7 +77,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Search } from '@element-plus/icons-vue';
+import { Search, Key, FolderOpened, Pointer, Connection } from '@element-plus/icons-vue';
 import { getPermissions } from '@/api/system/permission';
 import { USE_MOCK } from '@/config/mock';
 import type { PermissionVO } from '@/types/system/rbac';
@@ -194,9 +194,9 @@ function getDefaultPermissionMock(): PermissionVO[] {
 }
 
 function getNodeIcon(type?: string) {
-  if (type === 'MENU') return '📂';
-  if (type === 'BUTTON') return '🔘';
-  return '🔌';
+  if (type === 'MENU') return FolderOpened;
+  if (type === 'BUTTON') return Pointer;
+  return Connection;
 }
 
 function getTypeLabel(type?: string) {

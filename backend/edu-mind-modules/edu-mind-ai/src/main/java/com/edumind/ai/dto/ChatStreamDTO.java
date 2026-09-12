@@ -10,4 +10,9 @@ public class ChatStreamDTO {
 
     @NotBlank(message = "消息内容不能为空")
     private String message;
+
+    private Long knowledgeBaseId;
+    private Boolean useRag;
+    private Long chapterId;
+    private Long documentId;
 }

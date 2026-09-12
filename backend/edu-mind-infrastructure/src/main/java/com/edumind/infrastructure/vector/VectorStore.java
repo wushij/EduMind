@@ -14,4 +14,15 @@ public interface VectorStore {
     void delete(String collectionName, String id);
 
     List<String> searchNearestIds(String collectionName, List<Float> queryVector, int topK);
+
+    default List<VectorSearchResult> searchNearest(String collectionName, List<Float> queryVector, int topK) {
+        return searchNearestIds(collectionName, queryVector, topK).stream()
+                .map(id -> VectorSearchResult.builder().id(id).score(0f).build())
+                .toList();
+    }
+
+    default List<VectorSearchResult> searchNearest(String collectionName, List<Float> queryVector, int topK,
+                                                   Map<String, Object> filter) {
+        return searchNearest(collectionName, queryVector, topK);
+    }
 }

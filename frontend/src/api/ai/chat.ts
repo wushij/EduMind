@@ -16,6 +16,11 @@ export const renameConversation = (id: string, title: string) =>
 
 export const deleteConversation = (id: string) => del<void>(`/ai/conversations/${id}`);
 
+export const generateConversationTitle = (id: string) =>
+  post<string>(`/ai/conversations/${id}/generate-title`);
+
+export const cancelChatStream = (streamId: string) => del<void>(`/ai/chat/stream/${streamId}`);
+
 export const aiChatApi = {
   getConversations,
   getMessages,

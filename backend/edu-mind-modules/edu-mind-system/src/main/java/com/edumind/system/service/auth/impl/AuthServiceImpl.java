@@ -40,6 +40,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRoleDao userRoleDao;
     private final CaptchaService captchaService;
     private final UserVoAssembler userVoAssembler;
+    private final com.edumind.system.service.email.EmailCodeService emailCodeService;
 
     @Override
     public LoginVO login(LoginDTO loginDTO) {
@@ -86,6 +87,38 @@ public class AuthServiceImpl implements AuthService {
                 .token(StpUtil.getTokenValue())
                 .userInfo(userVoAssembler.toVO(user))
                 .build();
+    }
+
+    @Override
+    public LoginVO emailLogin(com.edumind.system.dto.auth.EmailLoginDTO emailLoginDTO) {
+        String email = emailLoginDTO.getEmail().trim().toLowerCase();
+        String code = emailLoginDTO.getCode().trim();
+
+        // 1. 核验验证码（核验成功后单次销毁）
+        emailCodeService.verifyCode(email, "login", code);
+
+        // 2. 检索绑定该邮箱的用户
+        UserEntity user = userDao.findByEmail(email);
+        if (user == null) {
+            throw new BusinessException("该邮箱尚未绑定任何平台账号，请先使用账号登录后在个人中心绑定该邮箱");
+        }
+
+        if ("DISABLE".equalsIgnoreCase(user.getStatus())) {
+            throw new BusinessException("该账号已被停用，请联系管理员");
+        }
+
+        // 3. 执行登录授权
+        StpUtil.login(user.getId());
+
+        return LoginVO.builder()
+                .token(StpUtil.getTokenValue())
+                .userInfo(userVoAssembler.toVO(user))
+                .build();
+    }
+
+    @Override
+    public void sendEmailCode(com.edumind.system.dto.auth.EmailSendCodeDTO sendCodeDTO) {
+        emailCodeService.sendCode(sendCodeDTO);
     }
 
     @Override

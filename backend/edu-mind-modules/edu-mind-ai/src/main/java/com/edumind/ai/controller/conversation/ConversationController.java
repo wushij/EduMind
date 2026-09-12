@@ -54,4 +54,10 @@ public class ConversationController {
     public void deleteConversation(@PathVariable("id") String id) {
         conversationService.deleteConversation(id);
     }
+
+    @SaCheckPermission("ai:chat")
+    @PostMapping("/{id}/generate-title")
+    public ApiResult<String> generateTitle(@PathVariable("id") String id) {
+        return ApiResult.success(conversationService.generateTitle(id));
+    }
 }

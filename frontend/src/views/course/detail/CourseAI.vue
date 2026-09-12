@@ -45,7 +45,7 @@
         <div class="col-card chapters-card">
           <div class="col-card-header">
             <span class="header-title">课程章节</span>
-            <span class="count-badge">14章</span>
+            <span class="count-badge">{{ chaptersData.length }}章</span>
           </div>
 
           <!-- 章节搜索框 -->
@@ -128,9 +128,9 @@
                   <el-dropdown-menu class="model-dropdown-menu">
                     <el-dropdown-item
                       v-for="m in modelOptions"
-                      :key="m.name"
-                      :command="m.name"
-                      :class="{ 'is-selected': currentModel === m.name }"
+                      :key="m.key"
+                      :command="m.key"
+                      :class="{ 'is-selected': currentModelKey === m.key }"
                     >
                       <div class="model-item-row">
                         <span class="item-name">{{ m.name }}</span>
@@ -159,7 +159,7 @@
             <div v-if="activeSectionTitle" class="context-anchor-chip">
               <el-icon class="pin-icon"><Connection /></el-icon>
               <span>当前知识锚定章节：<strong>{{ activeSectionTitle }}</strong></span>
-              <button type="button" class="clear-anchor-btn" @click="activeSectionId = ''; activeSectionTitle = ''">
+              <button type="button" class="clear-anchor-btn" @click="activeSectionId = null; activeChapterId = undefined; activeSectionTitle = ''">
                 <el-icon><Close /></el-icon>
               </button>
             </div>
@@ -290,7 +290,10 @@ import {
   Close
 } from '@element-plus/icons-vue';
 import type { CourseVO } from '@/types/course/course';
-import { useAIStream, type ChatMessage as ChatMessageType } from '@/composables/ai/useAIStream';
+import type { Chapter } from '@/types/course/chapter';
+import { getChapters } from '@/api/course/chapter';
+import { getModelConfigs } from '@/api/system/model';
+import { useAIStream } from '@/composables/ai/useAIStream';
 import ChatMessage from '@/components/ai/ChatMessage.vue';
 import ChatInput from '@/components/ai/ChatInput.vue';
 import ChatSessionList from '@/components/ai/ChatSessionList.vue';
@@ -316,159 +319,63 @@ function handlePillClick(pill: (typeof quickActionPills)[0]) {
 
 // ======================= 2. 左栏：14 章课程章节树 =======================
 const chapterKeyword = ref('');
-const activeSectionId = ref('sec-1-1');
-const activeSectionTitle = ref('1.1 Java语言概述');
+const activeSectionId = ref<number | null>(null);
+const activeSectionTitle = ref('');
+const activeChapterId = ref<number | undefined>(undefined);
+const chaptersLoading = ref(false);
 
 interface ChapterNode {
-  id: string;
+  id: number;
   title: string;
   expanded: boolean;
-  sections: { id: string; title: string }[];
+  sections: { id: number; title: string }[];
 }
 
-const chaptersData = ref<ChapterNode[]>([
-  {
-    id: 'chap-1',
-    title: '第1章 Java基础',
-    expanded: true,
-    sections: [
-      { id: 'sec-1-1', title: '1.1 Java语言概述' },
-      { id: 'sec-1-2', title: '1.2 开发环境搭建' },
-      { id: 'sec-1-3', title: '1.3 第一个Java程序' },
-      { id: 'sec-1-4', title: '1.4 基本语法' },
-      { id: 'sec-1-5', title: '1.5 注释与编码规范' }
-    ]
-  },
-  {
-    id: 'chap-2',
-    title: '第2章 基本数据类型',
-    expanded: false,
-    sections: [
-      { id: 'sec-2-1', title: '2.1 八大基本数据类型' },
-      { id: 'sec-2-2', title: '2.2 类型自动提升与强制转换' },
-      { id: 'sec-2-3', title: '2.3 变量作用域与常量' }
-    ]
-  },
-  {
-    id: 'chap-3',
-    title: '第3章 运算符与表达式',
-    expanded: false,
-    sections: [
-      { id: 'sec-3-1', title: '3.1 算术与赋值运算符' },
-      { id: 'sec-3-2', title: '3.2 关系与逻辑运算符' },
-      { id: 'sec-3-3', title: '3.3 三元运算符与优先级' }
-    ]
-  },
-  {
-    id: 'chap-4',
-    title: '第4章 流程控制',
-    expanded: false,
-    sections: [
-      { id: 'sec-4-1', title: '4.1 if-else 分支' },
-      { id: 'sec-4-2', title: '4.2 switch 模式匹配' },
-      { id: 'sec-4-3', title: '4.3 for / while 循环与 break' }
-    ]
-  },
-  {
-    id: 'chap-5',
-    title: '第5章 数组',
-    expanded: false,
-    sections: [
-      { id: 'sec-5-1', title: '5.1 一维数组声明与内存分配' },
-      { id: 'sec-5-2', title: '5.2 二维数组与矩阵遍历' },
-      { id: 'sec-5-3', title: '5.3 Arrays 常用工具方法' }
-    ]
-  },
-  {
-    id: 'chap-6',
-    title: '第6章 面向对象编程',
-    expanded: false,
-    sections: [
-      { id: 'sec-6-1', title: '6.1 类与对象抽象' },
-      { id: 'sec-6-2', title: '6.2 构造方法与重载' },
-      { id: 'sec-6-3', title: '6.3 this 关键字与内存布局' }
-    ]
-  },
-  {
-    id: 'chap-7',
-    title: '第7章 继承与多态',
-    expanded: false,
-    sections: [
-      { id: 'sec-7-1', title: '7.1 类的继承机制' },
-      { id: 'sec-7-2', title: '7.2 super 关键字与方法重写' },
-      { id: 'sec-7-3', title: '7.3 向上转型与多态性' }
-    ]
-  },
-  {
-    id: 'chap-8',
-    title: '第8章 接口与内部类',
-    expanded: false,
-    sections: [
-      { id: 'sec-8-1', title: '8.1 抽象类 abstract' },
-      { id: 'sec-8-2', title: '8.2 接口 interface' },
-      { id: 'sec-8-3', title: '8.3 成员内部类与匿名类' }
-    ]
-  },
-  {
-    id: 'chap-9',
-    title: '第9章 异常处理',
-    expanded: false,
-    sections: [
-      { id: 'sec-9-1', title: '9.1 异常体系与分类' },
-      { id: 'sec-9-2', title: '9.2 try-catch-finally' },
-      { id: 'sec-9-3', title: '9.3 自定义业务异常' }
-    ]
-  },
-  {
-    id: 'chap-10',
-    title: '第10章 集合框架',
-    expanded: false,
-    sections: [
-      { id: 'sec-10-1', title: '10.1 List (ArrayList/LinkedList)' },
-      { id: 'sec-10-2', title: '10.2 Set (HashSet/TreeSet)' },
-      { id: 'sec-10-3', title: '10.3 Map (HashMap/ConcurrentHashMap)' }
-    ]
-  },
-  {
-    id: 'chap-11',
-    title: '第11章 IO流',
-    expanded: false,
-    sections: [
-      { id: 'sec-11-1', title: '11.1 字节流与字符流' },
-      { id: 'sec-11-2', title: '11.2 缓冲流与转换流' },
-      { id: 'sec-11-3', title: '11.3 对象序列化' }
-    ]
-  },
-  {
-    id: 'chap-12',
-    title: '第12章 多线程',
-    expanded: false,
-    sections: [
-      { id: 'sec-12-1', title: '12.1 线程创建与生命周期' },
-      { id: 'sec-12-2', title: '12.2 synchronized 与 Lock' },
-      { id: 'sec-12-3', title: '12.3 线程池与并发工具' }
-    ]
-  },
-  {
-    id: 'chap-13',
-    title: '第13章 JDBC数据库编程',
-    expanded: false,
-    sections: [
-      { id: 'sec-13-1', title: '13.1 JDBC 核心驱动' },
-      { id: 'sec-13-2', title: '13.2 PreparedStatement' },
-      { id: 'sec-13-3', title: '13.3 事务处理与连接池' }
-    ]
-  },
-  {
-    id: 'chap-14',
-    title: '第14章 项目实战',
-    expanded: false,
-    sections: [
-      { id: 'sec-14-1', title: '14.1 综合项目架构设计' },
-      { id: 'sec-14-2', title: '14.2 模块实现与测试' }
-    ]
+const chaptersData = ref<ChapterNode[]>([]);
+
+function mapChapterTree(nodes: Chapter[], expandedFirst = true): ChapterNode[] {
+  return nodes.map((node, index) => {
+    const childSections = (node.children || []).map((child) => ({
+      id: child.id,
+      title: child.title
+    }));
+    const sections =
+      childSections.length > 0
+        ? childSections
+        : [{ id: node.id, title: node.title }];
+    return {
+      id: node.id,
+      title: node.title,
+      expanded: expandedFirst && index === 0,
+      sections
+    };
+  });
+}
+
+async function loadChapters() {
+  const courseId = props.course?.id ? Number(props.course.id) : 0;
+  if (!courseId) return;
+  chaptersLoading.value = true;
+  try {
+    const res = await getChapters(courseId);
+    const list = Array.isArray(res?.data) ? res.data : [];
+    chaptersData.value = mapChapterTree(list as Chapter[]);
+    if (chaptersData.value.length > 0) {
+      const first = chaptersData.value[0];
+      const firstSec = first.sections[0];
+      if (firstSec) {
+        activeSectionId.value = firstSec.id;
+        activeChapterId.value = firstSec.id;
+        activeSectionTitle.value = firstSec.title;
+      }
+    }
+  } catch {
+    chaptersData.value = [];
+    ElMessage.error('加载课程章节失败');
+  } finally {
+    chaptersLoading.value = false;
   }
-]);
+}
 
 const filteredChapters = computed(() => {
   const kw = chapterKeyword.value.trim().toLowerCase();
@@ -489,10 +396,10 @@ const filteredChapters = computed(() => {
     .filter(Boolean) as ChapterNode[];
 });
 
-function selectSection(sec: { id: string; title: string }) {
+function selectSection(sec: { id: number; title: string }) {
   activeSectionId.value = sec.id;
+  activeChapterId.value = sec.id;
   activeSectionTitle.value = sec.title;
-  ElMessage.info(`已锚定知识章节：${sec.title}`);
 }
 
 // ======================= 3. 中栏：AI 问答工作台与消息流 =======================
@@ -515,18 +422,36 @@ function switchModeTab(key: string) {
   }
 }
 
-// 大模型选项
-const modelOptions = [
-  { name: 'DeepSeek R1', desc: '深度推理模型 · 逻辑严密' },
-  { name: 'DeepSeek V3', desc: '全能旗舰 · 教学调优' },
-  { name: 'Qwen 2.5', desc: '阿里开源 · 中文优选' },
-  { name: 'GPT-4o', desc: '多模态旗舰' }
-];
-const currentModel = ref('DeepSeek R1');
+const modelOptions = ref<Array<{ name: string; key: string; desc: string }>>([]);
+const currentModel = ref('默认模型');
+const currentModelKey = ref<string | undefined>(undefined);
 
-function handleModelSelect(modelName: string) {
-  currentModel.value = modelName;
-  ElMessage.success(`已切换推理引擎为：${modelName}`);
+async function loadModels() {
+  try {
+    const configs = await getModelConfigs();
+    const chatModels = configs.filter((m) => m.enabled && !m.supportsEmbedding);
+    modelOptions.value = chatModels.map((m) => ({
+      name: m.name,
+      key: m.modelKey,
+      desc: m.provider || 'LLM'
+    }));
+    const defaultModel = chatModels.find((m) => m.isDefault) || chatModels[0];
+    if (defaultModel) {
+      currentModel.value = defaultModel.name;
+      currentModelKey.value = defaultModel.modelKey;
+    }
+  } catch {
+    modelOptions.value = [];
+  }
+}
+
+function handleModelSelect(modelKey: string) {
+  const found = modelOptions.value.find((m) => m.key === modelKey);
+  if (found) {
+    currentModel.value = found.name;
+    currentModelKey.value = found.key;
+    ElMessage.success(`已切换推理引擎为：${found.name}`);
+  }
 }
 
 const historyDrawerVisible = ref(false);
@@ -547,65 +472,17 @@ const {
   deleteSession
 } = useAIStream();
 
-// 原型同款初始演示消息 (若 messages 为空时呈现)
-const prototypeInitialMessages: ChatMessageType[] = [
-  {
-    id: 'proto-intro-1',
-    role: 'assistant',
-    createdAt: '10:24',
-    content: `你好！我是 EduMind 的课程 AI 助手，
-我可以帮你：
-• 解答课程相关问题
-• 解析代码和报错信息
-• 讲解知识点和例题
-• 提供学习建议和拓展资源
-• 帮助完成练习和作业
-
-你可以直接输入问题，或者选择右侧的推荐问题快速提问～`
-  },
-  {
-    id: 'proto-intro-2',
-    role: 'user',
-    createdAt: '10:25',
-    content: '什么是面向对象？能结合 Java 举个简单的例子吗？'
-  },
-  {
-    id: 'proto-intro-3',
-    role: 'assistant',
-    createdAt: '10:25',
-    content: `当然可以！
-面向对象（Object-Oriented Programming, OOP）是一种程序设计思想，它将现实世界中的事物抽象为“对象”，通过对象之间的交互来完成程序的功能。面向对象的三大特性是：
-
-1. **封装**：将数据和方法封装在对象内部，隐藏内部实现细节。
-2. **继承**：子类可以继承父类的属性和方法。
-3. **多态**：同一个方法在不同对象中表现出不同的行为。
-
-下面是一个简单的 Java 示例：
-
-\`\`\`java
-// 定义一个学生类
-public class Student {
-    private String name;
-    private int age;
-
-    public Student(String name, int age) {
-        this.name = name;
-        this.age = age;
-    }
-
-    public void sayHello() {
-        System.out.println("大家好，我是 " + name + "，今年 " + age + " 岁！");
-    }
-}
-\`\`\`
-
-在这个例子中，Student 就是一个对象，它有自己的属性（name、age）和方法（sayHello）。你可以创建不同的 Student 对象，每个对象都有自己的数据。`
-  }
-];
+const welcomeMessage = computed(() => ({
+  id: 'welcome',
+  role: 'assistant' as const,
+  createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  content:
+    '你好！我是本课程的专属 AI 助教。已为你加载当前课程知识库，关于章节知识、典型例题或代码实现，请随时向我提问！'
+}));
 
 const allDisplayMessages = computed(() => {
   if (messages.value.length === 0) {
-    return prototypeInitialMessages;
+    return [welcomeMessage.value];
   }
   return messages.value;
 });
@@ -635,7 +512,10 @@ function handleSend(promptText: string) {
   if (activeSectionTitle.value) {
     finalPrompt = `[当前章节: ${activeSectionTitle.value}] ${finalPrompt}`;
   }
-  sendMessage(finalPrompt, courseId);
+  sendMessage(finalPrompt, courseId, {
+    chapterId: activeChapterId.value,
+    modelKey: currentModelKey.value
+  });
   scrollToBottom();
 }
 
@@ -715,7 +595,9 @@ watch(
 );
 
 onMounted(() => {
-  loadSessions(props.course?.id);
+  loadChapters();
+  loadModels();
+  loadSessions(props.course?.id ? Number(props.course.id) : undefined);
   scrollToBottom();
   nextTick(() => {
     const appContent = document.querySelector('.app-content');

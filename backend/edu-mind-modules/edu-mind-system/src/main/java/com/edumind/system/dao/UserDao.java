@@ -23,6 +23,14 @@ public class UserDao {
                 .eq(UserEntity::getUsername, username));
     }
 
+    public UserEntity findByEmail(String email) {
+        if (!StringUtils.hasText(email)) {
+            return null;
+        }
+        return userMapper.selectOne(new LambdaQueryWrapper<UserEntity>()
+                .eq(UserEntity::getEmail, email.trim()));
+    }
+
     public UserEntity findById(Long id) {
         return userMapper.selectById(id);
     }

@@ -18,7 +18,7 @@ export const aiRoutes: RouteRecordRaw[] = [
     path: '/ai/marketplace/student',
     name: 'AIMarketplaceStudent',
     component: () => import('@/views/ai/marketplace/StudentTools.vue'),
-    meta: { title: '学生专属 AI 工具', requiresAuth: true }
+    meta: { title: '学生专属 AI 工具', requiresAuth: true, roles: ['ADMIN', 'STUDENT'] }
   },
   {
     path: '/ai/marketplace/recommended',
@@ -31,6 +31,12 @@ export const aiRoutes: RouteRecordRaw[] = [
     name: 'AIMarketplaceMyTools',
     component: () => import('@/views/ai/marketplace/MyTools.vue'),
     meta: { title: '我的收藏工具', requiresAuth: true }
+  },
+  {
+    path: '/ai/marketplace/v05/:toolId',
+    name: 'AIMarketplaceV05Notice',
+    component: () => import('@/views/ai/marketplace/V05ToolNotice.vue'),
+    meta: { title: 'V0.5 工具预告', requiresAuth: true }
   },
 
   // AI 智能出题

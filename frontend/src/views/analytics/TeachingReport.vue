@@ -35,7 +35,7 @@
           </span>
         </div>
         <div class="kpi-val-row">
-          <span class="kpi-number">92.4%</span>
+          <span class="kpi-number">{{ passRate }}%</span>
           <span class="trend-pill trend-pill--up">+4.1% 环比上升</span>
         </div>
         <span class="kpi-sub">根据前 3 次随堂测验与作业推演</span>
@@ -49,7 +49,7 @@
           </span>
         </div>
         <div class="kpi-val-row">
-          <span class="kpi-number">86.8%</span>
+          <span class="kpi-number">{{ masteryRate }}%</span>
           <span class="trend-pill trend-pill--up">+6.5% 较期初</span>
         </div>
         <span class="kpi-sub">核心考点 24 个已达达标线</span>
@@ -63,7 +63,7 @@
           </span>
         </div>
         <div class="kpi-val-row">
-          <span class="kpi-number">1,420 次</span>
+          <span class="kpi-number">{{ aiCallCount.toLocaleString() }} 次</span>
           <span class="trend-pill trend-pill--up">分担 76% 咨询</span>
         </div>
         <span class="kpi-sub">平均首字延迟 1.1s (满意度 98.6%)</span>
@@ -77,7 +77,7 @@
           </span>
         </div>
         <div class="kpi-val-row">
-          <span class="kpi-number">24.5 h</span>
+          <span class="kpi-number">{{ savedHours }} h</span>
           <span class="trend-pill trend-pill--up">提效 68%</span>
         </div>
         <span class="kpi-sub">客观题秒级判分，主观题智能评分量规</span>
@@ -237,13 +237,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
 import analyticsBannerImg from '@/assets/images/教学分析banner.png';
+import { getTeachingReport } from '@/api/analytics/report';
+import type { TeachingReportVO } from '@/types/analytics/report';
 
 const router = useRouter();
+const courseId = 1;
+const reportData = ref<TeachingReportVO | null>(null);
+const passRate = ref(92.4);
+const masteryRate = ref(86.8);
+const aiCallCount = ref(0);
+const savedHours = ref(24.5);
 
 const knowledgeMasteryList = ref([
   {
@@ -327,9 +335,45 @@ const errorCategories = ref([
   }
 ]);
 
-function handleExportReport() {
-  ElMessage.success('正在排版并生成本学期《AI 教学质量评估周报 PDF》，请稍候...');
+async function loadReport() {
+  try {
+    const res = await getTeachingReport(courseId);
+    reportData.value = res?.data || null;
+    if (reportData.value) {
+      passRate.value = reportData.value.avgSubmissionRate;
+      masteryRate.value = Math.min(99, reportData.value.totalChapters * 10 + 50);
+      aiCallCount.value = reportData.value.aiCallCount;
+      knowledgeMasteryList.value = reportData.value.weakPoints.map((item, index) => ({
+        id: index + 1,
+        index: index + 1,
+        name: item.title,
+        course: `课程 #${courseId}`,
+        rate: Math.max(30, 100 - item.wrongCount * 12),
+        status: item.wrongCount >= 4 ? 'danger' : item.wrongCount >= 2 ? 'warning' : 'normal',
+        statusLabel: item.suggestion
+      }));
+    }
+  } catch {
+    ElMessage.error('加载教学报告失败');
+  }
 }
+
+function handleExportReport() {
+  if (!reportData.value) {
+    ElMessage.warning('暂无可导出的报告数据');
+    return;
+  }
+  const blob = new Blob([JSON.stringify(reportData.value, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `teaching-report-${courseId}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  ElMessage.success('教学报告已导出为 JSON');
+}
+
+onMounted(loadReport);
 
 function handleQuickQuiz(kp: any) {
   router.push({

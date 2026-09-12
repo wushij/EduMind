@@ -1,25 +1,13 @@
 <template>
   <div class="user-list-container">
-    <!-- 顶部操作头区 -->
-    <div class="user-header-dock">
+    <div class="page-header-card">
       <div class="header-left">
-        <div class="title-with-icon">
-          <span class="header-icon">👥</span>
-          <h1 class="main-title">系统用户与角色权限中心</h1>
-          <span class="capsule-count-tag">共 {{ filteredUsers.length }} 位注册用户</span>
-        </div>
-        <p class="sub-desc">
-          统一维护全校教职工、教学督导与修读学生的基础身份信息、角色绑定与账号活跃状态。
-        </p>
+        <h2>用户管理</h2>
+        <p>管理系统账号、角色授权与账号状态</p>
       </div>
-
-      <div class="header-right-actions">
-        <el-button
-          type="primary"
-          class="capsule-btn-primary"
-          @click="showCreateDialog = true"
-        >
-          <el-icon class="mr-1"><Plus /></el-icon> 新增系统用户
+      <div class="header-right">
+        <el-button type="primary" :icon="Plus" @click="showCreateDialog = true">
+          新增系统用户
         </el-button>
       </div>
     </div>
@@ -334,56 +322,30 @@ async function handleCreateUser() {
   background: #f8fafc;
   min-height: calc(100vh - 64px);
 
-  .user-header-dock {
+  .page-header-card {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
+    align-items: center;
     gap: 16px;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
+    padding: 20px 24px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
 
     .header-left {
-      .title-with-icon {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-
-        .header-icon {
-          font-size: 28px;
-        }
-
-        .main-title {
-          font-size: 22px;
-          font-weight: 800;
-          color: #0f172a;
-          margin: 0;
-        }
-
-        .capsule-count-tag {
-          font-size: 12px;
-          background: #eff6ff;
-          color: #2563eb;
-          border: 1px solid #bfdbfe;
-          border-radius: 9999px;
-          padding: 2px 10px;
-          font-weight: 500;
-        }
+      h2 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+        color: #0f172a;
       }
 
-      .sub-desc {
+      p {
         margin: 6px 0 0;
         font-size: 14px;
         color: #64748b;
-      }
-    }
-
-    .header-right-actions {
-      .capsule-btn-primary {
-        background: #2563eb;
-        border-color: #2563eb;
-        border-radius: 8px;
-        font-weight: 500;
-        padding: 9px 20px;
       }
     }
   }

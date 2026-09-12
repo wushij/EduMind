@@ -41,15 +41,16 @@
       </div>
 
       <div class="hero-actions">
-        <el-button @click="handleResetPassword">
-          🔑 重置登录密码
+        <el-button :icon="Key" @click="handleResetPassword">
+          重置登录密码
         </el-button>
         <el-button
           :type="userInfo?.status === 1 ? 'danger' : 'success'"
+          :icon="userInfo?.status === 1 ? Lock : Unlock"
           plain
           @click="toggleUserStatus"
         >
-          {{ userInfo?.status === 1 ? '🚫 冻结账号' : '✅ 解冻并恢复使用' }}
+          {{ userInfo?.status === 1 ? '冻结账号' : '解冻并恢复使用' }}
         </el-button>
       </div>
     </div>
@@ -58,7 +59,10 @@
     <div class="detail-body-grid">
       <!-- 基本信息与所属院系 -->
       <el-card shadow="never" class="info-card">
-        <h3 class="card-title">👤 用户基础档案</h3>
+        <h3 class="card-title">
+          <el-icon class="mr-1"><User /></el-icon>
+          <span>用户基础档案</span>
+        </h3>
         <div class="fields-list">
           <div class="field-item">
             <span class="label">用户名/账号：</span>
@@ -90,7 +94,10 @@
       <!-- 角色权限与系统资源分配 -->
       <el-card shadow="never" class="info-card">
         <div class="card-title-line">
-          <h3 class="card-title">🛡️ 角色身份与权限分配</h3>
+          <h3 class="card-title">
+            <el-icon class="mr-1"><Lock /></el-icon>
+            <span>角色身份与权限分配</span>
+          </h3>
           <el-button type="primary" link size="small" @click="editRolesModal = true">
             调整分配角色
           </el-button>
@@ -110,7 +117,10 @@
 
     <!-- 近期操作与登录审计记录 -->
     <el-card shadow="never" class="audit-table-card mt-4">
-      <h3 class="card-title">🕒 账号近期安全与操作审计日志</h3>
+      <h3 class="card-title">
+        <el-icon class="mr-1"><Clock /></el-icon>
+        <span>账号近期安全与操作审计日志</span>
+      </h3>
       <el-table :data="auditLogs" stripe class="audit-table">
         <el-table-column label="操作时间" prop="time" width="180" />
         <el-table-column label="操作模块" prop="module" width="140" />
@@ -146,7 +156,7 @@
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { ArrowLeft } from '@element-plus/icons-vue';
+import { ArrowLeft, Key, Lock, Unlock, User, Clock } from '@element-plus/icons-vue';
 import { getUserDetail, updateUserStatus } from '@/api/system/user';
 
 const route = useRoute();

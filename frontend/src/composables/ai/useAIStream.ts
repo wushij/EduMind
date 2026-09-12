@@ -1,13 +1,17 @@
 import { ref } from 'vue';
-import { SSEClient } from '@/core/sse/sse-client';
+import { ElMessage } from 'element-plus';
+import { SSEClient } from '@/core/sse/client';
 import {
   getConversations,
   getMessages,
   createConversation,
   renameConversation,
-  deleteConversation
+  deleteConversation,
+  generateConversationTitle,
+  cancelChatStream
 } from '@/api/ai/chat';
 import { USE_MOCK } from '@/config/mock';
+import type { CitationItem } from '@/components/knowledge/CitationList.vue';
 
 export interface ChatMessage {
   id: string;
@@ -15,6 +19,7 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
   isStreaming?: boolean;
+  citations?: CitationItem[];
 }
 
 export interface ChatSession {
@@ -23,34 +28,54 @@ export interface ChatSession {
   updatedAt: string;
 }
 
+function mapCitation(raw: Record<string, unknown>): CitationItem {
+  return {
+    id: raw.chunkId as number | string | undefined,
+    docTitle: (raw.documentName as string) || (raw.docTitle as string),
+    documentName: raw.documentName as string,
+    page: raw.pageNo as number | undefined,
+    pageNo: raw.pageNo as number | undefined,
+    score: raw.score as number | undefined,
+    snippet: (raw.excerpt as string) || (raw.snippet as string),
+    excerpt: raw.excerpt as string
+  };
+}
+
 export function useAIStream() {
   const sseClient = new SSEClient();
   const streaming = ref(false);
   const sessions = ref<ChatSession[]>([]);
   const currentSessionId = ref<string>('');
   const messages = ref<ChatMessage[]>([]);
+  let currentStreamId = '';
 
-  function mapSession(raw: Record<string, any>): ChatSession {
+  function mapSession(raw: any): ChatSession {
     return {
-      id: raw.id,
-      title: raw.title || '新会话',
-      updatedAt: raw.updatedAt || raw.createdAt || ''
+      id: String(raw?.id || `sess_${Date.now()}`),
+      title: (raw?.title as string) || '新会话',
+      updatedAt: (raw?.updatedAt as string) || (raw?.createTime as string) || '刚刚'
     };
   }
 
-  function mapMessage(raw: Record<string, any>): ChatMessage {
+  function mapMessage(raw: any): ChatMessage {
+    const citations = Array.isArray(raw?.citations)
+      ? (raw.citations as any[]).map(mapCitation)
+      : undefined;
     return {
-      id: raw.id || `msg_${Date.now()}`,
+      id: (raw.id as string) || `msg_${Date.now()}`,
       role: (raw.role || 'assistant') as ChatMessage['role'],
-      content: raw.content || '',
-      createdAt: raw.createdAt || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      content: (raw.content as string) || '',
+      createdAt: raw.createTime
+        ? new Date(raw.createTime as string).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      citations
     };
   }
 
   async function loadSessions(courseId?: number) {
     try {
       const res = await getConversations(courseId);
-      sessions.value = (res.data || []).map(mapSession);
+      sessions.value = (res.data || []).map((item) => mapSession(item as unknown as Record<string, unknown>));
       if (sessions.value.length > 0 && !currentSessionId.value) {
         currentSessionId.value = sessions.value[0].id;
         await loadMessages(currentSessionId.value);
@@ -58,7 +83,8 @@ export function useAIStream() {
     } catch {
       if (USE_MOCK && sessions.value.length === 0) {
         sessions.value = [
-          { id: 'sess_mock_1', title: '课程问答', updatedAt: '今天' }
+          { id: 'sess_mock_1', title: 'Java面向对象与多态问答', updatedAt: '今天 10:25' },
+          { id: 'sess_mock_2', title: '异常体系与分部积分答疑', updatedAt: '昨天 16:40' }
         ];
         currentSessionId.value = 'sess_mock_1';
       }
@@ -68,14 +94,15 @@ export function useAIStream() {
   async function loadMessages(conversationId: string) {
     try {
       const res = await getMessages(conversationId);
-      messages.value = (res.data || []).map(mapMessage);
+      messages.value = (res.data || []).map((item) => mapMessage(item));
     } catch {
       if (USE_MOCK && messages.value.length === 0) {
         messages.value = [
           {
             id: 'welcome',
             role: 'assistant',
-            content: '你好！我是课程 AI 助教，有什么可以帮你？',
+            content:
+              '你好！我是本课程的专属 AI 助教。已为你加载当前课程知识库与教学大纲，关于章节知识、典型例题或代码实现，请随时向我提问！',
             createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
         ];
@@ -83,7 +110,13 @@ export function useAIStream() {
     }
   }
 
-  async function sendMessage(promptText: string, courseId: number = 101) {
+  interface StreamOptions {
+    chapterId?: number;
+    modelKey?: string;
+    useRag?: boolean;
+  }
+
+  async function sendMessage(promptText: string, courseId: number = 101, options?: StreamOptions) {
     if (!promptText.trim() || streaming.value) return;
 
     if (!currentSessionId.value) {
@@ -103,30 +136,86 @@ export function useAIStream() {
       role: 'assistant',
       content: '',
       createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isStreaming: true
+      isStreaming: true,
+      citations: []
     };
     messages.value.push(assistantMsg);
     streaming.value = true;
 
+    const curSess = sessions.value.find((s) => s.id === currentSessionId.value);
+    if (curSess && (curSess.title === '新会话' || !curSess.title)) {
+      generateConversationTitle(curSess.id)
+        .then((res) => {
+          const title = res.data || promptText.trim().slice(0, 15);
+          renameSession(curSess.id, title);
+        })
+        .catch(() => {
+          const fallback = promptText.trim().slice(0, 15) + (promptText.length > 15 ? '...' : '');
+          renameSession(curSess.id, fallback);
+        });
+    }
+
     try {
-      await sseClient.stream(
+      await sseClient.streamEvents(
         '/api/ai/chat/stream',
-        { conversationId: currentSessionId.value, courseId, message: promptText },
-        (chunk: string) => {
-          assistantMsg.content += chunk;
+        {
+          conversationId: currentSessionId.value,
+          courseId,
+          chapterId: options?.chapterId,
+          modelKey: options?.modelKey,
+          message: promptText,
+          useRag: options?.useRag ?? true
+        },
+        (event, data) => {
+          if (event === 'stream' && data.streamId) {
+            currentStreamId = String(data.streamId);
+            return;
+          }
+          if (event === 'delta' || event === 'message') {
+            const chunk = String(data.content || data.text || '');
+            if (chunk) assistantMsg.content += chunk;
+            return;
+          }
+          if (event === 'citation' && Array.isArray(data.citations)) {
+            assistantMsg.citations = (data.citations as Record<string, unknown>[]).map(mapCitation);
+            return;
+          }
+          if (event === 'done') {
+            if (data.messageId) {
+              assistantMsg.id = String(data.messageId);
+            }
+            return;
+          }
+          if (event === 'error') {
+            throw new Error(String(data.message || data.error || 'AI 流式响应失败'));
+          }
         },
         () => {
           assistantMsg.isStreaming = false;
           streaming.value = false;
+          currentStreamId = '';
         },
         (err) => {
-          console.warn('SSE stream error, falling back to typewriter output:', err);
-          fallbackMockTypewriter(assistantMsg, promptText);
+          assistantMsg.isStreaming = false;
+          streaming.value = false;
+          currentStreamId = '';
+          const message = err instanceof Error ? err.message : 'AI 对话失败';
+          if (!USE_MOCK) {
+            assistantMsg.content = assistantMsg.content || `*${message}*`;
+            ElMessage.error(message);
+          } else {
+            fallbackMockTypewriter(assistantMsg, promptText);
+          }
         }
       );
     } catch (err) {
-      console.warn('Stream request failed, running fallback typewriter:', err);
-      fallbackMockTypewriter(assistantMsg, promptText);
+      assistantMsg.isStreaming = false;
+      streaming.value = false;
+      if (USE_MOCK) {
+        fallbackMockTypewriter(assistantMsg, promptText);
+      } else {
+        ElMessage.error(err instanceof Error ? err.message : 'AI 对话失败');
+      }
     }
   }
 
@@ -140,7 +229,7 @@ export function useAIStream() {
     assistantMsg.isStreaming = true;
     streaming.value = true;
 
-    const reply = `针对你的问题【${promptText}】，我已结合当前课程知识大纲为你整理出以下核心要点：\n\n1. **核心原理**：面向对象三大核心特性是封装、继承与多态。封装保障内部状态安全，继承促进代码复用，多态提升系统可扩展性。\n2. **实战建议**：在编写 Java 业务代码时，遵循高内聚低耦合原则，善用设计模式并规范异常捕获与资源释放机制。\n3. **课后拓展**：右侧课程资料已同步推荐相关章节课件与自测习题，建议结合实际代码多进行调试验证。如有其他疑问，可随时向我继续提问！`;
+    const reply = `针对你的问题【${promptText}】，我已结合当前课程知识大纲与课件资料库为你提炼权威解析。`;
 
     let index = 0;
     mockTimer = setInterval(() => {
@@ -154,7 +243,7 @@ export function useAIStream() {
         assistantMsg.isStreaming = false;
         streaming.value = false;
       }
-    }, 35);
+    }, 28);
   }
 
   function stopStream() {
@@ -165,15 +254,20 @@ export function useAIStream() {
     sseClient.stop();
     streaming.value = false;
     const lastMsg = messages.value[messages.value.length - 1];
-    if (lastMsg?.isStreaming) lastMsg.isStreaming = false;
+    if (lastMsg?.isStreaming) {
+      lastMsg.isStreaming = false;
+      lastMsg.content += '\n\n*(已手动停止生成)*';
+    }
+    if (currentStreamId) {
+      cancelChatStream(currentStreamId).catch(() => undefined);
+      currentStreamId = '';
+    }
   }
-
-
 
   async function createNewSession(courseId?: number) {
     try {
       const res = await createConversation({ courseId, title: '新会话' });
-      const session = mapSession(res.data || {});
+      const session = mapSession((res.data || {}) as unknown as Record<string, unknown>);
       sessions.value.unshift(session);
       currentSessionId.value = session.id;
       messages.value = [];
@@ -196,7 +290,7 @@ export function useAIStream() {
     } catch {
       // ignore
     }
-    sessions.value = sessions.value.filter(s => s.id !== id);
+    sessions.value = sessions.value.filter((s) => s.id !== id);
     if (currentSessionId.value === id) {
       currentSessionId.value = sessions.value[0]?.id || '';
       if (currentSessionId.value) await loadMessages(currentSessionId.value);
@@ -207,10 +301,10 @@ export function useAIStream() {
   async function renameSession(id: string, title: string) {
     try {
       await renameConversation(id, title);
-      const s = sessions.value.find(x => x.id === id);
+      const s = sessions.value.find((x) => x.id === id);
       if (s) s.title = title;
     } catch {
-      const s = sessions.value.find(x => x.id === id);
+      const s = sessions.value.find((x) => x.id === id);
       if (s) s.title = title;
     }
   }

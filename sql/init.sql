@@ -1,7 +1,7 @@
 -- =============================================================================
 -- 智教云 · EduMind 数据库全量初始化脚本
 -- 文件：sql/init.sql
--- 说明：包含全量 30 张表结构定义 + 丰富完整的核心业务种子数据
+-- 说明：包含全量 33 张表结构定义 + 丰富完整的核心业务种子数据（含 V0.5 RAG/Chunk/Prompt 治理）
 -- 适配：MySQL 8.0+ / utf8mb4 / MyBatis-Plus Java Entity 100% 对齐
 -- 执行：mysql -u root -p < sql/init.sql
 -- 默认账号：admin / teacher / student / student2，密码均为 admin123
@@ -24,8 +24,11 @@ DROP TABLE IF EXISTS sys_role_permission;
 DROP TABLE IF EXISTS sys_user_role;
 DROP TABLE IF EXISTS sys_permission;
 DROP TABLE IF EXISTS sys_role;
+DROP TABLE IF EXISTS sys_user_preference;
+DROP TABLE IF EXISTS sys_ai_quota;
 DROP TABLE IF EXISTS sys_user;
 DROP TABLE IF EXISTS sys_notification;
+DROP TABLE IF EXISTS sys_config;
 
 CREATE TABLE sys_user (
     id           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '用户ID',
@@ -38,7 +41,8 @@ CREATE TABLE sys_user (
     status       VARCHAR(16)  DEFAULT 'ENABLE' COMMENT 'ENABLE/DISABLE',
     create_time  DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time  DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    KEY idx_user_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表';
 
 CREATE TABLE sys_role (
@@ -86,6 +90,19 @@ CREATE TABLE sys_notification (
     PRIMARY KEY (id),
     KEY idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统消息通知表';
+
+CREATE TABLE sys_config (
+    id           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '配置主键ID',
+    config_key   VARCHAR(64)  NOT NULL UNIQUE COMMENT '配置键（唯一标示）',
+    config_value LONGTEXT     DEFAULT NULL COMMENT '配置值（支持JSON或长文本）',
+    config_name  VARCHAR(128) NOT NULL COMMENT '配置中文名称',
+    config_group VARCHAR(64)  NOT NULL DEFAULT 'DEFAULT' COMMENT '配置分组（mail/security/base等）',
+    remark       VARCHAR(255) DEFAULT NULL COMMENT '配置备注说明',
+    create_time  DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time  DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    KEY idx_config_group (config_group)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统全局参数配置表';
 
 -- -----------------------------------------------------------------------------
 -- 二、课程教学（课程 / 章节 / 知识点 / 选课成员）
@@ -306,6 +323,9 @@ CREATE TABLE grading_result (
 -- 五、知识库管理（知识库 / 文档 / 文本切片）
 -- -----------------------------------------------------------------------------
 
+DROP TABLE IF EXISTS knowledge_chunk_index;
+DROP TABLE IF EXISTS knowledge_index_task;
+DROP TABLE IF EXISTS knowledge_document_chunk;
 DROP TABLE IF EXISTS knowledge_document_text;
 DROP TABLE IF EXISTS knowledge_document;
 DROP TABLE IF EXISTS knowledge_base;
@@ -316,6 +336,8 @@ CREATE TABLE knowledge_base (
     course_id      BIGINT       DEFAULT NULL COMMENT '关联课程ID',
     description    TEXT         DEFAULT NULL COMMENT '知识库描述',
     document_count INT          DEFAULT 0 COMMENT '收录文档总数',
+    chunk_count    INT          DEFAULT 0 COMMENT 'Chunk 总数',
+    index_status   VARCHAR(32)  DEFAULT 'PENDING' COMMENT '向量索引状态',
     status         INT          DEFAULT 1 COMMENT '状态（1-启用 0-禁用）',
     create_time    DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time    DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -347,6 +369,58 @@ CREATE TABLE knowledge_document_text (
     PRIMARY KEY (id),
     UNIQUE KEY uk_doc_id (document_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库切片纯文本表';
+
+CREATE TABLE knowledge_document_chunk (
+    id                BIGINT       NOT NULL AUTO_INCREMENT COMMENT 'Chunk ID',
+    document_id       BIGINT       NOT NULL COMMENT '所属文档ID',
+    knowledge_base_id BIGINT       NOT NULL COMMENT '所属知识库ID',
+    chunk_index       INT          NOT NULL DEFAULT 0 COMMENT '切片序号',
+    content           TEXT         NOT NULL COMMENT '切片正文',
+    page_no           INT          DEFAULT NULL COMMENT '页码',
+    heading           VARCHAR(256) DEFAULT NULL COMMENT '章节标题',
+    char_count        INT          DEFAULT 0 COMMENT '字符数',
+    token_estimate    INT          DEFAULT 0 COMMENT 'Token 估算',
+    create_time       DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (id),
+    KEY idx_document_id (document_id),
+    KEY idx_kb_id (knowledge_base_id),
+    KEY idx_doc_chunk_index (document_id, chunk_index)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库文档切片表';
+
+CREATE TABLE knowledge_index_task (
+    id                BIGINT       NOT NULL AUTO_INCREMENT COMMENT '任务ID',
+    knowledge_base_id BIGINT       NOT NULL COMMENT '知识库ID',
+    mode              VARCHAR(16)  NOT NULL DEFAULT 'FULL' COMMENT 'FULL/INCREMENTAL',
+    status            VARCHAR(32)  NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/INDEXING/INDEXED/INDEX_FAILED',
+    total_chunks      INT          DEFAULT 0 COMMENT '总 Chunk 数',
+    indexed_chunks    INT          DEFAULT 0 COMMENT '已索引 Chunk 数',
+    failed_chunks     INT          DEFAULT 0 COMMENT '失败 Chunk 数',
+    embedding_model   VARCHAR(64)  DEFAULT NULL COMMENT 'Embedding 模型',
+    error_message     TEXT         DEFAULT NULL COMMENT '错误信息',
+    started_at        DATETIME     DEFAULT NULL COMMENT '开始时间',
+    finished_at       DATETIME     DEFAULT NULL COMMENT '结束时间',
+    create_time       DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time       DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    KEY idx_kb_id (knowledge_base_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库向量索引任务表';
+
+CREATE TABLE knowledge_chunk_index (
+    id                BIGINT       NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    chunk_id          BIGINT       NOT NULL COMMENT 'Chunk ID',
+    knowledge_base_id BIGINT       NOT NULL COMMENT '知识库ID',
+    document_id       BIGINT       NOT NULL COMMENT '文档ID',
+    vector_id         VARCHAR(64)  NOT NULL COMMENT '向量库中的向量ID',
+    embed_status      VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/INDEXED/FAILED',
+    embedding_model   VARCHAR(64)  DEFAULT NULL COMMENT 'Embedding 模型',
+    error_message     VARCHAR(512) DEFAULT NULL COMMENT '错误信息',
+    create_time       DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time       DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_chunk_id (chunk_id),
+    KEY idx_kb_id (knowledge_base_id),
+    KEY idx_doc_id (document_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Chunk 向量索引映射表';
 
 -- -----------------------------------------------------------------------------
 -- 六、教学资源（资源 / 课程资源关联）
@@ -386,6 +460,8 @@ CREATE TABLE course_resource (
 -- 七、AI 智能体系（AI 工具 / 对话会话 / 消息记录 / 模型调用日志）
 -- -----------------------------------------------------------------------------
 
+DROP TABLE IF EXISTS prompt_template_version;
+DROP TABLE IF EXISTS prompt_template;
 DROP TABLE IF EXISTS ai_message;
 DROP TABLE IF EXISTS ai_conversation;
 DROP TABLE IF EXISTS ai_call_log;
@@ -395,11 +471,15 @@ CREATE TABLE ai_tool (
     id             VARCHAR(64)  NOT NULL COMMENT '工具唯一标识',
     name           VARCHAR(128) NOT NULL COMMENT '工具名称',
     description    VARCHAR(512) DEFAULT NULL COMMENT '工具描述',
+    detailed_intro VARCHAR(1024) DEFAULT NULL COMMENT '详情页长描述',
     category       VARCHAR(32)  DEFAULT NULL COMMENT '适用对象（TEACHER/STUDENT/GENERAL）',
     icon           VARCHAR(64)  DEFAULT NULL COMMENT '图标名',
+    model_id       VARCHAR(64)  DEFAULT NULL COMMENT '默认模型',
     route          VARCHAR(256) DEFAULT NULL COMMENT '前端导航路由',
+    execution_mode VARCHAR(16)  DEFAULT 'ROUTE' COMMENT 'ROUTE|V05_NOTICE',
     tags           VARCHAR(256) DEFAULT NULL COMMENT '搜索标签（逗号分隔）',
     is_recommended TINYINT      DEFAULT 0 COMMENT '是否精选推荐（1-是 0-否）',
+    is_hot         TINYINT      DEFAULT 0 COMMENT '热门标记（1-是 0-否）',
     use_count      INT          DEFAULT 0 COMMENT '累计调用热度',
     status         INT          DEFAULT 1 COMMENT '状态（1-可用 0-下架）',
     create_time    DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -426,6 +506,7 @@ CREATE TABLE ai_message (
     conversation_id VARCHAR(64) NOT NULL COMMENT '所属会话ID',
     role            VARCHAR(16) NOT NULL COMMENT '发送方角色（user/assistant/system）',
     content         TEXT        DEFAULT NULL COMMENT '消息文本',
+    citations_json  TEXT        DEFAULT NULL COMMENT '引用 JSON（RAG 溯源）',
     token_count     INT         DEFAULT 0 COMMENT '本次Token消耗',
     create_time     DATETIME    DEFAULT CURRENT_TIMESTAMP COMMENT '发送时间',
     PRIMARY KEY (id),
@@ -433,17 +514,71 @@ CREATE TABLE ai_message (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI会话消息记录表';
 
 CREATE TABLE ai_call_log (
-    id                BIGINT      NOT NULL AUTO_INCREMENT COMMENT '日志ID',
-    user_id           BIGINT      DEFAULT NULL COMMENT '调用用户ID',
-    model             VARCHAR(64) DEFAULT NULL COMMENT '调用的LLM模型名',
-    prompt_tokens     INT         DEFAULT 0 COMMENT 'Prompt Token数',
-    completion_tokens INT         DEFAULT 0 COMMENT 'Completion Token数',
-    latency_ms        INT         DEFAULT 0 COMMENT '响应耗时（毫秒）',
-    scene             VARCHAR(64) DEFAULT NULL COMMENT '调用业务场景',
-    create_time       DATETIME    DEFAULT CURRENT_TIMESTAMP COMMENT '记录时间',
+    id                  BIGINT      NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+    user_id             BIGINT      DEFAULT NULL COMMENT '调用用户ID',
+    model               VARCHAR(64) DEFAULT NULL COMMENT '调用的LLM模型名',
+    prompt_tokens       INT         DEFAULT 0 COMMENT 'Prompt Token数',
+    completion_tokens   INT         DEFAULT 0 COMMENT 'Completion Token数',
+    latency_ms          INT         DEFAULT 0 COMMENT '响应耗时（毫秒）',
+    scene               VARCHAR(64) DEFAULT NULL COMMENT '调用业务场景',
+    knowledge_base_id   BIGINT      DEFAULT NULL COMMENT '知识库ID（RAG）',
+    retrieval_hit_count INT         DEFAULT 0 COMMENT '检索命中数',
+    citation_doc_ids    VARCHAR(512) DEFAULT NULL COMMENT '引用文档ID列表',
+    create_time         DATETIME    DEFAULT CURRENT_TIMESTAMP COMMENT '记录时间',
     PRIMARY KEY (id),
     KEY idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模型调用日志表';
+
+CREATE TABLE prompt_template (
+    id           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '模板ID',
+    code         VARCHAR(64)  NOT NULL COMMENT '模板编码',
+    name         VARCHAR(128) NOT NULL COMMENT '模板名称',
+    category     VARCHAR(32)  DEFAULT NULL COMMENT '分类',
+    status       VARCHAR(16)  DEFAULT 'DRAFT' COMMENT 'DRAFT/PUBLISHED',
+    version      INT          DEFAULT 1 COMMENT '当前版本号',
+    content      TEXT         NOT NULL COMMENT '模板内容',
+    variables    VARCHAR(512) DEFAULT NULL COMMENT '变量列表（逗号分隔）',
+    create_time  DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    update_time  DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Prompt 模板表';
+
+CREATE TABLE prompt_template_version (
+    id           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '版本ID',
+    template_id  BIGINT       NOT NULL COMMENT '模板ID',
+    version      INT          NOT NULL COMMENT '版本号',
+    content      TEXT         NOT NULL COMMENT '版本内容',
+    variables    VARCHAR(512) DEFAULT NULL COMMENT '变量列表',
+    published_by BIGINT       DEFAULT NULL COMMENT '发布人',
+    create_time  DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_template_version (template_id, version)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Prompt 模板版本表';
+
+CREATE TABLE sys_ai_quota (
+    id                BIGINT NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    user_id           BIGINT NOT NULL COMMENT '用户ID',
+    daily_token_limit INT    DEFAULT 0 COMMENT '日 Token 上限，0 表示不限',
+    daily_call_limit  INT    DEFAULT 0 COMMENT '日调用上限，0 表示不限',
+    used_tokens_today INT    DEFAULT 0 COMMENT '今日已用 Token',
+    used_calls_today  INT    DEFAULT 0 COMMENT '今日已调用次数',
+    update_time       DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 配额表';
+
+CREATE TABLE sys_user_preference (
+    user_id            BIGINT       NOT NULL COMMENT '用户ID',
+    theme              VARCHAR(16)  DEFAULT 'LIGHT' COMMENT '主题',
+    language           VARCHAR(16)  DEFAULT 'zh-CN' COMMENT '语言',
+    default_model      VARCHAR(64)  DEFAULT NULL COMMENT '默认模型',
+    enable_rag         TINYINT(1)   DEFAULT 1 COMMENT '默认启用 RAG',
+    enable_notification TINYINT(1)  DEFAULT 1 COMMENT '启用通知',
+    preferences_json   JSON         DEFAULT NULL COMMENT '扩展偏好 JSON',
+    updated_at         DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户偏好设置';
 
 -- -----------------------------------------------------------------------------
 -- 八、统计分析（每日学情与 AI 消耗统计快照）
@@ -512,7 +647,13 @@ INSERT INTO sys_permission (id, permission_code, permission_name, parent_id) VAL
 (21, 'analytics:view',      '学情分析查看', 0),
 (22, 'resource:view',       '资源查看', 0),
 (23, 'resource:upload',     '资源上传', 0),
-(24, 'notice:view',         '通知查看', 0);
+(24, 'notice:view',         '通知查看', 0),
+(25, 'knowledge:rag:debug',   'RAG调试', 0),
+(26, 'system:prompt:view',    'Prompt查看', 0),
+(27, 'system:prompt:edit',    'Prompt编辑', 0),
+(28, 'system:audit:view',     'AI审计查看', 0),
+(29, 'system:quota:view',     'AI配额查看', 0),
+(30, 'system:quota:edit',     'AI配额编辑', 0);
 
 -- 管理员全量权限
 INSERT INTO sys_role_permission (role_id, permission_id)
@@ -528,7 +669,18 @@ SELECT 3, id FROM sys_permission WHERE permission_code IN (
     'course:view', 'assignment:view', 'exam:view', 'knowledge:view', 'ai:chat', 'resource:view', 'notice:view'
 );
 
--- 5. 系统通知
+-- 5. 系统全局配置
+INSERT INTO sys_config (config_key, config_value, config_name, config_group, remark) VALUES
+('sys.mail.config', '{"enabled":false,"host":"smtp.qq.com","port":465,"username":"","password":"","fromName":"智教云 · EduMind","useSsl":true,"codeExpireMinutes":5,"codeIntervalSeconds":60,"dailyLimitPerEmail":10}', '邮件发送服务配置(SMTP)', 'mail', 'SMTP发信参数、发信人名称与验证码防刷策略'),
+('sys.base.info', '{"platformName":"智教云 · EduMind","subTitle":"AI 智能教学赋能平台","copyright":"© 2026 EduMind. All rights reserved.","icp":"京ICP备20260001号-1"}', '平台基础信息配置', 'base', '平台站点标题、副标与备案声明');
+
+-- 6. Prompt 模板（RAG 对话默认模板）
+INSERT INTO prompt_template (code, name, category, status, version, content, variables) VALUES
+('chat_rag', '课程AI-RAG对话', 'rag', 'PUBLISHED', 1,
+ '你是课程 AI 助教。请基于以下资料回答用户问题。\n\n【参考资料】\n{{context}}\n\n【用户问题】\n{{question}}',
+ 'context,question');
+
+-- 7. 系统通知
 INSERT INTO sys_notification (id, user_id, title, content, type, is_read, create_time) VALUES
 (1, 3, '【作业截止提醒】第一单元链表作业即将截止', '您选修的《数据结构与算法》课程第一单元作业截止时间为今晚 23:59，请及时完成并提交作答。', 'ASSIGNMENT', 0, NOW()),
 (2, 3, '【AI批改完成】单链表设计作业已完成评分', '张老师已确认您的作业批改成绩，综合得分 92 分，点击可查看详细 AI 知识盲点诊断与教师评语。', 'ASSIGNMENT', 1, NOW()),
@@ -717,15 +869,22 @@ INSERT INTO course_resource (id, course_id, resource_id, document_id, title, res
 (3, 101, NULL, 1, '数据结构第二章-线性表与链表深度解析.pdf', 'PDF'),
 (4, 102, 3, NULL, 'Java快速入门与JDK环境搭建指南.pptx', 'PPT');
 
--- 25. AI 工具广场
-INSERT INTO ai_tool (id, name, description, category, icon, route, tags, is_recommended, use_count, status) VALUES
-('tool_question_gen', 'AI 智能出题', '根据课程知识点与难度画像自动生成高契合度试题', 'TEACHER', 'EditPen',      '/ai/question/generate', '出题,教师',   1, 2436, 1),
-('tool_exam_gen',     'AI 智能组卷', '按难度曲线、题型比例与分值规则快速生成标准化试卷', 'TEACHER', 'Document',     '/ai/exam/generate',     '组卷,教师',   1, 1820, 1),
-('tool_grading',      'AI 批改助手', '客观题秒级判分，主观题多维度AI智能打分与评语生成', 'TEACHER', 'Checked',      '/ai/grading',           '批改,教师',   1, 956,  1),
-('tool_lesson',       'AI 教案编写', '根据大纲知识图谱快速生成标准化教学设计教案',       'TEACHER', 'Notebook',     '/ai/lesson',            '教案,教师',   0, 420,  1),
-('tool_chat',         'AI 课程助教', '课程内嵌智能助教，支持多轮对话与知识库问答检索',   'GENERAL', 'ChatDotRound', '/ai/assistant/chat',    '问答,助教',   1, 5200, 1),
-('tool_practice',     'AI 个性练习', '智能分析学生薄弱知识点，针对性推荐专项练习巩固',   'STUDENT', 'Reading',      '/learning/practice',    '练习,学生',   1, 1680, 1),
-('tool_summary',      'AI 课程总结', '长文档与视频资源核心知识点智能提炼总结',           'TEACHER', 'DataAnalysis', '/ai/summary',           '总结,知识提炼', 0, 310,  1);
+-- 25. AI 工具广场（14 项）
+INSERT INTO ai_tool (id, name, description, detailed_intro, category, icon, model_id, route, execution_mode, tags, is_recommended, is_hot, use_count, status) VALUES
+('tool_question_gen', 'AI 智能出题', '根据课程、章节和知识点智能生成高质量题目', '支持按章节与知识点勾选范围，配置题型、难度与题量后批量生成结构化试题，并可一键入库。', 'TEACHER', 'EditPen', 'deepseek-chat', '/ai/question/generate', 'ROUTE', '出题,教师,热门', 1, 1, 2436, 1),
+('tool_exam_gen', 'AI 智能组卷', '按总分、题型比例与难度规则快速生成标准化试卷', '内置总分校验与题型配比引擎，支持预览换题、调分并保存为可复用试卷。', 'TEACHER', 'Document', 'deepseek-chat', '/ai/exam/generate', 'ROUTE', '组卷,教师', 1, 1, 1820, 1),
+('tool_grading', 'AI 智能批改', '客观题秒级判分，主观题 AI 评分与评语生成', '支持作业提交后自动批改与教师复核改分，减轻期末阅卷压力。', 'TEACHER', 'Checked', 'deepseek-chat', '/ai/grading', 'ROUTE', '批改,教师', 1, 0, 956, 1),
+('tool_lesson', 'AI 教案生成', '输入授课主题与学时，生成结构化教案与课堂设计', '覆盖教学目标、重难点、课堂互动与板书建议，辅助青年教师快速备课。', 'TEACHER', 'Notebook', 'deepseek-chat', '/ai/marketplace/v05/tool_lesson', 'V05_NOTICE', '教案,教师', 0, 0, 420, 1),
+('tool_summary', 'AI 课程总结', '按章节或知识模块提炼核心要点与易错清单', '支持长文档与课件要点结构化摘要，生成考前复习精要。', 'TEACHER', 'DataAnalysis', 'deepseek-chat', '/ai/marketplace/v05/tool_summary', 'V05_NOTICE', '总结,知识提炼', 0, 0, 310, 1),
+('tool_chat', 'AI 课程问答', '基于课程资料的上下文助教答疑（SSE 流式）', '在课程空间内多轮对话，支持 Markdown、公式与代码高亮渲染。', 'GENERAL', 'ChatDotRound', 'deepseek-chat', '/course/101/ai', 'ROUTE', '问答,助教,热门', 1, 1, 5200, 1),
+('tool_wrong_analysis', 'AI 错题分析', '针对错题给出思路引导、错误归因与变式练习', '结合学生作答记录分析错因类型，并推荐巩固练习方向。', 'STUDENT', 'Warning', 'deepseek-chat', '/ai/marketplace/v05/tool_wrong_analysis', 'V05_NOTICE', '错题,学生', 0, 0, 680, 1),
+('tool_knowledge_explain', 'AI 知识点讲解', '由浅入深讲解核心概念，支持苏格拉底式引导', '针对单个知识点提供类比、例题与追问，帮助学生建立直觉理解。', 'STUDENT', 'Reading', 'deepseek-chat', '/ai/marketplace/v05/tool_knowledge_explain', 'V05_NOTICE', '讲解,学生', 0, 0, 890, 1),
+('tool_practice', 'AI 自适应刷题', '根据薄弱知识点智能生成阶梯练习', '分析近期学习数据，推送专项巩固题包与难度递进练习。', 'STUDENT', 'Reading', 'deepseek-chat', '/learning/recommendations', 'ROUTE', '练习,学生,推荐', 1, 0, 1680, 1),
+('tool_learning_plan', 'AI 学习计划', '根据学情报告自动定制复习日程', '结合掌握度与考试节点生成周计划与每日任务清单。', 'STUDENT', 'Calendar', 'deepseek-chat', '/ai/marketplace/v05/tool_learning_plan', 'V05_NOTICE', '计划,学生', 0, 0, 540, 1),
+('tool_ppt', 'AI PPT 生成', '根据大纲快速生成课件骨架与讲稿要点', '输出章节页结构与演讲备注，辅助课件制作。', 'TEACHER', 'Monitor', 'deepseek-chat', '/ai/marketplace/v05/tool_ppt', 'V05_NOTICE', 'PPT,教师', 0, 0, 260, 1),
+('tool_polish', 'AI 教学文本润色', '优化题干表述，消除歧义与语病', '面向试题、教案与通知类文本提供学术化润色建议。', 'GENERAL', 'EditPen', 'deepseek-chat', '/ai/marketplace/v05/tool_polish', 'V05_NOTICE', '润色,通用', 0, 0, 380, 1),
+('tool_translate', 'AI 双语专业翻译', '中英计算机与专业课术语精准对照翻译', '保持术语一致性，适合双语课件与论文摘要翻译。', 'GENERAL', 'Connection', 'deepseek-chat', '/ai/marketplace/v05/tool_translate', 'V05_NOTICE', '翻译,通用', 0, 0, 450, 1),
+('tool_resource_rec', 'AI 资源推荐', '基于课程与章节推荐关联课件与视频资源', '在学习中心展示与当前课程强关联的习题与教学资源。', 'STUDENT', 'Promotion', 'deepseek-chat', '/learning/recommendations', 'ROUTE', '推荐,学生', 1, 0, 1320, 1);
 
 -- 26. AI 示例会话
 INSERT INTO ai_conversation (id, user_id, course_id, title, message_count, total_tokens, deleted) VALUES

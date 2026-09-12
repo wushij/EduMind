@@ -109,9 +109,11 @@ async function handleBatchSave() {
 
 <style scoped lang="scss">
 .question-preview-page {
-  max-width: 920px;
-  margin: 0 auto;
-  padding: 10px 0 80px;
+  width: 100%;
+  padding: 24px;
+  background: #f8fafc;
+  min-height: calc(100vh - 64px);
+  box-sizing: border-box;
 
   .preview-top-bar {
     display: flex;

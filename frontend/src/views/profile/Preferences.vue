@@ -3,7 +3,7 @@
     <div class="pref-hero-dock">
       <div class="header-left">
         <div class="title-with-icon">
-          <span class="header-icon">⚙️</span>
+          <el-icon class="header-icon"><Setting /></el-icon>
           <h1 class="main-title">个人偏好与教学系统设置</h1>
           <span class="capsule-tag">个性化定制 · 本地即时生效</span>
         </div>
@@ -13,8 +13,8 @@
       </div>
 
       <div class="header-right">
-        <el-button type="primary" size="large" class="save-btn" @click="savePreferences">
-          💾 保存偏好配置
+        <el-button type="primary" size="large" class="save-btn" :icon="Check" @click="savePreferences">
+          保存偏好配置
         </el-button>
       </div>
     </div>
@@ -22,7 +22,10 @@
     <div class="pref-cards-stack">
       <!-- 视觉与界面偏好 -->
       <el-card shadow="never" class="pref-card">
-        <h3 class="card-section-title">🎨 视觉主题与显示模式</h3>
+        <h3 class="card-section-title">
+          <el-icon class="title-icon"><Brush /></el-icon>
+          <span>视觉主题与显示模式</span>
+        </h3>
         <div class="options-grid">
           <div class="pref-row">
             <div class="row-info">
@@ -30,9 +33,15 @@
               <span class="row-desc">选择契合个人审美的明亮浅色、深邃暗黑或跟随系统调度。</span>
             </div>
             <el-radio-group v-model="prefs.theme" size="default">
-              <el-radio-button label="LIGHT">☀️ 明亮浅色</el-radio-button>
-              <el-radio-button label="DARK">🌙 深邃极夜</el-radio-button>
-              <el-radio-button label="AUTO">💻 跟随系统</el-radio-button>
+              <el-radio-button label="LIGHT">
+                <span class="opt-btn-inner"><el-icon><Sunny /></el-icon><span>明亮浅色</span></span>
+              </el-radio-button>
+              <el-radio-button label="DARK">
+                <span class="opt-btn-inner"><el-icon><Moon /></el-icon><span>深邃极夜</span></span>
+              </el-radio-button>
+              <el-radio-button label="AUTO">
+                <span class="opt-btn-inner"><el-icon><Monitor /></el-icon><span>跟随系统</span></span>
+              </el-radio-button>
             </el-radio-group>
           </div>
 
@@ -51,7 +60,10 @@
 
       <!-- AI 交互体验偏好 -->
       <el-card shadow="never" class="pref-card">
-        <h3 class="card-section-title">🤖 AI 智能助教与渲染引擎偏好</h3>
+        <h3 class="card-section-title">
+          <el-icon class="title-icon"><Cpu /></el-icon>
+          <span>AI 智能助教与渲染引擎偏好</span>
+        </h3>
         <div class="options-grid">
           <div class="pref-row">
             <div class="row-info">
@@ -85,7 +97,10 @@
 
       <!-- 教学消息与通知提醒 -->
       <el-card shadow="never" class="pref-card">
-        <h3 class="card-section-title">🔔 教学活动提醒与消息通知</h3>
+        <h3 class="card-section-title">
+          <el-icon class="title-icon"><Bell /></el-icon>
+          <span>教学活动提醒与消息通知</span>
+        </h3>
         <div class="options-grid">
           <div class="pref-row">
             <div class="row-info">
@@ -111,6 +126,17 @@
 <script setup lang="ts">
 import { reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
+import { getUserPreferences, saveUserPreferences } from '@/api/profile/preferences';
+import {
+  Setting,
+  Check,
+  Brush,
+  Sunny,
+  Moon,
+  Monitor,
+  Cpu,
+  Bell
+} from '@element-plus/icons-vue';
 
 const STORAGE_KEY = 'edumind_user_preferences';
 
@@ -124,23 +150,41 @@ const prefs = reactive({
   notifyOnGradingDone: true
 });
 
-onMounted(() => {
+onMounted(async () => {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      Object.assign(prefs, JSON.parse(saved));
+    const res = await getUserPreferences();
+    if (res?.data) {
+      prefs.theme = res.data.theme || prefs.theme;
+      prefs.language = res.data.language || prefs.language;
+      prefs.defaultModel = res.data.defaultModel || prefs.defaultModel;
+      prefs.notifyOnSubmission = res.data.enableNotification ?? prefs.notifyOnSubmission;
+      prefs.notifyOnGradingDone = res.data.enableNotification ?? prefs.notifyOnGradingDone;
     }
-  } catch (err) {
-    console.warn('读取用户偏好失败:', err);
+  } catch {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        Object.assign(prefs, JSON.parse(saved));
+      }
+    } catch (err) {
+      console.warn('读取用户偏好失败:', err);
+    }
   }
 });
 
-function savePreferences() {
+async function savePreferences() {
   try {
+    await saveUserPreferences({
+      theme: prefs.theme,
+      language: prefs.language,
+      defaultModel: prefs.defaultModel,
+      enableRag: true,
+      enableNotification: prefs.notifyOnSubmission || prefs.notifyOnGradingDone
+    });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
-    ElMessage.success('🎉 偏好设置已保存并同步至当前浏览器环境！');
-  } catch (err) {
-    ElMessage.error('保存偏好设置失败，请检查浏览器存储权限');
+    ElMessage.success('偏好设置已保存');
+  } catch {
+    ElMessage.error('保存偏好设置失败');
   }
 }
 </script>
@@ -166,7 +210,10 @@ function savePreferences() {
         gap: 12px;
 
         .header-icon {
-          font-size: 28px;
+          font-size: 26px;
+          color: #2563eb;
+          display: inline-flex;
+          align-items: center;
         }
 
         .main-title {
@@ -216,10 +263,26 @@ function savePreferences() {
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
 
       .card-section-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         font-size: 16px;
         font-weight: 700;
         color: #0f172a;
         margin: 0 0 16px;
+
+        .title-icon {
+          font-size: 18px;
+          color: #2563eb;
+          display: inline-flex;
+          align-items: center;
+        }
+      }
+
+      .opt-btn-inner {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
       }
 
       .options-grid {

@@ -2,6 +2,7 @@ package com.edumind.knowledge.controller.knowledge;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.edumind.common.api.ApiResult;
+import com.edumind.knowledge.service.knowledge.DocumentPipelineService;
 import com.edumind.knowledge.service.knowledge.DocumentService;
 import com.edumind.knowledge.vo.knowledge.KnowledgeDocumentVO;
 import lombok.RequiredArgsConstructor;
@@ -16,13 +17,16 @@ import java.util.List;
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final DocumentPipelineService documentPipelineService;
 
     @SaCheckPermission("knowledge:edit")
     @PostMapping
     public ApiResult<KnowledgeDocumentVO> upload(
             @PathVariable("knowledgeBaseId") Long knowledgeBaseId,
             @RequestParam("file") MultipartFile file) {
-        return ApiResult.success(documentService.upload(knowledgeBaseId, file));
+        KnowledgeDocumentVO document = documentService.upload(knowledgeBaseId, file);
+        documentPipelineService.parseAndChunkAsync(document.getId());
+        return ApiResult.success(document);
     }
 
     @SaCheckPermission("knowledge:view")

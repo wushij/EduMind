@@ -21,6 +21,7 @@ import com.edumind.system.service.user.UserService;
 import com.edumind.system.vo.user.UserVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
@@ -34,6 +35,7 @@ public class UserServiceImpl implements UserService {
     private final UserRoleDao userRoleDao;
     private final UserConverter userConverter;
     private final UserVoAssembler userVoAssembler;
+    private final com.edumind.system.service.email.EmailCodeService emailCodeService;
 
     @Override
     public UserVO getProfile() {
@@ -68,6 +70,53 @@ public class UserServiceImpl implements UserService {
         }
         userDao.updateById(entity);
         return userVoAssembler.toVO(entity);
+    }
+
+    @Override
+    public void sendBindEmailCode(String email) {
+        if (!StringUtils.hasText(email)) {
+            throw new BusinessException("邮箱地址不能为空");
+        }
+        String cleanEmail = email.trim().toLowerCase();
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+
+        // 检查该邮箱是否已被其他人占用绑定
+        UserEntity existing = userDao.findByEmail(cleanEmail);
+        if (existing != null && !existing.getId().equals(currentUserId)) {
+            throw new BusinessException("该邮箱已被其他账号绑定，请更换其他邮箱");
+        }
+
+        emailCodeService.sendCode(com.edumind.system.dto.auth.EmailSendCodeDTO.builder()
+                .email(cleanEmail)
+                .scene("bind")
+                .build());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public UserVO bindEmail(com.edumind.system.dto.user.EmailBindDTO dto) {
+        String cleanEmail = dto.getEmail().trim().toLowerCase();
+        String code = dto.getCode().trim();
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+
+        // 1. 核验绑定专属验证码
+        emailCodeService.verifyCode(cleanEmail, "bind", code);
+
+        // 2. 检查唯一性
+        UserEntity existing = userDao.findByEmail(cleanEmail);
+        if (existing != null && !existing.getId().equals(currentUserId)) {
+            throw new BusinessException("该邮箱已被其他账号绑定，请更换其他邮箱");
+        }
+
+        // 3. 更新当前用户邮箱
+        UserEntity currentUser = userDao.findById(currentUserId);
+        if (currentUser == null) {
+            throw new BusinessException("当前用户不存在");
+        }
+        currentUser.setEmail(cleanEmail);
+        userDao.updateById(currentUser);
+
+        return userVoAssembler.toVO(currentUser);
     }
 
     @Override

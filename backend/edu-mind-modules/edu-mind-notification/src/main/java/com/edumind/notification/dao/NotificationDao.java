@@ -1,5 +1,6 @@
 package com.edumind.notification.dao;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.edumind.notification.entity.NotificationEntity;
 import com.edumind.notification.mapper.NotificationMapper;
 import lombok.RequiredArgsConstructor;
@@ -22,5 +23,18 @@ public class NotificationDao {
 
     public List<NotificationEntity> findByUserId(Long userId) {
         return notificationMapper.selectList(null);
+    }
+
+    public List<NotificationEntity> findUnreadByUserId(Long userId) {
+        return notificationMapper.selectList(
+                new LambdaQueryWrapper<NotificationEntity>()
+                        .eq(NotificationEntity::getUserId, userId)
+                        .eq(NotificationEntity::getIsRead, 0)
+                        .orderByDesc(NotificationEntity::getCreateTime)
+        );
+    }
+
+    public int insert(NotificationEntity entity) {
+        return notificationMapper.insert(entity);
     }
 }

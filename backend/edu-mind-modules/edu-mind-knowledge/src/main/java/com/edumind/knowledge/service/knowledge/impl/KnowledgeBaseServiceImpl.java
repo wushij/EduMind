@@ -6,6 +6,7 @@ import com.edumind.knowledge.dao.KnowledgeBaseDao;
 import com.edumind.knowledge.dto.knowledge.KnowledgeBaseCreateDTO;
 import com.edumind.knowledge.dto.knowledge.KnowledgeBaseUpdateDTO;
 import com.edumind.knowledge.entity.KnowledgeBaseEntity;
+import com.edumind.knowledge.service.knowledge.KnowledgeAccessService;
 import com.edumind.knowledge.service.knowledge.KnowledgeBaseService;
 import com.edumind.knowledge.vo.knowledge.KnowledgeBaseVO;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private final KnowledgeBaseDao knowledgeBaseDao;
     private final KnowledgeBaseConverter knowledgeBaseConverter;
+    private final KnowledgeAccessService knowledgeAccessService;
 
     @Override
     public Long create(KnowledgeBaseCreateDTO dto) {
@@ -30,24 +32,19 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     public KnowledgeBaseVO getById(Long id) {
-        KnowledgeBaseEntity entity = knowledgeBaseDao.findById(id);
-        if (entity == null) {
-            throw new BusinessException("知识库不存在");
-        }
+        KnowledgeBaseEntity entity = knowledgeAccessService.assertAccessible(id);
         return knowledgeBaseConverter.toVO(entity);
     }
 
     @Override
     public List<KnowledgeBaseVO> list(Long courseId) {
-        List<KnowledgeBaseEntity> entities = courseId != null
-                ? knowledgeBaseDao.findByCourseId(courseId)
-                : knowledgeBaseDao.findAll();
+        List<KnowledgeBaseEntity> entities = knowledgeAccessService.listAccessibleKnowledgeBases(courseId);
         return entities.stream().map(knowledgeBaseConverter::toVO).collect(Collectors.toList());
     }
 
     @Override
     public void update(Long id, KnowledgeBaseUpdateDTO dto) {
-        KnowledgeBaseEntity entity = knowledgeBaseDao.findById(id);
+        KnowledgeBaseEntity entity = knowledgeAccessService.assertAccessible(id);
         if (entity == null) {
             throw new BusinessException("知识库不存在");
         }
@@ -57,10 +54,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     public void delete(Long id) {
-        KnowledgeBaseEntity entity = knowledgeBaseDao.findById(id);
-        if (entity == null) {
-            throw new BusinessException("知识库不存在");
-        }
+        knowledgeAccessService.assertAccessible(id);
         knowledgeBaseDao.deleteById(id);
     }
 }

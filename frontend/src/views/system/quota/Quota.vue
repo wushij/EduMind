@@ -1,28 +1,128 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h2>Quota</h2>
+  <div class="quota-management-page">
+    <div class="quota-header-card">
+      <div class="header-left">
+        <h2>AI Token 用户配额管理</h2>
+        <p>按用户维度设定每日 Token 与调用次数上限，支持实时查看当日消耗进度</p>
+      </div>
     </div>
-    <div class="page-content">
-      <el-card shadow="never">
-        <p>Quota 页面正在建设中...</p>
-      </el-card>
-    </div>
+
+    <el-table v-loading="loading" :data="userQuotas" stripe>
+      <el-table-column prop="userId" label="用户 ID" width="100" />
+      <el-table-column prop="roleName" label="用户" min-width="160" />
+      <el-table-column label="今日消耗 / 日上限" min-width="220">
+        <template #default="{ row }">
+          <div class="progress-cell">
+            <span>{{ row.usedTokensToday.toLocaleString() }} / {{ row.isUnlimited ? '不限' : row.dailyTokenLimit.toLocaleString() }}</span>
+            <el-progress
+              v-if="!row.isUnlimited"
+              :percentage="Math.min(100, Math.round((row.usedTokensToday / row.dailyTokenLimit) * 100))"
+              :stroke-width="6"
+            />
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column prop="qpsLimit" label="日调用上限" width="120">
+        <template #default="{ row }">
+          {{ row.qpsLimit || '不限' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="120" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="primary" @click="editQuota(row)">编辑</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <el-dialog v-model="editDialogVisible" title="编辑用户配额" width="460px">
+      <el-form v-if="editingQuota" label-position="top">
+        <el-form-item label="用户">
+          <el-input :model-value="editingQuota.roleName" disabled />
+        </el-form-item>
+        <el-form-item label="日 Token 上限（0 表示不限）">
+          <el-input-number v-model="editingQuota.dailyTokenLimit" :step="10000" :min="0" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="日调用次数上限（0 表示不限）">
+          <el-input-number v-model="editingQuota.qpsLimit" :step="10" :min="0" style="width: 100%" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveUserQuota">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { getRoleQuotas, updateRoleQuota } from '@/api/system/quota';
+import type { RoleQuotaConfig } from '@/types/system/quota';
+import { ElMessage } from 'element-plus';
+
+const loading = ref(false);
+const userQuotas = ref<RoleQuotaConfig[]>([]);
+const editDialogVisible = ref(false);
+const editingQuota = ref<RoleQuotaConfig | null>(null);
+
+const fetchQuotas = async () => {
+  loading.value = true;
+  try {
+    userQuotas.value = await getRoleQuotas();
+  } catch {
+    userQuotas.value = [];
+    ElMessage.error('加载配额数据失败');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const editQuota = (row: RoleQuotaConfig) => {
+  editingQuota.value = JSON.parse(JSON.stringify(row));
+  editDialogVisible.value = true;
+};
+
+const saveUserQuota = async () => {
+  if (!editingQuota.value) return;
+  try {
+    await updateRoleQuota(editingQuota.value.id, editingQuota.value);
+    ElMessage.success('用户配额已更新');
+    editDialogVisible.value = false;
+    await fetchQuotas();
+  } catch {
+    ElMessage.error('保存失败');
+  }
+};
+
+onMounted(() => {
+  fetchQuotas();
+});
 </script>
 
 <style scoped lang="scss">
-.page-container {
-  .page-header {
-    margin-bottom: 16px;
+.quota-management-page {
+  padding: 24px;
+
+  .quota-header-card {
+    margin-bottom: 20px;
+
     h2 {
-      font-size: 20px;
-      font-weight: 600;
-      color: #1F2937;
+      margin: 0 0 8px;
+      font-size: 22px;
     }
+
+    p {
+      margin: 0;
+      color: #64748b;
+      font-size: 14px;
+    }
+  }
+
+  .progress-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
   }
 }
 </style>

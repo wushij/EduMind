@@ -1,17 +1,20 @@
 <template>
   <div class="question-generate-page">
-    <!-- 顶部工作台标题与说明 -->
-    <div class="generate-top-bar">
-      <div class="title-group">
-        <h1 class="page-title">AI 智能出题向导</h1>
-        <p class="page-subtitle">
-          结合课程大纲与 DeepSeek 教学大模型，按照知识点分布与难度配比自动生成高契合度题目
-        </p>
+    <!-- 顶部专属 3D 视觉大 Banner (严格对齐原型图 2 与 ai智能出题banner.png，比例 2172×724) -->
+    <div class="question-banner-stage">
+      <div class="banner-ratio-box">
+        <img
+          class="banner-image"
+          :src="questionBannerImg"
+          alt="AI 智能出题"
+          draggable="false"
+        />
+        <div class="banner-float-actions">
+          <button type="button" class="capsule-back-btn" @click="router.push('/ai/marketplace')">
+            <span>← 返回 AI 广场</span>
+          </button>
+        </div>
       </div>
-
-      <button type="button" class="capsule-back-btn" @click="router.push('/ai/marketplace')">
-        <span>← 返回 AI 广场</span>
-      </button>
     </div>
 
     <!-- 5 步向导步骤进度条 (纯正长圆跑道指示条) -->
@@ -304,6 +307,7 @@ import { USE_MOCK } from '@/config/mock';
 import { MOCK_COURSES } from '@/mock/courses';
 import { MOCK_CHAPTERS } from '@/mock/chapters';
 import { QuestionType, Difficulty } from '@/mock/questions';
+import questionBannerImg from '@/assets/images/ai智能出题banner.png';
 
 const router = useRouter();
 const { currentStep, generating, formState, nextStep, prevStep, generate } = useQuestionGenerate();
@@ -425,44 +429,62 @@ async function handleGenerateSubmit() {
 
 <style scoped lang="scss">
 .question-generate-page {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 10px 0 40px;
+  width: 100%;
+  padding: 24px;
+  background: #f8fafc;
+  min-height: calc(100vh - 64px);
+  box-sizing: border-box;
 
-  .generate-top-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 24px;
+  // 顶部专属 3D 视觉大 Banner (比例 2172×724)
+  .question-banner-stage {
+    width: 100%;
+    margin-bottom: 20px;
 
-    .title-group {
-      .page-title {
-        margin: 0 0 6px 0;
-        font-size: 24px;
-        font-weight: 700;
-        color: #0F172A;
-      }
-      .page-subtitle {
-        margin: 0;
-        font-size: 13.5px;
-        color: #64748B;
-      }
-    }
-
-    .capsule-back-btn {
-      height: 36px;
-      padding: 0 16px;
-      border-radius: 9999px;
-      background: #FFFFFF;
+    .banner-ratio-box {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 2172 / 724;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 6px 24px rgba(22, 119, 255, 0.08);
       border: 1px solid #E2E8F0;
-      color: #64748B;
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.2s;
 
-      &:hover {
-        color: #1677FF;
-        border-color: #CBD5E1;
+      .banner-image {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        user-select: none;
+      }
+
+      .banner-float-actions {
+        position: absolute;
+        top: 16px;
+        right: 20px;
+        z-index: 2;
+
+        .capsule-back-btn {
+          height: 34px;
+          padding: 0 16px;
+          border-radius: 9999px;
+          background: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(8px);
+          border: 1px solid rgba(226, 232, 240, 0.85);
+          color: #334155;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+          &:hover {
+            color: #1677FF;
+            background: #FFFFFF;
+            border-color: #93C5FD;
+          }
+        }
       }
     }
   }

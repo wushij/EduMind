@@ -23,3 +23,18 @@ ai:
 edumind:
   rate-limit:
     enabled: false
+  chunk:
+    size: 800
+    overlap: 128
+  embedding:
+    base-url: https://api.openai.com
+    api-key: ${EMBEDDING_API_KEY:}
+    model: text-embedding-3-small
+    dimensions: 1536
+    mock-enabled: true
+  milvus:
+    enabled: false
+    host: localhost
+    port: 19530
+    collection: edumind_chunks
+    dimension: 1536

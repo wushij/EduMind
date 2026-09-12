@@ -1,5 +1,8 @@
 package com.edumind.knowledge.api;
 
+import com.edumind.knowledge.vo.knowledge.KnowledgeBaseVO;
+import com.edumind.knowledge.vo.knowledge.KnowledgeDocumentVO;
+
 import java.util.List;
 
 /**
@@ -7,11 +10,11 @@ import java.util.List;
  */
 public interface KnowledgeQueryApi {
 
-    Object getKnowledgeBaseById(Long knowledgeBaseId);
+    KnowledgeBaseVO getKnowledgeBaseById(Long knowledgeBaseId);
 
-    List<?> listKnowledgeBasesByCourseId(Long courseId);
+    List<KnowledgeBaseVO> listKnowledgeBasesByCourseId(Long courseId);
 
-    List<?> listDocumentsByKnowledgeBaseId(Long knowledgeBaseId);
+    List<KnowledgeDocumentVO> listDocumentsByKnowledgeBaseId(Long knowledgeBaseId);
 
     String getDocumentText(Long documentId);
 }

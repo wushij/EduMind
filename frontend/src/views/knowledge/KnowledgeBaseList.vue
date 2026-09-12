@@ -1,50 +1,52 @@
 <template>
   <div class="knowledge-base-page-container">
-    <!-- 1. 顶部 Hero Banner (严格对齐页面Banner与背景图规范) -->
-    <PageHeroBanner
-      title="知识库"
-      subtitle="沉淀课程知识资产，为 AI 助教提供精准依据"
-      :background-image="kbBannerImg"
-      background-variant="knowledge"
-      :show-illustration="false"
-    >
-      <template #actions>
-        <button
-          type="button"
-          class="capsule-nav-btn capsule-nav-btn--primary"
-          @click="showCreateDialog = true"
-        >
-          <span>创建知识库</span>
-        </button>
-      </template>
-    </PageHeroBanner>
+    <!-- 1. 顶部专属 3D 视觉大 Banner (严格对齐原型图 2 与 知识库管理banner.png，比例 2172×724) -->
+    <div class="knowledge-banner-stage">
+      <div class="banner-ratio-box">
+        <img
+          class="banner-image"
+          :src="kbBannerImg"
+          alt="知识库管理"
+          draggable="false"
+        />
+        <div class="banner-float-actions">
+          <button
+            type="button"
+            class="capsule-nav-btn capsule-nav-btn--primary"
+            @click="showCreateDialog = true"
+          >
+            <el-icon><Plus /></el-icon>
+            <span>新建知识库</span>
+          </button>
+        </div>
+        <!-- 2. 全局统计指标长圆条 (嵌入 Banner 内部：位于图2“文档管理”四大能力胶囊正下方) -->
+        <div class="banner-stats-dock">
+          <div class="stat-item-pill">
+            <el-icon class="pill-icon pill-icon--blue"><Collection /></el-icon>
+            <span class="pill-label">知识库总数：</span>
+            <strong class="pill-val">{{ knowledgeBases.length }} 个</strong>
+          </div>
 
-    <!-- 2. 全局统计指标长圆条 (Pill Stats Bar) -->
-    <section class="kb-overview-stats-bar">
-      <div class="stat-item-pill">
-        <span class="pill-icon">📚</span>
-        <span class="pill-label">知识库总数：</span>
-        <strong class="pill-val">{{ knowledgeBases.length }} 个</strong>
-      </div>
+          <div class="stat-item-pill">
+            <el-icon class="pill-icon pill-icon--emerald"><Document /></el-icon>
+            <span class="pill-label">入库文档规模：</span>
+            <strong class="pill-val">{{ totalDocs }} 篇</strong>
+          </div>
 
-      <div class="stat-item-pill">
-        <span class="pill-icon">📄</span>
-        <span class="pill-label">入库文档规模：</span>
-        <strong class="pill-val">{{ totalDocs }} 篇</strong>
-      </div>
+          <div class="stat-item-pill">
+            <el-icon class="pill-icon pill-icon--amber"><Coin /></el-icon>
+            <span class="pill-label">向量切片总量：</span>
+            <strong class="pill-val">{{ totalChunks }} 个</strong>
+          </div>
 
-      <div class="stat-item-pill">
-        <span class="pill-icon">🧩</span>
-        <span class="pill-label">向量切片总量：</span>
-        <strong class="pill-val">{{ totalChunks }} 个</strong>
+          <div class="stat-item-pill stat-item-pill--green">
+            <span class="status-pulse-dot"></span>
+            <span class="pill-label">Milvus / PgVector 索引状态：</span>
+            <strong class="pill-val">正常运行 (99.4% 命中率)</strong>
+          </div>
+        </div>
       </div>
-
-      <div class="stat-item-pill stat-item-pill--green">
-        <span class="status-pulse-dot"></span>
-        <span class="pill-label">Milvus / PgVector 索引状态：</span>
-        <strong class="pill-val">正常运行 (99.4% 命中率)</strong>
-      </div>
-    </section>
+    </div>
 
     <!-- 3. 长圆跑道分类 Tabs (Pill Tabs) -->
     <div class="kb-tabs-filter-bar">
@@ -57,6 +59,7 @@
           :class="{ active: selectedCategory === tab.value }"
           @click="selectedCategory = tab.value"
         >
+          <el-icon v-if="tab.icon" class="tab-icon"><component :is="tab.icon" /></el-icon>
           <span>{{ tab.label }}</span>
           <span class="tab-count-pill">{{ getCategoryCount(tab.value) }}</span>
         </button>
@@ -87,7 +90,7 @@
 
     <!-- 空状态 -->
     <div v-else class="empty-kb-panel">
-      <div class="empty-icon">🔍</div>
+      <el-icon class="empty-icon"><Search /></el-icon>
       <h3 class="empty-title">未找到匹配的知识库</h3>
       <p class="empty-hint">建议调整上方搜索关键字或分类筛选条件，也可以点击上方按钮快速创建。</p>
       <button
@@ -102,7 +105,7 @@
     <!-- 5. 创建新知识库长圆弹窗 (Pill Modal) -->
     <el-dialog
       v-model="showCreateDialog"
-      title="✨ 创建新课程教学知识库"
+      title="创建新课程教学知识库"
       width="560px"
       class="capsule-custom-dialog"
       :show-close="true"
@@ -133,7 +136,8 @@
               :class="{ active: createForm.category === cat.value }"
               @click="createForm.category = cat.value"
             >
-              {{ cat.label }}
+              <el-icon v-if="cat.icon" class="cat-opt-icon"><component :is="cat.icon" /></el-icon>
+              <span>{{ cat.label }}</span>
             </span>
           </div>
         </el-form-item>
@@ -193,6 +197,17 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
+import {
+  Collection,
+  Document,
+  Coin,
+  Monitor,
+  Reading,
+  Files,
+  Search,
+  Grid,
+  Plus
+} from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
 import KnowledgeBaseCard from '@/components/knowledge/KnowledgeBaseCard.vue';
 import { useKnowledgeBase } from '@/composables/knowledge/useKnowledgeBase';
@@ -208,10 +223,10 @@ const searchKeyword = ref<string>('');
 const showCreateDialog = ref(false);
 
 const categoryTabs = [
-  { label: '全部知识库', value: 'ALL' },
-  { label: '💻 专业核心', value: 'MAJOR' },
-  { label: '📖 公卡通识', value: 'COMMON' },
-  { label: '📑 历年真题', value: 'EXAM' }
+  { label: '全部知识库', value: 'ALL', icon: Grid },
+  { label: '专业核心', value: 'MAJOR', icon: Monitor },
+  { label: '公卡通识', value: 'COMMON', icon: Reading },
+  { label: '历年真题', value: 'EXAM', icon: Files }
 ];
 
 const totalDocs = computed(() => {
@@ -316,96 +331,159 @@ async function handleConfirmCreate() {
   gap: 20px;
   width: 100%;
 
-  // 1. Hero 动作坞
-  .hero-actions-dock {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
+  // 顶部专属 3D 视觉大 Banner (比例 2172×724)
+  .knowledge-banner-stage {
+    width: 100%;
+    margin-bottom: 2px;
 
-    .capsule-nav-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      height: 38px;
-      padding: 0 20px;
-      border-radius: 9999px; // 长圆胶囊
-      font-size: 13.5px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: all 0.22s ease;
-
-      &--primary {
-        background: #1677FF;
-        color: #FFFFFF;
-        box-shadow: 0 3px 12px rgba(22, 119, 255, 0.3);
-
-        &:hover {
-          background: #4096FF;
-          transform: translateY(-2px);
-        }
-      }
-
-      &--secondary {
-        background: #FFFFFF;
-        color: #334155;
-        border: 1px solid #CBD5E1;
-
-        &:hover {
-          background: #F8FAFC;
-          color: #1677FF;
-          border-color: #93C5FD;
-        }
-      }
-    }
-  }
-
-  // 2. 指标条
-  .kb-overview-stats-bar {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    flex-wrap: wrap;
-
-    .stat-item-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      height: 36px;
-      padding: 0 16px;
-      border-radius: 9999px; // 长圆药丸
-      background: #FFFFFF;
+    .banner-ratio-box {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 2172 / 724;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 6px 24px rgba(22, 119, 255, 0.08);
       border: 1px solid #E2E8F0;
-      box-shadow: 0 2px 10px rgba(30, 80, 150, 0.03);
-      font-size: 12.5px;
-      color: #64748B;
 
-      .pill-icon {
-        font-size: 14px;
+      .banner-image {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        user-select: none;
       }
 
-      .pill-val {
-        color: #1E293B;
-        font-weight: 700;
-      }
+      .banner-float-actions {
+        position: absolute;
+        top: 20px;
+        right: 24px;
+        z-index: 2;
 
-      &--green {
-        margin-left: auto;
-        border-color: #A7F3D0;
-        background: #F0FDF4;
-        color: #059669;
+        .capsule-nav-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          height: 38px;
+          padding: 0 20px;
+          border-radius: 9999px;
+          font-size: 13.5px;
+          font-weight: 600;
+          cursor: pointer;
+          border: none;
+          background: #1677FF;
+          color: #FFFFFF;
+          box-shadow: 0 4px 16px rgba(22, 119, 255, 0.35);
+          transition: all 0.2s ease;
 
-        .pill-val {
-          color: #059669;
+          &:hover {
+            background: #0958d9;
+            transform: translateY(-1px);
+          }
         }
+      }
 
-        .status-pulse-dot {
-          width: 7px;
-          height: 7px;
-          border-radius: 50%;
-          background: #10B981;
-          box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+      // 2. 悬浮在 Banner 内部左下方：位于“文档管理”等四大胶囊正下方的统计条
+      .banner-stats-dock {
+        position: absolute;
+        left: 4.4%;
+        top: 84%;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: nowrap;
+        max-width: 92%;
+
+        .stat-item-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          height: 34px;
+          padding: 0 14px;
+          border-radius: 9999px; // 长圆药丸
+          background: rgba(255, 255, 255, 0.92);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border: 1px solid rgba(255, 255, 255, 0.85);
+          box-shadow: 0 4px 14px rgba(22, 119, 255, 0.08);
+          font-size: 12px;
+          color: #475569;
+          white-space: nowrap;
+          flex-shrink: 0;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: #FFFFFF;
+            box-shadow: 0 6px 18px rgba(22, 119, 255, 0.14);
+            transform: translateY(-1px);
+          }
+
+          .pill-icon {
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+
+            &--blue { color: #2563EB; }
+            &--emerald { color: #059669; }
+            &--amber { color: #D97706; }
+          }
+
+          .pill-val {
+            color: #0F172A;
+            font-weight: 700;
+          }
+
+          &--green {
+            background: rgba(240, 253, 244, 0.95);
+            border-color: rgba(167, 243, 208, 0.9);
+            color: #059669;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.1);
+
+            .pill-val {
+              color: #059669;
+            }
+
+            .status-pulse-dot {
+              width: 7px;
+              height: 7px;
+              border-radius: 50%;
+              background: #10B981;
+              box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+            }
+          }
+        }
+      }
+
+      @media (max-width: 1400px) {
+        .banner-stats-dock {
+          top: 83%;
+          gap: 8px;
+
+          .stat-item-pill {
+            height: 30px;
+            padding: 0 10px;
+            font-size: 11.5px;
+
+            .pill-icon {
+              font-size: 13px;
+            }
+          }
+        }
+      }
+
+      @media (max-width: 1100px) {
+        .banner-stats-dock {
+          top: 81.5%;
+          gap: 6px;
+
+          .stat-item-pill {
+            height: 28px;
+            padding: 0 8px;
+            font-size: 11px;
+          }
         }
       }
     }
@@ -443,6 +521,10 @@ async function handleConfirmCreate() {
         cursor: pointer;
         transition: all 0.2s ease;
         white-space: nowrap;
+
+        .tab-icon {
+          font-size: 14px;
+        }
 
         .tab-count-pill {
           padding: 1px 8px;
@@ -521,7 +603,8 @@ async function handleConfirmCreate() {
     text-align: center;
 
     .empty-icon {
-      font-size: 40px;
+      font-size: 44px;
+      color: #94A3B8;
       margin-bottom: 12px;
     }
 
@@ -605,6 +688,9 @@ async function handleConfirmCreate() {
     flex-wrap: wrap;
 
     .cat-opt-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       padding: 6px 16px;
       border-radius: 9999px; // 长圆单选药丸
       border: 1px solid #E2E8F0;
@@ -614,6 +700,10 @@ async function handleConfirmCreate() {
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s;
+
+      .cat-opt-icon {
+        font-size: 13px;
+      }
 
       &:hover {
         border-color: #93C5FD;

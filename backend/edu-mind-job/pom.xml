@@ -17,5 +17,14 @@
             <groupId>com.edumind</groupId>
             <artifactId>edu-mind-infrastructure</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-knowledge</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 </project>

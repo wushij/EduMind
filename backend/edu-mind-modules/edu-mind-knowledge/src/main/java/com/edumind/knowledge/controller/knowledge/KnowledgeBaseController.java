@@ -4,7 +4,9 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.edumind.common.api.ApiResult;
 import com.edumind.knowledge.dto.knowledge.KnowledgeBaseCreateDTO;
 import com.edumind.knowledge.dto.knowledge.KnowledgeBaseUpdateDTO;
+import com.edumind.knowledge.service.chunk.ChunkService;
 import com.edumind.knowledge.service.knowledge.KnowledgeBaseService;
+import com.edumind.knowledge.vo.knowledge.ChunkStatsVO;
 import com.edumind.knowledge.vo.knowledge.KnowledgeBaseVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ import java.util.List;
 public class KnowledgeBaseController {
 
     private final KnowledgeBaseService knowledgeBaseService;
+    private final ChunkService chunkService;
 
     @SaCheckPermission("knowledge:edit")
     @PostMapping
@@ -35,6 +38,12 @@ public class KnowledgeBaseController {
     @GetMapping
     public ApiResult<List<KnowledgeBaseVO>> list(@RequestParam(value = "courseId", required = false) Long courseId) {
         return ApiResult.success(knowledgeBaseService.list(courseId));
+    }
+
+    @SaCheckPermission("knowledge:view")
+    @GetMapping("/{id}/chunk-stats")
+    public ApiResult<ChunkStatsVO> chunkStats(@PathVariable("id") Long id) {
+        return ApiResult.success(chunkService.getChunkStats(id));
     }
 
     @SaCheckPermission("knowledge:edit")

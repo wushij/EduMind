@@ -66,4 +66,20 @@ public final class RedisKeyBuilder {
     public static String lock(String biz, String id) {
         return RedisConstant.LOCK_KEY + biz + ":" + id;
     }
+
+    public static String emailCode(String scene, String email) {
+        return RedisConstant.EMAIL_CODE_KEY + scene.toLowerCase().trim() + ":" + email.toLowerCase().trim();
+    }
+
+    public static String emailLimit(String scene, String email) {
+        return RedisConstant.EMAIL_LIMIT_KEY + scene.toLowerCase().trim() + ":" + email.toLowerCase().trim();
+    }
+
+    public static String emailDaily(String email, String date) {
+        return RedisConstant.EMAIL_DAILY_KEY + email.toLowerCase().trim() + ":" + date;
+    }
+
+    public static String sysConfig(String key) {
+        return RedisConstant.CONFIG_CACHE_KEY + key.trim();
+    }
 }

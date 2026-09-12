@@ -128,23 +128,28 @@ function mapTool(raw: Record<string, any>): AITool {
 
   const style = resolveToolStyle(raw);
 
+  const executionMode =
+    raw.executionMode === 'V05_NOTICE' ? 'V05_NOTICE' : 'ROUTE';
+
   return {
     id: raw.id,
     name: raw.name,
     category,
     categoryLabel: categoryLabels[category] || category,
     description: raw.description || '',
-    detailedIntro: raw.description || '',
+    detailedIntro: raw.detailedIntro || raw.description || '',
     iconBg: style.gradient,
     iconName: style.iconName,
     iconTheme: style.theme,
     iconEmoji: '',
+    modelId: raw.modelId || raw.model_id || '',
     route: raw.route || '/',
+    executionMode,
     tags: parseTags(raw.tags),
     isRecommended: !!raw.isRecommended,
+    isHot: !!raw.isHot,
     isFavorite: !!raw.isFavorite,
-    usageCount: raw.useCount || raw.usageCount || 0,
-    rating: raw.rating || 4.8
+    usageCount: raw.useCount || raw.usageCount || 0
   };
 }
 

@@ -46,6 +46,8 @@ public class KnowledgeBaseConverter {
         vo.setDescription(entity.getDescription());
         vo.setCourseId(entity.getCourseId());
         vo.setDocCount(entity.getDocCount());
+        vo.setChunkCount(entity.getChunkCount());
+        vo.setIndexStatus(entity.getIndexStatus());
         vo.setStatus(entity.getStatus());
         vo.setCreateTime(entity.getCreateTime());
         vo.setUpdateTime(entity.getUpdateTime());

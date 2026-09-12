@@ -26,4 +26,14 @@ public interface CourseQueryApi {
     List<KnowledgePointVO> listKnowledgePointsByCourseId(Long courseId);
 
     KnowledgePointVO getKnowledgePointById(Long id);
+
+    /**
+     * 用户是否为课程成员（含教师与学生）
+     */
+    boolean isCourseMember(Long courseId, Long userId);
+
+    /**
+     * 用户可访问的课程 ID 列表（选课成员）
+     */
+    List<Long> listCourseIdsByUserId(Long userId);
 }

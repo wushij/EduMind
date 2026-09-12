@@ -8,15 +8,11 @@
 
 ```text
 sql/
-├── init.sql                                    # 全量单文件初始化（建库 + 30 张表 + 种子数据）
-├── migration/                                  # 增量版本脚本（按版本号顺序手动执行）
-│   ├── V0_1_0__init_core.sql
-│   ├── V0_1_1__ai_question_exam.sql
-│   ├── V0_2_0__question_bank.sql
-│   ├── V0_2_1__assignment_grading.sql
-│   ├── V0_2_2__knowledge_document.sql
-│   ├── V0_2_3__rbac_system.sql
-│   ├── V0_2_4__notification_statistics.sql
+├── init.sql                                    # 全量单文件初始化（建库 + 33 张表 + 种子数据，含 V0.1~V0.5）
+├── migration/                                  # 增量版本脚本（每个大版本一个文件）
+│   ├── V0_1_0__mvp_core.sql                    # V0.1 MVP 核心（用户/课程/AI/题目/试卷/会话）
+│   ├── V0_2_0__mvp_expansion.sql               # V0.2 MVP 扩展（题库/作业/文档/RBAC/通知/工具广场）
+│   ├── V0_5_0__product_enhancement.sql         # V0.5 产品增强（Chunk/向量/RAG/Prompt/配额/权限）
 │   └── R__seed_data.sql                        # 种子数据（可重复执行，注意幂等）
 └── README.md
 ```
@@ -35,30 +31,47 @@ mysql -u root -p < sql/init.sql
 
 或在 Navicat / DataGrip 中打开并执行 `sql/init.sql`。
 
-### 方式二：按版本增量迁移（已有空库或需分步升级）
+`init.sql` 已包含所有版本迁移脚本的最终表结构与种子数据，**无需再跑 migration**。
 
-在已创建 `edumind` 数据库的前提下，**严格按文件名顺序**依次执行 `sql/migration/` 下脚本：
+### 方式二：按版本增量迁移（已有空库分步升级）
+
+在已创建 `edumind` 数据库的前提下，**每个大版本只执行一个脚本**：
 
 ```text
-1. V0_1_0__init_core.sql
-2. V0_1_1__ai_question_exam.sql
-3. V0_2_0__question_bank.sql
-4. V0_2_1__assignment_grading.sql
-5. V0_2_2__knowledge_document.sql
-6. V0_2_3__rbac_system.sql
-7. V0_2_4__notification_statistics.sql
-8. R__seed_data.sql
+1. V0_1_0__mvp_core.sql
+2. V0_2_0__mvp_expansion.sql
+3. V0_5_0__product_enhancement.sql
+4. R__seed_data.sql          # 可选，补充演示种子数据
 ```
 
-示例（MySQL CLI，需先 `USE edumind;` 或脚本内含建库语句）：
+示例：
 
 ```bash
-mysql -u root -p edumind < sql/migration/V0_1_0__init_core.sql
-mysql -u root -p edumind < sql/migration/V0_1_1__ai_question_exam.sql
-# ... 依此类推
+mysql -u root -p edumind < sql/migration/V0_1_0__mvp_core.sql
+mysql -u root -p edumind < sql/migration/V0_2_0__mvp_expansion.sql
+mysql -u root -p edumind < sql/migration/V0_5_0__product_enhancement.sql
+mysql -u root -p edumind < sql/migration/R__seed_data.sql
 ```
 
 > **注意：** 若已执行过 `init.sql`，通常无需再跑 migration 脚本，避免重复建表。两种方式二选一即可。
+
+### 已有库升级（按目标版本单脚本执行）
+
+若库是早期版本建的，只需执行**尚未执行过的版本**对应脚本：
+
+| 目标版本 | 迁移脚本 | 说明 |
+|:---|:---|:---|
+| V0.1 MVP 核心 | `V0_1_0__mvp_core.sql` | 用户、课程、AI、题目、试卷、会话 |
+| V0.2 MVP 扩展 | `V0_2_0__mvp_expansion.sql` | 题库、作业批改、知识库文档、RBAC、通知、AI 工具广场 |
+| V0.5 产品增强 | `V0_5_0__product_enhancement.sql` | Chunk、向量索引、RAG、Prompt 治理、配额、权限 |
+
+示例（从 V0.2 升级到 V0.5）：
+
+```bash
+mysql -u root -p edumind < sql/migration/V0_5_0__product_enhancement.sql
+```
+
+> 全新建库请直接执行最新版 `sql/init.sql`（已含完整结构及种子），无需再跑 migration。
 
 ---
 
@@ -97,7 +110,7 @@ mysql -u root -proot < sql/init.sql
 
 ---
 
-## 30 张核心业务表全景清单
+## 33 张核心业务表全景清单
 
 | 业务领域 | 数据表名 | Java Entity 实体映射 | 职责说明 |
 |:---|:---|:---|:---|
@@ -107,6 +120,8 @@ mysql -u root -proot < sql/init.sql
 | | `sys_permission` | `PermissionEntity` | 细粒度操作权限编码 |
 | | `sys_role_permission`| `RolePermissionEntity` | 角色与权限映射 |
 | | `sys_notification` | `NotificationEntity` | 站内消息与作业通知 |
+| | `sys_config` | - | 系统全局参数（邮件 SMTP、平台信息等） |
+| | `sys_ai_quota` | - | AI Token / 调用配额 |
 | **课程教学** | `course` | `CourseEntity` | 课程主信息 |
 | | `course_chapter` | `ChapterEntity` | 课程大纲层级章节树 |
 | | `course_knowledge_point` | `KnowledgePointEntity` | 知识图谱核心知识点 |
@@ -124,10 +139,15 @@ mysql -u root -proot < sql/init.sql
 | **知识管理** | `knowledge_base` | `KnowledgeBaseEntity` | 课程关联知识库 |
 | | `knowledge_document` | `KnowledgeDocumentEntity` | 上传文档（PDF/Word/Markdown） |
 | | `knowledge_document_text` | `KnowledgeDocumentTextEntity` | 向量化切片正文 |
+| | `knowledge_document_chunk` | - | 文档 Chunk 切片 |
+| | `knowledge_index_task` | - | 向量索引任务 |
+| | `knowledge_chunk_index` | - | Chunk 与向量映射 |
 | **教学资源** | `teaching_resource` | `ResourceEntity` | 课件、教案与媒体资源 |
 | | `course_resource` | `CourseResourceEntity` | 课程与资源/文档关联 |
 | **AI 智能赋能**| `ai_tool` | `AiToolEntity` | AI 工具广场元数据 |
 | | `ai_conversation` | `ConversationEntity` | AI 多轮会话记录 |
 | | `ai_message` | `MessageEntity` | 对话消息历史与 Token 统计 |
 | | `ai_call_log` | `AiCallLogEntity` | 大模型真实调用耗时与用量审计 |
+| | `prompt_template` | - | Prompt 模板 |
+| | `prompt_template_version` | - | Prompt 模板版本历史 |
 | **统计分析** | `statistics_daily_snapshot` | `StatisticsEntity` | 每日学情与 AI 消耗快照（供 ECharts 大屏） |

@@ -34,6 +34,7 @@
         <poi.version>5.2.5</poi.version>
         <edumind.version>1.0.0-SNAPSHOT</edumind.version>
         <redisson.version>3.34.1</redisson.version>
+        <milvus-sdk.version>2.4.4</milvus-sdk.version>
     </properties>
 
     <modules>
@@ -180,6 +181,13 @@
                 <groupId>org.redisson</groupId>
                 <artifactId>redisson-spring-boot-starter</artifactId>
                 <version>${redisson.version}</version>
+            </dependency>
+
+            <!-- Milvus 向量库 -->
+            <dependency>
+                <groupId>io.milvus</groupId>
+                <artifactId>milvus-sdk-java</artifactId>
+                <version>${milvus-sdk.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

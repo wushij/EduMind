@@ -75,3 +75,30 @@ export interface AuditLog {
   tokenCost?: number;
   createdAt: string;
 }
+
+export interface MailConfigVO {
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  password?: string;
+  hasPassword?: boolean;
+  fromName: string;
+  useSsl: boolean;
+  codeExpireMinutes: number;
+  codeIntervalSeconds: number;
+  dailyLimitPerEmail: number;
+}
+
+export interface MailConfigDTO {
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  password?: string;
+  fromName: string;
+  useSsl: boolean;
+  codeExpireMinutes?: number;
+  codeIntervalSeconds?: number;
+  dailyLimitPerEmail?: number;
+}

@@ -21,5 +21,9 @@
             <groupId>com.edumind</groupId>
             <artifactId>edu-mind-question</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-knowledge</artifactId>
+        </dependency>
     </dependencies>
 </project>

@@ -1,8 +1,6 @@
 <template>
   <div class="ai-tool-card" @click="emit('open-detail', tool)">
-    <!-- 卡片头部：图标、名称与分类徽章 -->
     <div class="tool-card-header">
-      <!-- 矢量彩色图标盒 (零 Emoji) -->
       <ColorIcon
         :name="toolIconName"
         :theme="toolIconTheme"
@@ -14,46 +12,38 @@
       <div class="tool-name-col">
         <div class="title-badge-row">
           <h3 class="tool-title">{{ tool.name }}</h3>
-          <span v-if="tool.isRecommended" class="pill-badge pill-badge--hot">推荐</span>
+          <span v-if="tool.isHot" class="pill-badge pill-badge--fire">热门</span>
+          <span v-if="tool.isRecommended" class="pill-badge pill-badge--rec">推荐</span>
         </div>
         <span class="pill-badge pill-badge--cat" :class="categoryClass">
           {{ tool.categoryLabel }}
         </span>
       </div>
 
-      <!-- 收藏按钮 (矢量星标，零 Emoji) -->
       <button
         type="button"
         class="favorite-btn"
-        :class="{ active: tool.isFavorite }"
-        :title="tool.isFavorite ? '取消收藏' : '加入常用'"
-        @click.stop="toggleFavorite"
+        :class="{ active: isFavorite(tool.id) }"
+        :title="isFavorite(tool.id) ? '取消收藏' : '加入常用'"
+        @click.stop="handleToggleFavorite"
       >
         <el-icon class="star-icon">
-          <StarFilled v-if="tool.isFavorite" />
+          <StarFilled v-if="isFavorite(tool.id)" />
           <Star v-else />
         </el-icon>
       </button>
     </div>
 
-    <!-- 描述 -->
     <p class="tool-desc">{{ tool.description }}</p>
 
-    <!-- 标签 -->
     <div class="tool-tags-row">
       <span v-for="tag in tool.tags" :key="tag" class="pill-tag">
         # {{ tag }}
       </span>
     </div>
 
-    <!-- 卡片底部：使用统计与立即使用按钮 (对齐原型图 1 中图) -->
     <div class="tool-card-footer">
       <div class="stats-meta">
-        <span class="rating">
-          <el-icon class="rate-star"><StarFilled /></el-icon>
-          {{ tool.rating }}
-        </span>
-        <span class="dot">·</span>
         <span class="usage">{{ tool.usageCount }} 次调用</span>
       </div>
 
@@ -75,6 +65,8 @@ import { useRouter } from 'vue-router';
 import { Star, StarFilled, Right } from '@element-plus/icons-vue';
 import ColorIcon, { type IconTheme } from '@/components/common/ColorIcon.vue';
 import type { AITool } from '@/types/ai/tool';
+import { useAIToolFavorites } from '@/composables/ai/useAIToolFavorites';
+import { launchAITool } from '@/utils/ai/launch-tool';
 
 const props = defineProps<{
   tool: AITool;
@@ -85,6 +77,7 @@ const emit = defineEmits<{
 }>();
 
 const router = useRouter();
+const { isFavorite, toggleFavorite } = useAIToolFavorites();
 
 const categoryClass = computed(() => {
   if (props.tool.category === 'TEACHER') return 'cat-teacher';
@@ -92,33 +85,32 @@ const categoryClass = computed(() => {
   return 'cat-general';
 });
 
-const toolIconName = computed(() => {
-  if (props.tool.category === 'TEACHER') return 'EditPen';
-  if (props.tool.category === 'STUDENT') return 'Reading';
-  return 'MagicStick';
-});
+const toolIconName = computed(() => props.tool.iconName || 'MagicStick');
 
 const toolIconTheme = computed<IconTheme>(() => {
+  const theme = props.tool.iconTheme;
+  if (theme) return theme as IconTheme;
   if (props.tool.category === 'TEACHER') return 'blue';
   if (props.tool.category === 'STUDENT') return 'emerald';
   return 'purple';
 });
 
-function toggleFavorite() {
-  props.tool.isFavorite = !props.tool.isFavorite;
+function handleToggleFavorite() {
+  toggleFavorite(props.tool.id);
+  props.tool.isFavorite = isFavorite(props.tool.id);
 }
 
 function handleUseTool() {
-  router.push(props.tool.route);
+  launchAITool(props.tool, router);
 }
 </script>
 
 <style scoped lang="scss">
 .ai-tool-card {
-  background: #FFFFFF;
+  background: #ffffff;
   border-radius: 16px;
   padding: 22px;
-  border: 1px solid #EBF1F7;
+  border: 1px solid #ebf1f7;
   box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
   display: flex;
   flex-direction: column;
@@ -128,12 +120,12 @@ function handleUseTool() {
   &:hover {
     transform: translateY(-4px);
     box-shadow: 0 10px 28px rgba(22, 119, 255, 0.12);
-    border-color: #BFDBFE;
+    border-color: #bfdbfe;
 
     .capsule-use-btn {
-      background: #1677FF;
-      color: #FFFFFF;
-      border-color: #1677FF;
+      background: #1677ff;
+      color: #ffffff;
+      border-color: #1677ff;
 
       .arrow-icon {
         transform: translateX(3px);
@@ -154,28 +146,38 @@ function handleUseTool() {
       .title-badge-row {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         margin-bottom: 4px;
+        flex-wrap: wrap;
 
         .tool-title {
           font-size: 15px;
           font-weight: 700;
-          color: #1E293B;
+          color: #1e293b;
           margin: 0;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
 
-        .pill-badge--hot {
-          background: #FEF2F2;
-          color: #EF4444;
-          border: 1px solid #FCA5A5;
+        .pill-badge--fire {
+          background: #fff7ed;
+          color: #ea580c;
+          border: 1px solid #fdba74;
           padding: 1px 7px;
           border-radius: 9999px;
           font-size: 10px;
           font-weight: 600;
-          flex-shrink: 0;
+        }
+
+        .pill-badge--rec {
+          background: #eff6ff;
+          color: #1677ff;
+          border: 1px solid #bfdbfe;
+          padding: 1px 7px;
+          border-radius: 9999px;
+          font-size: 10px;
+          font-weight: 600;
         }
       }
 
@@ -187,18 +189,18 @@ function handleUseTool() {
         font-weight: 500;
 
         &.cat-teacher {
-          background: #EFF6FF;
-          color: #1677FF;
+          background: #eff6ff;
+          color: #1677ff;
         }
 
         &.cat-student {
-          background: #F0FDF4;
-          color: #10B981;
+          background: #f0fdf4;
+          color: #10b981;
         }
 
         &.cat-general {
-          background: #F8FAFC;
-          color: #64748B;
+          background: #f8fafc;
+          color: #64748b;
         }
       }
     }
@@ -210,7 +212,7 @@ function handleUseTool() {
       cursor: pointer;
       padding: 6px;
       border-radius: 50%;
-      color: #94A3B8;
+      color: #94a3b8;
       transition: all 0.2s ease;
 
       .star-icon {
@@ -218,21 +220,21 @@ function handleUseTool() {
       }
 
       &:hover {
-        background: #FEF2F2;
-        color: #F59E0B;
+        background: #fef2f2;
+        color: #f59e0b;
       }
 
       &.active {
-        color: #F59E0B;
+        color: #f59e0b;
       }
     }
   }
 
   .tool-desc {
     font-size: 13px;
-    color: #64748B;
+    color: #64748b;
     line-height: 1.55;
-    margin: 0 0 14px 0;
+    margin: 0 0 14px;
     min-height: 40px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -249,8 +251,8 @@ function handleUseTool() {
 
     .pill-tag {
       font-size: 11px;
-      color: #64748B;
-      background: #F1F5F9;
+      color: #64748b;
+      background: #f1f5f9;
       padding: 2px 8px;
       border-radius: 6px;
     }
@@ -262,34 +264,11 @@ function handleUseTool() {
     justify-content: space-between;
     margin-top: auto;
     padding-top: 14px;
-    border-top: 1px solid #F1F5F9;
+    border-top: 1px solid #f1f5f9;
 
     .stats-meta {
-      display: flex;
-      align-items: center;
-      gap: 6px;
       font-size: 12px;
-      color: #64748B;
-
-      .rating {
-        display: flex;
-        align-items: center;
-        gap: 3px;
-        font-weight: 600;
-        color: #F59E0B;
-
-        .rate-star {
-          font-size: 13px;
-        }
-      }
-
-      .dot {
-        color: #CBD5E1;
-      }
-
-      .usage {
-        color: #64748B;
-      }
+      color: #64748b;
     }
 
     .capsule-use-btn {
@@ -298,9 +277,9 @@ function handleUseTool() {
       gap: 5px;
       padding: 6px 14px;
       border-radius: 9999px;
-      background: #EFF6FF;
-      color: #1677FF;
-      border: 1px solid #BFDBFE;
+      background: #eff6ff;
+      color: #1677ff;
+      border: 1px solid #bfdbfe;
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;

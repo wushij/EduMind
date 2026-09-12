@@ -29,6 +29,17 @@ public class UserController {
         return ApiResult.success(userService.updateProfile(dto));
     }
 
+    @org.springframework.web.bind.annotation.PostMapping("/api/users/send-bind-code")
+    public ApiResult<Void> sendBindCode(@Valid @RequestBody com.edumind.system.dto.auth.EmailSendCodeDTO dto) {
+        userService.sendBindEmailCode(dto.getEmail());
+        return ApiResult.success();
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/api/users/bind-email")
+    public ApiResult<UserVO> bindEmail(@Valid @RequestBody com.edumind.system.dto.user.EmailBindDTO dto) {
+        return ApiResult.success(userService.bindEmail(dto));
+    }
+
     @PutMapping("/api/auth/password")
     public ApiResult<Void> changePassword(@Valid @RequestBody PasswordChangeDTO dto) {
         userService.changePassword(dto);
