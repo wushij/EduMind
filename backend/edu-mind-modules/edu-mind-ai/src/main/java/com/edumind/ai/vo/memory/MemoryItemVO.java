@@ -8,8 +8,13 @@ import java.time.LocalDateTime;
 public class MemoryItemVO {
     private Long id;
     private Long namespaceId;
+    private String memoryType;
     private String summary;
+    private String fullContent;
     private String sensitivityLevel;
     private String vectorRef;
+    private Double confidenceScore;
+    private Boolean encrypted;
+    private Integer accessCount;
     private LocalDateTime createTime;
 }

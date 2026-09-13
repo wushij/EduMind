@@ -1,6 +1,7 @@
 package com.edumind.system.service.config.impl;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.TypeReference;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.infrastructure.mail.MailClient;
 import com.edumind.infrastructure.mail.MailConfig;
@@ -510,7 +511,7 @@ public class SysConfigServiceImpl implements SysConfigService {
         // 若是安全配置，联动热更新
         if ("security".equals(code)) {
             try {
-                Map<String, Object> map = JSON.parseObject(configValueJson, Map.class);
+                Map<String, Object> map = JSON.parseObject(configValueJson, new TypeReference<Map<String, Object>>() {});
                 if (map != null) {
                     dynamicSecurityConfigService.updateConfig(map);
                 }

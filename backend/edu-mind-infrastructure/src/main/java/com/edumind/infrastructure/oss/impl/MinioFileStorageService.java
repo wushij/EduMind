@@ -1,5 +1,7 @@
 package com.edumind.infrastructure.oss.impl;
 
+import com.edumind.common.context.TenantContext;
+import com.edumind.common.utils.TenantObjectKeyBuilder;
 import com.edumind.infrastructure.oss.FileStorageService;
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
@@ -99,6 +101,11 @@ public class MinioFileStorageService implements FileStorageService {
 
     @Override
     public InputStream getFile(String bucketName, String objectName) {
+        Long currentTenantId = TenantContext.getTenantId();
+        if (!TenantObjectKeyBuilder.validateTenantOwnership(currentTenantId, objectName)) {
+            log.warn("拒绝跨租户读取MinIO存储文件: tenantId={}, objectName={}", currentTenantId, objectName);
+            return null;
+        }
         String bucket = bucketName != null ? bucketName : defaultBucketName;
         if (useMinio()) {
             try {
@@ -124,6 +131,11 @@ public class MinioFileStorageService implements FileStorageService {
 
     @Override
     public void deleteFile(String bucketName, String objectName) {
+        Long currentTenantId = TenantContext.getTenantId();
+        if (!TenantObjectKeyBuilder.validateTenantOwnership(currentTenantId, objectName)) {
+            log.warn("拒绝跨租户删除MinIO存储文件: tenantId={}, objectName={}", currentTenantId, objectName);
+            return;
+        }
         String bucket = bucketName != null ? bucketName : defaultBucketName;
         if (useMinio()) {
             try {

@@ -54,4 +54,9 @@ public class SysOrganizationDao {
     public int deleteById(Long id) {
         return sysOrganizationMapper.deleteById(id);
     }
+
+    public int deleteByTenantId(Long tenantId) {
+        return sysOrganizationMapper.delete(new LambdaQueryWrapper<SysOrganizationEntity>()
+                .eq(SysOrganizationEntity::getTenantId, tenantId));
+    }
 }

@@ -1,7 +1,6 @@
 package com.edumind;
 
 import com.edumind.ai.agent.executor.AgentExecutorImpl;
-import com.edumind.ai.dto.agent.AgentRunCreateDTO;
 import com.edumind.ai.agent.tool.AgentTool;
 import com.edumind.ai.dto.assistant.GlobalAssistantRequestDTO;
 import com.edumind.ai.dto.question.SmartPaperComposeDTO;
@@ -14,7 +13,6 @@ import com.edumind.ai.service.question.SmartPaperComposeService;
 import com.edumind.ai.vo.agent.AgentRunVO;
 import com.edumind.ai.vo.question.SmartPaperComposeVO;
 import com.edumind.common.context.TenantContext;
-import com.edumind.common.exception.BusinessException;
 import com.edumind.common.model.LoginUser;
 import com.edumind.common.model.UserContext;
 import com.edumind.knowledge.dto.graph.KnowledgePointRelationCreateDTO;
@@ -35,11 +33,9 @@ import org.springframework.test.context.ActiveProfiles;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -343,17 +339,5 @@ public class GateV11IntegrationTest {
                 "SELECT DISTINCT tool_name FROM agent_tool_call WHERE run_id = ? AND tool_name IS NOT NULL",
                 (rs, row) -> rs.getString(1), runId);
         assertTrue(tools.size() >= 2, "ReAct should invoke at least 2 distinct tools: " + tools);
-    }
-
-    private AgentRunVO waitForRun(String runId, int maxAttempts) throws InterruptedException {
-        AgentRunVO run = null;
-        for (int i = 0; i < maxAttempts; i++) {
-            run = agentRunService.getRun(runId);
-            if (run != null && !"RUNNING".equals(run.getStatus())) {
-                return run;
-            }
-            TimeUnit.MILLISECONDS.sleep(500);
-        }
-        return run;
     }
 }

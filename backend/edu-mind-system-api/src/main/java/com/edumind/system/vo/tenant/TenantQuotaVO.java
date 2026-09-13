@@ -1,9 +1,20 @@
 package com.edumind.system.vo.tenant;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
+
+/**
+ * 租户配额视图对象
+ */
 @Data
-public class TenantQuotaVO {
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class TenantQuotaVO implements Serializable {
     private Long id;
     private Long tenantId;
     private String quotaType;

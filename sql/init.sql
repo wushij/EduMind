@@ -109,11 +109,30 @@ CREATE TABLE IF NOT EXISTS sys_notification (
     title       VARCHAR(128) NOT NULL COMMENT '通知标题',
     content     TEXT         DEFAULT NULL COMMENT '通知正文',
     type        VARCHAR(32)  DEFAULT 'SYSTEM' COMMENT '通知类型（SYSTEM/COURSE/EXAM/ASSIGNMENT）',
+    ref_id      BIGINT       DEFAULT NULL COMMENT '关联业务ID',
+    priority    TINYINT      NOT NULL DEFAULT 0 COMMENT '0普通 1强弹窗 2跑马灯',
     is_read     TINYINT      DEFAULT 0 COMMENT '是否已读（0-未读 1-已读）',
     create_time DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (id),
-    KEY idx_user_id (user_id)
+    KEY idx_user_id (user_id),
+    KEY idx_user_read (user_id, is_read)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统消息通知表';
+
+CREATE TABLE IF NOT EXISTS sys_notification_broadcast (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    title           VARCHAR(128) NOT NULL,
+    content         TEXT         NOT NULL,
+    target_type     VARCHAR(16)  NOT NULL DEFAULT 'all' COMMENT 'all/role',
+    target_payload  VARCHAR(128) DEFAULT NULL COMMENT '角色编码 ADMIN/TEACHER/STUDENT',
+    notify_type     VARCHAR(32)  NOT NULL DEFAULT 'BROADCAST',
+    priority        TINYINT      NOT NULL DEFAULT 0 COMMENT '0普通 1强弹窗 2跑马灯',
+    sender_id       BIGINT       NOT NULL,
+    sender_name     VARCHAR(64)  DEFAULT '',
+    total_count     INT          NOT NULL DEFAULT 0,
+    read_count      INT          NOT NULL DEFAULT 0,
+    create_time     DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统消息广播任务表';
 
 CREATE TABLE IF NOT EXISTS sys_config (
     id           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '配置主键ID',
@@ -731,7 +750,7 @@ CREATE TABLE IF NOT EXISTS ai_model_config (
     enabled             TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '是否启用',
     priority            INT          NOT NULL DEFAULT 1 COMMENT '路由优先级',
     fallback_model_key  VARCHAR(64)  DEFAULT NULL COMMENT '降级模型',
-    max_tokens          INT          DEFAULT 4096 COMMENT '最大 Token',
+    max_tokens          INT          DEFAULT 8192 COMMENT '最大 Token',
     temperature         DECIMAL(3,2) DEFAULT 0.70 COMMENT '温度参数',
     is_default          TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '同类型默认模型',
     reasoning_effort    VARCHAR(16)  NOT NULL DEFAULT 'low' COMMENT '思考强度',
@@ -906,7 +925,8 @@ CREATE TABLE IF NOT EXISTS ai_memory_namespace (
     user_id        BIGINT      NOT NULL COMMENT '用户ID',
     course_id      BIGINT      DEFAULT NULL COMMENT '关联课程ID(NULL代表个人全局)',
     scope          VARCHAR(32) NOT NULL DEFAULT 'COURSE' COMMENT '作用域(GLOBAL/COURSE)',
-    consent_status TINYINT     NOT NULL DEFAULT 1 COMMENT '用户授权状态(1:同意, 0:已撤回)',
+    consent_status TINYINT     NOT NULL DEFAULT 0 COMMENT '用户授权状态(1:同意, 0:未授权/已撤回)',
+    retention_days INT         NOT NULL DEFAULT 180 COMMENT '记忆留存周期(天)',
     status         TINYINT     NOT NULL DEFAULT 1 COMMENT '状态',
     create_time    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (id),
@@ -916,6 +936,7 @@ CREATE TABLE IF NOT EXISTS ai_memory_namespace (
 CREATE TABLE IF NOT EXISTS ai_memory_item (
     id                 BIGINT       NOT NULL AUTO_INCREMENT COMMENT '记忆条目ID',
     namespace_id       BIGINT       NOT NULL COMMENT '命名空间ID',
+    memory_type        VARCHAR(32)  NOT NULL DEFAULT 'PREFERENCE' COMMENT '记忆类型(PREFERENCE/PROFILE/EPISODIC/FEEDBACK)',
     summary            VARCHAR(512) NOT NULL COMMENT '记忆摘要内容(明文脱敏)',
     content_ciphertext TEXT         DEFAULT NULL COMMENT 'SM4加密敏感事实材料',
     sensitivity_level  VARCHAR(16)  NOT NULL DEFAULT 'NORMAL' COMMENT '敏感级别(NORMAL/ACADEMIC/HIGH_RISK)',
@@ -1012,9 +1033,11 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 -- 1. 系统角色
 INSERT IGNORE INTO sys_role (id, role_code, role_name, description) VALUES
-(1, 'ADMIN',   '系统管理员', '平台系统全量管理权限'),
-(2, 'TEACHER', '教师',       '教学管理、出题组卷与作业批改'),
-(3, 'STUDENT', '学生',       '课程学习、在线测试与智能练习');
+(1, 'ADMIN',        '系统管理员', '平台系统全量管理权限'),
+(2, 'TEACHER',      '教师',       '教学管理、出题组卷与作业批改'),
+(3, 'STUDENT',      '学生',       '课程学习、在线测试与智能练习'),
+(4, 'TENANT_ADMIN', '租户管理员', '校级租户管理员：管理本校全部组织、课程与配额'),
+(5, 'ORG_ADMIN',    '院系管理员', '院系/年级管理员：管理所属院系子树及辖下课程与师生');
 
 -- 2. 系统用户（密码统一为 admin123；邮箱/手机默认为空，由用户在个人中心自行绑定）
 INSERT IGNORE INTO sys_user (id, username, password, real_name, email, phone, avatar, status) VALUES
@@ -1088,9 +1111,32 @@ INSERT IGNORE INTO sys_permission (id, permission_code, permission_name, parent_
 (26, 'system:prompt:view',    'Prompt查看', 0),
 (27, 'system:prompt:edit',    'Prompt编辑', 0),
 (28, 'system:audit:view',     'AI审计查看', 0),
-(29, 'system:quota:view',     'AI配额查看', 0),
-(30, 'system:quota:edit',     'AI配额编辑', 0),
-(31, 'ai:tool:use',           'Agent工具调用', 0);
+(29, 'system:quota:view',           '配额查看', 0),
+(30, 'system:quota:edit',           '配额编辑', 0),
+(31, 'ai:tool:use',                 'Agent工具调用', 0),
+(32, 'system:organization:list',    '组织列表', 0),
+(33, 'system:organization:view',    '组织查看', 0),
+(34, 'system:organization:create',  '组织创建', 0),
+(35, 'system:organization:edit',    '组织编辑', 0),
+(36, 'system:organization:update',  '组织更新', 0),
+(37, 'system:organization:delete', '组织删除', 0),
+(38, 'system:organization:assign',  '组织成员分配与解绑', 0),
+(39, 'notice:broadcast:view',       '广播推送查看', 0),
+(40, 'notice:broadcast:send',       '广播推送发送', 0),
+(41, 'system:menu:view',            '菜单管理查看', 0),
+(42, 'system:menu:edit',            '菜单管理编辑', 0),
+(43, 'system:permission:view',      '权限分配矩阵查看', 0),
+(44, 'system:tenant:view',          '租户与校区查看', 0),
+(45, 'system:tenant:edit',          '租户与校区编辑', 0),
+(46, 'system:org:view',             '组织架构查看', 0),
+(47, 'system:config:view',          '系统全局配置查看', 0),
+(48, 'system:config:edit',          '系统全局配置编辑', 0),
+(49, 'system:model:view',           'AI模型接入调度', 0),
+(50, 'system:model:edit',           'AI模型接入配置', 0),
+(51, 'system:tool:view',            'AI工具调度查看', 0),
+(52, 'system:gateway:view',         'AI网关监控查看', 0),
+(53, 'ai:memory:view',              '长期记忆查看', 0),
+(54, 'ai:memory:manage',            '长期记忆管理', 0);
 
 -- 管理员全量权限
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
@@ -1103,7 +1149,36 @@ SELECT 2, id FROM sys_permission WHERE permission_code NOT LIKE 'system:%';
 -- 学生端学习权限
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
 SELECT 3, id FROM sys_permission WHERE permission_code IN (
-    'course:view', 'assignment:view', 'exam:view', 'knowledge:view', 'ai:chat', 'resource:view', 'notice:view'
+    'course:view', 'assignment:view', 'exam:view', 'knowledge:view', 'ai:chat', 'resource:view', 'notice:view',
+    'ai:memory:view', 'ai:memory:manage'
+);
+
+-- 租户管理员校级权限
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+SELECT 4, id FROM sys_permission
+WHERE permission_code IN (
+    'system:user:view', 'system:user:edit',
+    'system:organization:list', 'system:organization:view', 'system:organization:create',
+    'system:organization:edit', 'system:organization:update', 'system:organization:delete', 'system:organization:assign',
+    'system:quota:view', 'system:quota:edit',
+    'course:view', 'course:create', 'course:edit',
+    'question:view', 'question:edit',
+    'exam:view', 'exam:edit',
+    'knowledge:view', 'knowledge:edit',
+    'analytics:view', 'resource:view', 'resource:upload', 'notice:view', 'ai:chat',
+    'ai:memory:view', 'ai:memory:manage'
+);
+
+-- 院系管理员辖下权限
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+SELECT 5, id FROM sys_permission
+WHERE permission_code IN (
+    'system:organization:list', 'system:organization:view', 'system:organization:assign',
+    'course:view', 'course:create', 'course:edit',
+    'question:view', 'question:edit',
+    'exam:view', 'exam:edit',
+    'knowledge:view', 'analytics:view', 'resource:view', 'ai:chat',
+    'ai:memory:view', 'ai:memory:manage'
 );
 
 -- 5. 系统全局配置（V2.0.1 十二大分组 + 邮件 SMTP）
@@ -1129,6 +1204,8 @@ INSERT IGNORE INTO prompt_template (code, name, category, status, version, conte
 
 -- 7. 系统通知
 INSERT IGNORE INTO sys_notification (id, user_id, title, content, type, is_read, create_time) VALUES
+(6, 1, '【系统欢迎】欢迎使用智教云 EduMind', '您已成功登录平台，可在顶部铃铛或个人中心查看教学、知识库与 AI 相关通知。', 'SYSTEM', 0, NOW()),
+(7, 1, '【平台提示】消息通知中心已上线', '支持 WebSocket 实时推送、分类筛选与全部已读，请在个人中心体验完整功能。', 'SYSTEM', 0, NOW()),
 (1, 3, '【作业截止提醒】第一单元链表作业即将截止', '您选修的《数据结构与算法》课程第一单元作业截止时间为今晚 23:59，请及时完成并提交作答。', 'ASSIGNMENT', 0, NOW()),
 (2, 3, '【AI批改完成】单链表设计作业已完成评分', '张老师已确认您的作业批改成绩，综合得分 92 分，点击可查看详细 AI 知识盲点诊断与教师评语。', 'ASSIGNMENT', 1, NOW()),
 (3, 3, '【系统升级】AI 智能助教与知识库升级通知', '平台已上线基于 RAG 的课程知识库向量问答增强系统，欢迎在课程详情中向 AI 助教提问！', 'SYSTEM', 0, NOW()),
@@ -1368,9 +1445,9 @@ INSERT IGNORE INTO ai_model_config (
     enabled, priority, fallback_model_key, max_tokens, temperature,
     is_default, reasoning_effort, dimension, sort_order
 ) VALUES
-('deepseek-chat', 'deepseek-chat', 'deepseek', 'chat', 'deepseek-chat', 'https://api.deepseek.com/v1', 1, 1, 'mock', 4096, 0.70, 1, 'low', 0, 1),
-('qwen-turbo', 'qwen-turbo', 'qwen', 'chat', 'qwen-turbo', 'https://dashscope.aliyuncs.com/compatible-mode/v1', 1, 2, 'mock', 4096, 0.70, 0, 'medium', 0, 2),
-('mock', 'mock', 'mock', 'chat', 'mock', '', 1, 99, NULL, 4096, 0.70, 0, 'low', 0, 99),
+('deepseek-chat', 'deepseek-chat', 'deepseek', 'chat', 'deepseek-chat', 'https://api.deepseek.com/v1', 1, 1, 'mock', 8192, 0.70, 1, 'low', 0, 1),
+('qwen-turbo', 'qwen-turbo', 'qwen', 'chat', 'qwen-turbo', 'https://dashscope.aliyuncs.com/compatible-mode/v1', 1, 2, 'mock', 8192, 0.70, 0, 'medium', 0, 2),
+('mock', 'mock', 'mock', 'chat', 'mock', '', 1, 99, NULL, 8192, 0.70, 0, 'low', 0, 99),
 ('bge-large-zh', 'bge-large-zh', 'bge', 'embedding', 'bge-large-zh-v1.5', 'http://127.0.0.1:8080/v1', 1, 1, NULL, 512, 0.00, 1, 'low', 1024, 1);
 
 INSERT IGNORE INTO ai_gateway_route (scene, primary_model_key, fallback_model_key) VALUES

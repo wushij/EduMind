@@ -6,6 +6,14 @@ import lombok.Data;
 @Data
 public class MemoryConsentDTO {
     private Long courseId;
-    @NotNull(message = "授权状态不能为空")
     private Boolean consent;
+    private Boolean consentGranted;
+    private Integer retentionDays;
+
+    public boolean isAgreed() {
+        if (consentGranted != null) {
+            return consentGranted;
+        }
+        return Boolean.TRUE.equals(consent);
+    }
 }

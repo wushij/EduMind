@@ -2,11 +2,11 @@ package com.edumind.ai.util;
 
 /**
  * 流式推送给前端的思考展示上限（完整思考仍入库，仅 UI 截断防刷屏）。
- * 对齐 goblog MaxReasoningStreamRunes = 6000
+ * 流式思考展示上限（完整思考仍入库）。
  */
 public final class ReasoningStreamLimiter {
 
-    public static final int MAX_REASONING_STREAM_RUNES = 6000;
+    public static final int MAX_REASONING_STREAM_RUNES = 16000;
 
     private ReasoningStreamLimiter() {
     }

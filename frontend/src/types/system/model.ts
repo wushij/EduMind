@@ -70,7 +70,7 @@ export function toLegacyModelConfig(item: AIModelConfigItem): ModelProviderConfi
     endpoint: item.baseUrl || '',
     apiKeyMasked: item.hasApiKey ? '••••••••••••••••' : '',
     contextLength: isEmbedding ? 512 : 64000,
-    maxOutputTokens: isEmbedding ? 0 : 4096,
+    maxOutputTokens: isEmbedding ? 0 : 8192,
     temperature: item.temperature,
     supportsStreaming: !isEmbedding,
     supportsEmbedding: isEmbedding,

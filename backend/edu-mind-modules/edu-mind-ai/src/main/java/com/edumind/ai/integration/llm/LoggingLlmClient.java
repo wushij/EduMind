@@ -3,8 +3,10 @@ package com.edumind.ai.integration.llm;
 import cn.dev33.satoken.stp.StpUtil;
 import com.edumind.ai.dao.AiCallLogDao;
 import com.edumind.ai.entity.AiCallLogEntity;
+import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.infrastructure.redis.cache.AiQuotaService;
+import com.edumind.system.api.TenantQuotaApi;
 import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDateTime;
@@ -18,6 +20,7 @@ public class LoggingLlmClient implements LlmClient {
     private final LlmProperties properties;
     private final AiQuotaService aiQuotaService;
     private final long dailyQuota;
+    private final TenantQuotaApi tenantQuotaApi;
 
     @Override
     public String chat(String systemPrompt, String userPrompt) {
@@ -85,11 +88,14 @@ public class LoggingLlmClient implements LlmClient {
     }
 
     private void assertQuota() {
-        if (!StpUtil.isLogin()) {
-            return;
+        if (StpUtil.isLogin()) {
+            if (!aiQuotaService.checkAndIncrementDailyQuota(StpUtil.getLoginIdAsLong(), dailyQuota)) {
+                throw new BusinessException("今日 AI 调用次数已达上限");
+            }
         }
-        if (!aiQuotaService.checkAndIncrementDailyQuota(StpUtil.getLoginIdAsLong(), dailyQuota)) {
-            throw new BusinessException("今日 AI 调用次数已达上限");
+        Long tenantId = TenantContext.getTenantId();
+        if (tenantId != null && tenantId > 0 && tenantQuotaApi != null) {
+            tenantQuotaApi.checkTokenQuotaAvailable(tenantId);
         }
     }
 
@@ -105,6 +111,15 @@ public class LoggingLlmClient implements LlmClient {
         entity.setLatencyMs((int) (System.currentTimeMillis() - startMs));
         entity.setCreateTime(LocalDateTime.now());
         aiCallLogDao.insert(entity);
+
+        // 原子扣减租户 Token 配额
+        Long tenantId = entity.getTenantId() != null ? entity.getTenantId() : TenantContext.getTenantId();
+        if (tenantId != null && tenantId > 0 && tenantQuotaApi != null) {
+            long totalTokens = (long) promptTokens + completionTokens;
+            if (totalTokens > 0) {
+                tenantQuotaApi.consumeTokenQuota(tenantId, totalTokens);
+            }
+        }
     }
 
     private int estimateTokens(String... texts) {

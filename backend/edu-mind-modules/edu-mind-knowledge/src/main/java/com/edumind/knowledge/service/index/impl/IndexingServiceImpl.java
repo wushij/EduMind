@@ -169,7 +169,7 @@ public class IndexingServiceImpl implements IndexingService {
         String title = "INDEXED".equals(status) ? "向量索引完成" : "INDEX_FAILED".equals(status) ? "向量索引失败" : "向量索引更新";
         String content = "知识库 #" + knowledgeBaseId + " 索引状态：" + status
                 + "，成功 " + indexed + " 条，失败 " + failed + " 条。";
-        notificationWriteApi.sendToUser(userId, title, content, "KNOWLEDGE_INDEX");
+        notificationWriteApi.sendToUser(userId, title, content, "KNOWLEDGE_INDEX", knowledgeBaseId);
     }
 
     @Override

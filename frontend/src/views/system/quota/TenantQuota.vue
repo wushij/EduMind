@@ -8,19 +8,21 @@
       <template #extra>
         <div class="hero-stats-row">
           <div class="hero-stat-card">
-            <span class="stat-num text-primary">48.2%</span>
+            <span class="stat-num text-primary">{{ tokenPercentage }}%</span>
             <span class="stat-label">本月 Token 消耗水位</span>
           </div>
           <div class="hero-stat-card">
-            <span class="stat-num text-success">1.82 GB</span>
+            <span class="stat-num text-success">{{ (quotas.storageUsed / 1024).toFixed(2) }} GB</span>
             <span class="stat-label">向量检索库容量</span>
           </div>
           <div class="hero-stat-card">
-            <span class="stat-num text-warning">42 QPS</span>
+            <span class="stat-num text-warning">{{ quotas.qpsPeak }} QPS</span>
             <span class="stat-label">今日并发峰值</span>
           </div>
           <div class="hero-stat-card">
-            <span class="stat-num text-info">正常</span>
+            <span class="stat-num" :class="tokenPercentage >= quotas.tokenWarningThreshold ? (tokenPercentage >= 100 ? 'text-danger' : 'text-warning') : 'text-info'">
+              {{ tokenPercentage >= 100 ? '超额阻断' : (tokenPercentage >= quotas.tokenWarningThreshold ? '水位预警' : '配额正常') }}
+            </span>
             <span class="stat-label">配额健康状态</span>
           </div>
         </div>
@@ -59,7 +61,7 @@
                 <span class="sub">周期：按自然月度重置</span>
               </div>
             </div>
-            <el-tag :type="tokenPercentage > 80 ? 'danger' : 'primary'" size="small">
+            <el-tag :type="tokenPercentage >= quotas.tokenWarningThreshold ? (tokenPercentage >= 100 ? 'danger' : 'warning') : 'primary'" size="small">
               {{ tokenPercentage }}% 已消耗
             </el-tag>
           </div>
@@ -69,14 +71,16 @@
               <span class="total-val">/ {{ (quotas.tokenLimit / 10000).toFixed(0) }}万 Tokens</span>
             </div>
             <el-progress
-              :percentage="tokenPercentage"
-              :color="tokenPercentage > 85 ? '#EF4444' : '#2563EB'"
+              :percentage="Math.min(100, tokenPercentage)"
+              :color="isTokenWarning ? (tokenPercentage >= 100 ? '#EF4444' : '#F59E0B') : '#2563EB'"
               :stroke-width="10"
               style="margin: 14px 0;"
             />
             <div class="card-bottom-info">
               <span>预警水位线：{{ quotas.tokenWarningThreshold }}%</span>
-              <span class="est-text">预计可用 14 天</span>
+              <span class="est-text" :class="{ 'text-danger': tokenPercentage >= 100 }">
+                {{ tokenPercentage >= 100 ? '租户 Token 配额已耗尽，请联系管理员扩容' : (isTokenWarning ? '建议尽快扩容' : '余量充足') }}
+              </span>
             </div>
           </div>
         </div>
@@ -267,7 +271,9 @@ const configDialogVisible = ref(false);
 const quotas = ref({
   tokenUsed: 4820000,
   tokenLimit: 10000000,
+  tokenUsagePercent: 48,
   tokenWarningThreshold: 85,
+  tokenIsWarning: false,
   storageUsed: 1820,
   storageLimit: 5120,
   qpsPeak: 42,
@@ -282,12 +288,24 @@ const editForm = ref({
   qpsLimit: 80
 });
 
+// 水位优先使用后端计算好的 usagePercent，避免前端重复计算
 const tokenPercentage = computed(() => {
-  return Math.round((quotas.value.tokenUsed / quotas.value.tokenLimit) * 100);
+  if (typeof quotas.value.tokenUsagePercent === 'number') {
+    return quotas.value.tokenUsagePercent;
+  }
+  return quotas.value.tokenLimit > 0 ? Math.round((quotas.value.tokenUsed / quotas.value.tokenLimit) * 100) : 0;
+});
+
+// 预警状态优先读取后端 VO 的 isWarning 标志
+const isTokenWarning = computed(() => {
+  if (typeof quotas.value.tokenIsWarning === 'boolean') {
+    return quotas.value.tokenIsWarning;
+  }
+  return tokenPercentage.value >= quotas.value.tokenWarningThreshold;
 });
 
 const storagePercentage = computed(() => {
-  return Math.round((quotas.value.storageUsed / quotas.value.storageLimit) * 100);
+  return quotas.value.storageLimit > 0 ? Math.round((quotas.value.storageUsed / quotas.value.storageLimit) * 100) : 0;
 });
 
 const auditRecords = ref([
@@ -307,7 +325,24 @@ const refreshQuotas = async () => {
       if (tokenItem) {
         quotas.value.tokenUsed = tokenItem.usedValue;
         quotas.value.tokenLimit = tokenItem.limitValue;
+        quotas.value.tokenUsagePercent = tokenItem.usagePercent ?? (tokenItem.limitValue > 0 ? Math.round((tokenItem.usedValue / tokenItem.limitValue) * 100) : 0);
         quotas.value.tokenWarningThreshold = tokenItem.warningThreshold;
+        quotas.value.tokenIsWarning = tokenItem.isWarning ?? (quotas.value.tokenUsagePercent >= tokenItem.warningThreshold);
+      }
+      const storageItem = res.data.find(q => q.quotaType === 'STORAGE');
+      if (storageItem) {
+        quotas.value.storageUsed = storageItem.usedValue;
+        quotas.value.storageLimit = storageItem.limitValue;
+      }
+      const qpsItem = res.data.find(q => q.quotaType === 'QPS');
+      if (qpsItem) {
+        quotas.value.qpsPeak = qpsItem.usedValue;
+        quotas.value.qpsLimit = qpsItem.limitValue;
+      }
+      const seatsItem = res.data.find(q => q.quotaType === 'SEATS');
+      if (seatsItem) {
+        quotas.value.concurrencyUsed = seatsItem.usedValue;
+        quotas.value.concurrencyLimit = seatsItem.limitValue;
       }
     }
     ElMessage.success('用量监控数据已同步');

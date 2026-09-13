@@ -19,14 +19,21 @@ import com.edumind.course.service.course.CourseService;
 import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.course.vo.course.CourseVO;
 import com.edumind.course.vo.knowledge.KnowledgePointVO;
+import com.edumind.system.api.OrganizationQueryApi;
+import com.edumind.system.api.TenantDataScope;
+import com.edumind.system.api.TenantDataScopeApi;
 import com.edumind.system.api.UserQueryApi;
 import com.edumind.system.vo.user.UserVO;
 import com.edumind.common.context.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,31 +45,48 @@ public class CourseServiceImpl implements CourseService {
     private final KnowledgePointDao knowledgePointDao;
     private final CourseConverter courseConverter;
     private final UserQueryApi userQueryApi;
+    private final TenantDataScopeApi tenantDataScopeApi;
+    private final OrganizationQueryApi organizationQueryApi;
 
     @Override
     public PageResult<CourseVO> listCourses(CourseQueryDTO query) {
         Long currentUserId = StpUtil.getLoginIdAsLong();
-        List<String> roles = userQueryApi.getRolesByUserId(currentUserId);
+        Long tenantId = TenantContext.getTenantId();
+        TenantDataScope scope = tenantDataScopeApi.resolve(currentUserId, tenantId);
 
         Page<CourseEntity> page;
-        if (roles.contains(RoleCode.ADMIN.getCode())) {
+        if (scope.isAllTenant()) {
             page = courseDao.pageQueryAll(query);
-        } else if (roles.contains(RoleCode.TEACHER.getCode())) {
-            List<Long> teacherCourseIds = courseDao.findByTeacherId(currentUserId).stream()
-                    .map(CourseEntity::getId)
-                    .collect(Collectors.toList());
-            if (teacherCourseIds.isEmpty()) {
-                return PageResult.empty(defaultPage(query), defaultPageSize(query));
-            }
-            page = courseDao.pageQuery(query, teacherCourseIds);
-        } else if (roles.contains(RoleCode.STUDENT.getCode())) {
-            List<Long> enrolledCourseIds = courseMemberDao.findCourseIdsByUserId(currentUserId);
-            if (enrolledCourseIds.isEmpty()) {
-                return PageResult.empty(defaultPage(query), defaultPageSize(query));
-            }
-            page = courseDao.pageQuery(query, enrolledCourseIds);
         } else {
-            return PageResult.empty(defaultPage(query), defaultPageSize(query));
+            Set<Long> allowedCourseIds = new HashSet<>(scope.getCourseIds());
+            List<String> roles = userQueryApi.getRolesByUserId(currentUserId);
+            if (roles != null && roles.contains(RoleCode.TEACHER.getCode())) {
+                List<Long> teacherCourseIds = courseDao.findByTeacherId(currentUserId).stream()
+                        .map(CourseEntity::getId)
+                        .collect(Collectors.toList());
+                allowedCourseIds.addAll(teacherCourseIds);
+            }
+            if (roles != null && roles.contains(RoleCode.STUDENT.getCode())) {
+                allowedCourseIds.addAll(courseMemberDao.findCourseIdsByUserId(currentUserId));
+            }
+            // 院系管理员/教研负责人：包含所属组织及子树下所有成员所授课程
+            if (scope.getOrgIds() != null && !scope.getOrgIds().isEmpty()) {
+                for (Long orgId : scope.getOrgIds()) {
+                    List<Long> userIds = organizationQueryApi.listUserIdsByOrgId(tenantId, orgId);
+                    if (!CollectionUtils.isEmpty(userIds)) {
+                        for (Long uid : userIds) {
+                            allowedCourseIds.addAll(courseDao.findByTeacherId(uid).stream()
+                                    .map(CourseEntity::getId)
+                                    .collect(Collectors.toList()));
+                        }
+                    }
+                }
+            }
+
+            if (allowedCourseIds.isEmpty()) {
+                return PageResult.empty(defaultPage(query), defaultPageSize(query));
+            }
+            page = courseDao.pageQuery(query, new ArrayList<>(allowedCourseIds));
         }
 
         List<CourseVO> list = page.getRecords().stream()

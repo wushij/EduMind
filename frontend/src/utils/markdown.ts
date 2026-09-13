@@ -265,11 +265,6 @@ function normalizeLatexDelimiters(text: string): string {
         (_m, formula: string) => `$${repairMalformedLeftRight(formula.trim())}$`
       );
 
-      // 修复流式输出里缺失的 $ 闭合：$...\\frac 直到行末或中文
-      s = s.replace(
-        /(?<!\$)\$(?!\$)([^$\n]*\\(?:frac|left|right|boxed|lim|ln|le|ge|Rightarrow)[^$\n]*)(?=\s*[\u4e00-\u9fa5，。；;！!？?]|$)/g,
-        (_m, formula: string) => `$${repairMalformedLeftRight(formula.trim())}$`
-      );
 
       // 修复 $...$ 与 $$...$$ 内部的 \left/\right
       s = s.replace(/\$\$([\s\S]+?)\$\$/g, (_m, formula: string) => `$$${repairMalformedLeftRight(formula)}$$`);

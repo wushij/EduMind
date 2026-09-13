@@ -10,7 +10,7 @@ export const DEFAULT_CHAT_MODELS: ModelProviderConfig[] = [
     endpoint: '',
     apiKeyMasked: '',
     contextLength: 64000,
-    maxOutputTokens: 4096,
+    maxOutputTokens: 8192,
     temperature: 0.3,
     supportsStreaming: true,
     supportsEmbedding: false,

@@ -43,6 +43,22 @@ public class SysOrganizationController {
         return ApiResult.success(sysOrganizationService.getOrgMembers(tenantId, id));
     }
 
+    @PostMapping("/{id}/members")
+    @SaCheckPermission(value = {"system:organization:assign", "system:organization:edit", "system:user:edit"}, mode = SaMode.OR)
+    public ApiResult<Void> assignMember(@PathVariable("id") Long id, @Valid @RequestBody com.edumind.system.dto.tenant.OrgMemberAssignDTO dto) {
+        Long tenantId = TenantContext.requireTenantId();
+        sysOrganizationService.assignMember(tenantId, id, dto);
+        return ApiResult.success();
+    }
+
+    @DeleteMapping("/{id}/members/{memberId}")
+    @SaCheckPermission(value = {"system:organization:assign", "system:organization:edit", "system:user:edit"}, mode = SaMode.OR)
+    public ApiResult<Void> removeMember(@PathVariable("id") Long id, @PathVariable("memberId") Long memberId) {
+        Long tenantId = TenantContext.requireTenantId();
+        sysOrganizationService.removeMember(tenantId, id, memberId);
+        return ApiResult.success();
+    }
+
     @PostMapping
     @SaCheckPermission(value = {"system:organization:create", "system:organization:edit", "system:user:edit"}, mode = SaMode.OR)
     public ApiResult<Long> createNode(@Valid @RequestBody OrgCreateDTO dto) {

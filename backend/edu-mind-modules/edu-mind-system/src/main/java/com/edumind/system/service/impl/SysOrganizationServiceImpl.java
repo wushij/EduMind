@@ -8,6 +8,7 @@ import com.edumind.system.dao.SysMemberOrgDao;
 import com.edumind.system.dao.SysOrganizationDao;
 import com.edumind.system.dao.SysTenantMemberDao;
 import com.edumind.system.dao.UserDao;
+import com.edumind.system.dto.tenant.OrgMemberAssignDTO;
 import com.edumind.system.entity.SysMemberOrgEntity;
 import com.edumind.system.entity.SysOrganizationEntity;
 import com.edumind.system.entity.SysTenantMemberEntity;
@@ -26,6 +27,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import cn.dev33.satoken.stp.StpUtil;
+import com.edumind.system.api.TenantDataScope;
+import com.edumind.system.api.TenantDataScopeApi;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -37,6 +42,7 @@ public class SysOrganizationServiceImpl implements SysOrganizationService, Organ
     private final SysMemberOrgDao sysMemberOrgDao;
     private final SysTenantMemberDao sysTenantMemberDao;
     private final UserDao userDao;
+    private final TenantDataScopeApi tenantDataScopeApi;
 
     private Long resolveAndVerifyTenantId(Long explicitTenantId) {
         Long currentTenantId = TenantContext.requireTenantId();
@@ -46,10 +52,27 @@ public class SysOrganizationServiceImpl implements SysOrganizationService, Organ
         return currentTenantId;
     }
 
+    /**
+     * 获取当前租户的组织架构树
+     * 注意 (UX 边界)：
+     * 1. 平台管理员/校级管理员 (allTenant=true) 拥有全校可见视角；
+     * 2. 院系管理员 (ORG_ADMIN) 仅能看到所辖院系及其展开的下级子树；
+     * 3. 普通教师/学生未绑定任何组织节点时，数据范围 orgIds 为空，返回空树结构，属于安全合规预期（前端展示未分配提示）。
+     */
     @Override
     public List<OrganizationNodeVO> getTree(Long tenantId) {
         Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
         List<SysOrganizationEntity> entities = sysOrganizationDao.listByTenantId(resolvedTenantId);
+        if (StpUtil.isLogin()) {
+            Long currentUserId = StpUtil.getLoginIdAsLong();
+            TenantDataScope scope = tenantDataScopeApi.resolve(currentUserId, resolvedTenantId);
+            if (!scope.isAllTenant()) {
+                Set<Long> visible = scope.getOrgIds();
+                entities = entities.stream()
+                        .filter(e -> visible.contains(e.getId()))
+                        .collect(Collectors.toList());
+            }
+        }
         return buildTree(entities, resolvedTenantId);
     }
 
@@ -77,7 +100,7 @@ public class SysOrganizationServiceImpl implements SysOrganizationService, Organ
                 .distinct()
                 .collect(Collectors.toList());
 
-        List<SysTenantMemberEntity> members = sysTenantMemberDao.listByIds(tenantId, memberIds);
+        List<SysTenantMemberEntity> members = sysTenantMemberDao.listByIds(resolvedTenantId, memberIds);
         return members.stream().map(member -> {
             UserEntity user = userDao.findById(member.getUserId());
             String displayName = member.getRealName() != null ? member.getRealName() : "学员 " + member.getUserId();
@@ -95,6 +118,57 @@ public class SysOrganizationServiceImpl implements SysOrganizationService, Organ
                     .lastActive(null)
                     .build();
         }).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assignMember(Long tenantId, Long orgId, OrgMemberAssignDTO dto) {
+        if (dto == null || dto.getMemberId() == null) {
+            throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "成员ID不能为空");
+        }
+        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
+        SysOrganizationEntity org = sysOrganizationDao.findByIdAndTenantId(orgId, resolvedTenantId);
+        if (org == null) {
+            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "组织节点不存在或不属于当前学校");
+        }
+
+        // 校验成员是否存在且属于当前学校
+        SysTenantMemberEntity tenantMember = sysTenantMemberDao.findById(dto.getMemberId());
+        if (tenantMember == null || !resolvedTenantId.equals(tenantMember.getTenantId())) {
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "该成员不属于当前学校");
+        }
+
+        String roleType = dto.getRoleType() != null && !dto.getRoleType().isBlank()
+                ? dto.getRoleType().trim().toUpperCase()
+                : "STUDENT";
+
+        // 幂等处理：若已存在该分配关系，则更新角色类型；若不存在则新增
+        SysMemberOrgEntity exist = sysMemberOrgDao.findByTenantOrgAndMember(resolvedTenantId, orgId, dto.getMemberId());
+        if (exist != null) {
+            exist.setRoleType(roleType);
+            sysMemberOrgDao.updateById(exist);
+        } else {
+            SysMemberOrgEntity relation = new SysMemberOrgEntity();
+            relation.setTenantId(resolvedTenantId);
+            relation.setOrganizationId(orgId);
+            relation.setMemberId(dto.getMemberId());
+            relation.setRoleType(roleType);
+            sysMemberOrgDao.insert(relation);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void removeMember(Long tenantId, Long orgId, Long memberId) {
+        if (memberId == null) {
+            throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "成员ID不能为空");
+        }
+        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
+        SysOrganizationEntity org = sysOrganizationDao.findByIdAndTenantId(orgId, resolvedTenantId);
+        if (org == null) {
+            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "组织节点不存在或不属于当前学校");
+        }
+        sysMemberOrgDao.deleteByTenantOrgAndMember(resolvedTenantId, orgId, memberId);
     }
 
     private String resolveOrgRoleLabel(String roleType) {
@@ -240,5 +314,18 @@ public class SysOrganizationServiceImpl implements SysOrganizationService, Organ
     public List<Long> listMemberIdsByOrgId(Long tenantId, Long organizationId) {
         Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
         return sysMemberOrgDao.listMemberIdsByOrgId(resolvedTenantId, organizationId);
+    }
+
+    @Override
+    public List<Long> listUserIdsByOrgId(Long tenantId, Long organizationId) {
+        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
+        List<Long> memberIds = sysMemberOrgDao.listMemberIdsByOrgId(resolvedTenantId, organizationId);
+        if (CollectionUtils.isEmpty(memberIds)) {
+            return Collections.emptyList();
+        }
+        return sysTenantMemberDao.listByIds(resolvedTenantId, memberIds).stream()
+                .map(SysTenantMemberEntity::getUserId)
+                .distinct()
+                .collect(Collectors.toList());
     }
 }

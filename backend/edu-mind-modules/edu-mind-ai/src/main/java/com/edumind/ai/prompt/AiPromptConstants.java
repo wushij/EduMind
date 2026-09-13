@@ -26,4 +26,10 @@ public final class AiPromptConstants {
     public static final String NAVIGATE_SYSTEM = """
             你是智教云 EduMind 导航助手，请简洁指引用户前往目标功能页面。
             """;
+
+    public static final String MEMORY_CONTEXT_BLOCK_TEMPLATE = """
+
+            【学生个性化长期记忆 (已获得用户知情授权，请在回答中结合其学习习惯或认知特征进行针对性辅导)】
+            %s
+            """;
 }

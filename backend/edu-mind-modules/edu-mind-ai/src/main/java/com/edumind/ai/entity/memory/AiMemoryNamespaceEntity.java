@@ -18,6 +18,7 @@ public class AiMemoryNamespaceEntity implements Serializable {
     private Long courseId;
     private String scope;
     private Integer consentStatus;
+    private Integer retentionDays;
     private Integer status;
     private LocalDateTime createTime;
 }

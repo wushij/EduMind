@@ -81,13 +81,7 @@
         </el-dropdown>
       </div>
 
-      <el-tooltip content="通知消息" placement="bottom">
-        <div class="action-item">
-          <el-badge :value="3" class="item">
-            <el-icon :size="20"><Bell /></el-icon>
-          </el-badge>
-        </div>
-      </el-tooltip>
+      <NotificationBell />
 
       <el-dropdown trigger="click" placement="bottom-end" @command="handleCommand">
         <div class="user-profile">
@@ -128,7 +122,6 @@ import {
   Fold,
   Expand,
   Search,
-  Bell,
   ArrowDown,
   User,
   Setting,
@@ -143,6 +136,7 @@ import { useTenantStore } from '@/stores/system/tenant';
 import { DEFAULT_AVATAR } from '@/constants/auth';
 import { ElMessage } from 'element-plus';
 import { onMounted } from 'vue';
+import NotificationBell from '@/components/notification/NotificationBell.vue';
 
 defineProps<{ isCollapsed: boolean }>();
 defineEmits(['toggle-sidebar']);

@@ -11,4 +11,12 @@
     <artifactId>edu-mind-system-api</artifactId>
     <name>edu-mind-system-api</name>
     <description>System 模块跨模块公开 API（仅接口，无实现）</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
 </project>

@@ -18,6 +18,8 @@ public interface AgentMemoryService {
 
     void forgetMemory(Long memoryId);
 
+    void forgetAll(Long courseId);
+
     void feedbackMemory(Long memoryId, MemoryFeedbackDTO dto);
 
     List<MemoryItemVO> retrieveMemories(Long courseId, String queryPrompt);

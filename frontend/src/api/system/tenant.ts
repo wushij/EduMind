@@ -66,6 +66,14 @@ export function getOrgMembers(id: number): Promise<ApiResponse<OrganizationMembe
   return get<OrganizationMemberVO[]>(`/system/organizations/${id}/members`, undefined, { silent: true });
 }
 
+export function assignOrgMember(id: number, data: { memberId: number; roleType?: string }): Promise<ApiResponse<void>> {
+  return post<void>(`/system/organizations/${id}/members`, data);
+}
+
+export function removeOrgMember(id: number, memberId: number): Promise<ApiResponse<void>> {
+  return del<void>(`/system/organizations/${id}/members/${memberId}`);
+}
+
 // ===== 租户配额管控 =====
 
 export function listTenantQuotas(tenantId?: number): Promise<ApiResponse<TenantQuotaVO[]>> {

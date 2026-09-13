@@ -37,6 +37,12 @@ export const systemRoutes: RouteRecordRaw[] = [
     meta: { title: '角色权限管理', requiresAuth: true, roles: ['ADMIN'] }
   },
   {
+    path: '/system/menus',
+    name: 'SystemMenuList',
+    component: () => import('@/views/system/menu/index.vue'),
+    meta: { title: '菜单管理', requiresAuth: true, roles: ['ADMIN'] }
+  },
+  {
     path: '/system/permissions',
     name: 'SystemPermission',
     component: () => import('@/views/system/roles/Permission.vue'),
@@ -101,14 +107,6 @@ export const systemRoutes: RouteRecordRaw[] = [
     meta: { title: '系统安全与调用审计', requiresAuth: true, roles: ['ADMIN'] }
   },
 
-  // 平台通用配置
-  {
-    path: '/system/config',
-    name: 'SystemConfig',
-    component: () => import('@/views/system/config/SystemConfig.vue'),
-    meta: { title: '平台全局配置', requiresAuth: true, roles: ['ADMIN'] }
-  },
-
   // AI 网关
   {
     path: '/system/gateway',
@@ -126,5 +124,24 @@ export const systemRoutes: RouteRecordRaw[] = [
       roles: ['ADMIN'],
       activeMenu: '/system/gateway'
     }
+  },
+
+  {
+    path: '/system/notification-broadcast',
+    name: 'NotificationBroadcast',
+    component: () => import('@/views/system/notification/BroadcastList.vue'),
+    meta: {
+      title: '消息广播推送',
+      requiresAuth: true,
+      permissions: ['notice:broadcast:view']
+    }
+  },
+
+  // 平台全局配置 (放最后)
+  {
+    path: '/system/config',
+    name: 'SystemConfig',
+    component: () => import('@/views/system/config/SystemConfig.vue'),
+    meta: { title: '平台全局配置', requiresAuth: true, roles: ['ADMIN'] }
   }
 ];

@@ -21,9 +21,9 @@ import java.util.stream.Collectors;
 public class UserQueryApiImpl implements UserQueryApi {
 
     private final UserDao userDao;
+    private final UserRoleDao userRoleDao;
     private final RoleDao roleDao;
     private final PermissionDao permissionDao;
-    private final UserRoleDao userRoleDao;
     private final UserVoAssembler userVoAssembler;
 
     @Override
@@ -56,5 +56,32 @@ public class UserQueryApiImpl implements UserQueryApi {
     @Override
     public List<Long> listUserIdsByRoleId(Long roleId) {
         return userRoleDao.findUserIdsByRoleId(roleId);
+    }
+
+    @Override
+    public List<Long> listAllActiveUserIds() {
+        return userDao.listAllActiveUserIds();
+    }
+
+    @Override
+    public List<Long> listUserIdsByRoleCode(String roleCode) {
+        if (roleCode == null || roleCode.isBlank()) {
+            return Collections.emptyList();
+        }
+        RoleEntity role = roleDao.findByRoleCode(roleCode.trim().toUpperCase());
+        if (role == null) {
+            return Collections.emptyList();
+        }
+        return userRoleDao.findUserIdsByRoleId(role.getId());
+    }
+
+    @Override
+    public long countActiveUsers() {
+        return userDao.countActiveUsers();
+    }
+
+    @Override
+    public long countUsersByRoleCode(String roleCode) {
+        return listUserIdsByRoleCode(roleCode).size();
     }
 }

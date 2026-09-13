@@ -132,7 +132,8 @@ import {
   Monitor,
   Avatar,
   CreditCard,
-  Tools
+  Tools,
+  Bell
 } from '@element-plus/icons-vue';
 import { useAuthStore } from '@/stores/auth/auth';
 import { useAppStore } from '@/stores/app/app';
@@ -313,6 +314,21 @@ function buildModuleDefinitions(): NavModule[] {
       ]
     },
 
+    // AI 智算中心
+    {
+      key: 'ai-compute',
+      name: 'AI 智算中心',
+      icon: Cpu,
+      roles: ['ADMIN'],
+      children: [
+        { path: '/system/models', name: 'AI 模型', icon: Cpu },
+        { path: '/system/prompts', name: 'Prompt 模板', icon: ChatLineSquare },
+        { path: '/system/tools', name: 'AI 工具', icon: Operation },
+        { path: '/system/gateway', name: 'AI 网关', icon: Connection },
+        { path: '/system/quotas', name: '算力与配额', icon: Money }
+      ]
+    },
+
     // 系统管理
     {
       key: 'system',
@@ -321,27 +337,30 @@ function buildModuleDefinitions(): NavModule[] {
       roles: ['ADMIN'],
       permissions: ['system:user:view', 'system:role:view'],
       children: [
-        { path: '/system/tenants', name: '租户与校区', icon: School },
-        { path: '/system/organizations', name: '组织架构', icon: Connection },
         { path: '/system/users', name: '用户管理', icon: User, permissions: ['system:user:view'] },
         { path: '/system/roles', name: '角色权限', icon: Lock, permissions: ['system:role:view'] },
+        { path: '/system/menus', name: '菜单管理', icon: Operation },
         { path: '/system/permissions', name: '权限分配', icon: Key },
-        { path: '/system/tools', name: 'AI 工具', icon: Operation },
-        { path: '/system/models', name: 'AI 模型', icon: Cpu },
-        { path: '/system/prompts', name: 'Prompt', icon: ChatLineSquare },
-        { path: '/system/quotas', name: '租户配额管控', icon: Money },
+        { path: '/system/tenants', name: '租户与校区', icon: School },
+        { path: '/system/organizations', name: '组织架构', icon: Connection },
         { path: '/system/audit', name: '审计日志', icon: Clock },
-        { path: '/system/config', name: '系统配置', icon: Monitor },
-        { path: '/system/gateway', name: 'AI 网关', icon: Connection }
+        {
+          path: '/system/notification-broadcast',
+          name: '消息广播',
+          icon: Promotion,
+          permissions: ['notice:broadcast:view']
+        },
+        { path: '/system/config', name: '系统配置', icon: Monitor }
       ]
     },
 
-    // 个人中心
+    // 个人中心（含消息通知，对齐 mock 菜单「通知与个人」）
     {
       key: 'profile',
       name: '个人中心',
       icon: User,
       children: [
+        { path: '/notice', name: '消息通知', icon: Bell },
         { path: '/profile', name: '个人资料', icon: Avatar },
         { path: '/profile/security', name: '账号安全', icon: Lock },
         { path: '/profile/ai-usage', name: 'AI 消耗明细', icon: CreditCard },

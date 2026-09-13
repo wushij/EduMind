@@ -8,6 +8,7 @@ import { getUserInfo, logout as logoutApi, login as loginApi } from '@/api/auth/
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_USERS } from '@/mock/users';
 import { normalizeAvatarUrl } from '@/utils/format/file';
+import { useNotifyStore } from '@/stores/notification/notify';
 
 const DEFAULT_ROLE_ACCOUNTS: Record<'ADMIN' | 'TEACHER' | 'STUDENT', { username: string; password: string }> = {
   ADMIN: { username: 'admin', password: 'admin123' },
@@ -34,6 +35,9 @@ export const useAuthStore = defineStore('auth', () => {
   const setToken = (newToken: string) => {
     token.value = newToken;
     tokenUtil.set(newToken);
+    const notifyStore = useNotifyStore();
+    notifyStore.stopWs();
+    notifyStore.startWs();
   };
 
   const setUser = (user: UserInfo) => {
@@ -166,6 +170,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch {
       // 忽略登出接口异常，仍清除本地态
     }
+    useNotifyStore().stopWs();
     token.value = null;
     currentUser.value = null;
     permissions.value = [];

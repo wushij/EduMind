@@ -44,7 +44,7 @@ function mapChatModelVo(list: ChatModelVO[]): ModelProviderConfig[] {
       endpoint: '',
       apiKeyMasked: '',
       contextLength: 32000,
-      maxOutputTokens: 4096,
+      maxOutputTokens: 8192,
       temperature: 0.3,
       supportsStreaming: true,
       supportsEmbedding: false,

@@ -19,6 +19,11 @@ public interface OrganizationQueryApi {
     List<Long> listMemberIdsByOrgId(Long tenantId, Long organizationId);
 
     /**
+     * 获取指定班级/组织下的系统用户ID列表
+     */
+    List<Long> listUserIdsByOrgId(Long tenantId, Long organizationId);
+
+    /**
      * 获取成员所属的组织信息
      */
     List<Map<String, Object>> listOrgsByMemberId(Long tenantId, Long memberId);

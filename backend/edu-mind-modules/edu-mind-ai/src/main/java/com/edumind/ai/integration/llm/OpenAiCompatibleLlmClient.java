@@ -130,6 +130,9 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
             return;
         }
         String reasoning = delta.getString("reasoning_content");
+        if (!StringUtils.hasText(reasoning)) {
+            reasoning = delta.getString("reasoning");
+        }
         if (StringUtils.hasText(reasoning)) {
             callback.onReasoning(reasoning);
         }
@@ -178,7 +181,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         if (properties.getTemperature() != null) {
             body.put("temperature", properties.getTemperature());
         }
-        applyReasoningEffort(body);
+        applyThinkingOptions(body);
         body.put("messages", List.of(
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userPrompt)
@@ -186,19 +189,25 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         return body;
     }
 
-    private void applyReasoningEffort(Map<String, Object> body) {
+    /**
+     * 对齐 Code Compass：DeepSeek 默认开启 thinking；通义兼容模式开启 enable_thinking。
+     * 否则上游不会返回 reasoning_content，前端「深度思考」卡片无内容。
+     */
+    private void applyThinkingOptions(Map<String, Object> body) {
         String provider = properties.getProvider() != null ? properties.getProvider().toLowerCase() : "";
-        if (!provider.contains("deepseek")) {
+        String baseUrl = properties.getBaseUrl() != null ? properties.getBaseUrl().toLowerCase() : "";
+
+        if (provider.contains("deepseek") || baseUrl.contains("deepseek")) {
+            String effort = ReasoningEffortNormalizer.normalize(properties.getReasoningEffort());
+            body.put("reasoning_effort", effort);
+            body.put("thinking", Map.of("type", "enabled"));
             return;
         }
-        String model = properties.getModel() != null ? properties.getModel().toLowerCase() : "";
-        // deepseek-v4-flash 等对话模型不支持 thinking / reasoning_effort，仅 reasoner 系列需要
-        if (!model.contains("reasoner") && !model.contains("-r1") && !model.contains("think")) {
-            return;
+
+        if (provider.contains("qwen") || provider.contains("tongyi") || provider.contains("dashscope")
+                || baseUrl.contains("dashscope")) {
+            body.put("enable_thinking", true);
         }
-        String effort = ReasoningEffortNormalizer.normalize(properties.getReasoningEffort());
-        body.put("reasoning_effort", effort);
-        body.put("thinking", Map.of("type", "enabled"));
     }
 
     private String normalizeBaseUrl() {

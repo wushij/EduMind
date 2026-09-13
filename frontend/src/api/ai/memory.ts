@@ -24,6 +24,10 @@ export function forgetMemoryItem(id: number): Promise<ApiResponse<void>> {
   return del<void>(`/ai/memories/${id}`);
 }
 
+export function forgetAllMemories(courseId?: number): Promise<ApiResponse<void>> {
+  return del<void>('/ai/memories/all', { courseId });
+}
+
 export function feedbackMemoryItem(id: number, data: MemoryFeedbackRequest): Promise<ApiResponse<void>> {
   return put<void>(`/ai/memories/${id}/feedback`, data);
 }

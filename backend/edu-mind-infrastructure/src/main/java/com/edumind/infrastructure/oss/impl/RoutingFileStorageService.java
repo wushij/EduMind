@@ -61,7 +61,6 @@ public class RoutingFileStorageService implements FileStorageService {
             config = StorageConfig.builder().type("local").build();
         }
         FileStorageService next = createDriver(config);
-        FileStorageService prev = this.delegate;
         this.delegate = next;
         this.currentConfig = config;
         log.info("文件存储驱动已热切换成功: 引擎类型={}, 实例={}", next.getStorageType(), next.getClass().getSimpleName());

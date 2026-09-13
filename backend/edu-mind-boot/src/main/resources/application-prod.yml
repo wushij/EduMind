@@ -13,6 +13,10 @@ spring:
       #   master: mymaster
       #   nodes: ${REDIS_SENTINEL_NODES:127.0.0.1:26379}
 
+ai:
+  llm:
+    mock-enabled: false
+
 edumind:
   rate-limit:
     enabled: true

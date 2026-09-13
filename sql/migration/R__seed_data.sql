@@ -49,7 +49,11 @@ INSERT IGNORE INTO sys_permission (id, permission_code, permission_name, parent_
 (22, 'resource:view',       '资源查看', 0),
 (23, 'resource:upload',     '资源上传', 0),
 (24, 'notice:view',         '通知查看', 0),
-(31, 'ai:tool:use',         'Agent工具调用', 0);
+(31, 'ai:tool:use',         'Agent工具调用', 0),
+(39, 'notice:broadcast:view', '广播推送查看', 0),
+(40, 'notice:broadcast:send', '广播推送发送', 0),
+(53, 'ai:memory:view',      '长期记忆查看', 0),
+(54, 'ai:memory:manage',    '长期记忆管理', 0);
 
 -- 管理员具备所有权限
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
@@ -62,13 +66,16 @@ SELECT 2, id FROM sys_permission WHERE permission_code NOT LIKE 'system:%';
 -- 学生具备选课学习与自测权限
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
 SELECT 3, id FROM sys_permission WHERE permission_code IN (
-    'course:view', 'assignment:view', 'exam:view', 'knowledge:view', 'ai:chat', 'resource:view', 'notice:view'
+    'course:view', 'assignment:view', 'exam:view', 'knowledge:view', 'ai:chat', 'resource:view', 'notice:view',
+    'ai:memory:view', 'ai:memory:manage'
 );
 
 -- -----------------------------------------------------------------------------
 -- 3. 系统消息通知
 -- -----------------------------------------------------------------------------
 INSERT IGNORE INTO sys_notification (id, user_id, title, content, type, is_read, create_time) VALUES
+(6, 1, '【系统欢迎】欢迎使用智教云 EduMind', '您已成功登录平台，可在顶部铃铛或个人中心查看教学、知识库与 AI 相关通知。', 'SYSTEM', 0, NOW()),
+(7, 1, '【平台提示】消息通知中心已上线', '支持 WebSocket 实时推送、分类筛选与全部已读，请在个人中心体验完整功能。', 'SYSTEM', 0, NOW()),
 (1, 3, '【作业截止提醒】第一单元链表作业即将截止', '您选修的《数据结构与算法》课程第一单元作业截止时间为今晚 23:59，请及时完成并提交作答。', 'ASSIGNMENT', 0, NOW()),
 (2, 3, '【AI批改完成】单链表设计作业已完成评分', '张老师已确认您的作业批改成绩，综合得分 92 分，点击可查看详细 AI 知识盲点诊断与教师评语。', 'ASSIGNMENT', 1, NOW()),
 (3, 3, '【系统升级】AI 智能助教与知识库升级通知', '平台已上线基于 RAG 的课程知识库向量问答增强系统，欢迎在课程详情中向 AI 助教提问！', 'SYSTEM', 0, NOW()),

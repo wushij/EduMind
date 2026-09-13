@@ -10,6 +10,7 @@ import { learningRoutes } from './routes/learning';
 import { analyticsRoutes } from './routes/analytics';
 import { systemRoutes } from './routes/system';
 import { profileRoutes } from './routes/profile';
+import { noticeRoutes } from './routes/notice';
 import { setupRouterGuards } from './guards';
 
 const mainRoutes: RouteRecordRaw = {
@@ -25,7 +26,8 @@ const mainRoutes: RouteRecordRaw = {
     ...learningRoutes,
     ...analyticsRoutes,
     ...systemRoutes,
-    ...profileRoutes
+    ...profileRoutes,
+    ...noticeRoutes
   ]
 };
 

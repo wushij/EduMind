@@ -106,19 +106,22 @@
               <el-tag :type="getTypeTagType(item.memoryType)" effect="light">
                 {{ getTypeLabel(item.memoryType) }}
               </el-tag>
-              <span class="memory-key font-mono">{{ item.memoryKey }}</span>
+              <el-tag v-if="item.encrypted" type="warning" size="small" effect="plain" round>
+                国密SM4加密
+              </el-tag>
+              <span class="memory-key font-mono">{{ item.memoryKey || '#' + item.id }}</span>
             </div>
             <div class="header-score">
               <span class="score-label">置信度:</span>
-              <span class="score-val">{{ (item.confidenceScore * 100).toFixed(0) }}%</span>
+              <span class="score-val">{{ ((item.confidenceScore || 0.95) * 100).toFixed(0) }}%</span>
             </div>
           </div>
 
           <div class="card-body">
-            <p class="memory-content">{{ item.memoryValue }}</p>
+            <p class="memory-content">{{ item.summary || item.memoryValue }}</p>
             <div class="memory-meta">
-              <span>调用召回：{{ item.accessCount }} 次</span>
-              <span>记录时间：{{ item.createTime || '2026-09-12 16:30' }}</span>
+              <span>敏感级别：{{ item.sensitivityLevel || 'NORMAL' }}</span>
+              <span>记录时间：{{ item.createTime || '刚刚' }}</span>
             </div>
           </div>
 
@@ -142,19 +145,24 @@
     </div>
 
     <!-- 注入先验记忆对话框 -->
-    <el-dialog v-model="createDialogVisible" title="注入教学先验特征记忆" width="500px">
+    <el-dialog v-model="createDialogVisible" title="注入教学先验特征记忆" width="520px">
       <el-form :model="createForm" label-position="top">
-        <el-form-item label="记忆键名 (Key)" required>
-          <el-input v-model="createForm.memoryKey" placeholder="如：math_calculus_derivative_habit" />
-        </el-form-item>
         <el-form-item label="记忆类别" required>
           <el-select v-model="createForm.memoryType" style="width: 100%;">
             <el-option label="学习风格与偏好 (PREFERENCE)" value="PREFERENCE" />
             <el-option label="能力画像与薄弱点 (PROFILE)" value="PROFILE" />
             <el-option label="教学交互情境 (EPISODIC)" value="EPISODIC" />
+            <el-option label="交互纠错反馈 (FEEDBACK)" value="FEEDBACK" />
           </el-select>
         </el-form-item>
-        <el-form-item label="记忆内容描述 (Value)" required>
+        <el-form-item label="敏感级别 (安全合规)">
+          <el-select v-model="createForm.sensitivityLevel" style="width: 100%;">
+            <el-option label="普通 (NORMAL)" value="NORMAL" />
+            <el-option label="学术特征 (ACADEMIC)" value="ACADEMIC" />
+            <el-option label="高敏感 (HIGH_RISK - 启用国密 SM4 加密)" value="HIGH_RISK" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="记忆摘要/事实描述" required>
           <el-input
             v-model="createForm.memoryValue"
             type="textarea"
@@ -188,10 +196,10 @@
           <el-divider content-position="left">召回命中的记忆片段 (Top-{{ recalledItems.length }})</el-divider>
           <div v-for="(rec, idx) in recalledItems" :key="rec.id" class="recalled-item">
             <div class="recalled-top">
-              <span class="rank">#{{ idx + 1 }} 相似度得分：96.4%</span>
-              <el-tag size="small" type="success">{{ rec.memoryType }}</el-tag>
+              <span class="rank">#{{ idx + 1 }} 相似度得分：{{ ((rec.confidenceScore || 0.95) * 100).toFixed(0) }}%</span>
+              <el-tag size="small" :type="getTypeTagType(rec.memoryType)">{{ getTypeLabel(rec.memoryType) }}</el-tag>
             </div>
-            <p class="rec-val">{{ rec.memoryValue }}</p>
+            <p class="rec-val">{{ rec.summary || rec.memoryValue }}</p>
           </div>
         </div>
       </div>
@@ -204,66 +212,33 @@ import { ref, computed, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Lock, Search, MagicStick, Plus, Check, Close, Delete } from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
-import { getMemoryNamespace, updateMemoryConsent, createMemoryItem, forgetMemoryItem, retrieveMemories } from '@/api/ai/memory';
+import {
+  getMemoryNamespace,
+  updateMemoryConsent,
+  createMemoryItem,
+  forgetMemoryItem,
+  forgetAllMemories,
+  feedbackMemoryItem,
+  retrieveMemories
+} from '@/api/ai/memory';
 import type { MemoryItemVO } from '@/types/ai/memory';
 
 const loading = ref(false);
-const consentGranted = ref(true);
+const consentGranted = ref(false);
 const retentionDays = ref(180);
 const searchKeyword = ref('');
 const typeFilter = ref<string | undefined>(undefined);
 
-const memoryItems = ref<MemoryItemVO[]>([
-  {
-    id: 1,
-    namespaceId: 1,
-    memoryKey: 'calculus_weak_chain_rule',
-    memoryValue: '在求解复合函数的高阶导数时，易遗漏最内层因子的导数项，需在步骤推演中给予高亮提示。',
-    memoryType: 'PROFILE',
-    confidenceScore: 0.94,
-    accessCount: 18,
-    createTime: '2026-09-10 14:20'
-  },
-  {
-    id: 2,
-    namespaceId: 1,
-    memoryKey: 'learning_style_visual',
-    memoryValue: '偏好几何图示与函数图像辅助理解，在讲解极值与拐点时优先渲染切线动态变化动画。',
-    memoryType: 'PREFERENCE',
-    confidenceScore: 0.98,
-    accessCount: 35,
-    createTime: '2026-09-08 09:15'
-  },
-  {
-    id: 3,
-    namespaceId: 1,
-    memoryKey: 'exam_history_midterm_weakness',
-    memoryValue: '2026秋期中考试第18题（导数切线不等式证明）失分率偏高，学生曾表达对放缩法存在畏难情绪。',
-    memoryType: 'EPISODIC',
-    confidenceScore: 0.89,
-    accessCount: 8,
-    createTime: '2026-09-11 17:04'
-  },
-  {
-    id: 4,
-    namespaceId: 1,
-    memoryKey: 'feedback_code_python_preference',
-    memoryValue: '在算法与编程教学中，偏好 Python 3.11 现代语法，排斥过于冗长复杂的递归命名。',
-    memoryType: 'FEEDBACK',
-    confidenceScore: 0.92,
-    accessCount: 12,
-    createTime: '2026-09-09 11:30'
-  }
-]);
+// 真实后端数据源，初始化为空
+const memoryItems = ref<MemoryItemVO[]>([]);
 
 const preferenceCount = computed(() => memoryItems.value.filter(i => i.memoryType === 'PREFERENCE').length);
 const episodicCount = computed(() => memoryItems.value.filter(i => i.memoryType === 'EPISODIC').length);
 
 const filteredMemories = computed(() => {
   return memoryItems.value.filter(item => {
-    const matchKw = !searchKeyword.value ||
-      item.memoryKey.toLowerCase().includes(searchKeyword.value.toLowerCase()) ||
-      item.memoryValue.toLowerCase().includes(searchKeyword.value.toLowerCase());
+    const text = ((item.summary || '') + ' ' + (item.memoryKey || '') + ' ' + (item.memoryValue || '')).toLowerCase();
+    const matchKw = !searchKeyword.value || text.includes(searchKeyword.value.toLowerCase());
     const matchType = !typeFilter.value || item.memoryType === typeFilter.value;
     return matchKw && matchType;
   });
@@ -273,14 +248,15 @@ const createDialogVisible = ref(false);
 const createForm = ref({
   memoryKey: '',
   memoryType: 'PREFERENCE',
+  sensitivityLevel: 'NORMAL',
   memoryValue: ''
 });
 
 const recallDrawerVisible = ref(false);
-const queryPrompt = ref('请结合我平时的做题薄弱点，为我安排 2 道导数训练');
+const queryPrompt = ref('请结合我平时的做题习惯与知识盲区进行诊断');
 const recalledItems = ref<MemoryItemVO[]>([]);
 
-const getTypeLabel = (type: string) => {
+const getTypeLabel = (type?: string) => {
   switch (type) {
     case 'PREFERENCE': return '学习偏好';
     case 'PROFILE': return '认知画像';
@@ -290,7 +266,7 @@ const getTypeLabel = (type: string) => {
   }
 };
 
-const getTypeTagType = (type: string) => {
+const getTypeTagType = (type?: string) => {
   switch (type) {
     case 'PREFERENCE': return 'success';
     case 'PROFILE': return 'danger';
@@ -304,14 +280,13 @@ const loadMemories = async () => {
     loading.value = true;
     const res = await getMemoryNamespace();
     if (res?.data) {
-      consentGranted.value = res.data.consentGranted;
-      retentionDays.value = res.data.retentionDays;
-      if (res.data.items && res.data.items.length > 0) {
-        memoryItems.value = res.data.items;
-      }
+      consentGranted.value = !!res.data.consentGranted;
+      retentionDays.value = res.data.retentionDays || 180;
+      memoryItems.value = res.data.items || [];
     }
-  } catch (e) {
-    // Keep initialized mock
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载长期记忆空间失败');
+    memoryItems.value = [];
   } finally {
     loading.value = false;
   }
@@ -323,9 +298,15 @@ const handleConsentChange = async () => {
       consentGranted: consentGranted.value,
       retentionDays: retentionDays.value
     });
-    ElMessage.success('隐私授权偏好已保存');
+    if (!consentGranted.value) {
+      memoryItems.value = [];
+      ElMessage.warning('已撤销记忆知情同意，系统已级联擦除历史记忆条目');
+    } else {
+      ElMessage.success('知情同意偏好已成功更新');
+      await loadMemories();
+    }
   } catch (e: any) {
-    ElMessage.error(e.message || '更新授权失败');
+    ElMessage.error(e?.message || '更新授权失败');
   }
 };
 
@@ -334,9 +315,14 @@ const handleForgetAll = () => {
     confirmButtonText: '立即清空',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    memoryItems.value = [];
-    ElMessage.success('已清空全部记忆');
+  }).then(async () => {
+    try {
+      await forgetAllMemories();
+      memoryItems.value = [];
+      ElMessage.success('已清空并物理擦除全部记忆资产');
+    } catch (e: any) {
+      ElMessage.error(e?.message || '一键清空记忆失败');
+    }
   });
 };
 
@@ -344,37 +330,35 @@ const openCreateDialog = () => {
   createForm.value = {
     memoryKey: '',
     memoryType: 'PREFERENCE',
+    sensitivityLevel: 'NORMAL',
     memoryValue: ''
   };
   createDialogVisible.value = true;
 };
 
 const submitCreateMemory = async () => {
-  if (!createForm.value.memoryKey || !createForm.value.memoryValue) {
-    ElMessage.warning('请填写完整的键名与内容');
+  const summaryContent = createForm.value.memoryValue.trim();
+  if (!summaryContent) {
+    ElMessage.warning('请填写记忆描述内容');
     return;
   }
   try {
-    await createMemoryItem(createForm.value);
-    memoryItems.value.unshift({
-      id: Date.now(),
-      namespaceId: 1,
-      memoryKey: createForm.value.memoryKey,
-      memoryValue: createForm.value.memoryValue,
-      memoryType: createForm.value.memoryType as any,
-      confidenceScore: 0.95,
-      accessCount: 0,
-      createTime: '刚刚'
+    await createMemoryItem({
+      summary: summaryContent,
+      memoryType: createForm.value.memoryType,
+      sensitivityLevel: createForm.value.sensitivityLevel
     });
-    ElMessage.success('先验记忆已成功植入');
+    ElMessage.success('长期记忆已成功沉淀入库');
     createDialogVisible.value = false;
+    await loadMemories();
   } catch (e: any) {
-    ElMessage.error(e.message || '注入记忆失败');
+    ElMessage.error(e?.message || '注入长期记忆失败');
   }
 };
 
 const forgetSingle = (item: MemoryItemVO) => {
-  ElMessageBox.confirm(`确认让 Agent 遗忘条目【${item.memoryKey}】吗？`, '确认遗忘', {
+  const displayTitle = item.summary ? item.summary.substring(0, 16) + '...' : '#' + item.id;
+  ElMessageBox.confirm(`确认让 Agent 遗忘条目【${displayTitle}】吗？`, '确认遗忘', {
     confirmButtonText: '确认',
     cancelButtonText: '取消',
     type: 'info'
@@ -382,33 +366,52 @@ const forgetSingle = (item: MemoryItemVO) => {
     try {
       await forgetMemoryItem(item.id);
       memoryItems.value = memoryItems.value.filter(i => i.id !== item.id);
-      ElMessage.success('条目已安全擦除');
+      ElMessage.success('条目已安全物理擦除');
     } catch (e: any) {
-      ElMessage.error(e.message || '遗忘操作失败');
+      ElMessage.error(e?.message || '遗忘操作失败');
     }
   });
 };
 
-const giveFeedback = (item: MemoryItemVO, score: number) => {
-  ElMessage.success(score > 3 ? '感谢正向反馈，Agent 将持续强化此项记忆' : '已记录负向反馈，Agent 将衰减该项关联权重');
+const giveFeedback = async (item: MemoryItemVO, score: number) => {
+  try {
+    await feedbackMemoryItem(item.id, {
+      feedbackAction: score > 3 ? 'MODIFY' : 'FORGET',
+      relevanceScore: score,
+      reason: score > 3 ? '用户标记记忆准确' : '用户标记记忆偏差，行使遗忘'
+    });
+    if (score <= 2) {
+      memoryItems.value = memoryItems.value.filter(i => i.id !== item.id);
+      ElMessage.success('已记录负向反馈并物理遗忘该条目');
+    } else {
+      ElMessage.success('感谢正向反馈，Agent 将持续强化此项记忆');
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '反馈提交失败');
+  }
 };
 
 const openRecallTester = () => {
-  recalledItems.value = [memoryItems.value[0], memoryItems.value[1]];
+  recalledItems.value = [];
   recallDrawerVisible.value = true;
 };
 
 const doRetrieve = async () => {
+  if (!queryPrompt.value.trim()) {
+    ElMessage.warning('请输入检索 Prompt');
+    return;
+  }
   try {
-    const res = await retrieveMemories(queryPrompt.value);
-    if (res?.data && res.data.length > 0) {
-      recalledItems.value = res.data;
+    const res = await retrieveMemories(queryPrompt.value.trim());
+    recalledItems.value = res?.data || [];
+    if (recalledItems.value.length === 0) {
+      ElMessage.info('未召回相关记忆条目');
     } else {
-      recalledItems.value = [memoryItems.value[0], memoryItems.value[2]];
+      ElMessage.success(`已完成 Top-${recalledItems.value.length} 记忆语义召回`);
     }
-    ElMessage.success('已完成 Top-K 向量相似度语义检索');
-  } catch (e) {
-    recalledItems.value = [memoryItems.value[0], memoryItems.value[2]];
+  } catch (e: any) {
+    ElMessage.error(e?.message || '检索召回失败');
+    recalledItems.value = [];
   }
 };
 

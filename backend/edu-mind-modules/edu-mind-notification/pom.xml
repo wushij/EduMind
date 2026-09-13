@@ -11,4 +11,15 @@
     <artifactId>edu-mind-notification</artifactId>
     <name>edu-mind-notification</name>
     <description>业务领域模块：edu-mind-notification</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-system-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+    </dependencies>
 </project>

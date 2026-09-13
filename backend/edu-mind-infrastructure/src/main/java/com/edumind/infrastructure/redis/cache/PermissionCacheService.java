@@ -66,8 +66,16 @@ public class PermissionCacheService {
         }
     }
 
+    public void evictByTenant(Long tenantId) {
+        if (tenantId == null) {
+            return;
+        }
+        redisService.deleteByPattern(RedisConstant.PREFIX + "tenant:" + tenantId + ":rbac:*");
+    }
+
     public void evictAll() {
         redisService.deleteByPattern(RedisConstant.RBAC_PERM_KEY + "*");
         redisService.deleteByPattern(RedisConstant.RBAC_ROLE_KEY + "*");
+        redisService.deleteByPattern(RedisConstant.PREFIX + "tenant:*:rbac:*");
     }
 }

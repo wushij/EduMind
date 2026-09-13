@@ -15,5 +15,5 @@ public class LlmProperties {
     private Boolean streamEnabled = true;
     private Double temperature = 0.7;
     private String reasoningEffort = "low";
-    private Integer maxTokens = 4096;
+    private Integer maxTokens = 8192;
 }

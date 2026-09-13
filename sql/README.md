@@ -23,10 +23,18 @@ sql/
 │   ├── V2_0_0__multi_tenant_core.sql           # V2.0 多租户/组织/记忆/OCR/导出/国密/干预
 │   ├── V2_0_1__system_config_expansion.sql   # V2.0.1 系统配置十二分组 + 短信/邮件审计表
 │   ├── V2_0_2__legacy_core_tenant_id.sql       # V2.0.2 核心业务表 tenant_id 列扩展
+│   ├── V2_0_3__notification_ref_id.sql         # V2.0.3 通知关联业务 ID + 已读索引
+│   ├── V2_0_4__notification_broadcast.sql      # V2.0.4 通知优先级 + 广播任务表
+│   ├── V2_0_5__notification_broadcast_permissions.sql # V2.0.5 广播推送权限种子
+│   ├── V2_0_6__system_and_ai_compute_permissions.sql  # V2.0.6 系统管理/AI智算权限种子
+│   ├── V2_0_7__memory_retention.sql            # V2.0.7 长期记忆留存周期 + 记忆权限
 │   ├── R__gate_f_e2e_seed.sql                  # Gate F 隔离测试种子（teacher2 + course104）
 │   ├── R__gate_g_e2e_seed.sql                  # Gate G E2E 种子（掌握度/图谱/错题，幂等）
 │   ├── R__gate_h_e2e_seed.sql                  # Gate H E2E 种子（course_statistics/ai_call_log，幂等）
 │   ├── R__seed_data.sql                        # 种子数据（可重复执行，注意幂等）
+│   ├── R__seed_chat_thinking_prompt.sql        # 课程 AI Prompt 增加简要思考结构（幂等）
+│   ├── R__seed_tenant_roles.sql                # 租户/院系管理员角色与组织权限（幂等，旧库升级用）
+│   ├── R__seed_member_org.sql                  # 组织成员分配演示种子（幂等）
 │   ├── R__fix_default_user_roles.sql           # 修复默认账号角色绑定（幂等）
 │   └── R__clear_default_user_contact.sql       # 清除演示账号种子邮箱/手机（幂等）
 └── rollback/
@@ -49,7 +57,7 @@ mysql -u root -p < sql/init.sql
 
 > 已有业务数据的库 **禁止** 执行 `init.sql`；补表、改结构、版本升级请走 `sql/migration/V*.sql`（执行前 `mysqldump` 备份）。
 
-`init.sql` 已包含 **V0.1 ~ V2.0.2** 与 **V1.2.x** 的最终表结构与演示种子，**全新空库跑 init 后无需再跑 migration**（Gate E2E 可选种子除外）。
+`init.sql` 已包含 **V0.1 ~ V2.0.7** 与 **V1.2.x** 的最终表结构与演示种子（含 `chat_rag` 思考链 Prompt v2），**全新空库跑 init 后无需再跑 migration**（Gate E2E 可选种子除外）。
 
 ### 方式二：按版本增量迁移（已有空库分步升级）
 
@@ -69,7 +77,13 @@ mysql -u root -p < sql/init.sql
 11. V1_2_1__ai_message_reasoning.sql
 12. V2_0_1__system_config_expansion.sql
 13. V2_0_2__legacy_core_tenant_id.sql
-14. R__seed_data.sql          # 可选，补充演示种子数据
+14. V2_0_3__notification_ref_id.sql
+15. V2_0_4__notification_broadcast.sql
+16. V2_0_5__notification_broadcast_permissions.sql
+17. V2_0_6__system_and_ai_compute_permissions.sql
+18. V2_0_7__memory_retention.sql
+19. R__seed_data.sql          # 可选，补充演示种子数据
+20. R__seed_tenant_roles.sql  # 旧库升级：租户/院系管理员角色与组织权限
 ```
 
 示例：
@@ -88,10 +102,17 @@ mysql -u root -p edumind < sql/migration/V1_2_0__ai_model_config_ops.sql
 mysql -u root -p edumind < sql/migration/V1_2_1__ai_message_reasoning.sql
 mysql -u root -p edumind < sql/migration/V2_0_1__system_config_expansion.sql
 mysql -u root -p edumind < sql/migration/V2_0_2__legacy_core_tenant_id.sql
+mysql -u root -p edumind < sql/migration/V2_0_3__notification_ref_id.sql
+mysql -u root -p edumind < sql/migration/V2_0_4__notification_broadcast.sql
+mysql -u root -p edumind < sql/migration/V2_0_5__notification_broadcast_permissions.sql
+mysql -u root -p edumind < sql/migration/V2_0_6__system_and_ai_compute_permissions.sql
+mysql -u root -p edumind < sql/migration/V2_0_7__memory_retention.sql
 mysql -u root -p edumind < sql/migration/R__seed_data.sql
+mysql -u root -p edumind < sql/migration/R__seed_tenant_roles.sql
 ```
 
-> **注意：** 若已执行过 `init.sql`，通常无需再跑 migration 脚本，避免重复建表。两种方式二选一即可。
+> **注意：** 若已执行过 `init.sql`，通常无需再跑 migration 脚本，避免重复建表。两种方式二选一即可。  
+> 若库是 V2.0.2 之前建的旧库，需额外执行 `R__seed_tenant_roles.sql` 补齐租户 RBAC。
 
 ### 删表与结构变更规则
 
@@ -120,6 +141,11 @@ mysql -u root -p edumind < sql/migration/R__seed_data.sql
 | V1.2.1 思考链字段 | `V1_2_1__ai_message_reasoning.sql` | `ai_message.reasoning_content` |
 | V2.0.1 系统配置扩充 | `V2_0_1__system_config_expansion.sql` | `sys_sms_log`/`sys_email_log` + 12 组 `sys_config` |
 | V2.0.2 核心表租户列 | `V2_0_2__legacy_core_tenant_id.sql` | `course`/`knowledge_base`/`ai_*`/`edu_question` 增加 `tenant_id` |
+| V2.0.3 通知跳转 | `V2_0_3__notification_ref_id.sql` | `sys_notification.ref_id` + `idx_user_read` |
+| V2.0.4 消息广播 | `V2_0_4__notification_broadcast.sql` | `priority` + `sys_notification_broadcast` |
+| V2.0.5 广播权限 | `V2_0_5__notification_broadcast_permissions.sql` | `notice:broadcast:view/send` |
+| V2.0.6 系统/智算权限 | `V2_0_6__system_and_ai_compute_permissions.sql` | 菜单/租户/配置/模型/网关等权限 |
+| V2.0.7 记忆生命周期 | `V2_0_7__memory_retention.sql` | `retention_days`/`memory_type` + `ai:memory:*` 权限 |
 
 示例（从 V0.2 升级到 V0.5）：
 
@@ -136,7 +162,7 @@ mysql -u root -p edumind < sql/migration/V1_1_0__ai_call_log_course_id.sql
 mysql -u root -p edumind < sql/migration/V1_1_1__course_statistics_job.sql
 ```
 
-示例（从 V1.1 升级到 V2.0.2）：
+示例（从 V1.1 升级到 V2.0.7）：
 
 ```bash
 mysql -u root -p edumind < sql/migration/V2_0_0__multi_tenant_core.sql
@@ -144,9 +170,14 @@ mysql -u root -p edumind < sql/migration/V1_2_0__ai_model_config_ops.sql
 mysql -u root -p edumind < sql/migration/V1_2_1__ai_message_reasoning.sql
 mysql -u root -p edumind < sql/migration/V2_0_1__system_config_expansion.sql
 mysql -u root -p edumind < sql/migration/V2_0_2__legacy_core_tenant_id.sql
+mysql -u root -p edumind < sql/migration/V2_0_3__notification_ref_id.sql
+mysql -u root -p edumind < sql/migration/V2_0_4__notification_broadcast.sql
+mysql -u root -p edumind < sql/migration/V2_0_5__notification_broadcast_permissions.sql
+mysql -u root -p edumind < sql/migration/V2_0_6__system_and_ai_compute_permissions.sql
+mysql -u root -p edumind < sql/migration/V2_0_7__memory_retention.sql
 ```
 
-> 全新建库请直接执行最新版 `sql/init.sql`（已含 V0.1~V2.0.2 与 V1.2.x 完整结构及种子），无需再跑 migration。
+> 全新建库请直接执行最新版 `sql/init.sql`（已含 V0.1~V2.0.7 与 V1.2.x 完整结构及种子），无需再跑 migration。
 
 ### V1.1 回滚（慎用，先备份）
 
@@ -205,16 +236,19 @@ Get-Content sql\migration\R__gate_h_e2e_seed.sql -Raw -Encoding UTF8 | mysql -ur
 
 ---
 
-## 65 张核心业务表全景清单
+## 67 张核心业务表全景清单
 
 | 业务领域 | 数据表名 | Java Entity 实体映射 | 职责说明 |
 |:---|:---|:---|:---|
 | **系统管理** | `sys_user` | `UserEntity` | 用户基础信息（密码采用 BCrypt 加密） |
-| | `sys_role` | `RoleEntity` | 角色表（ADMIN, TEACHER, STUDENT） |
+| | `sys_role` | `RoleEntity` | 角色表（ADMIN, TEACHER, STUDENT, TENANT_ADMIN, ORG_ADMIN） |
 | | `sys_user_role` | `UserRoleEntity` | 用户与角色多对多映射 |
 | | `sys_permission` | `PermissionEntity` | 细粒度操作权限编码 |
 | | `sys_role_permission`| `RolePermissionEntity` | 角色与权限映射 |
-| | `sys_notification` | `NotificationEntity` | 站内消息与作业通知 |
+| | `sys_notification` | `NotificationEntity` | 站内消息与作业通知（含 ref_id/priority） |
+| | `sys_notification_broadcast` | - | 系统消息广播任务（V2.0.4） |
+| | `sys_sms_log` | - | 短信发送审计日志（V2.0.1） |
+| | `sys_email_log` | - | 邮件发送审计日志（V2.0.1） |
 | | `sys_config` | - | 系统全局参数（邮件 SMTP、平台信息等） |
 | | `sys_ai_quota` | - | AI Token / 调用配额 |
 | | `sys_user_preference` | - | 用户偏好（主题/默认模型/RAG 开关） |

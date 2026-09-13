@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum RoleCode {
     ADMIN("ADMIN"),
+    TENANT_ADMIN("TENANT_ADMIN"),
+    ORG_ADMIN("ORG_ADMIN"),
     TEACHER("TEACHER"),
     STUDENT("STUDENT");
 

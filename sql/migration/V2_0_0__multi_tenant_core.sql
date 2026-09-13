@@ -107,7 +107,8 @@ CREATE TABLE IF NOT EXISTS `ai_memory_namespace` (
     `user_id` BIGINT NOT NULL,
     `course_id` BIGINT DEFAULT NULL COMMENT '关联课程ID(NULL代表个人全局)',
     `scope` VARCHAR(32) NOT NULL DEFAULT 'COURSE' COMMENT '作用域(GLOBAL/COURSE)',
-    `consent_status` TINYINT NOT NULL DEFAULT 1 COMMENT '用户授权状态(1:同意, 0:已撤回)',
+    `consent_status` TINYINT NOT NULL DEFAULT 0 COMMENT '用户授权状态(1:同意, 0:未授权/已撤回)',
+    `retention_days` INT NOT NULL DEFAULT 180 COMMENT '记忆留存周期(天)',
     `status` TINYINT NOT NULL DEFAULT 1,
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
@@ -118,6 +119,7 @@ CREATE TABLE IF NOT EXISTS `ai_memory_namespace` (
 CREATE TABLE IF NOT EXISTS `ai_memory_item` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `namespace_id` BIGINT NOT NULL,
+    `memory_type` VARCHAR(32) NOT NULL DEFAULT 'PREFERENCE' COMMENT '记忆类型(PREFERENCE/PROFILE/EPISODIC/FEEDBACK)',
     `summary` VARCHAR(512) NOT NULL COMMENT '记忆摘要内容(明文脱敏)',
     `content_ciphertext` TEXT DEFAULT NULL COMMENT 'SM4加密敏感事实材料',
     `sensitivity_level` VARCHAR(16) NOT NULL DEFAULT 'NORMAL' COMMENT '敏感级别(NORMAL/ACADEMIC/HIGH_RISK)',

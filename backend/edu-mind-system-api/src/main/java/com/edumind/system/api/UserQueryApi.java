@@ -14,4 +14,14 @@ public interface UserQueryApi {
     List<String> getPermissionsByUserId(Long userId);
 
     List<Long> listUserIdsByRoleId(Long roleId);
+
+    /** 全部启用用户 ID */
+    List<Long> listAllActiveUserIds();
+
+    /** 按角色编码查询用户 ID（ADMIN/TEACHER/STUDENT） */
+    List<Long> listUserIdsByRoleCode(String roleCode);
+
+    long countActiveUsers();
+
+    long countUsersByRoleCode(String roleCode);
 }

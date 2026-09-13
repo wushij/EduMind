@@ -1,13 +1,19 @@
 export interface MemoryItemVO {
   id: number;
-  namespaceId: number;
-  memoryKey: string;
-  memoryValue: string;
-  memoryType: 'PREFERENCE' | 'PROFILE' | 'EPISODIC' | 'FEEDBACK';
-  confidenceScore: number;
-  accessCount: number;
-  lastAccessTime?: string;
+  namespaceId?: number;
+  summary: string;
+  fullContent?: string;
+  memoryType: 'PREFERENCE' | 'PROFILE' | 'EPISODIC' | 'FEEDBACK' | string;
+  sensitivityLevel?: string;
+  vectorRef?: string;
+  confidenceScore?: number;
+  encrypted?: boolean;
+  accessCount?: number;
   createTime?: string;
+
+  // 兼容辅助显示别名
+  memoryKey?: string;
+  memoryValue?: string;
 }
 
 export interface MemoryNamespaceVO {
@@ -15,7 +21,8 @@ export interface MemoryNamespaceVO {
   tenantId: number;
   userId: number;
   courseId?: number;
-  namespaceKey: string;
+  scope?: string;
+  consentStatus?: boolean;
   consentGranted: boolean;
   retentionDays: number;
   items: MemoryItemVO[];
@@ -25,17 +32,25 @@ export interface MemoryConsentRequest {
   courseId?: number;
   consentGranted: boolean;
   retentionDays?: number;
+  consent?: boolean;
 }
 
 export interface MemoryItemCreateRequest {
   courseId?: number;
-  memoryKey: string;
-  memoryValue: string;
-  memoryType: string;
-  confidenceScore?: number;
+  summary: string;
+  fullContent?: string;
+  memoryType?: 'PREFERENCE' | 'PROFILE' | 'EPISODIC' | 'FEEDBACK' | string;
+  sensitivityLevel?: 'NORMAL' | 'ACADEMIC' | 'HIGH_RISK' | string;
+
+  // 兼容旧表单输入别名
+  memoryKey?: string;
+  memoryValue?: string;
 }
 
 export interface MemoryFeedbackRequest {
-  relevanceScore: number; // 1 to 5
+  feedbackAction?: 'FORGET' | 'MODIFY' | string;
+  correctContent?: string;
+  reason?: string;
+  relevanceScore?: number; // 1 to 5
   comment?: string;
 }

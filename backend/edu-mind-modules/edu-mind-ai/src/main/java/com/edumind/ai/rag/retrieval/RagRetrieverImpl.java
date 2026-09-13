@@ -58,10 +58,8 @@ public class RagRetrieverImpl implements RagRetriever {
         if (documentId != null) {
             filter.put("documentId", documentId);
         }
-        Long tenantId = TenantContext.getTenantId();
-        if (tenantId != null && tenantId > 0) {
-            filter.put("tenantId", tenantId);
-        }
+        Long tenantId = TenantContext.requireTenantId();
+        filter.put("tenantId", tenantId);
         List<VectorSearchResult> results = vectorStore.searchNearest(
                 milvusProperties.getCollection(), queryVector, topK * 2, filter);
         Map<Long, KnowledgeDocumentVO> documentMap = new HashMap<>();

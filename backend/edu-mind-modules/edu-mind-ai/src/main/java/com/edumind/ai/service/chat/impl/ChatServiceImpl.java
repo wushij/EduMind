@@ -210,6 +210,9 @@ public class ChatServiceImpl implements ChatService {
                     if (plan.getAgentCode() != null) {
                         done.put("agentCode", plan.getAgentCode());
                     }
+                    if (StringUtils.hasText(reasoningContent)) {
+                        done.put("reasoningContent", reasoningContent.toString());
+                    }
                     sendEvent(emitter, "done", done);
                     emitter.complete();
                     logCall(start, ragUsed, knowledgeBaseId, conversation.getCourseId(), promptForLog, assistantContent.toString(), citationsForSave);

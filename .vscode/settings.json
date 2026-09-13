@@ -2,12 +2,7 @@
   "java.debug.settings.vmArgs": "-Dspring.profiles.active=dev",
   "java.configuration.updateBuildConfiguration": "automatic",
   "java.import.maven.enabled": true,
-  "java.import.gradle.enabled": false,
   "java.project.importHint": true,
-  "java.import.maven.root": ["pom.xml"],
-  "java.compile.nullAnalysis.mode": "disabled",
   "js/ts.tsdk.promptToUseWorkspaceVersion": true,
-  "js/ts.preferences.includePackageJsonAutoImports": "on",
-  "typescript.tsdk": "frontend/node_modules/typescript/lib",
-  "typescript.enablePromptUseWorkspaceTsdk": true
+  "js/ts.preferences.includePackageJsonAutoImports": "on"
 }

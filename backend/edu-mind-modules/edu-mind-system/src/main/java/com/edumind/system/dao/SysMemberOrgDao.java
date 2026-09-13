@@ -46,9 +46,32 @@ public class SysMemberOrgDao {
         return sysMemberOrgMapper.insert(entity);
     }
 
+    public SysMemberOrgEntity findByTenantOrgAndMember(Long tenantId, Long organizationId, Long memberId) {
+        return sysMemberOrgMapper.selectOne(new LambdaQueryWrapper<SysMemberOrgEntity>()
+                .eq(SysMemberOrgEntity::getTenantId, tenantId)
+                .eq(SysMemberOrgEntity::getOrganizationId, organizationId)
+                .eq(SysMemberOrgEntity::getMemberId, memberId));
+    }
+
+    public int deleteByTenantOrgAndMember(Long tenantId, Long organizationId, Long memberId) {
+        return sysMemberOrgMapper.delete(new LambdaQueryWrapper<SysMemberOrgEntity>()
+                .eq(SysMemberOrgEntity::getTenantId, tenantId)
+                .eq(SysMemberOrgEntity::getOrganizationId, organizationId)
+                .eq(SysMemberOrgEntity::getMemberId, memberId));
+    }
+
+    public int updateById(SysMemberOrgEntity entity) {
+        return sysMemberOrgMapper.updateById(entity);
+    }
+
     public int deleteByOrgId(Long tenantId, Long organizationId) {
         return sysMemberOrgMapper.delete(new LambdaQueryWrapper<SysMemberOrgEntity>()
                 .eq(SysMemberOrgEntity::getTenantId, tenantId)
                 .eq(SysMemberOrgEntity::getOrganizationId, organizationId));
+    }
+
+    public int deleteByTenantId(Long tenantId) {
+        return sysMemberOrgMapper.delete(new LambdaQueryWrapper<SysMemberOrgEntity>()
+                .eq(SysMemberOrgEntity::getTenantId, tenantId));
     }
 }

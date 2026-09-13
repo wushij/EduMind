@@ -222,7 +222,7 @@ public class AiModelManageServiceImpl implements AiModelManageService {
         entity.setIsDefault(Boolean.TRUE.equals(dto.getIsDefault()));
         entity.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
         entity.setPriority(entity.getSortOrder() != null ? entity.getSortOrder() : 0);
-        entity.setMaxTokens("embedding".equals(configType) ? 512 : 4096);
+        entity.setMaxTokens("embedding".equals(configType) ? 512 : 8192);
         if ("chat".equals(configType)) {
             entity.setReasoningEffort(ReasoningEffortNormalizer.normalize(dto.getReasoningEffort()));
             entity.setDimension(0);

@@ -21,7 +21,6 @@ public class GatewayResilienceStore {
     private static final String METRIC_PREFIX = "edumind:gateway:metric:";
     private static final long RATE_WINDOW_SECONDS = 60;
     private static final long CIRCUIT_OPEN_MS = 60_000;
-    private static final int FAILURE_THRESHOLD = 3;
 
     private final RateLimitService rateLimitService;
     private final RedisService redisService;

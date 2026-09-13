@@ -32,4 +32,8 @@ public class SysTenantQuotaDao {
     public int updateById(SysTenantQuotaEntity entity) {
         return sysTenantQuotaMapper.updateById(entity);
     }
+
+    public int consumeQuotaAtomic(Long tenantId, String quotaType, long delta) {
+        return sysTenantQuotaMapper.consumeQuotaAtomic(tenantId, quotaType, delta);
+    }
 }

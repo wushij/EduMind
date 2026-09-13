@@ -14,6 +14,8 @@ public class NotificationVO implements Serializable {
     private String title;
     private String content;
     private String type;
+    private Long refId;
+    private Integer priority;
     private Integer isRead;
     private LocalDateTime createTime;
 }

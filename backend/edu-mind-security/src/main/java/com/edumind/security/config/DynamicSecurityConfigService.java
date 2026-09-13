@@ -1,6 +1,7 @@
 package com.edumind.security.config;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.TypeReference;
 import com.edumind.infrastructure.redis.RedisKeyBuilder;
 import com.edumind.infrastructure.redis.RedisService;
 import jakarta.annotation.PostConstruct;
@@ -130,7 +131,7 @@ public class DynamicSecurityConfigService {
         try {
             String json = redisService.get(cacheKey);
             if (json != null && !json.isBlank()) {
-                Map<String, Object> map = JSON.parseObject(json, Map.class);
+                Map<String, Object> map = JSON.parseObject(json, new TypeReference<Map<String, Object>>() {});
                 if (map != null) {
                     return map;
                 }

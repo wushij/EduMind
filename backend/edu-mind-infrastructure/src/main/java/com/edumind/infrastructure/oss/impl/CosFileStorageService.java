@@ -1,5 +1,7 @@
 package com.edumind.infrastructure.oss.impl;
 
+import com.edumind.common.context.TenantContext;
+import com.edumind.common.utils.TenantObjectKeyBuilder;
 import com.edumind.infrastructure.oss.FileStorageService;
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
@@ -62,6 +64,11 @@ public class CosFileStorageService implements FileStorageService {
 
     @Override
     public InputStream getFile(String bucketName, String objectName) {
+        Long currentTenantId = TenantContext.getTenantId();
+        if (!TenantObjectKeyBuilder.validateTenantOwnership(currentTenantId, objectName)) {
+            log.warn("拒绝跨租户读取腾讯云COS存储文件: tenantId={}, objectName={}", currentTenantId, objectName);
+            return null;
+        }
         String bucket = StringUtils.hasText(bucketName) ? bucketName : defaultBucket;
         try {
             return cosClient.getObject(
@@ -75,6 +82,11 @@ public class CosFileStorageService implements FileStorageService {
 
     @Override
     public void deleteFile(String bucketName, String objectName) {
+        Long currentTenantId = TenantContext.getTenantId();
+        if (!TenantObjectKeyBuilder.validateTenantOwnership(currentTenantId, objectName)) {
+            log.warn("拒绝跨租户删除腾讯云COS存储文件: tenantId={}, objectName={}", currentTenantId, objectName);
+            return;
+        }
         String bucket = StringUtils.hasText(bucketName) ? bucketName : defaultBucket;
         try {
             cosClient.removeObject(

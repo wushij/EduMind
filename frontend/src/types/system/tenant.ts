@@ -70,14 +70,21 @@ export interface OrgUpdateRequest {
   sortOrder?: number;
 }
 
+export interface OrgMemberAssignRequest {
+  memberId: number;
+  roleType?: string;
+}
+
 export interface TenantQuotaVO {
   id?: number;
   tenantId: number;
-  quotaType: 'TOKEN' | 'STORAGE' | 'CONCURRENCY' | 'QPS';
+  quotaType: 'TOKEN' | 'STORAGE' | 'CONCURRENCY' | 'QPS' | 'SEATS';
   limitValue: number;
   usedValue: number;
+  usagePercent?: number;
   warningThreshold: number;
-  resetCycle: string;
+  isWarning?: boolean;
+  resetCycle?: string;
   lastResetTime?: string;
 }
 

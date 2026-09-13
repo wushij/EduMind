@@ -72,4 +72,19 @@ public class UserDao {
                 .orderByAsc(UserEntity::getId)
                 .last("LIMIT 100"));
     }
+
+    public java.util.List<Long> listAllActiveUserIds() {
+        return userMapper.selectList(new LambdaQueryWrapper<UserEntity>()
+                        .eq(UserEntity::getStatus, "1")
+                        .select(UserEntity::getId)
+                        .orderByAsc(UserEntity::getId))
+                .stream()
+                .map(UserEntity::getId)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    public long countActiveUsers() {
+        return userMapper.selectCount(new LambdaQueryWrapper<UserEntity>()
+                .eq(UserEntity::getStatus, "1"));
+    }
 }

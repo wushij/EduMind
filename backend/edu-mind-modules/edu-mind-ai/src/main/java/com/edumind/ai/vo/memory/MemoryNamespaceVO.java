@@ -12,5 +12,7 @@ public class MemoryNamespaceVO {
     private Long courseId;
     private String scope;
     private Boolean consentStatus;
+    private Boolean consentGranted;
+    private Integer retentionDays;
     private List<MemoryItemVO> items;
 }

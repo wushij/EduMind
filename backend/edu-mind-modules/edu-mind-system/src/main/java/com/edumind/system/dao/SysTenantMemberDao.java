@@ -14,6 +14,13 @@ public class SysTenantMemberDao {
 
     private final SysTenantMemberMapper sysTenantMemberMapper;
 
+    public SysTenantMemberEntity findById(Long id) {
+        if (id == null) {
+            return null;
+        }
+        return sysTenantMemberMapper.selectById(id);
+    }
+
     public List<SysTenantMemberEntity> listByUserId(Long userId) {
         return sysTenantMemberMapper.selectList(new LambdaQueryWrapper<SysTenantMemberEntity>()
                 .eq(SysTenantMemberEntity::getUserId, userId)
@@ -37,5 +44,10 @@ public class SysTenantMemberDao {
 
     public int insert(SysTenantMemberEntity entity) {
         return sysTenantMemberMapper.insert(entity);
+    }
+
+    public int deleteByTenantId(Long tenantId) {
+        return sysTenantMemberMapper.delete(new LambdaQueryWrapper<SysTenantMemberEntity>()
+                .eq(SysTenantMemberEntity::getTenantId, tenantId));
     }
 }

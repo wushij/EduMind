@@ -1,5 +1,6 @@
 package com.edumind.ai.controller.memory;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.edumind.ai.dto.memory.MemoryConsentDTO;
 import com.edumind.ai.dto.memory.MemoryFeedbackDTO;
 import com.edumind.ai.dto.memory.MemoryItemCreateDTO;
@@ -29,34 +30,47 @@ public class AgentMemoryController {
     private final AgentMemoryService agentMemoryService;
 
     @GetMapping
+    @SaCheckPermission("ai:memory:view")
     public ApiResult<MemoryNamespaceVO> getNamespace(@RequestParam(required = false) Long courseId) {
         return ApiResult.success(agentMemoryService.getNamespace(courseId));
     }
 
     @PostMapping("/consent")
+    @SaCheckPermission("ai:memory:manage")
     public ApiResult<Void> updateConsent(@Valid @RequestBody MemoryConsentDTO dto) {
         agentMemoryService.updateConsent(dto);
         return ApiResult.success();
     }
 
     @PostMapping
+    @SaCheckPermission("ai:memory:manage")
     public ApiResult<Long> createMemory(@Valid @RequestBody MemoryItemCreateDTO dto) {
         return ApiResult.success(agentMemoryService.createMemoryItem(dto));
     }
 
     @DeleteMapping("/{id}")
+    @SaCheckPermission("ai:memory:manage")
     public ApiResult<Void> forgetMemory(@PathVariable("id") Long id) {
         agentMemoryService.forgetMemory(id);
         return ApiResult.success();
     }
 
+    @DeleteMapping("/all")
+    @SaCheckPermission("ai:memory:manage")
+    public ApiResult<Void> forgetAll(@RequestParam(required = false) Long courseId) {
+        agentMemoryService.forgetAll(courseId);
+        return ApiResult.success();
+    }
+
     @PutMapping("/{id}/feedback")
+    @SaCheckPermission("ai:memory:manage")
     public ApiResult<Void> feedbackMemory(@PathVariable("id") Long id, @Valid @RequestBody MemoryFeedbackDTO dto) {
         agentMemoryService.feedbackMemory(id, dto);
         return ApiResult.success();
     }
 
     @GetMapping("/retrieve")
+    @SaCheckPermission("ai:memory:view")
     public ApiResult<List<MemoryItemVO>> retrieve(
             @RequestParam(required = false) Long courseId,
             @RequestParam String queryPrompt) {

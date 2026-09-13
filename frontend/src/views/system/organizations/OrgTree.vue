@@ -229,6 +229,26 @@
         <el-button type="primary" @click="submitNodeForm">确认保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 成员分配弹窗 -->
+    <el-dialog v-model="memberDialogVisible" title="添加/分配组织成员" width="460px">
+      <el-form :model="memberForm" label-position="top">
+        <el-form-item label="成员ID (校内成员编号/ID)" required>
+          <el-input-number v-model="memberForm.memberId" :min="1" style="width: 100%;" placeholder="请输入租户成员ID" />
+        </el-form-item>
+        <el-form-item label="组织内角色">
+          <el-select v-model="memberForm.roleType" style="width: 100%;">
+            <el-option label="学生 (STUDENT)" value="STUDENT" />
+            <el-option label="任课教师 (TEACHER)" value="TEACHER" />
+            <el-option label="班主任/负责人 (HEAD_TEACHER)" value="HEAD_TEACHER" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="memberDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="memberSubmitting" @click="submitMemberForm">确认分配</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -248,7 +268,7 @@ import {
   Delete
 } from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
-import { getOrgTree, createOrgNode, updateOrgNode, deleteOrgNode, getOrgMembers } from '@/api/system/tenant';
+import { getOrgTree, createOrgNode, updateOrgNode, deleteOrgNode, getOrgMembers, assignOrgMember, removeOrgMember } from '@/api/system/tenant';
 import type { OrganizationNodeVO, OrganizationMemberVO } from '@/types/system/tenant';
 
 const loading = ref(false);
@@ -258,6 +278,13 @@ const treeRef = ref();
 const treeData = ref<OrganizationNodeVO[]>([]);
 const selectedNode = ref<OrganizationNodeVO | null>(null);
 const memberKeyword = ref('');
+
+const memberDialogVisible = ref(false);
+const memberSubmitting = ref(false);
+const memberForm = ref({
+  memberId: 1,
+  roleType: 'STUDENT'
+});
 
 const stats = ref({
   campusCount: 2,
@@ -553,7 +580,34 @@ const submitNodeForm = async () => {
 };
 
 const openAddMemberDialog = () => {
-  ElMessage.info('名单导入：支持一键上传 Excel 或同步教务系统');
+  if (!selectedNode.value?.id) {
+    ElMessage.warning('请先在左侧选择要分配成员的组织或班级节点');
+    return;
+  }
+  memberForm.value = { memberId: 1, roleType: 'STUDENT' };
+  memberDialogVisible.value = true;
+};
+
+const submitMemberForm = async () => {
+  if (!selectedNode.value?.id) return;
+  if (!memberForm.value.memberId) {
+    ElMessage.warning('请输入成员ID');
+    return;
+  }
+  try {
+    memberSubmitting.value = true;
+    await assignOrgMember(selectedNode.value.id, {
+      memberId: memberForm.value.memberId,
+      roleType: memberForm.value.roleType
+    });
+    ElMessage.success('成员分配成功');
+    memberDialogVisible.value = false;
+    loadMembers(selectedNode.value.id);
+  } catch (e: any) {
+    ElMessage.error(e.message || '分配成员失败');
+  } finally {
+    memberSubmitting.value = false;
+  }
 };
 
 const exportRoster = () => {
@@ -565,13 +619,19 @@ const viewStudentProfile = (student: any) => {
 };
 
 const removeMember = (student: any) => {
-  ElMessageBox.confirm(`确认将【${student.name}】从当前班级中移出吗？`, '提示', {
-    confirmButtonText: '确认',
+  if (!selectedNode.value?.id) return;
+  ElMessageBox.confirm(`确认将【${student.name}】从当前组织节点中移出吗？`, '提示', {
+    confirmButtonText: '确认移出',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    members.value = members.value.filter(m => m.id !== student.id);
-    ElMessage.success('已移出');
+  }).then(async () => {
+    try {
+      await removeOrgMember(selectedNode.value!.id, student.id);
+      ElMessage.success('已移出组织');
+      loadMembers(selectedNode.value!.id);
+    } catch (e: any) {
+      ElMessage.error(e.message || '移出失败');
+    }
   });
 };
 

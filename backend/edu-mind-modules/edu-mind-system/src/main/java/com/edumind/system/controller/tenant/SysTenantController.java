@@ -1,6 +1,5 @@
 package com.edumind.system.controller.tenant;
 
-import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaCheckRole;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.edumind.common.api.ApiResult;
