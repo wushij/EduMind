@@ -264,6 +264,21 @@ public class UserServiceImpl implements UserService {
         userDao.deleteById(id);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resetPassword(Long id, String newPassword) {
+        UserEntity entity = userDao.findById(id);
+        if (entity == null) {
+            throw new BusinessException("用户不存在");
+        }
+        entity.setPassword(BCrypt.hashpw(newPassword));
+        userDao.updateById(entity);
+        try {
+            StpUtil.kickout(id);
+        } catch (Exception ignored) {
+        }
+    }
+
     private boolean matchesPassword(String rawPassword, String storedPassword) {
         if (!StringUtils.hasText(storedPassword)) {
             return false;

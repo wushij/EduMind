@@ -1,0 +1,32 @@
+package com.edumind.system.dao;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.edumind.system.entity.SysTenantMemberEntity;
+import com.edumind.system.mapper.SysTenantMemberMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+@RequiredArgsConstructor
+public class SysTenantMemberDao {
+
+    private final SysTenantMemberMapper sysTenantMemberMapper;
+
+    public List<SysTenantMemberEntity> listByUserId(Long userId) {
+        return sysTenantMemberMapper.selectList(new LambdaQueryWrapper<SysTenantMemberEntity>()
+                .eq(SysTenantMemberEntity::getUserId, userId)
+                .eq(SysTenantMemberEntity::getStatus, 1));
+    }
+
+    public SysTenantMemberEntity findByTenantAndUser(Long tenantId, Long userId) {
+        return sysTenantMemberMapper.selectOne(new LambdaQueryWrapper<SysTenantMemberEntity>()
+                .eq(SysTenantMemberEntity::getTenantId, tenantId)
+                .eq(SysTenantMemberEntity::getUserId, userId));
+    }
+
+    public int insert(SysTenantMemberEntity entity) {
+        return sysTenantMemberMapper.insert(entity);
+    }
+}

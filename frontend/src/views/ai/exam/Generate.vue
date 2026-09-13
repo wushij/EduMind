@@ -138,11 +138,38 @@
       </div>
     </div>
 
+    <!-- 布鲁姆认知分层配置 -->
+    <div v-if="composeMode === 'full'" class="config-section-card">
+      <h3 class="section-title">2. 布鲁姆认知分层权重</h3>
+      <p class="section-desc">调节各认知层级题量占比，组卷引擎将按权重从题库中智能抽题：</p>
+      <div class="cognitive-level-grid">
+        <div v-for="item in cognitiveLevelOptions" :key="item.key" class="cognitive-level-item">
+          <span class="level-label">{{ item.label }}</span>
+          <el-slider
+            v-model="cognitiveLevels[item.key]"
+            :min="0"
+            :max="100"
+            :step="5"
+            show-input
+            size="small"
+          />
+        </div>
+      </div>
+      <el-alert
+        v-if="cognitiveLevelTotal !== 100"
+        type="warning"
+        :closable="false"
+        show-icon
+        :title="`认知分层权重合计 ${cognitiveLevelTotal}%，建议调整为 100%`"
+        style="margin-top: 12px"
+      />
+    </div>
+
     <!-- 题型题量与分值配置卡片 -->
     <div v-if="composeMode === 'full'" class="config-section-card">
       <div class="section-header-flex">
         <div>
-          <h3 class="section-title">2. 题型配比与分值精细规划</h3>
+          <h3 class="section-title">3. 题型配比与分值精细规划</h3>
           <p class="section-desc">调节各题型题量与每题单价，确保右侧实时计算的总分严格对齐目标总分：</p>
         </div>
 
@@ -274,13 +301,32 @@ const difficultyModel = ref<'FOUNDATION' | 'NORMAL' | 'ADVANCED'>('NORMAL');
 const composing = ref(false);
 const composePreview = ref<SmartPaperComposeVO | null>(null);
 
+const cognitiveLevelOptions = [
+  { key: 'REMEMBER', label: '识记 (Remember)' },
+  { key: 'UNDERSTAND', label: '理解 (Understand)' },
+  { key: 'APPLY', label: '应用 (Apply)' },
+  { key: 'ANALYZE', label: '分析 (Analyze)' },
+  { key: 'EVALUATE', label: '评价 (Evaluate)' }
+];
+
+const cognitiveLevels = ref<Record<string, number>>({
+  REMEMBER: 15,
+  UNDERSTAND: 25,
+  APPLY: 30,
+  ANALYZE: 20,
+  EVALUATE: 10
+});
+
+const cognitiveLevelTotal = computed(() =>
+  Object.values(cognitiveLevels.value).reduce((sum, val) => sum + val, 0)
+);
+
 const {
   examForm,
   currentExam,
   generating,
   calculatedTotalScore,
-  isScoreMatched,
-  generateExam
+  isScoreMatched
 } = useExamGenerate();
 
 const courses = ref<any[]>([]);
@@ -321,8 +367,74 @@ const displayCourses = computed(() => {
   return courses.value.length ? courses.value : (USE_MOCK ? MOCK_COURSES : []);
 });
 
+function buildTypeRatios() {
+  const totalCount = examForm.rules.reduce((sum, rule) => sum + rule.count, 0);
+  if (totalCount <= 0) return {};
+  const ratios: Record<string, number> = {};
+  examForm.rules.forEach((rule) => {
+    if (rule.count > 0) {
+      ratios[rule.type] = rule.count / totalCount;
+    }
+  });
+  return ratios;
+}
+
+function buildCognitiveLevelRatios() {
+  const total = cognitiveLevelTotal.value || 1;
+  const ratios: Record<string, number> = {};
+  Object.entries(cognitiveLevels.value).forEach(([key, val]) => {
+    if (val > 0) ratios[key] = val / total;
+  });
+  return ratios;
+}
+
 async function handleGenerateExam() {
-  await generateExam();
+  if (!isScoreMatched.value) {
+    ElMessage.warning('请先调整题型分值使总分匹配');
+    return;
+  }
+  generating.value = true;
+  try {
+    const totalCount = examForm.rules.reduce((sum, rule) => sum + rule.count, 0);
+    const res = await composeSmartPaperV2({
+      courseId: examForm.courseId,
+      totalCount,
+      totalScore: examForm.totalScore,
+      difficultyDistribution: getDifficultyDistribution(),
+      typeRatios: buildTypeRatios(),
+      cognitiveLevels: buildCognitiveLevelRatios()
+    });
+    const preview = res.data;
+    if (!preview?.questions?.length) {
+      ElMessage.warning('未抽到题目，请检查题库');
+      return;
+    }
+    currentExam.value = {
+      id: Date.now(),
+      courseId: examForm.courseId,
+      courseName: displayCourses.value.find((c) => c.id === examForm.courseId)?.title ?? '',
+      title: examForm.title,
+      semester: '',
+      totalScore: preview.totalScore || examForm.totalScore,
+      durationMinutes: examForm.durationMinutes,
+      passScore: Math.round((preview.totalScore || examForm.totalScore) * 0.6),
+      rules: [...examForm.rules],
+      questions: preview.questions.map((q: any) =>
+        normalizeQuestion({
+          ...q,
+          courseId: examForm.courseId,
+          score: q.score ?? Math.round(examForm.totalScore / totalCount)
+        })
+      ),
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+    ElMessage.success(`完整模式组卷完成，知识点覆盖率 ${((preview.coverageRate || 0) * 100).toFixed(1)}%`);
+    router.push('/ai/exam/preview');
+  } catch (err: any) {
+    ElMessage.error(err?.message || '完整模式智能组卷失败');
+  } finally {
+    generating.value = false;
+  }
 }
 
 async function handleQuickCompose() {
@@ -449,6 +561,31 @@ function handleProceedToPreview() {
     .compose-preview {
       margin: 16px 0;
     }
+  }
+
+  .cognitive-level-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    .cognitive-level-item {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      align-items: center;
+      gap: 12px;
+
+      .level-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #334155;
+      }
+    }
+  }
+
+  .section-desc {
+    margin: 0 0 14px;
+    font-size: 13px;
+    color: #64748B;
   }
 
   // 配置卡片

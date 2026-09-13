@@ -18,6 +18,15 @@
     </div>
 
     <el-alert
+      v-if="isAggregated"
+      type="success"
+      :closable="false"
+      show-icon
+      title="当前 KPI 与趋势优先来自 course_statistics 日聚合表"
+      class="mock-alert"
+    />
+
+    <el-alert
       v-if="usedMockFallback"
       type="info"
       :closable="false"
@@ -81,6 +90,7 @@ const range = ref('7d');
 const {
   loading,
   usedMockFallback,
+  isAggregated,
   learningData,
   teachingAdvice,
   fetchLearning,

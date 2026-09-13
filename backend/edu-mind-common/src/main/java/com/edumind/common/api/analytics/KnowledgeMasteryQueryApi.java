@@ -8,4 +8,9 @@ import java.util.Map;
 public interface KnowledgeMasteryQueryApi {
 
     Map<Long, Double> getMasteryByStudentAndCourse(Long studentId, Long courseId);
+
+    /**
+     * 学生学情画像（掌握度、薄弱点等）
+     */
+    Map<String, Object> getStudentProfile(Long studentId, Long courseId);
 }

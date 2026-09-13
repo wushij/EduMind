@@ -1,9 +1,9 @@
 <template>
   <main class="app-content">
     <div class="app-content-body">
-      <router-view v-slot="{ Component }">
-        <transition name="fade" mode="out-in">
-          <component :is="Component" />
+      <router-view v-slot="{ Component, route }">
+        <transition name="page-switch" appear>
+          <component :is="Component" :key="route.fullPath" />
         </transition>
       </router-view>
     </div>
@@ -25,10 +25,12 @@
   padding: 20px 24px $page-bottom-spacing;
   background-color: #F5F8FC;
   box-sizing: border-box;
+  scrollbar-gutter: stable;
 
   .app-content-body {
     width: 100%;
     min-width: 0;
+    min-height: var(--page-min-height, calc(100vh - 64px - 40px - 48px));
   }
 }
 </style>

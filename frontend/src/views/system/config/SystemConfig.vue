@@ -1,27 +1,27 @@
 <template>
   <div class="system-config-page">
-    <!-- é¡¶é¨æ é¢å¡ç -->
+    <!-- 顶部标题卡片 -->
     <div class="config-header-card">
       <div class="header-left">
         <div class="header-icon-box">
           <el-icon :size="24" class="icon-cog"><Setting /></el-icon>
         </div>
         <div class="header-text-block">
-          <h1 class="page-title">å¹³å°å¨å±è¿è¡ä¸æå¡åæ°éç½®</h1>
+          <h1 class="page-title">平台全局运行与服务参数配置</h1>
           <p class="page-subtitle">
-            éä¸­ç®¡çæºæäºÂ·EduMind å¤å¼ææä»¶å­å¨ä¸­æ¢ãå¨é¾è·¯å½å¯ä¸é²çç ´å®å¨ç­ç¥ãSMTP é®ä»¶åä¿¡åç«ç¹åºç¡åæ°
+            集中管理智教云·EduMind 多引擎文件存储中枢、全链路国密与防爆破安全策略、SMTP 邮件发信及站点基础参数
           </p>
         </div>
       </div>
       <div class="header-right">
         <button type="button" class="action-refresh-btn" @click="handleRefreshAll">
           <el-icon><Refresh /></el-icon>
-          <span>éæ°å è½½</span>
+          <span>重新加载</span>
         </button>
       </div>
     </div>
 
-    <!-- éé¡¹å¡åæ¢å¯¼èª -->
+    <!-- 选项卡切换导航 -->
     <div class="config-tabs-nav">
       <div
         class="tab-item"
@@ -29,7 +29,7 @@
         @click="currentTab = 'storage'"
       >
         <el-icon><Coin /></el-icon>
-        <span>æä»¶å­å¨ä¸­æ¢ (Storage)</span>
+        <span>文件存储中枢 (Storage)</span>
       </div>
       <div
         class="tab-item"
@@ -37,7 +37,7 @@
         @click="currentTab = 'security'"
       >
         <el-icon><Lock /></el-icon>
-        <span>å®å¨ä¸é²çç ´ç­ç¥ (Security)</span>
+        <span>安全与防爆破策略 (Security)</span>
       </div>
       <div
         class="tab-item"
@@ -45,7 +45,7 @@
         @click="currentTab = 'mail'"
       >
         <el-icon><Message /></el-icon>
-        <span>é®ä»¶åä¿¡æå¡ (SMTP)</span>
+        <span>邮件发信服务 (SMTP)</span>
       </div>
       <div
         class="tab-item"
@@ -53,11 +53,11 @@
         @click="currentTab = 'base'"
       >
         <el-icon><Monitor /></el-icon>
-        <span>å¹³å°åºç¡ä¿¡æ¯</span>
+        <span>平台基础信息</span>
       </div>
     </div>
 
-    <!-- éé¡¹å¡åå®¹é¢æ¿ -->
+    <!-- 选项卡内容面板 -->
     <div class="config-content-body">
       <StorageConfigPane v-if="currentTab === 'storage'" ref="storagePaneRef" />
       <SecurityConfigPane v-if="currentTab === 'security'" ref="securityPaneRef" />
@@ -97,7 +97,7 @@ function handleRefreshAll() {
   gap: 20px;
   width: 100%;
 
-  // 1. é¡¶é¨å¡ç
+  // 1. 顶部卡片
   .config-header-card {
     background: #FFFFFF;
     border-radius: 18px;
@@ -166,7 +166,7 @@ function handleRefreshAll() {
     }
   }
 
-  // 2. éé¡¹å¡åæ¢å¯¼èª
+  // 2. 选项卡切换导航
   .config-tabs-nav {
     display: flex;
     align-items: center;

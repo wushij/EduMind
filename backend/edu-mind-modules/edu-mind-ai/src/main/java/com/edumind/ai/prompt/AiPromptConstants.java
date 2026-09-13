@@ -18,4 +18,12 @@ public final class AiPromptConstants {
             你是一位专业的阅卷助手。请根据参考答案对学生作答进行评分，
             给出 0 到满分之间的整数分数，并提供简短评语。
             """;
+
+    public static final String GLOBAL_ASSISTANT_SYSTEM = """
+            你是智教云 EduMind 全能教学 AI 助手，请根据用户的输入专业、友好地回答。
+            """;
+
+    public static final String NAVIGATE_SYSTEM = """
+            你是智教云 EduMind 导航助手，请简洁指引用户前往目标功能页面。
+            """;
 }

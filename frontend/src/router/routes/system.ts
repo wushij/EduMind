@@ -1,6 +1,20 @@
 import { RouteRecordRaw } from 'vue-router';
 
 export const systemRoutes: RouteRecordRaw[] = [
+  // 多租户与校区架构 (V2.0)
+  {
+    path: '/system/tenants',
+    name: 'SystemTenantList',
+    component: () => import('@/views/system/tenants/TenantList.vue'),
+    meta: { title: '租户与校区管理', requiresAuth: true, roles: ['ADMIN'] }
+  },
+  {
+    path: '/system/organizations',
+    name: 'SystemOrgTree',
+    component: () => import('@/views/system/organizations/OrgTree.vue'),
+    meta: { title: '组织架构与班级', requiresAuth: true, roles: ['ADMIN'] }
+  },
+
   // 用户管理
   {
     path: '/system/users',
@@ -71,12 +85,12 @@ export const systemRoutes: RouteRecordRaw[] = [
     meta: { title: '编辑 AI 工具', requiresAuth: true, roles: ['ADMIN'] }
   },
 
-  // 配额与额度
+  // 配额与额度 (V2.0 租户用量与配额大盘)
   {
     path: '/system/quotas',
     name: 'SystemQuota',
-    component: () => import('@/views/system/quota/Quota.vue'),
-    meta: { title: 'Token 配额管控', requiresAuth: true, roles: ['ADMIN'] }
+    component: () => import('@/views/system/quota/TenantQuota.vue'),
+    meta: { title: '租户用量与配额大盘', requiresAuth: true, roles: ['ADMIN'] }
   },
 
   // 审计日志

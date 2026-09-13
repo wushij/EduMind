@@ -3,6 +3,8 @@ package com.edumind.statistics.service.analytics.impl;
 import com.edumind.course.api.CourseQueryApi;
 import com.edumind.course.vo.knowledge.KnowledgePointVO;
 import com.edumind.statistics.dao.KnowledgeMasteryDao;
+import com.edumind.statistics.dao.WrongQuestionRecordDao;
+import com.edumind.statistics.entity.WrongQuestionRecordEntity;
 import com.edumind.statistics.entity.KnowledgeMasteryEntity;
 import com.edumind.statistics.service.analytics.KnowledgeMasteryService;
 import com.edumind.statistics.vo.analytics.KnowledgeMasteryVO;
@@ -26,6 +28,7 @@ import java.util.stream.Collectors;
 public class KnowledgeMasteryServiceImpl implements KnowledgeMasteryService {
 
     private final KnowledgeMasteryDao knowledgeMasteryDao;
+    private final WrongQuestionRecordDao wrongQuestionRecordDao;
     private final CourseQueryApi courseQueryApi;
 
     @Override
@@ -124,20 +127,20 @@ public class KnowledgeMasteryServiceImpl implements KnowledgeMasteryService {
         result.put("knowledgePoints", kpList);
 
         List<KnowledgeMasteryEntity> masteries = knowledgeMasteryDao.listByCourse(courseId);
-        Set<Long> studentIds = new HashSet<>(masteries.stream().map(KnowledgeMasteryEntity::getStudentId).collect(Collectors.toSet()));
-        if (studentIds.isEmpty()) {
-            studentIds.add(3L);
-            studentIds.add(4L);
-            studentIds.add(5L);
-        }
+        Set<Long> studentIds = masteries.stream()
+                .map(KnowledgeMasteryEntity::getStudentId)
+                .collect(Collectors.toCollection(HashSet::new));
 
         List<Map<String, Object>> studentList = new ArrayList<>();
         List<Map<String, Object>> cells = new ArrayList<>();
 
         int sIndex = 1;
         for (Long sid : studentIds) {
-            String name = "学生" + (sid == 3L ? "张三" : sid == 4L ? "李四" : sid == 5L ? "王五" : String.valueOf(sid));
-            studentList.add(Map.of("id", sid, "name", name, "studentNo", "S202600" + sIndex++));
+            studentList.add(Map.of(
+                    "id", sid,
+                    "name", "学生" + sid,
+                    "studentNo", "S" + courseId + String.format("%04d", sIndex++)
+            ));
 
             Map<Long, BigDecimal> personal = knowledgeMasteryDao.listByCourseAndStudent(courseId, sid)
                     .stream()
@@ -146,12 +149,47 @@ public class KnowledgeMasteryServiceImpl implements KnowledgeMasteryService {
 
             for (KnowledgePointVO p : points) {
                 BigDecimal score = personal.get(p.getId());
-                double val = score != null ? score.doubleValue() : 0.72;
-                cells.add(Map.of("studentId", sid, "knowledgePointId", p.getId(), "mastery", val));
+                if (score == null) {
+                    continue;
+                }
+                Map<String, Object> cell = new HashMap<>();
+                cell.put("studentId", sid);
+                cell.put("knowledgePointId", p.getId());
+                cell.put("mastery", score.doubleValue());
+                cells.add(cell);
             }
         }
         result.put("students", studentList);
         result.put("cells", cells);
         return result;
+    }
+
+    @Override
+    public Map<String, Object> getHeatmapCell(Long courseId, Long studentId, Long knowledgePointId) {
+        Map<String, Object> cell = new HashMap<>();
+        cell.put("courseId", courseId);
+        cell.put("studentId", studentId);
+        cell.put("knowledgePointId", knowledgePointId);
+
+        KnowledgeMasteryEntity mastery = knowledgeMasteryDao.findByStudentAndKp(studentId, knowledgePointId);
+        if (mastery != null) {
+            cell.put("mastery", mastery.getMasteryScore().doubleValue());
+        }
+
+        List<KnowledgePointVO> points = courseQueryApi.listKnowledgePointsByCourseId(courseId);
+        points.stream()
+                .filter(p -> knowledgePointId.equals(p.getId()))
+                .findFirst()
+                .ifPresent(p -> cell.put("knowledgePointTitle", p.getTitle()));
+
+        WrongQuestionRecordEntity wrong = wrongQuestionRecordDao.findByStudentCourseAndKp(studentId, courseId, knowledgePointId);
+        if (wrong != null) {
+            cell.put("diagnosis", wrong.getDiagnosis());
+            cell.put("wrongCount", wrong.getWrongCount());
+            cell.put("recommendedQuestionIds", wrong.getVariantQuestionIds());
+        } else if (mastery != null && mastery.getMasteryScore().doubleValue() < 0.7) {
+            cell.put("diagnosis", "掌握度偏低，建议复习相关章节并完成变式练习");
+        }
+        return cell;
     }
 }

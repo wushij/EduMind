@@ -15,6 +15,39 @@
     </div>
 
     <div class="header-right">
+      <!-- 多租户与校区一键切换器 (V2.0) -->
+      <div class="tenant-switcher">
+        <el-dropdown trigger="click" placement="bottom-end" @command="handleTenantSwitch">
+          <el-button size="small" class="tenant-switch-btn" plain>
+            <el-icon class="tenant-icon"><School /></el-icon>
+            <span class="tenant-text">{{ tenantStore.activeTenantName }}</span>
+            <el-tag size="small" type="primary" effect="plain" class="campus-tag">{{ tenantStore.activeCampusName }}</el-tag>
+            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu class="tenant-dropdown-menu">
+              <el-dropdown-item
+                v-for="tenant in tenantStore.availableTenants"
+                :key="tenant.id"
+                :command="tenant.id"
+                :disabled="tenantStore.currentTenant?.id === tenant.id"
+              >
+                <div class="tenant-menu-item">
+                  <div class="tenant-item-title">
+                    <span class="name">{{ tenant.name }}</span>
+                    <el-tag v-if="tenantStore.currentTenant?.id === tenant.id" size="small" type="success" effect="light">当前</el-tag>
+                  </div>
+                  <div class="tenant-item-meta">
+                    <span>编码: {{ tenant.tenantCode }}</span>
+                    <span v-if="tenant.campusCount">校区: {{ tenant.campusCount }}</span>
+                  </div>
+                </div>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
+
       <!-- 评审/演示专用：三端角色一键切换器 -->
       <div class="role-switcher">
         <el-dropdown trigger="click" placement="bottom-end" @command="handleRoleSwitch">
@@ -58,7 +91,7 @@
 
       <el-dropdown trigger="click" placement="bottom-end" @command="handleCommand">
         <div class="user-profile">
-          <el-avatar :size="34" :src="authStore.currentUser?.avatar" />
+          <el-avatar :size="34" :src="authStore.currentUser?.avatar || DEFAULT_AVATAR" />
           <div class="user-meta">
             <span class="user-name">{{ authStore.currentUser?.realName }}</span>
             <el-tag size="small" :type="currentRoleTagType" effect="plain" class="role-badge">
@@ -102,17 +135,31 @@ import {
   EditPen,
   Reading,
   Lock,
-  SwitchButton
+  SwitchButton,
+  School
 } from '@element-plus/icons-vue';
 import { useAuthStore } from '@/stores/auth/auth';
+import { useTenantStore } from '@/stores/system/tenant';
+import { DEFAULT_AVATAR } from '@/constants/auth';
 import { ElMessage } from 'element-plus';
+import { onMounted } from 'vue';
 
 defineProps<{ isCollapsed: boolean }>();
 defineEmits(['toggle-sidebar']);
 
 const router = useRouter();
 const authStore = useAuthStore();
+const tenantStore = useTenantStore();
 const searchKeyword = ref('');
+
+onMounted(() => {
+  tenantStore.fetchCurrent();
+  tenantStore.fetchAvailable();
+});
+
+const handleTenantSwitch = (tenantId: number) => {
+  tenantStore.switchTenant(tenantId);
+};
 
 const currentRoleName = computed(() => {
   const role = authStore.currentRole;
@@ -194,6 +241,44 @@ const handleCommand = (cmd: string) => {
     display: flex;
     align-items: center;
     gap: 18px;
+
+    .tenant-switcher {
+      .tenant-switch-btn {
+        border-radius: 16px;
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        font-weight: 500;
+        color: #334155;
+        padding: 4px 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+
+        .tenant-icon {
+          color: #2563EB;
+        }
+
+        .tenant-text {
+          max-width: 140px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .campus-tag {
+          font-size: 11px;
+          height: 18px;
+          padding: 0 5px;
+          border-radius: 10px;
+        }
+
+        &:hover {
+          background: #EFF6FF;
+          border-color: #BFDBFE;
+          color: #1D4ED8;
+        }
+      }
+    }
 
     .role-switcher {
       .role-switch-btn {
@@ -319,6 +404,46 @@ const handleCommand = (cmd: string) => {
     .el-icon {
       font-size: 15px;
       margin-right: 2px;
+    }
+  }
+}
+
+.tenant-dropdown-menu {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 260px;
+  padding: 6px 0 !important;
+
+  .el-dropdown-menu__item {
+    display: flex !important;
+    padding: 8px 14px !important;
+    width: 100%;
+    box-sizing: border-box;
+
+    .tenant-menu-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      width: 100%;
+
+      .tenant-item-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 500;
+        color: #1E293B;
+      }
+
+      .tenant-item-meta {
+        display: flex;
+        gap: 12px;
+        font-size: 11px;
+        color: #64748B;
+      }
+    }
+
+    &:hover:not(.is-disabled) {
+      background-color: #EFF6FF;
     }
   }
 }

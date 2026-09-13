@@ -104,7 +104,7 @@ public class CourseStatisticsJob {
         CourseStatisticsEntity entity = new CourseStatisticsEntity();
         entity.setCourseId(courseId);
         entity.setStatDate(date);
-        entity.setStudentCount(Math.max(1, activeStudents.size()));
+        entity.setStudentCount(activeStudents.size());
         entity.setAvgScore(BigDecimal.valueOf(avgScore).setScale(2, RoundingMode.HALF_UP));
         entity.setMasteryAvg(BigDecimal.valueOf(masteryAvg).setScale(4, RoundingMode.HALF_UP));
         entity.setAiCallCount((int) aiCalls);

@@ -2,6 +2,7 @@ package com.edumind.ai.agent.executor;
 
 import com.alibaba.fastjson2.JSON;
 import com.edumind.ai.agent.planner.AgentPlanner;
+import com.edumind.ai.agent.react.ReactAgentExecutor;
 import com.edumind.ai.agent.tool.AgentTool;
 import com.edumind.ai.agent.tool.ToolRegistry;
 import com.edumind.ai.dao.AgentRunDao;
@@ -21,6 +22,8 @@ import com.edumind.common.utils.IdUtil;
 import com.edumind.knowledge.api.KnowledgeQueryApi;
 import com.edumind.knowledge.vo.knowledge.KnowledgeBaseVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -28,10 +31,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AgentExecutorImpl {
 
+    @Value("${edumind.ai.agent.react-enabled:true}")
+    private boolean reactEnabled;
+
+    private final ReactAgentExecutor reactAgentExecutor;
     private final AgentPlanner agentPlanner;
     private final ToolRegistry toolRegistry;
     private final AgentRunDao agentRunDao;
@@ -99,14 +107,71 @@ public class AgentExecutorImpl {
 
     private Object executeAgentChain(String runId, String agentCode, String goal,
                                      Map<String, Object> params, int startIndex) {
+        if (reactEnabled && shouldUseReact(agentCode, goal)) {
+            try {
+                final int[] stepIndex = {startIndex};
+                Object result = reactAgentExecutor.execute(runId, goal, agentCode, params,
+                        (step, event) -> {
+                            streamRegistry.emit(runId, "step", event);
+                            persistReactEvent(runId, stepIndex[0]++, event, params);
+                        });
+                return wrapExecutionResult(result, "react");
+            } catch (Exception ex) {
+                log.warn("ReAct executor failed, fallback to switch chain: {}", ex.getMessage());
+            }
+        }
         int index = startIndex;
-        return switch (agentCode) {
+        Object fallback = switch (agentCode) {
             case "question" -> runQuestionAgent(runId, params, index);
             case "teaching" -> runTeachingAgent(runId, goal, params, index);
             case "learning" -> runLearningAgent(runId, params, index);
             case "grading" -> runGradingAgent(runId, goal, index);
             default -> runTeachingAgent(runId, goal, params, index);
         };
+        return wrapExecutionResult(fallback, "switch_fallback");
+    }
+
+    private boolean shouldUseReact(String agentCode, String goal) {
+        if ("question".equals(agentCode) || "learning".equals(agentCode)) {
+            return true;
+        }
+        if ("teaching".equals(agentCode) && goal != null) {
+            return goal.contains("资源") || goal.contains("微课")
+                    || goal.contains("拓展") || goal.contains("分析");
+        }
+        return false;
+    }
+
+    private Object wrapExecutionResult(Object result, String executionMode) {
+        Map<String, Object> wrapped = new HashMap<>();
+        if (result instanceof Map<?, ?> map) {
+            map.forEach((k, v) -> wrapped.put(String.valueOf(k), v));
+        } else if (result != null) {
+            wrapped.put("answer", result);
+        }
+        wrapped.putIfAbsent("executionMode", executionMode);
+        return wrapped;
+    }
+
+    private void persistReactEvent(String runId, int index, Map<String, Object> event, Map<String, Object> params) {
+        String type = String.valueOf(event.get("type"));
+        String title = event.get("title") != null ? String.valueOf(event.get("title")) : type;
+        String tool = event.get("tool") != null ? String.valueOf(event.get("tool")) : null;
+        String status = event.get("status") != null ? String.valueOf(event.get("status")) : "DONE";
+        String content = event.get("content") != null ? String.valueOf(event.get("content")) : null;
+        AgentStepEntity stepEntity = saveStep(runId, index, type, title, tool, status, null, content);
+
+        if ("OBSERVE".equals(type) && tool != null) {
+            AgentToolCallEntity call = new AgentToolCallEntity();
+            call.setRunId(runId);
+            call.setStepId(stepEntity.getId());
+            call.setToolName(tool);
+            call.setInputJson(JSON.toJSONString(params));
+            call.setOutputJson(content);
+            call.setStatus("DONE");
+            call.setDurationMs(1);
+            agentToolCallDao.insert(call);
+        }
     }
 
     private Object runQuestionAgent(String runId, Map<String, Object> params, int index) {

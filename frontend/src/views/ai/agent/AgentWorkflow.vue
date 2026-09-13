@@ -49,8 +49,11 @@
     <el-card v-if="currentRun" shadow="never" class="steps-card">
       <template #header>
         <div class="steps-header">
-          <span>执行步骤</span>
-          <el-tag :type="statusTagType">{{ currentRun.status }}</el-tag>
+          <span>执行步骤 ({{ planProgress }}%)</span>
+          <div class="steps-header-tags">
+            <el-tag size="small" type="info">工具调用 {{ toolSummary.total }}</el-tag>
+            <el-tag :type="statusTagType">{{ currentRun.status }}</el-tag>
+          </div>
         </div>
       </template>
 
@@ -82,7 +85,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useAgentRun } from '@/composables/ai/useAgentRun';
+import { useAgentExecution } from '@/features/agent/execution';
+import { getPlanProgress } from '@/features/agent/planning';
+import { summarizeToolCalling } from '@/features/agent/tool-calling';
 import CitationList from '@/components/knowledge/CitationList.vue';
 import type { AgentCitationVO } from '@/types/ai/agent';
 import { ElMessage } from 'element-plus';
@@ -94,8 +99,11 @@ const agentCode = ref((route.query.agentCode as string) || '');
 const goal = ref('');
 const courseId = ref(1);
 
-const { loading, polling, usedMockFallback, agents, currentRun, fetchAgents, runAgent } =
-  useAgentRun();
+const { loading, polling, usedMockFallback, agents, currentRun, fetchAgents, executeGoal } =
+  useAgentExecution();
+
+const planProgress = computed(() => getPlanProgress(currentRun.value));
+const toolSummary = computed(() => summarizeToolCalling(currentRun.value?.steps ?? []));
 
 const agent = computed(() => agents.value.find((item) => item.code === agentCode.value));
 
@@ -124,7 +132,7 @@ async function handleRun() {
     ElMessage.warning('请选择智能体并填写执行目标');
     return;
   }
-  await runAgent({
+  await executeGoal({
     agentCode: agentCode.value,
     goal: goal.value.trim(),
     courseId: courseId.value
@@ -177,6 +185,12 @@ onMounted(fetchAgents);
     justify-content: space-between;
     align-items: center;
     font-weight: 700;
+
+    .steps-header-tags {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
   }
 
   .step-title {

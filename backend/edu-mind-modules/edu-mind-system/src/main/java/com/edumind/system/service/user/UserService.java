@@ -36,4 +36,6 @@ public interface UserService {
     UserVO getUserById(Long id);
 
     void deleteUser(Long id);
+
+    void resetPassword(Long id, String newPassword);
 }

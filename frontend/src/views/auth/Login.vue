@@ -325,6 +325,9 @@ import AuthCaptchaField from '@/components/common/AuthCaptchaField.vue';
 import EmailCodeBtn from '@/components/common/EmailCodeBtn.vue';
 import { getCaptcha, login as loginApi, emailLogin as emailLoginApi } from '@/api/auth/auth';
 import { toCaptchaDataUrl } from '@/utils/captcha';
+import { storage } from '@/core/storage/local';
+import { TENANT_ID_KEY } from '@/stores/system/tenant';
+import type { LoginResult } from '@/types/auth/auth';
 
 const router = useRouter();
 const route = useRoute();
@@ -352,6 +355,25 @@ const emailForm = reactive({
   email: '',
   code: ''
 });
+
+const applyLoginSession = (data: LoginResult) => {
+  authStore.setToken(data.token);
+  if (data.userInfo) {
+    authStore.setUser({
+      id: data.userInfo.id,
+      username: data.userInfo.username,
+      realName: data.userInfo.realName || data.userInfo.username,
+      avatar: data.userInfo.avatar || '',
+      roles: (data.userInfo.roles || []) as any,
+      permissions: data.userInfo.permissions || [],
+      department: data.userInfo.department,
+      email: data.userInfo.email
+    });
+  }
+  if (data.tenantId) {
+    storage.set(TENANT_ID_KEY, data.tenantId);
+  }
+};
 
 // 刷新验证码 (云盘同款：仅走后端 Hutool LineCaptcha)
 const refreshCaptcha = async () => {
@@ -391,19 +413,8 @@ const handleLogin = async () => {
       captchaId: captchaId.value
     });
     if (res?.data?.token) {
-      authStore.setToken(res.data.token);
-      if (res.data.userInfo) {
-        authStore.setUser({
-          id: res.data.userInfo.id,
-          username: res.data.userInfo.username,
-          realName: res.data.userInfo.realName || res.data.userInfo.username,
-          avatar: res.data.userInfo.avatar || '',
-          roles: (res.data.userInfo.roles || []) as any,
-          permissions: res.data.userInfo.permissions || [],
-          department: res.data.userInfo.department,
-          email: res.data.userInfo.email
-        });
-      } else {
+      applyLoginSession(res.data);
+      if (!res.data.userInfo) {
         await authStore.fetchUserInfo();
       }
     } else if (USE_MOCK) {
@@ -464,19 +475,8 @@ const handleEmailLogin = async () => {
   try {
     const res = await emailLoginApi({ email, code });
     if (res?.data?.token) {
-      authStore.setToken(res.data.token);
-      if (res.data.userInfo) {
-        authStore.setUser({
-          id: res.data.userInfo.id,
-          username: res.data.userInfo.username,
-          realName: res.data.userInfo.realName || res.data.userInfo.username,
-          avatar: res.data.userInfo.avatar || '',
-          roles: (res.data.userInfo.roles || []) as any,
-          permissions: res.data.userInfo.permissions || [],
-          department: res.data.userInfo.department,
-          email: res.data.userInfo.email
-        });
-      } else {
+      applyLoginSession(res.data);
+      if (!res.data.userInfo) {
         await authStore.fetchUserInfo();
       }
 

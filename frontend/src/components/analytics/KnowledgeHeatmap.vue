@@ -80,7 +80,7 @@
 
     <el-empty
       v-else-if="!loading"
-      description="该课程暂无知识点掌握度矩阵数据，请先安排学生完成作业或测验"
+      :description="loadError ? '加载知识掌握度数据失败，请稍后重试' : '该课程暂无知识点掌握度矩阵数据，请先安排学生完成作业或测验'"
       :image-size="80"
     />
 
@@ -170,20 +170,26 @@ const activeCell = ref<{
   kpId?: number;
 } | null>(null);
 
+const loadError = ref(false);
+
 const fetchHeatmap = async () => {
   const cId = props.courseId || 102;
   loading.value = true;
+  loadError.value = false;
+  kpList.value = [];
+  studentRows.value = [];
+  classAvgScores.value = {};
   try {
     const res: any = await getKnowledgeHeatmap(cId);
     const data: KnowledgeHeatmapVO = res?.data || res;
-    if (data && data.knowledgePoints && data.knowledgePoints.length) {
+    if (data?.knowledgePoints?.length) {
       parseHeatmapVO(data);
     } else {
-      fallbackMockData();
+      loadError.value = true;
     }
-  } catch (err) {
-    console.warn('获取知识掌握度热力矩阵异常，使用兜底数据:', err);
-    fallbackMockData();
+  } catch {
+    loadError.value = true;
+    ElMessage.error('加载知识掌握度热力矩阵失败');
   } finally {
     loading.value = false;
   }
@@ -233,36 +239,6 @@ const parseHeatmapVO = (vo: KnowledgeHeatmapVO) => {
   classAvgScores.value = avgScores;
 };
 
-const fallbackMockData = () => {
-  kpList.value = [
-    { id: 101, title: '极限存在准则与无穷小量', chapterName: '第一章 极限' },
-    { id: 102, title: '连续性与闭区间定理', chapterName: '第一章 极限' },
-    { id: 103, title: '导数定义与切线方程', chapterName: '第二章 导数' },
-    { id: 104, title: '高阶导数与莱布尼茨公式', chapterName: '第二章 导数' },
-    { id: 105, title: '微分中值定理与洛必达法则', chapterName: '第三章 中值定理' },
-    { id: 106, title: '函数极值与拐点判别法', chapterName: '第三章 中值定理' },
-    { id: 107, title: '不定积分换元与分部积分', chapterName: '第四章 积分' }
-  ];
-
-  studentRows.value = [
-    { id: 1001, name: '李思源', studentNo: 'S2026001', scores: { 101: 92, 102: 88, 103: 95, 104: 78, 105: 84, 106: 62, 107: 80 } },
-    { id: 1002, name: '张敏静', studentNo: 'S2026002', scores: { 101: 85, 102: 76, 103: 88, 104: 65, 105: 58, 106: 48, 107: 72 } },
-    { id: 1003, name: '王浩宇', studentNo: 'S2026003', scores: { 101: 72, 102: 68, 103: 80, 104: 52, 105: 45, 106: 38, 107: 60 } },
-    { id: 1004, name: '陈天翔', studentNo: 'S2026004', scores: { 101: 95, 102: 90, 103: 96, 104: 88, 105: 92, 106: 85, 107: 90 } },
-    { id: 1005, name: '赵雨晨', studentNo: 'S2026005', scores: { 101: 64, 102: 58, 103: 74, 104: 48, 105: 50, 106: 42, 107: 55 } }
-  ];
-
-  classAvgScores.value = {
-    101: 81.6,
-    102: 76.0,
-    103: 86.6,
-    104: 66.2,
-    105: 65.8,
-    106: 55.0,
-    107: 71.4
-  };
-};
-
 const getScoreColor = (score: number) => {
   if (score >= 85) return 'rgba(82, 196, 26, 0.75)'; // 深绿
   if (score >= 70) return 'rgba(115, 209, 61, 0.6)';  // 浅绿
@@ -304,7 +280,7 @@ const handleAssignPractice = () => {
   drilldownVisible.value = false;
   ElMessage.success(`已为【${activeCell.value?.studentName}】针对【${activeCell.value?.kpTitle}】推送定制自适应习题`);
   router.push({
-    path: '/learning/ai-practice',
+    path: '/learning/practice',
     query: {
       courseId: props.courseId || 102,
       mode: 'WEAK_POINT'

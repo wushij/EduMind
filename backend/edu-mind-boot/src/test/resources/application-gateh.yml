@@ -1,0 +1,24 @@
+# Gate H 集成测试专用 Profile（隔离验收库，禁止在生产/共享 dev 库直接跑 GateV11 DDL）
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/edumind_gateh?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+edumind:
+  rate-limit:
+    enabled: false
+
+ai:
+  llm:
+    provider: mock
+    mock-enabled: true
+    stream-enabled: true
+  embedding:
+    mock-enabled: true
+  milvus:
+    enabled: false

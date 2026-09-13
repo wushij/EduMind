@@ -13,10 +13,10 @@ INSERT IGNORE INTO sys_role (id, role_code, role_name, description) VALUES
 (3, 'STUDENT', '学生',       '课程学习、在线测试与智能练习');
 
 INSERT IGNORE INTO sys_user (id, username, password, real_name, email, phone, avatar, status) VALUES
-(1, 'admin',     '$2b$10$DLVcEXn5RunOfqlY84u9S.nnXViwwLRheQgk0KIIpKr9y1im4mIOq', '系统管理员', 'admin@edumind.edu',     '13800000001', 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', 'ENABLE'),
-(2, 'teacher',   '$2b$10$DLVcEXn5RunOfqlY84u9S.nnXViwwLRheQgk0KIIpKr9y1im4mIOq', '张老师',     'teacher@edumind.edu',   '13800000002', 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', 'ENABLE'),
-(3, 'student',   '$2b$10$DLVcEXn5RunOfqlY84u9S.nnXViwwLRheQgk0KIIpKr9y1im4mIOq', '李同学',     'student@edumind.edu',   '13800000003', 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', 'ENABLE'),
-(4, 'student2',  '$2b$10$DLVcEXn5RunOfqlY84u9S.nnXViwwLRheQgk0KIIpKr9y1im4mIOq', '王同学',     'student2@edumind.edu',  '13800000004', 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', 'ENABLE');
+(1, 'admin',     '$2b$10$DLVcEXn5RunOfqlY84u9S.nnXViwwLRheQgk0KIIpKr9y1im4mIOq', '系统管理员', NULL, NULL, 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', 'ENABLE'),
+(2, 'teacher',   '$2b$10$DLVcEXn5RunOfqlY84u9S.nnXViwwLRheQgk0KIIpKr9y1im4mIOq', '张老师',     NULL, NULL, 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', 'ENABLE'),
+(3, 'student',   '$2b$10$DLVcEXn5RunOfqlY84u9S.nnXViwwLRheQgk0KIIpKr9y1im4mIOq', '李同学',     NULL, NULL, 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', 'ENABLE'),
+(4, 'student2',  '$2b$10$DLVcEXn5RunOfqlY84u9S.nnXViwwLRheQgk0KIIpKr9y1im4mIOq', '王同学',     NULL, NULL, 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', 'ENABLE');
 
 INSERT IGNORE INTO sys_user_role (user_id, role_id) VALUES
 (1, 1), (2, 2), (3, 3), (4, 3);

@@ -8,5 +8,7 @@ public interface KnowledgeMasteryService {
 
     java.util.Map<String, Object> getHeatmap(Long courseId, String range);
 
+    java.util.Map<String, Object> getHeatmapCell(Long courseId, Long studentId, Long knowledgePointId);
+
     void upsertMastery(Long studentId, Long courseId, Long knowledgePointId, double scoreRatio);
 }

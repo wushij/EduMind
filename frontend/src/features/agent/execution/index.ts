@@ -1,14 +1,25 @@
-import { AgentPlanStep } from '../planning';
+import { useAgentRun } from '@/composables/ai/useAgentRun';
 
-export class AgentExecutionFeature {
-  public static executeStep(step: AgentPlanStep): Promise<AgentPlanStep> {
-    step.status = 'RUNNING';
-    return new Promise(resolve => {
-      setTimeout(() => {
-        step.status = 'COMPLETED';
-        step.output = { message: `Step ${step.name} finished successfully` };
-        resolve(step);
-      }, 500);
+/** Agent 执行编排 — 封装 useAgentRun 供页面层调用 */
+export function useAgentExecution() {
+  const agentRun = useAgentRun();
+
+  async function executeGoal(params: {
+    agentCode: string;
+    goal: string;
+    courseId?: number;
+  }) {
+    return agentRun.runAgent({
+      agentCode: params.agentCode,
+      goal: params.goal,
+      courseId: params.courseId
     });
   }
+
+  return {
+    ...agentRun,
+    executeGoal
+  };
 }
+
+export { useAgentRun };

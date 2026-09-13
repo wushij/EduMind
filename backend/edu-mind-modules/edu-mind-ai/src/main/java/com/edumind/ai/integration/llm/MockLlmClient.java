@@ -20,7 +20,79 @@ public class MockLlmClient implements LlmClient {
 
     @Override
     public String chat(String systemPrompt, String userPrompt) {
+        if (isReactAgentCall(systemPrompt)) {
+            return buildReactAction(userPrompt);
+        }
+        if (systemPrompt != null && systemPrompt.contains("总结助手")) {
+            return "基于工具观察结果，已生成教学推进建议。";
+        }
         return "[" + modelKey + "] 这是 Mock LLM 的回复。您的问题是：" + userPrompt;
+    }
+
+    private boolean isReactAgentCall(String systemPrompt) {
+        return systemPrompt != null && systemPrompt.contains("ReAct Agent");
+    }
+
+    private String buildReactAction(String userPrompt) {
+        String goalSection = extractGoalSection(userPrompt);
+        String observations = extractObservationHistory(userPrompt);
+        boolean questionFlow = goalSection.contains("单选题")
+                || goalSection.contains("多选题")
+                || (goalSection.contains("生成") && goalSection.contains("题"));
+
+        Map<String, Object> action = new HashMap<>();
+        if (questionFlow) {
+            if (!hasObservation(observations, "search_knowledge_point")) {
+                action.put("thought", "检索相关知识点");
+                action.put("action", "search_knowledge_point");
+                action.put("actionInput", Map.of("courseId", 102));
+            } else if (!hasObservation(observations, "generate_question")) {
+                action.put("thought", "生成题目");
+                action.put("action", "generate_question");
+                action.put("actionInput", Map.of("courseId", 102, "count", 5));
+            } else {
+                action.put("thought", "题目已生成");
+                action.put("action", "finish");
+                action.put("finalAnswer", "已根据知识点生成练习题目。");
+            }
+            return JSON.toJSONString(action);
+        }
+
+        if (!hasObservation(observations, "get_student_profile")) {
+            action.put("thought", "先获取学生学情画像");
+            action.put("action", "get_student_profile");
+            action.put("actionInput", Map.of("studentId", 1001, "courseId", 102));
+        } else if (!hasObservation(observations, "recommend_resource")) {
+            action.put("thought", "基于弱项推荐巩固资源");
+            action.put("action", "recommend_resource");
+            action.put("actionInput", Map.of("courseId", 102, "limit", 3));
+        } else {
+            action.put("thought", "信息已足够，生成最终回答");
+            action.put("action", "finish");
+            action.put("finalAnswer", "已综合分析学情画像并推荐匹配资源，建议按推荐顺序完成巩固练习。");
+        }
+        return JSON.toJSONString(action);
+    }
+
+    /** 仅解析 ReAct 模板中的「历史观察」段，避免工具清单里的 tool name 误判为已执行。 */
+    private String extractObservationHistory(String userPrompt) {
+        if (userPrompt == null) {
+            return "";
+        }
+        int marker = userPrompt.indexOf("历史观察：");
+        return marker >= 0 ? userPrompt.substring(marker) : "";
+    }
+
+    private String extractGoalSection(String userPrompt) {
+        if (userPrompt == null) {
+            return "";
+        }
+        int marker = userPrompt.indexOf("任务目标：");
+        return marker >= 0 ? userPrompt.substring(marker) : userPrompt;
+    }
+
+    private boolean hasObservation(String observations, String toolName) {
+        return observations.contains("Observation[" + toolName + "]");
     }
 
     @Override

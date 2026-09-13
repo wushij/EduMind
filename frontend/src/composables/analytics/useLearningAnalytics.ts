@@ -21,6 +21,7 @@ import type {
 export function useLearningAnalytics() {
   const loading = ref(false);
   const usedMockFallback = ref(false);
+  const isAggregated = ref(false);
   const learningData = ref<LearningAnalyticsVO | null>(null);
   const masteryData = ref<KnowledgeMasteryVO | null>(null);
   const wrongQuestions = ref<WrongQuestionAnalyticsVO | null>(null);
@@ -33,12 +34,15 @@ export function useLearningAnalytics() {
     try {
       const res = await getLearningAnalytics({ courseId, range });
       learningData.value = res.data;
+      isAggregated.value = Boolean(res.data?.aggregated);
     } catch {
       if (USE_MOCK) {
         usedMockFallback.value = true;
         learningData.value = { ...MOCK_LEARNING_ANALYTICS, courseId };
+        isAggregated.value = false;
       } else {
         learningData.value = null;
+        isAggregated.value = false;
       }
     } finally {
       loading.value = false;
@@ -125,6 +129,7 @@ export function useLearningAnalytics() {
   return {
     loading,
     usedMockFallback,
+    isAggregated,
     learningData,
     masteryData,
     wrongQuestions,

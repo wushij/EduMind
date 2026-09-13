@@ -16,6 +16,9 @@ export const updateUser = (id: number, data: Record<string, any>) =>
 export const updateUserStatus = (id: number, status: string) =>
   put<void>(`/system/users/${id}/status`, { status });
 
+export const resetUserPassword = (id: number, newPassword: string) =>
+  put<void>(`/system/users/${id}/password`, { newPassword });
+
 export const deleteUser = (id: number) => del<void>(`/system/users/${id}`);
 
 export const getProfile = () => get<UserInfo>('/users/profile');
@@ -28,11 +31,10 @@ export const sendBindEmailCode = (email: string) =>
 export const bindEmail = (data: { email: string; code: string }) =>
   post<UserInfo>('/users/bind-email', data);
 
-export const uploadAvatar = async (file: File) => {
+export const uploadAvatar = (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
-  const res = await axiosInstance.post('/users/avatar', formData, {
+  return axiosInstance.post<UserInfo>('/users/avatar', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
-  return res.data;
 };

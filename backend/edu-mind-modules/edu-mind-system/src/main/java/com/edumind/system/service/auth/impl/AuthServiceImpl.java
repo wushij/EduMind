@@ -16,6 +16,7 @@ import com.edumind.system.entity.UserRoleEntity;
 import com.edumind.system.service.user.UserVoAssembler;
 import com.edumind.system.dto.auth.LoginDTO;
 import com.edumind.system.entity.UserEntity;
+import com.edumind.system.service.SysTenantService;
 import com.edumind.system.service.auth.AuthService;
 import com.edumind.system.vo.auth.LoginVO;
 import com.edumind.system.vo.user.UserVO;
@@ -45,6 +46,7 @@ public class AuthServiceImpl implements AuthService {
     private final com.edumind.system.service.email.EmailCodeService emailCodeService;
     private final RedisService redisService;
     private final PermissionCacheService permissionCacheService;
+    private final SysTenantService sysTenantService;
 
     @Override
     public LoginVO login(LoginDTO loginDTO) {
@@ -61,18 +63,23 @@ public class AuthServiceImpl implements AuthService {
             if ("admin".equals(username) && "admin123".equals(password)) {
                 permissionCacheService.evictUser(1L);
                 StpUtil.login(1L);
-                UserVO adminVO = UserVO.builder()
-                        .id(1L)
-                        .username("admin")
-                        .realName("系统管理员")
-                        .roles(Collections.singletonList("ADMIN"))
-                        .permissions(Collections.emptyList())
-                        .status("ENABLE")
-                        .avatar("")
-                        .build();
+                Long tenantId = sysTenantService.initializeLoginTenantSession(1L);
+                UserEntity bootstrapAdmin = userDao.findById(1L);
+                UserVO adminVO = bootstrapAdmin != null
+                        ? userVoAssembler.toVO(bootstrapAdmin)
+                        : UserVO.builder()
+                                .id(1L)
+                                .username("admin")
+                                .realName("系统管理员")
+                                .roles(Collections.singletonList("ADMIN"))
+                                .permissions(Collections.emptyList())
+                                .status("ENABLE")
+                                .avatar("https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png")
+                                .build();
                 return LoginVO.builder()
                         .token(StpUtil.getTokenValue())
                         .userInfo(adminVO)
+                        .tenantId(tenantId)
                         .build();
             }
             throw new BusinessException("用户名或密码错误");
@@ -88,10 +95,12 @@ public class AuthServiceImpl implements AuthService {
 
         permissionCacheService.evictUser(user.getId());
         StpUtil.login(user.getId());
+        Long tenantId = sysTenantService.initializeLoginTenantSession(user.getId());
 
         return LoginVO.builder()
                 .token(StpUtil.getTokenValue())
                 .userInfo(userVoAssembler.toVO(user))
+                .tenantId(tenantId)
                 .build();
     }
 
@@ -116,10 +125,12 @@ public class AuthServiceImpl implements AuthService {
         // 3. 执行登录授权
         permissionCacheService.evictUser(user.getId());
         StpUtil.login(user.getId());
+        Long tenantId = sysTenantService.initializeLoginTenantSession(user.getId());
 
         return LoginVO.builder()
                 .token(StpUtil.getTokenValue())
                 .userInfo(userVoAssembler.toVO(user))
+                .tenantId(tenantId)
                 .build();
     }
 

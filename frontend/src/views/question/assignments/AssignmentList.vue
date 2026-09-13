@@ -353,15 +353,22 @@ async function handleFastAIGrade(assignmentId: number) {
 
 <style scoped lang="scss">
 .assignment-list-container {
-  padding: 24px;
-  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+
   .assignment-header-dock {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 24px 28px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 16px;
-    margin-bottom: 24px;
 
     .header-left {
       .title-with-icon {
@@ -400,95 +407,110 @@ async function handleFastAIGrade(assignmentId: number) {
 
     .header-right-actions {
       .capsule-btn-primary {
-        background: #2563eb;
-        border-color: #2563eb;
-        border-radius: 8px;
-        font-weight: 500;
-        padding: 9px 20px;
+        border-radius: 9999px;
+        font-weight: 600;
+        padding: 9px 22px;
       }
     }
   }
 
   .stats-cards-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 16px;
-    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    width: 100%;
 
     .stat-card {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      height: 46px;
+      padding: 0 18px;
+      border-radius: 9999px;
       background: #ffffff;
       border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 16px 20px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+      box-shadow: 0 2px 10px rgba(30, 80, 150, 0.03);
+      flex: 1 1 220px;
 
       .stat-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 10px;
+        width: 32px;
+        height: 32px;
+        border-radius: 9999px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 22px;
+        font-size: 16px;
+        flex-shrink: 0;
       }
 
       .stat-meta {
         display: flex;
-        flex-direction: column;
+        align-items: baseline;
+        gap: 8px;
+        min-width: 0;
 
         .stat-val {
-          font-size: 24px;
+          font-size: 18px;
           font-weight: 800;
           color: #0f172a;
-          line-height: 1.1;
+          line-height: 1;
         }
 
         .stat-title {
-          font-size: 13px;
+          font-size: 12.5px;
           color: #64748b;
-          margin-top: 4px;
+          margin-top: 0;
+          white-space: nowrap;
         }
       }
     }
   }
 
   .filter-capsule-card {
+    width: 100%;
+    box-sizing: border-box;
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 14px 20px;
-    margin-bottom: 20px;
+    border-radius: 18px;
+    padding: 18px 24px;
+    box-shadow: 0 2px 12px rgba(30, 80, 150, 0.03);
 
     .filter-left {
       display: flex;
       align-items: center;
       gap: 12px;
       flex-wrap: wrap;
+      width: 100%;
 
       .search-input {
-        width: 320px;
+        flex: 1;
+        min-width: 280px;
       }
 
       .filter-select {
-        width: 160px;
+        width: 180px;
+        flex-shrink: 0;
       }
     }
   }
 
   .assignments-grid-wrapper {
+    width: 100%;
+
     .assignments-stack {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 20px;
 
       .assignment-row-card {
+        width: 100%;
+        box-sizing: border-box;
         background: #ffffff;
         border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 20px 24px;
+        border-radius: 18px;
+        padding: 24px 28px;
+        box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
         display: flex;
         align-items: center;
         justify-content: space-between;

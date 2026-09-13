@@ -136,6 +136,11 @@ import {
 } from '@element-plus/icons-vue';
 import { useAuthStore } from '@/stores/auth/auth';
 import { useAppStore } from '@/stores/app/app';
+import {
+  getStoredKnowledgeBaseId,
+  LAST_KNOWLEDGE_ID_KEY,
+  parseKnowledgeBaseIdFromPath
+} from '@/composables/knowledge/useKnowledgeRoute';
 
 const props = withDefaults(
   defineProps<{
@@ -151,8 +156,6 @@ const router = useRouter();
 const authStore = useAuthStore();
 const appStore = useAppStore();
 const menuRef = ref();
-
-const LAST_KNOWLEDGE_ID_KEY = 'edumind_last_knowledge_id';
 
 interface SubMenuItem {
   path: string;
@@ -175,12 +178,11 @@ interface NavModule {
 
 /** 解析当前上下文知识库 ID，避免侧边栏硬编码 /knowledge/1/... */
 function getKnowledgeBaseId(): string {
-  const routeMatch = route.path.match(/^\/knowledge\/([^/]+)/);
-  const routeId = routeMatch?.[1];
-  if (routeId && routeId !== 'create') {
-    return routeId;
+  const routeId = parseKnowledgeBaseIdFromPath(route.path);
+  if (routeId) {
+    return String(routeId);
   }
-  return localStorage.getItem(LAST_KNOWLEDGE_ID_KEY) || '1';
+  return String(getStoredKnowledgeBaseId());
 }
 
 function knowledgePath(suffix: string): string {
@@ -235,7 +237,8 @@ function buildModuleDefinitions(): NavModule[] {
         { path: '/ai/lesson', name: 'AI 教案', icon: Notebook },
         { path: '/ai/summary', name: 'AI 总结', icon: DocumentCopy },
         { path: '/ai/recommendation', name: 'AI 推荐', icon: Promotion },
-        { path: '/ai/agent', name: 'Agent 中心', icon: Cpu, permissions: ['ai:tool:use'] }
+        { path: '/ai/agent', name: 'Agent 中心', icon: Cpu, permissions: ['ai:tool:use'] },
+        { path: '/ai/memory', name: '记忆与隐私', icon: Key }
       ]
     },
 
@@ -249,6 +252,7 @@ function buildModuleDefinitions(): NavModule[] {
       children: [
         { path: '/knowledge', name: '知识库', icon: Folder, permissions: ['knowledge:view'] },
         { path: '/knowledge/create', name: '创建知识库', icon: FolderAdd },
+        { path: '/knowledge/ocr', name: 'OCR 试卷识别', icon: Search },
         { path: `/knowledge/${kbId}/documents`, name: '文档管理', icon: Files },
         { path: `/knowledge/${kbId}/chunks`, name: '切片管理', icon: Grid },
         { path: `/knowledge/${kbId}/embeddings`, name: '向量状态', icon: PieChart },
@@ -270,6 +274,7 @@ function buildModuleDefinitions(): NavModule[] {
         { path: '/question/list', name: '题目', icon: Memo, permissions: ['question:view'] },
         { path: '/question/banks', name: '题库', icon: Collection },
         { path: '/question/exams', name: '试卷', icon: DocumentChecked },
+        { path: '/question/exports', name: '试卷导出中心', icon: DocumentCopy },
         { path: '/question/assignments', name: '作业', icon: Notebook },
         { path: '/question/submissions', name: '提交记录', icon: Finished }
       ]
@@ -302,6 +307,7 @@ function buildModuleDefinitions(): NavModule[] {
         { path: '/analytics/learning', name: '学情分析', icon: TrendCharts },
         { path: '/analytics/mastery', name: '知识点掌握', icon: PieChart },
         { path: '/analytics/wrong-questions', name: '错题分析', icon: QuestionFilled },
+        { path: '/analytics/interventions', name: '教学干预决策', icon: Warning },
         { path: '/analytics/ai-usage', name: 'AI 使用分析', icon: Coin },
         { path: '/analytics/teaching-report', name: '教学报告', icon: DocumentCopy }
       ]
@@ -315,13 +321,15 @@ function buildModuleDefinitions(): NavModule[] {
       roles: ['ADMIN'],
       permissions: ['system:user:view', 'system:role:view'],
       children: [
+        { path: '/system/tenants', name: '租户与校区', icon: School },
+        { path: '/system/organizations', name: '组织架构', icon: Connection },
         { path: '/system/users', name: '用户管理', icon: User, permissions: ['system:user:view'] },
         { path: '/system/roles', name: '角色权限', icon: Lock, permissions: ['system:role:view'] },
         { path: '/system/permissions', name: '权限分配', icon: Key },
         { path: '/system/tools', name: 'AI 工具', icon: Operation },
         { path: '/system/models', name: 'AI 模型', icon: Cpu },
         { path: '/system/prompts', name: 'Prompt', icon: ChatLineSquare },
-        { path: '/system/quotas', name: 'AI 配额', icon: Money },
+        { path: '/system/quotas', name: '租户配额管控', icon: Money },
         { path: '/system/audit', name: '审计日志', icon: Clock },
         { path: '/system/config', name: '系统配置', icon: Monitor },
         { path: '/system/gateway', name: 'AI 网关', icon: Connection }
@@ -457,9 +465,9 @@ function openActiveSubMenu() {
 watch(
   () => route.path,
   (path) => {
-    const match = path.match(/^\/knowledge\/([^/]+)/);
-    if (match && match[1] !== 'create') {
-      localStorage.setItem(LAST_KNOWLEDGE_ID_KEY, match[1]);
+    const kbId = parseKnowledgeBaseIdFromPath(path);
+    if (kbId) {
+      localStorage.setItem(LAST_KNOWLEDGE_ID_KEY, String(kbId));
     }
   },
   { immediate: true }

@@ -65,6 +65,8 @@ public class PromptService {
             case "question_generate" -> AiPromptConstants.QUESTION_GENERATE_SYSTEM;
             case "chat" -> AiPromptConstants.CHAT_SYSTEM;
             case "subjective_grading" -> AiPromptConstants.SUBJECTIVE_GRADING_SYSTEM;
+            case "global_assistant" -> AiPromptConstants.GLOBAL_ASSISTANT_SYSTEM;
+            case "navigate" -> AiPromptConstants.NAVIGATE_SYSTEM;
             default -> "";
         };
     }

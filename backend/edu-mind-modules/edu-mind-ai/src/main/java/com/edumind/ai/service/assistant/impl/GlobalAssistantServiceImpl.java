@@ -9,6 +9,9 @@ import com.edumind.ai.integration.llm.LlmClient;
 import com.edumind.ai.integration.llm.LlmProperties;
 import com.edumind.ai.router.IntentRouter;
 import com.edumind.ai.service.assistant.GlobalAssistantService;
+import com.edumind.ai.service.routing.IntentDispatchPlan;
+import com.edumind.ai.service.routing.IntentDispatchRequest;
+import com.edumind.ai.service.routing.IntentDispatchService;
 import com.edumind.security.context.LoginUserResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +30,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class GlobalAssistantServiceImpl implements GlobalAssistantService {
 
-    private final IntentRouter intentRouter;
+    private final IntentDispatchService intentDispatchService;
     private final AiGatewayFacade aiGatewayFacade;
     private final AiCallLogDao aiCallLogDao;
     private final LlmProperties llmProperties;
@@ -38,42 +41,46 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
         SseEmitter emitter = new SseEmitter(180000L);
         String convId = dto.getConversationId() != null ? dto.getConversationId() : "conv-" + UUID.randomUUID().toString().substring(0, 8);
 
-        // 1. 意图分流
-        IntentRouter.IntentResult intent = intentRouter.route(dto.getMessage(), dto.getCourseId());
+        IntentRouter.IntentResult intent = intentDispatchService.route(dto.getMessage(), dto.getCourseId());
+        IntentDispatchPlan plan = intentDispatchService.prepare(IntentDispatchRequest.builder()
+                .message(dto.getMessage())
+                .courseId(dto.getCourseId())
+                .intent(intent)
+                .build());
 
         assistantExecutor.execute(() -> {
             try {
-                // 发送 intent 事件
                 Map<String, Object> intentData = new HashMap<>();
-                intentData.put("route", intent.type());
-                intentData.put("agentCode", intent.targetCode());
+                intentData.put("route", plan.getRoute());
+                intentData.put("agentCode", plan.getAgentCode());
                 intentData.put("confidence", intent.confidence());
                 intentData.put("slots", intent.slots());
                 sendEvent(emitter, "intent", intentData);
 
-                // 2. 调用大模型流式生成
+                if ("navigate".equals(plan.getRoute()) && plan.getNavigatePayload() != null) {
+                    sendEvent(emitter, "navigate", plan.getNavigatePayload());
+                }
+
                 StringBuilder contentBuilder = new StringBuilder();
-                String systemPrompt = "你是一个全能教学AI助手EduMind，请根据用户的输入专业、友好地回答。当前识别意图：" + intent.type();
                 long start = System.currentTimeMillis();
 
-                aiGatewayFacade.streamChat("global_assistant", systemPrompt, dto.getMessage(), new LlmClient.StreamCallback() {
+                aiGatewayFacade.streamChat("global_assistant", plan.getSystemPrompt(), plan.getUserPrompt(), new LlmClient.StreamCallback() {
                     @Override
                     public void onChunk(String chunk) {
                         contentBuilder.append(chunk);
-                        Map<String, String> delta = new HashMap<>();
-                        delta.put("content", chunk);
-                        sendEvent(emitter, "delta", delta);
+                        sendEvent(emitter, "delta", Map.of("content", chunk));
                     }
 
                     @Override
                     public void onComplete() {
                         Map<String, Object> done = new HashMap<>();
                         done.put("conversationId", convId);
-                        done.put("citations", List.of());
+                        done.put("citations", plan.getCitations() != null ? plan.getCitations() : List.of());
+                        if (plan.getAgentCode() != null) {
+                            done.put("agentCode", plan.getAgentCode());
+                        }
                         sendEvent(emitter, "done", done);
                         emitter.complete();
-
-                        // 审计落库
                         logAudit(dto.getCourseId(), start, dto.getMessage(), contentBuilder.toString());
                     }
 
@@ -97,41 +104,56 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
     @Override
     public Map<String, Object> ask(GlobalAssistantRequestDTO dto) {
         String convId = dto.getConversationId() != null ? dto.getConversationId() : "conv-" + UUID.randomUUID().toString().substring(0, 8);
-        IntentRouter.IntentResult intent = intentRouter.route(dto.getMessage(), dto.getCourseId());
-        String systemPrompt = "你是一个全能教学AI助手EduMind，请根据用户的输入专业、友好地回答。当前识别意图：" + intent.type();
-        long start = System.currentTimeMillis();
-        String answer = aiGatewayFacade.chat("global_assistant", systemPrompt, dto.getMessage());
+        IntentRouter.IntentResult intent = intentDispatchService.route(dto.getMessage(), dto.getCourseId());
+        IntentDispatchPlan plan = intentDispatchService.prepare(IntentDispatchRequest.builder()
+                .message(dto.getMessage())
+                .courseId(dto.getCourseId())
+                .intent(intent)
+                .build());
 
+        long start = System.currentTimeMillis();
+        String answer = aiGatewayFacade.chat("global_assistant", plan.getSystemPrompt(), plan.getUserPrompt());
         logAudit(dto.getCourseId(), start, dto.getMessage(), answer);
 
-        String targetCode = intent.targetCode();
-        if ("exam".equals(targetCode)) {
-            targetCode = "/ai/exam/generate";
-        } else if ("learning".equals(targetCode)) {
-            targetCode = "/analytics/knowledge-mastery";
-        } else if ("kb_retrieval".equals(targetCode)) {
-            targetCode = "/knowledge/retrieval";
-        }
-
-        String intentDesc;
-        if ("agent".equals(intent.type()) && "exam".equals(intent.targetCode())) {
-            intentDesc = "🎯 识别意图：AI智能组卷与出题";
-        } else if ("rag".equals(intent.type())) {
-            intentDesc = "🔍 识别意图：知识库考点检索";
-        } else if ("navigate".equals(intent.type())) {
-            intentDesc = "🧭 识别意图：页面功能直达";
-        } else {
-            intentDesc = "🤖 识别意图：课程助教答疑";
-        }
+        String targetCode = resolveTargetCode(intent, plan);
 
         Map<String, Object> result = new HashMap<>();
         result.put("conversationId", convId);
-        result.put("intent", intent.type());
-        result.put("intentDesc", intentDesc);
+        result.put("intent", plan.getRoute());
+        result.put("intentDesc", buildIntentDesc(plan));
         result.put("targetCode", targetCode);
         result.put("content", answer);
-        result.put("citations", List.of());
+        result.put("citations", plan.getCitations() != null ? plan.getCitations() : List.of());
+        if (plan.getNavigatePayload() != null) {
+            result.put("navigate", plan.getNavigatePayload());
+        }
         return result;
+    }
+
+    private String resolveTargetCode(IntentRouter.IntentResult intent, IntentDispatchPlan plan) {
+        if ("navigate".equals(plan.getRoute())) {
+            return plan.getTargetCode();
+        }
+        String targetCode = intent.targetCode();
+        if ("exam".equals(targetCode)) {
+            return "/ai/exam/generate";
+        }
+        if ("learning".equals(targetCode)) {
+            return "/analytics/knowledge-mastery";
+        }
+        if ("kb_retrieval".equals(targetCode)) {
+            return "/knowledge/retrieval";
+        }
+        return targetCode;
+    }
+
+    private String buildIntentDesc(IntentDispatchPlan plan) {
+        return switch (plan.getRoute()) {
+            case "agent" -> "🎯 识别意图：Agent 任务编排（" + plan.getAgentCode() + "）";
+            case "rag" -> "🔍 识别意图：知识库考点检索";
+            case "navigate" -> "🧭 识别意图：页面功能直达";
+            default -> "🤖 识别意图：课程助教答疑";
+        };
     }
 
     private void sendEvent(SseEmitter emitter, String eventName, Object data) {

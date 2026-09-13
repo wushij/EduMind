@@ -7,7 +7,7 @@
     ]"
     :style="bannerStyle"
   >
-    <!-- 装饰性光斑背景微动效 -->
+    <!-- 装饰性柔光背景微动效 -->
     <div class="glow-orb glow-orb--left"></div>
     <div class="glow-orb glow-orb--right"></div>
 
@@ -59,71 +59,9 @@
         </div>
       </div>
 
-      <!-- 右侧插画区域 -->
-      <div v-if="showIllustrationEffective" class="hero-illustration">
-        <slot name="illustration">
-          <!-- 内置默认高质感 AI 科技插画 (SVG) -->
-          <div class="default-illustration">
-            <svg class="robot-tech-svg" viewBox="0 0 260 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <!-- 浮空圆环基底 -->
-              <ellipse cx="130" cy="155" rx="80" ry="14" fill="#1677FF" fill-opacity="0.12" />
-              <ellipse cx="130" cy="155" rx="55" ry="9" fill="#1677FF" fill-opacity="0.2" />
-
-              <!-- 悬浮微芯片卡片 -->
-              <g class="float-chip" transform="translate(18, 25)">
-                <rect width="64" height="42" rx="12" fill="#FFFFFF" fill-opacity="0.9" filter="drop-shadow(0 6px 16px rgba(22, 119, 255, 0.15))" />
-                <rect x="8" y="10" width="22" height="6" rx="3" fill="#1677FF" />
-                <rect x="8" y="20" width="38" height="4" rx="2" fill="#93C5FD" />
-                <rect x="8" y="28" width="28" height="4" rx="2" fill="#CBD5E1" />
-                <circle cx="50" cy="13" r="5" fill="#52C41A" fill-opacity="0.8" />
-              </g>
-
-              <!-- 悬浮智慧星芒卡片 -->
-              <g class="float-ai-badge" transform="translate(180, 40)">
-                <rect width="58" height="38" rx="10" fill="#FFFFFF" fill-opacity="0.92" filter="drop-shadow(0 6px 14px rgba(114, 46, 209, 0.15))" />
-                <circle cx="20" cy="19" r="9" fill="#722ED1" fill-opacity="0.15" />
-                <path d="M20 14L21.5 17.5L25 19L21.5 20.5L20 24L18.5 20.5L15 19L18.5 17.5L20 14Z" fill="#722ED1" />
-                <rect x="34" y="14" width="16" height="4" rx="2" fill="#C4B5FD" />
-                <rect x="34" y="22" width="12" height="3" rx="1.5" fill="#E2E8F0" />
-              </g>
-
-              <!-- 中心 AI 智能体头盔/机体 -->
-              <g class="robot-main" transform="translate(85, 45)">
-                <!-- 身体底盘 -->
-                <rect x="15" y="65" width="60" height="40" rx="18" fill="url(#robot-body-grad)" />
-                <rect x="25" y="75" width="40" height="8" rx="4" fill="#FFFFFF" fill-opacity="0.4" />
-
-                <!-- 头部 -->
-                <rect x="5" y="10" width="80" height="56" rx="24" fill="#FFFFFF" filter="drop-shadow(0 8px 24px rgba(22, 119, 255, 0.2))" />
-                <!-- 头盔面罩 (深蓝渐变) -->
-                <rect x="12" y="16" width="66" height="42" rx="18" fill="url(#visor-grad)" />
-                <!-- 灵动双目 (青蓝光斑) -->
-                <ellipse cx="32" cy="36" rx="8" ry="6" fill="#38BDF8" />
-                <circle cx="34" cy="34" r="2.5" fill="#FFFFFF" />
-                <ellipse cx="58" cy="36" rx="8" ry="6" fill="#38BDF8" />
-                <circle cx="60" cy="34" r="2.5" fill="#FFFFFF" />
-                <!-- 头部天线 -->
-                <circle cx="45" cy="4" r="4" fill="#1677FF" />
-                <line x1="45" y1="4" x2="45" y2="10" stroke="#1677FF" stroke-width="2.5" stroke-linecap="round" />
-                <!-- 耳部光环 -->
-                <rect x="0" y="28" width="6" height="18" rx="3" fill="#1677FF" />
-                <rect x="84" y="28" width="6" height="18" rx="3" fill="#1677FF" />
-              </g>
-
-              <!-- 渐变定义 -->
-              <defs>
-                <linearGradient id="robot-body-grad" x1="15" y1="65" x2="75" y2="105" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#1677FF" />
-                  <stop offset="1" stop-color="#0958D9" />
-                </linearGradient>
-                <linearGradient id="visor-grad" x1="12" y1="16" x2="78" y2="58" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#0A1B39" />
-                  <stop offset="1" stop-color="#1E293B" />
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-        </slot>
+      <!-- 右侧自定义插画区 (仅在外部显式传入插槽时呈现，默认不展示 AI logo) -->
+      <div v-if="$slots.illustration" class="hero-illustration">
+        <slot name="illustration" />
       </div>
     </div>
 
@@ -135,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 import { Close } from '@element-plus/icons-vue';
 
 const props = withDefaults(
@@ -143,7 +81,7 @@ const props = withDefaults(
     title: string;
     subtitle?: string;
     backgroundImage?: string;
-    backgroundVariant?: 'default' | 'ai' | 'learning' | 'knowledge';
+    backgroundVariant?: 'default' | 'ai' | 'learning' | 'knowledge' | 'system' | 'analytics' | 'question';
     size?: 'normal' | 'large';
     showSearch?: boolean;
     searchPlaceholder?: string;
@@ -157,7 +95,7 @@ const props = withDefaults(
     size: 'normal',
     showSearch: false,
     searchPlaceholder: '搜索...',
-    showIllustration: true,
+    showIllustration: false,
     modelValue: ''
   }
 );
@@ -171,11 +109,6 @@ const searchValue = computed({
   get: () => props.modelValue,
   set: (val: string) => emit('update:modelValue', val)
 });
-
-/** 已设置背景图时默认隐藏右侧插画，避免与 Banner 主视觉重叠 */
-const showIllustrationEffective = computed(
-  () => props.showIllustration && !props.backgroundImage
-);
 
 const bannerStyle = computed(() => {
   if (props.backgroundImage) {
@@ -202,16 +135,16 @@ function clearSearch() {
 .page-hero-banner {
   position: relative;
   width: 100%;
-  border-radius: 18px;
-  padding: 32px 36px 28px;
-  margin-bottom: 22px;
+  border-radius: 24px; // 柔和长圆大边框
+  padding: 18px 28px 16px; // 精致紧凑内边距，大幅减少垂直空间占用
+  margin-bottom: 18px;
   overflow: hidden;
   box-sizing: border-box;
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 8px 30px rgba(22, 119, 255, 0.06), 0 1px 3px rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
   transition: all 0.3s ease;
 
-  // 1. 预设高雅渐变背景
+  // 1. 预设高雅渐变背景 (保留原设计底色)
   &--default {
     background: linear-gradient(135deg, #EAF3FF 0%, #F1F6FF 45%, #E5EFFF 100%);
   }
@@ -228,12 +161,24 @@ function clearSearch() {
     background: linear-gradient(135deg, #EFF6FF 0%, #FAF5FF 50%, #F0F9FF 100%);
   }
 
+  &--system {
+    background: linear-gradient(135deg, #EEF2FF 0%, #F8FAFC 45%, #E0E7FF 100%);
+  }
+
+  &--analytics {
+    background: linear-gradient(135deg, #ECFDF5 0%, #F0F9FF 50%, #EEF2FF 100%);
+  }
+
+  &--question {
+    background: linear-gradient(135deg, #FFF7ED 0%, #FEF3C7 40%, #FFFBEB 100%);
+  }
+
   // 尺寸变体
   &--large {
-    padding: 38px 44px 34px;
+    padding: 24px 32px 20px;
     .hero-title {
-      font-size: 28px !important;
-      letter-spacing: -0.3px;
+      font-size: 22px !important;
+      letter-spacing: -0.2px;
     }
   }
 
@@ -242,23 +187,23 @@ function clearSearch() {
     position: absolute;
     border-radius: 50%;
     pointer-events: none;
-    filter: blur(55px);
+    filter: blur(50px);
     z-index: 0;
 
     &--left {
-      top: -40px;
-      left: 10%;
-      width: 180px;
-      height: 180px;
-      background: rgba(22, 119, 255, 0.12);
+      top: -30px;
+      left: 8%;
+      width: 140px;
+      height: 140px;
+      background: rgba(22, 119, 255, 0.1);
     }
 
     &--right {
-      bottom: -40px;
-      right: 15%;
-      width: 220px;
-      height: 220px;
-      background: rgba(114, 46, 209, 0.08);
+      bottom: -30px;
+      right: 12%;
+      width: 160px;
+      height: 160px;
+      background: rgba(114, 46, 209, 0.06);
     }
   }
 
@@ -268,46 +213,45 @@ function clearSearch() {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 28px;
+    gap: 20px;
   }
 
   // 3. 文案排版
   .hero-content {
     flex: 1;
-    max-width: 680px;
 
     .hero-title-group {
       .hero-title {
-        font-size: 24px;
+        font-size: 19px;
         font-weight: 700;
         color: #0F172A;
-        margin: 0 0 8px 0;
-        line-height: 1.3;
+        margin: 0 0 4px 0;
+        line-height: 1.35;
       }
 
       .hero-subtitle {
-        font-size: 14.5px;
+        font-size: 13px;
         color: #475569;
         margin: 0;
-        line-height: 1.6;
+        line-height: 1.55;
       }
     }
 
     // 4. 纯正长圆胶囊搜索框 (Capsule Search)
     .hero-search-wrapper {
-      margin-top: 18px;
+      margin-top: 14px;
 
       .capsule-search-box {
         display: flex;
         align-items: center;
         width: 100%;
-        max-width: 520px;
-        height: 46px;
+        max-width: 480px;
+        height: 40px;
         background: #FFFFFF;
         border: 1.5px solid #E2E8F0;
         border-radius: 9999px; // 纯正长圆跑道
-        padding: 3px 4px 3px 18px;
-        box-shadow: 0 4px 16px rgba(22, 119, 255, 0.07);
+        padding: 2px 4px 2px 16px;
+        box-shadow: 0 2px 10px rgba(22, 119, 255, 0.06);
         box-sizing: border-box;
         transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -317,18 +261,18 @@ function clearSearch() {
 
         &:focus-within {
           border-color: #1677FF;
-          box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.16);
+          box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.14);
         }
 
         .search-prefix-icon {
           display: flex;
           align-items: center;
           color: #94A3B8;
-          margin-right: 10px;
+          margin-right: 8px;
 
           .search-svg {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
           }
         }
 
@@ -338,12 +282,12 @@ function clearSearch() {
           border: none;
           outline: none;
           background: transparent;
-          font-size: 14px;
+          font-size: 13.5px;
           color: #1E293B;
 
           &::placeholder {
             color: #94A3B8;
-            font-size: 13.5px;
+            font-size: 13px;
           }
         }
 
@@ -352,8 +296,8 @@ function clearSearch() {
           border: none;
           color: #94A3B8;
           font-size: 12px;
-          width: 22px;
-          height: 22px;
+          width: 20px;
+          height: 20px;
           border-radius: 50%;
           cursor: pointer;
           display: flex;
@@ -368,12 +312,12 @@ function clearSearch() {
         }
 
         .capsule-search-submit {
-          height: 38px;
-          padding: 0 22px;
+          height: 32px;
+          padding: 0 18px;
           border-radius: 9999px; // 胶囊搜索按钮
           background: #1677FF;
           color: #FFFFFF;
-          font-size: 14px;
+          font-size: 13px;
           font-weight: 500;
           border: none;
           cursor: pointer;
@@ -393,71 +337,37 @@ function clearSearch() {
     }
 
     .hero-actions {
-      margin-top: 18px;
+      margin-top: 14px;
       display: flex;
       align-items: center;
       gap: 12px;
     }
   }
 
-  // 5. 右侧插画
+  // 5. 右侧插画 (仅在显式传入 slot 时渲染)
   .hero-illustration {
     position: relative;
     z-index: 1;
     flex-shrink: 0;
-
-    .default-illustration {
-      width: 240px;
-      height: 150px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-
-      .robot-tech-svg {
-        width: 100%;
-        height: 100%;
-        overflow: visible;
-
-        .float-chip {
-          animation: floatY 4s ease-in-out infinite alternate;
-        }
-
-        .float-ai-badge {
-          animation: floatY 4.5s ease-in-out 1s infinite alternate;
-        }
-
-        .robot-main {
-          animation: robotHover 3.5s ease-in-out infinite alternate;
-        }
-      }
-    }
+    max-height: 100px;
+    display: flex;
+    align-items: center;
   }
 
-  // 6. 下方扩展区 (如分类 Tabs)
+  // 6. 下方扩展区 (如分类 Tabs、统计药丸指标等)
   .hero-extra {
     position: relative;
     z-index: 1;
-    margin-top: 22px;
-    padding-top: 18px;
-    border-top: 1px solid rgba(226, 232, 240, 0.6);
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(226, 232, 240, 0.55);
   }
-}
-
-// 动画
-@keyframes floatY {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(-8px); }
-}
-
-@keyframes robotHover {
-  0% { transform: translate(85px, 45px); }
-  100% { transform: translate(85px, 39px); }
 }
 
 // 响应式
 @media (max-width: 1024px) {
   .page-hero-banner {
-    padding: 24px 24px 20px;
+    padding: 16px 20px 14px;
 
     .hero-illustration {
       display: none;

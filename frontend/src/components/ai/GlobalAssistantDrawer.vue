@@ -1,6 +1,5 @@
 <template>
   <div class="global-assistant-root">
-    <!-- 悬浮唤起胶囊按钮 -->
     <div
       class="assistant-trigger-fab"
       :class="{ 'is-active': drawerVisible }"
@@ -14,7 +13,6 @@
       </div>
     </div>
 
-    <!-- 全局助手滑出式抽屉 -->
     <el-drawer
       v-model="drawerVisible"
       title="智教云 · 全域智能助手"
@@ -25,7 +23,6 @@
       destroy-on-close
     >
       <div class="drawer-layout">
-        <!-- 抽屉顶部头部 -->
         <div class="drawer-header">
           <div class="header-main">
             <div class="header-avatar">
@@ -45,7 +42,6 @@
           </div>
         </div>
 
-        <!-- 快捷场景推荐胶囊 -->
         <div class="preset-prompts-bar">
           <span class="preset-label">快捷指令：</span>
           <div class="prompt-chips">
@@ -61,7 +57,6 @@
           </div>
         </div>
 
-        <!-- 消息流展示区 -->
         <div ref="messagesScrollRef" class="messages-scroll-area">
           <div v-if="messages.length === 0" class="empty-welcome">
             <div class="robot-glow-box">
@@ -89,7 +84,6 @@
             </div>
 
             <div class="bubble-content-wrap">
-              <!-- 意图识别结果徽标 -->
               <div v-if="msg.intent" class="intent-recognition-pill">
                 <el-tag size="small" :type="getIntentTagType(msg.intent)" effect="dark">
                   意图：{{ msg.intentDesc || msg.intent }}
@@ -105,7 +99,6 @@
                 </el-button>
               </div>
 
-              <!-- 正文文本 -->
               <div class="message-text">
                 {{ msg.content }}
                 <span v-if="msg.streaming" class="cursor-blink">|</span>
@@ -114,7 +107,6 @@
           </div>
         </div>
 
-        <!-- 底部提问输入栏 -->
         <div class="drawer-footer-input">
           <div class="input-card">
             <el-input
@@ -149,8 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRouter } from 'vue-router';
 import {
   Service,
   Cpu,
@@ -159,197 +150,33 @@ import {
   ChatDotRound,
   Promotion
 } from '@element-plus/icons-vue';
-import { post } from '@/core/http/request';
+import { useGlobalAssistant } from '@/composables/ai/useGlobalAssistant';
 
-interface AssistantMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  intent?: string;
-  intentDesc?: string;
-  targetCode?: string;
-  streaming?: boolean;
-}
-
-const route = useRoute();
 const router = useRouter();
 
-const drawerVisible = ref(false);
-const inputContent = ref('');
-const isStreaming = ref(false);
-const messagesScrollRef = ref<HTMLDivElement | null>(null);
-
-const activeCourseId = computed(() => {
-  const queryCourseId = route.query.courseId;
-  if (queryCourseId) {
-    const parsed = Number(queryCourseId);
-    if (!isNaN(parsed) && parsed > 0) return parsed;
-  }
-  const paramCourseId = route.params.courseId || route.params.id;
-  if (paramCourseId) {
-    const parsed = Number(paramCourseId);
-    if (!isNaN(parsed) && parsed > 0) return parsed;
-  }
-  return 102;
-});
-
-const presetChips = [
-  { label: '智能组卷', prompt: '帮我出一份包含导数与微分的期中试卷' },
-  { label: '检索切片', prompt: '请检索微积分第一章的核心切片和知识点资料' },
-  { label: '学情看板', prompt: '我想看看班级的学情分析报表' },
-  { label: '知识图谱', prompt: '展示当前课程的知识图谱拓扑结构' }
-];
-
-const messages = ref<AssistantMessage[]>([]);
-
-function toggleDrawer() {
-  drawerVisible.value = !drawerVisible.value;
-  if (drawerVisible.value) {
-    nextTick(scrollToBottom);
-  }
-}
-
-function clearMessages() {
-  messages.value = [];
-}
-
-function handleSendPrompt(promptText: string) {
-  inputContent.value = promptText;
-  handleSubmit();
-}
+const {
+  drawerVisible,
+  inputContent,
+  isStreaming,
+  messages,
+  messagesScrollRef,
+  activeCourseId,
+  presetChips,
+  toggleDrawer,
+  clearMessages,
+  handleSubmit,
+  handleSendPrompt,
+  getIntentTagType
+} = useGlobalAssistant();
 
 function handleNavigate(path: string) {
   drawerVisible.value = false;
   router.push(path);
 }
-
-function getIntentTagType(intent?: string) {
-  if (intent === 'agent' || intent === 'EXAM_COMPOSE') return 'danger';
-  if (intent === 'rag' || intent === 'KNOWLEDGE_RETRIEVAL') return 'warning';
-  if (intent === 'navigate' || intent === 'REPORT_ANALYTICS') return 'success';
-  return 'primary';
-}
-
-function scrollToBottom() {
-  if (messagesScrollRef.value) {
-    messagesScrollRef.value.scrollTop = messagesScrollRef.value.scrollHeight;
-  }
-}
-
-async function handleSubmit() {
-  const query = inputContent.value.trim();
-  if (!query || isStreaming.value) return;
-
-  // 用户发言
-  messages.value.push({
-    role: 'user',
-    content: query
-  });
-  inputContent.value = '';
-  scrollToBottom();
-
-  // 助手占位
-  const assistantMsg: AssistantMessage = {
-    role: 'assistant',
-    content: '',
-    streaming: true
-  };
-  messages.value.push(assistantMsg);
-  isStreaming.value = true;
-  scrollToBottom();
-
-  // 优先尝试真实 SSE 流式问答 (/api/ai/assistant/chat)，如果断连降级至 /api/ai/assistant/ask
-  let sseSucceeded = false;
-  try {
-    const token = localStorage.getItem('token') || '';
-    const response = await fetch('/api/ai/assistant/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-        'satoken': token
-      },
-      body: JSON.stringify({
-        message: query,
-        courseId: activeCourseId.value
-      })
-    });
-
-    if (response.ok && response.body) {
-      sseSucceeded = true;
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let buffer = '';
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data:')) {
-            const jsonStr = line.slice(5).trim();
-            if (jsonStr) {
-              try {
-                const payload = JSON.parse(jsonStr);
-                if (payload.route) {
-                  assistantMsg.intent = payload.route;
-                  assistantMsg.intentDesc = payload.agentCode || payload.route;
-                  assistantMsg.targetCode = payload.targetCode;
-                }
-                if (payload.content) {
-                  assistantMsg.content += payload.content;
-                }
-                if (payload.conversationId) {
-                  assistantMsg.streaming = false;
-                }
-                scrollToBottom();
-              } catch {
-                // 纯文本 delta
-                assistantMsg.content += jsonStr;
-                scrollToBottom();
-              }
-            }
-          }
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('SSE stream failed, falling back to ask API:', err);
-  }
-
-  // 若 SSE 未成功返回内容，则走同步 /ask 兜底
-  if (!sseSucceeded || !assistantMsg.content) {
-    try {
-      const res = await post<any>('/ai/assistant/ask', {
-        message: query,
-        input: query,
-        courseId: activeCourseId.value
-      });
-      const data = res?.data || res;
-      if (data) {
-        assistantMsg.intent = data.intent;
-        assistantMsg.intentDesc = data.intentDesc;
-        assistantMsg.content = data.content || '已处理您的教学助手请求。';
-        assistantMsg.targetCode = data.targetCode;
-      } else {
-        assistantMsg.content = '无法识别请求，请稍后重试。';
-      }
-    } catch (err: any) {
-      assistantMsg.content = `请求失败：${err?.message || '服务异常，请检查网络或重试'}`;
-    }
-  }
-
-  assistantMsg.streaming = false;
-  isStreaming.value = false;
-  scrollToBottom();
-}
 </script>
 
 <style scoped lang="scss">
 .global-assistant-root {
-  /* 悬浮 FAB 按钮 */
   .assistant-trigger-fab {
     position: fixed;
     right: 28px;
@@ -410,7 +237,6 @@ async function handleSubmit() {
   }
 }
 
-/* 抽屉布局 */
 .drawer-layout {
   height: 100%;
   display: flex;

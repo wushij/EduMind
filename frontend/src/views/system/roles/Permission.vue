@@ -1,130 +1,255 @@
 <template>
-  <div class="permission-page-container">
-    <!-- 顶部操作头区 -->
-    <div class="perm-header-dock">
-      <div class="header-left">
-        <div class="title-with-icon">
-          <el-icon class="header-icon"><Key /></el-icon>
-          <h1 class="main-title">系统权限与功能资源树</h1>
-          <span class="capsule-count-tag">细粒度 RBAC 授权体系统</span>
+  <div class="page-container gb-fade-in">
+    <!-- 顶部工具栏：标题、架构状态标签与操作按钮 (1:1 像素级复刻 Code Compass Filter Card) -->
+    <el-card shadow="never" class="filter-card">
+      <div class="filter-row">
+        <div class="filter-left">
+          <span class="filter-title">系统菜单与路由权限树</span>
+          <span class="filter-tag">已同步最新 8 大核心业务模块架构</span>
+          <span class="filter-count">共 {{ moduleCount }} 个顶层模块 · {{ totalNodeCount }} 个节点</span>
         </div>
-        <p class="sub-desc">
-          涵盖前端路由菜单权限、页面按钮操作权限与后端 API 资源防护端点，支持按模块层级统一树状展现与检索。
-        </p>
-      </div>
-
-      <div class="header-right-actions">
-        <el-button @click="toggleExpandAll">
-          {{ isAllExpanded ? '折叠全部' : '展开全部' }}
-        </el-button>
-        <el-button type="primary" plain @click="loadPermissions">
-          刷新权限树
-        </el-button>
-      </div>
-    </div>
-
-    <!-- 树状卡片与搜索过滤 -->
-    <el-card shadow="never" class="perm-tree-card">
-      <div class="tree-search-bar">
-        <el-input
-          v-model="filterText"
-          placeholder="输入权限名称、编码或路径进行实时过滤..."
-          clearable
-          :prefix-icon="Search"
-          class="tree-search-input"
-        />
-        <div class="tree-legend">
-          <span class="legend-item"><span class="dot bg-blue-500"></span> 菜单路由</span>
-          <span class="legend-item"><span class="dot bg-emerald-500"></span> 页面按钮</span>
-          <span class="legend-item"><span class="dot bg-amber-500"></span> API 接口</span>
+        <div class="filter-actions">
+          <el-input
+            v-model="keyword"
+            clearable
+            placeholder="搜索菜单名称 / 路径 / 权限标识"
+            style="width: 250px"
+            :prefix-icon="Search"
+            class="search-input"
+          />
+          <el-button @click="toggleExpandAll" class="expand-btn" round>
+            <el-icon><Operation /></el-icon>
+            {{ expandAll ? '折叠全部' : '展开全部' }}
+          </el-button>
+          <el-button type="primary" round :loading="loading" @click="fetchData">
+            <el-icon><Refresh /></el-icon> 刷新
+          </el-button>
         </div>
       </div>
+    </el-card>
 
-      <div v-loading="loading" class="tree-content-box">
-        <el-empty
-          v-if="!loading && permissions.length === 0"
-          description="暂无权限数据，请确认后端已初始化权限种子或检查登录权限"
-        />
-        <el-tree
-          v-else
-          ref="treeRef"
-          :data="permissionTree"
-          node-key="id"
-          :default-expand-all="isAllExpanded"
-          :filter-node-method="filterNode"
-          :props="{ label: 'label', children: 'children' }"
-        >
-          <template #default="{ data }">
-            <div class="custom-tree-node">
-              <div class="node-left">
-                <el-icon class="node-icon"><component :is="getNodeIcon(data.permissionType)" /></el-icon>
-                <span class="node-name">{{ data.permissionName }}</span>
-                <span class="node-code font-mono">{{ data.permissionCode }}</span>
-              </div>
-              <div class="node-right">
-                <el-tag size="small" :type="getTypeTagType(data.permissionType)" effect="light">
-                  {{ getTypeLabel(data.permissionType) }}
-                </el-tag>
-              </div>
+    <!-- 菜单树形数据表格 (1:1 复刻 Code Compass menu-tree-table 规范) -->
+    <el-card shadow="never" class="table-card">
+      <el-table
+        :key="tableKey"
+        ref="tableRef"
+        :data="treeTableData"
+        row-key="rowKey"
+        :default-expand-all="expandAll"
+        :tree-props="{ children: 'children' }"
+        v-loading="loading"
+        style="width: 100%"
+        class="gb-modern-table menu-tree-table"
+      >
+        <!-- 菜单名称列 (严格对齐：占位符与展开箭头等宽，图标与文本同列垂直对齐，彻底消除纵向文字换行) -->
+        <el-table-column prop="name" label="菜单名称" min-width="230" class-name="menu-name-col">
+          <template #default="{ row }">
+            <div
+              class="menu-name-cell"
+              :class="{ 'is-parent': row.children && row.children.length > 0 }"
+              @click.stop="toggleRow(row)"
+            >
+              <el-icon v-if="row.icon" size="17" class="name-icon" color="#6366f1">
+                <component :is="getIconComponent(row.icon)" />
+              </el-icon>
+              <strong class="menu-name-text">{{ row.name }}</strong>
+              <span v-if="row.children && row.children.length > 0" class="child-count-pill">
+                {{ row.children.length }} 项
+              </span>
             </div>
           </template>
-        </el-tree>
-      </div>
+        </el-table-column>
+
+        <!-- 图标展示 -->
+        <el-table-column prop="icon" label="图标" width="130" align="center">
+          <template #default="{ row }">
+            <div v-if="row.icon" class="icon-preview-box">
+              <el-icon size="17" color="#6366f1"><component :is="getIconComponent(row.icon)" /></el-icon>
+              <span class="icon-code-text">{{ row.icon }}</span>
+            </div>
+            <span v-else class="text-placeholder">-</span>
+          </template>
+        </el-table-column>
+
+        <!-- 类型标识 -->
+        <el-table-column prop="type" label="类型" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag
+              :type="row.type === 1 ? 'primary' : row.type === 2 ? 'success' : 'warning'"
+              :effect="row.type === 1 ? 'dark' : 'light'"
+              size="small"
+              round
+            >
+              {{ row.type === 1 ? '目录' : row.type === 2 ? '菜单' : '按钮' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <!-- 路由路径 -->
+        <el-table-column prop="path" label="路由路径" min-width="210">
+          <template #default="{ row }">
+            <span v-if="row.path" class="code-pill">{{ row.path }}</span>
+            <span v-else class="text-placeholder">-</span>
+          </template>
+        </el-table-column>
+
+        <!-- 权限标识 (Code Compass 风格 Danger Tag) -->
+        <el-table-column prop="permission" label="权限标识" min-width="170" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.permission" type="danger" size="small" round font-mono>
+              {{ row.permission }}
+            </el-tag>
+            <span v-else class="text-placeholder">-</span>
+          </template>
+        </el-table-column>
+
+        <!-- 排序 -->
+        <el-table-column prop="sort" label="排序" width="80" align="center">
+          <template #default="{ row }">
+            <span class="sort-badge">{{ row.sort }}</span>
+          </template>
+        </el-table-column>
+
+        <template #empty>
+          <div style="padding: 36px 0">
+            <el-empty description="暂无匹配的菜单权限数据" />
+          </div>
+        </template>
+      </el-table>
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Search, Key, FolderOpened, Pointer, Connection } from '@element-plus/icons-vue';
+import {
+  Operation,
+  Refresh,
+  Search,
+  Reading,
+  MagicStick,
+  FolderOpened,
+  Document,
+  DataAnalysis,
+  Files,
+  Setting,
+  Bell,
+  Collection,
+  DocumentAdd,
+  EditPen,
+  Service,
+  Tickets,
+  CircleCheck,
+  Cpu,
+  Folder,
+  FolderAdd,
+  DocumentChecked,
+  Notebook,
+  TrendCharts,
+  Upload,
+  School,
+  Connection,
+  User,
+  Lock,
+  Key,
+  ChatLineSquare,
+  Money,
+  Pointer
+} from '@element-plus/icons-vue';
 import { getPermissions } from '@/api/system/permission';
 import { USE_MOCK } from '@/config/mock';
 import type { PermissionVO } from '@/types/system/rbac';
+import { buildSidebarMenuTree, type SysMenuNode } from '@/constants/permission';
 
 const loading = ref(false);
-const filterText = ref('');
-const treeRef = ref<any>();
-const isAllExpanded = ref(true);
+const rawPermissions = ref<PermissionVO[]>([]);
+const keyword = ref('');
+const expandAll = ref(true);
+const tableKey = ref(0);
+const tableRef = ref();
 
-const permissions = ref<PermissionVO[]>([]);
+function getIconComponent(iconName?: string) {
+  const map: Record<string, any> = {
+    Reading,
+    MagicStick,
+    FolderOpened,
+    Document,
+    DataAnalysis,
+    Files,
+    Setting,
+    Bell,
+    Collection,
+    DocumentAdd,
+    EditPen,
+    Service,
+    Tickets,
+    CircleCheck,
+    Cpu,
+    Folder,
+    FolderAdd,
+    DocumentChecked,
+    Notebook,
+    TrendCharts,
+    Upload,
+    School,
+    Connection,
+    User,
+    Lock,
+    Key,
+    ChatLineSquare,
+    Money,
+    Pointer,
+    Operation
+  };
+  return (iconName && map[iconName]) || Document;
+}
 
-watch(filterText, (val) => {
-  treeRef.value?.filter(val);
+const treeTableData = computed(() => {
+  return buildSidebarMenuTree(rawPermissions.value, keyword.value);
 });
 
-function filterNode(value: string, data: any) {
-  if (!value) return true;
-  const kw = value.toLowerCase();
-  const matchName = data.permissionName?.toLowerCase().includes(kw);
-  const matchCode = data.permissionCode?.toLowerCase().includes(kw);
-  return matchName || matchCode;
+const moduleCount = computed(() => {
+  return treeTableData.value.filter((m) => m.type === 1).length;
+});
+
+function countAllNodes(list: SysMenuNode[]): number {
+  let count = 0;
+  for (const item of list) {
+    count++;
+    if (item.children && item.children.length > 0) {
+      count += countAllNodes(item.children);
+    }
+  }
+  return count;
+}
+const totalNodeCount = computed(() => countAllNodes(treeTableData.value));
+
+function toggleExpandAll() {
+  expandAll.value = !expandAll.value;
+  tableKey.value++;
 }
 
-const permissionTree = computed(() => mapPermissionLabels(permissions.value));
-
-function mapPermissionLabels(nodes: PermissionVO[]): Array<PermissionVO & { label: string }> {
-  return nodes.map((item) => ({
-    ...item,
-    label: `${item.permissionName} (${item.permissionCode})`,
-    children: item.children?.length ? mapPermissionLabels(item.children) : []
-  }));
+function toggleRow(row: SysMenuNode) {
+  if (row.children && row.children.length > 0) {
+    tableRef.value?.toggleRowExpansion(row);
+  }
 }
 
-async function loadPermissions() {
+async function fetchData() {
   loading.value = true;
   try {
     const res = await getPermissions();
-    permissions.value = res.data || [];
-    if (permissions.value.length === 0 && USE_MOCK) {
-      permissions.value = getDefaultPermissionMock();
+    rawPermissions.value = res.data || [];
+    if (rawPermissions.value.length === 0 && USE_MOCK) {
+      rawPermissions.value = getDefaultPermissionMock();
     }
   } catch (err: any) {
     if (USE_MOCK) {
-      permissions.value = getDefaultPermissionMock();
+      rawPermissions.value = getDefaultPermissionMock();
     } else {
-      permissions.value = [];
-      ElMessage.error(err?.message || '加载权限树失败，请检查网络或登录权限');
+      rawPermissions.value = [];
+      ElMessage.error(err?.message || '加载菜单权限树失败');
     }
   } finally {
     loading.value = false;
@@ -133,235 +258,207 @@ async function loadPermissions() {
 
 function getDefaultPermissionMock(): PermissionVO[] {
   return [
-    {
-      id: 1,
-      permissionCode: 'course:manage',
-      permissionName: '课程体系与教学管理',
-      permissionType: 'MENU',
-      children: [
-        { id: 11, permissionCode: 'course:list', permissionName: '查看课程列表', permissionType: 'MENU' },
-        { id: 12, permissionCode: 'course:create', permissionName: '新增创建课程', permissionType: 'BUTTON' },
-        { id: 13, permissionCode: 'course:update', permissionName: '修改课程信息', permissionType: 'BUTTON' },
-        { id: 14, permissionCode: 'course:delete', permissionName: '下架归档课程', permissionType: 'BUTTON' }
-      ]
-    },
-    {
-      id: 2,
-      permissionCode: 'question:manage',
-      permissionName: '试题中心与在线考核',
-      permissionType: 'MENU',
-      children: [
-        { id: 21, permissionCode: 'question:bank:view', permissionName: '题库查询浏览', permissionType: 'MENU' },
-        { id: 22, permissionCode: 'question:bank:manage', permissionName: '题库创建与题目调度', permissionType: 'BUTTON' },
-        { id: 23, permissionCode: 'exam:compose', permissionName: '试卷编排与发布', permissionType: 'BUTTON' },
-        { id: 24, permissionCode: 'assignment:grading', permissionName: '作业批改与成绩终审', permissionType: 'BUTTON' }
-      ]
-    },
-    {
-      id: 3,
-      permissionCode: 'knowledge:manage',
-      permissionName: '知识库与文档切片中心',
-      permissionType: 'MENU',
-      children: [
-        { id: 31, permissionCode: 'knowledge:base:view', permissionName: '知识库列表浏览', permissionType: 'MENU' },
-        { id: 32, permissionCode: 'knowledge:doc:upload', permissionName: '上传教材课件文档', permissionType: 'BUTTON' },
-        { id: 33, permissionCode: 'knowledge:doc:parse', permissionName: '触发语义向量化解析', permissionType: 'API' }
-      ]
-    },
-    {
-      id: 4,
-      permissionCode: 'ai:service',
-      permissionName: 'AI 教学赋能与大模型调用',
-      permissionType: 'MENU',
-      children: [
-        { id: 41, permissionCode: 'ai:chat:use', permissionName: '智能学伴交互对话', permissionType: 'MENU' },
-        { id: 42, permissionCode: 'ai:grading:trigger', permissionName: 'AI 辅助预批改服务', permissionType: 'API' },
-        { id: 43, permissionCode: 'ai:model:config', permissionName: '模型参数与配额调优', permissionType: 'BUTTON' }
-      ]
-    },
-    {
-      id: 5,
-      permissionCode: 'system:manage',
-      permissionName: '系统安全与全局管理',
-      permissionType: 'MENU',
-      children: [
-        { id: 51, permissionCode: 'system:user:manage', permissionName: '系统用户档案管理', permissionType: 'MENU' },
-        { id: 52, permissionCode: 'system:role:assign', permissionName: '角色分配与权限授权', permissionType: 'BUTTON' },
-        { id: 53, permissionCode: 'system:audit:view', permissionName: '安全审计日志查看', permissionType: 'MENU' }
-      ]
-    }
+    { id: 1, permissionCode: 'system:user:view', permissionName: '用户档案查看' },
+    { id: 2, permissionCode: 'system:user:edit', permissionName: '用户档案编辑' },
+    { id: 3, permissionCode: 'system:role:view', permissionName: '角色权限查看' },
+    { id: 4, permissionCode: 'system:role:edit', permissionName: '角色权限配置' },
+    { id: 5, permissionCode: 'course:view', permissionName: '我的课程' },
+    { id: 6, permissionCode: 'course:create', permissionName: '创建课程' },
+    { id: 7, permissionCode: 'course:edit', permissionName: '课程编辑' },
+    { id: 8, permissionCode: 'question:view', permissionName: '题目浏览查看' },
+    { id: 9, permissionCode: 'question:edit', permissionName: '题目创建编辑' },
+    { id: 10, permissionCode: 'exam:view', permissionName: '试卷查看浏览' },
+    { id: 11, permissionCode: 'exam:edit', permissionName: '试卷编排修改' },
+    { id: 12, permissionCode: 'assignment:view', permissionName: '作业任务查看' },
+    { id: 13, permissionCode: 'assignment:create', permissionName: '作业发布创建' },
+    { id: 14, permissionCode: 'assignment:grade', permissionName: '作业批改打分' },
+    { id: 15, permissionCode: 'knowledge:view', permissionName: '知识库列表' },
+    { id: 16, permissionCode: 'knowledge:edit', permissionName: '创建维护知识库' },
+    { id: 17, permissionCode: 'ai:chat', permissionName: 'AI 助手交互' },
+    { id: 18, permissionCode: 'ai:grading', permissionName: 'AI 批改评测' },
+    { id: 19, permissionCode: 'ai:question', permissionName: 'AI 出题生成' },
+    { id: 20, permissionCode: 'ai:exam', permissionName: 'AI 组卷编排' },
+    { id: 21, permissionCode: 'analytics:view', permissionName: '学情分析看板' },
+    { id: 22, permissionCode: 'resource:view', permissionName: '课件资源查看' },
+    { id: 23, permissionCode: 'resource:upload', permissionName: '课件资源上传' },
+    { id: 24, permissionCode: 'notice:view', permissionName: '系统通知公告' },
+    { id: 25, permissionCode: 'system:tenant:view', permissionName: '租户校区管理' },
+    { id: 26, permissionCode: 'system:org:view', permissionName: '组织架构管理' },
+    { id: 27, permissionCode: 'system:model:view', permissionName: 'AI 模型接入调度' },
+    { id: 28, permissionCode: 'system:prompt:view', permissionName: 'Prompt 模板库' },
+    { id: 29, permissionCode: 'system:quota:view', permissionName: '租户配额管控' },
+    { id: 30, permissionCode: 'knowledge:rag:debug', permissionName: 'RAG 检索调试' },
+    { id: 31, permissionCode: 'ai:tool:use', permissionName: 'Agent 工具调度' }
   ];
 }
 
-function getNodeIcon(type?: string) {
-  if (type === 'MENU') return FolderOpened;
-  if (type === 'BUTTON') return Pointer;
-  return Connection;
-}
-
-function getTypeLabel(type?: string) {
-  const map: Record<string, string> = {
-    MENU: '菜单路由',
-    BUTTON: '操作按钮',
-    API: '后端API'
-  };
-  return map[type || 'MENU'] || '资源';
-}
-
-function getTypeTagType(type?: string) {
-  const map: Record<string, string> = {
-    MENU: 'primary',
-    BUTTON: 'success',
-    API: 'warning'
-  };
-  return (map[type || 'MENU'] as any) || 'info';
-}
-
-function toggleExpandAll() {
-  isAllExpanded.value = !isAllExpanded.value;
-}
-
-onMounted(loadPermissions);
+onMounted(fetchData);
 </script>
 
-<style scoped lang="scss">
-.permission-page-container {
-  padding: 24px;
+<style scoped>
+.page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
   background: #f8fafc;
-  .perm-header-dock {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 24px;
+  min-height: calc(100vh - 64px);
+}
 
-    .header-left {
-      .title-with-icon {
-        display: flex;
-        align-items: center;
-        gap: 12px;
+.filter-card {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
 
-        .header-icon {
-          font-size: 28px;
-        }
+.filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
 
-        .main-title {
-          font-size: 22px;
-          font-weight: 800;
-          color: #0f172a;
-          margin: 0;
-        }
+.filter-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
-        .capsule-count-tag {
-          font-size: 12px;
-          background: #eff6ff;
-          color: #2563eb;
-          border: 1px solid #bfdbfe;
-          border-radius: 9999px;
-          padding: 2px 10px;
-          font-weight: 500;
-        }
-      }
+.filter-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
 
-      .sub-desc {
-        margin: 6px 0 0;
-        font-size: 14px;
-        color: #64748b;
-      }
-    }
+.filter-tag {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
 
-    .header-right-actions {
-      display: flex;
-      gap: 12px;
-    }
-  }
+.filter-count {
+  font-size: 12px;
+  color: #64748b;
+}
 
-  .perm-tree-card {
-    background: #ffffff;
-    border-radius: 14px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
-    padding: 20px 24px;
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
-    .tree-search-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 20px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid #f1f5f9;
+.table-card {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  overflow: hidden;
+}
 
-      .tree-search-input {
-        width: 360px;
-      }
+/* 核心：精确消除第一列占位符与箭头宽度差异，文本永不竖向折行 */
+.menu-tree-table :deep(.el-table__body td.menu-name-col .cell),
+.menu-tree-table :deep(.el-table__header th.menu-name-col .cell) {
+  display: flex !important;
+  align-items: center !important;
+  text-align: left !important;
+  justify-content: flex-start !important;
+  white-space: nowrap !important;
+}
 
-      .tree-legend {
-        display: flex;
-        align-items: center;
-        gap: 18px;
+.menu-tree-table :deep(.el-table__expand-icon) {
+  width: 20px !important;
+  height: 20px !important;
+  margin-right: 6px !important;
+  cursor: pointer;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 
-        .legend-item {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 12px;
-          color: #64748b;
+.menu-tree-table :deep(.el-table__placeholder) {
+  width: 20px !important;
+  height: 20px !important;
+  margin-right: 6px !important;
+  display: inline-block !important;
+  flex-shrink: 0;
+}
 
-          .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-          }
-        }
-      }
-    }
+.menu-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+  white-space: nowrap;
+}
 
-    .tree-content-box {
-      :deep(.el-tree-node__content) {
-        height: 44px;
-        border-radius: 8px;
-        margin-bottom: 4px;
-        transition: background-color 0.2s;
+.menu-name-cell.is-parent {
+  cursor: pointer;
+}
 
-        &:hover {
-          background-color: #f1f5f9;
-        }
-      }
+.menu-name-cell.is-parent:hover .menu-name-text {
+  color: #6366f1;
+}
 
-      .custom-tree-node {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        width: 100%;
-        padding-right: 16px;
+.name-icon {
+  flex-shrink: 0;
+}
 
-        .node-left {
-          display: flex;
-          align-items: center;
-          gap: 10px;
+.menu-name-text {
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
-          .node-icon {
-            font-size: 16px;
-          }
+.child-count-pill {
+  font-size: 11px;
+  color: #94a3b8;
+  background: rgba(15, 23, 42, 0.05);
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-weight: 500;
+}
 
-          .node-name {
-            font-size: 14px;
-            font-weight: 600;
-            color: #1e293b;
-          }
+.icon-preview-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
 
-          .node-code {
-            font-size: 12px;
-            color: #64748b;
-            background: #f8fafc;
-            padding: 1px 6px;
-            border-radius: 4px;
-            border: 1px solid #e2e8f0;
-          }
-        }
-      }
-    }
-  }
+.icon-code-text {
+  font-size: 11.5px;
+  color: #64748b;
+  font-family: monospace;
+}
+
+.code-pill {
+  font-family: monospace;
+  font-size: 12px;
+  background: rgba(15, 23, 42, 0.04);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #334155;
+}
+
+.sort-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.05);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.text-placeholder {
+  color: #94a3b8;
 }
 </style>

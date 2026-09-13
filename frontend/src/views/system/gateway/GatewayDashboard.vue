@@ -38,6 +38,18 @@
         <div class="kpi-label">降级次数</div>
         <div class="kpi-value">{{ metrics?.fallbackCount?.toLocaleString() ?? 0 }}</div>
       </el-card>
+      <el-card shadow="never" class="kpi-card kpi-card--warn">
+        <div class="kpi-label">熔断触发</div>
+        <div class="kpi-value">{{ metrics?.circuitOpenCount?.toLocaleString() ?? 0 }}</div>
+      </el-card>
+      <el-card shadow="never" class="kpi-card kpi-card--warn">
+        <div class="kpi-label">限流拦截</div>
+        <div class="kpi-value">{{ metrics?.rateLimitedCount?.toLocaleString() ?? 0 }}</div>
+      </el-card>
+      <el-card shadow="never" class="kpi-card">
+        <div class="kpi-label">重试次数</div>
+        <div class="kpi-value">{{ metrics?.retryCount?.toLocaleString() ?? 0 }}</div>
+      </el-card>
     </div>
 
     <el-card shadow="never" class="provider-card">
@@ -127,7 +139,7 @@ onMounted(loadMetrics);
 
   .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 16px;
   }
 
@@ -144,6 +156,10 @@ onMounted(loadMetrics);
       font-size: 24px;
       font-weight: 700;
       color: #0F172A;
+    }
+
+    &--warn .kpi-value {
+      color: #D97706;
     }
   }
 

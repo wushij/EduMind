@@ -5,6 +5,7 @@ import lombok.Data;
 @Data
 public class SubjectiveGradingDTO {
     private Long questionId;
+    private Long courseId;
     private String questionStem;
     private String referenceAnswer;
     private String studentAnswer;

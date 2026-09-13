@@ -144,7 +144,7 @@
             <span>如果您记得当前登录密码，请输入原密码验证身份并设置新密码。</span>
           </div>
 
-          <el-form label-position="top" class="security-capsule-form" @submit.prevent="handleChangePassword">
+          <el-form label-position="top" class="security-capsule-form" autocomplete="off" @submit.prevent="handleChangePassword">
             <el-form-item label="当前登录密码">
               <div class="capsule-input-box">
                 <el-icon class="input-icon"><Lock /></el-icon>
@@ -153,6 +153,8 @@
                   :type="showOldPwd ? 'text' : 'password'"
                   class="capsule-input"
                   placeholder="请输入您当前使用的登录密码"
+                  autocomplete="current-password"
+                  name="current-password"
                 />
                 <button type="button" class="pwd-eye-btn" @click="showOldPwd = !showOldPwd">
                   <el-icon><View v-if="showOldPwd" /><Hide v-else /></el-icon>
@@ -168,6 +170,8 @@
                   :type="showNewPwd ? 'text' : 'password'"
                   class="capsule-input"
                   placeholder="请输入 8~20 位新密码 (包含字母与数字)"
+                  autocomplete="new-password"
+                  name="change-new-password"
                 />
                 <button type="button" class="pwd-eye-btn" @click="showNewPwd = !showNewPwd">
                   <el-icon><View v-if="showNewPwd" /><Hide v-else /></el-icon>
@@ -196,6 +200,8 @@
                   :type="showConfirmPwd ? 'text' : 'password'"
                   class="capsule-input"
                   placeholder="请再次输入新密码以确认"
+                  autocomplete="new-password"
+                  name="confirm-new-password"
                 />
                 <button type="button" class="pwd-eye-btn" @click="showConfirmPwd = !showConfirmPwd">
                   <el-icon><View v-if="showConfirmPwd" /><Hide v-else /></el-icon>
@@ -238,16 +244,12 @@
               <span>无需原密码！系统将向您绑定的安全邮箱发送 6 位临时验证码，核验通过即可直接重设密码。</span>
             </div>
 
-            <el-form label-position="top" class="security-capsule-form" @submit.prevent="handleEmailResetPassword">
-              <el-form-item label="接收验证码的安全邮箱">
-                <div class="email-preset-display">
-                  <div class="email-info">
-                    <el-icon class="email-icon"><Message /></el-icon>
-                    <span class="email-text">{{ userEmail }}</span>
-                    <span class="verify-badge">已认证</span>
-                  </div>
-                  <button type="button" class="change-email-btn" @click="openBindDialog">
-                    更换邮箱
+            <el-form label-position="top" class="security-capsule-form" autocomplete="off" @submit.prevent="handleEmailResetPassword">
+              <el-form-item label="密保邮箱">
+                <div class="email-status-card">
+                  <span class="email-address">{{ maskEmail(userEmail) }}</span>
+                  <button type="button" class="email-action-btn" @click="openBindDialog">
+                    更换绑定
                   </button>
                 </div>
               </el-form-item>
@@ -255,12 +257,19 @@
               <el-form-item label="邮箱验证码">
                 <div class="capsule-code-row">
                   <div class="capsule-input-box code-input">
+                    <el-icon class="input-icon"><Finished /></el-icon>
                     <input
                       v-model="emailResetForm.code"
                       type="text"
                       maxlength="6"
+                      inputmode="numeric"
                       class="capsule-input"
                       placeholder="请输入 6 位数字验证码"
+                      autocomplete="one-time-code"
+                      name="email-verification-code"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
                     />
                   </div>
                   <button
@@ -278,12 +287,14 @@
 
               <el-form-item label="设置新密码">
                 <div class="capsule-input-box">
-                  <el-icon class="input-icon"><Key /></el-icon>
+                  <el-icon class="input-icon"><Lock /></el-icon>
                   <input
                     v-model="emailResetForm.newPassword"
                     :type="showEmailNewPwd ? 'text' : 'password'"
                     class="capsule-input"
                     placeholder="请输入 8~20 位新密码 (包含字母与数字)"
+                    autocomplete="new-password"
+                    name="reset-new-password"
                   />
                   <button type="button" class="pwd-eye-btn" @click="showEmailNewPwd = !showEmailNewPwd">
                     <el-icon><View v-if="showEmailNewPwd" /><Hide v-else /></el-icon>
@@ -312,6 +323,8 @@
                     :type="showEmailConfirmPwd ? 'text' : 'password'"
                     class="capsule-input"
                     placeholder="请再次输入新密码以确认"
+                    autocomplete="new-password"
+                    name="reset-confirm-password"
                   />
                   <button type="button" class="pwd-eye-btn" @click="showEmailConfirmPwd = !showEmailConfirmPwd">
                     <el-icon><View v-if="showEmailConfirmPwd" /><Hide v-else /></el-icon>
@@ -460,6 +473,8 @@
               type="email"
               placeholder="请输入新的安全电子邮箱"
               class="capsule-input"
+              autocomplete="email"
+              name="bind-email"
             />
           </div>
         </div>
@@ -468,12 +483,19 @@
           <label class="group-label">邮箱验证码</label>
           <div class="capsule-code-row">
             <div class="capsule-input-box code-input">
+              <el-icon class="input-icon"><Finished /></el-icon>
               <input
                 v-model="bindForm.code"
                 type="text"
                 maxlength="6"
+                inputmode="numeric"
                 placeholder="6 位数字验证码"
                 class="capsule-input"
+                autocomplete="one-time-code"
+                name="bind-email-verification-code"
+                autocapitalize="off"
+                autocorrect="off"
+                spellcheck="false"
               />
             </div>
             <button
@@ -519,6 +541,7 @@ import {
   Lock,
   Key,
   Message,
+  Finished,
   Check,
   CircleCheckFilled,
   CircleCloseFilled,
@@ -1285,6 +1308,55 @@ onBeforeUnmount(() => {
       color: #334155;
       padding-bottom: 6px;
     }
+
+    :deep(.el-form-item__content) {
+      width: 100%;
+    }
+  }
+
+  .email-status-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 46px;
+    padding: 0 8px 0 18px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 9999px;
+    box-sizing: border-box;
+
+    .email-address {
+      flex: 1;
+      min-width: 0;
+      font-size: 14px;
+      color: #1e293b;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .email-action-btn {
+      flex-shrink: 0;
+      margin-left: 12px;
+      padding: 6px 16px;
+      border-radius: 9999px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      color: #1677ff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover {
+        background: #1677ff;
+        border-color: #1677ff;
+        color: #ffffff;
+        box-shadow: 0 2px 8px rgba(22, 119, 255, 0.2);
+      }
+    }
   }
 
   .capsule-input-box {
@@ -1378,58 +1450,6 @@ onBeforeUnmount(() => {
         color: #f1f5f9 !important;
         cursor: not-allowed;
         box-shadow: none;
-      }
-    }
-  }
-
-  /* 预设邮箱展示条 */
-  .email-preset-display {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    height: 46px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 9999px;
-    padding: 0 16px;
-
-    .email-info {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-
-      .email-icon {
-        font-size: 16px;
-        color: #2563eb;
-      }
-
-      .email-text {
-        font-size: 14px;
-        font-weight: 600;
-        color: #0f172a;
-        font-family: 'SF Mono', Monaco, monospace;
-      }
-
-      .verify-badge {
-        font-size: 11px;
-        background: #dcfce7;
-        color: #15803d;
-        padding: 1px 8px;
-        border-radius: 9999px;
-        font-weight: 600;
-      }
-    }
-
-    .change-email-btn {
-      background: none;
-      border: none;
-      color: #2563eb;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-
-      &:hover {
-        text-decoration: underline;
       }
     }
   }

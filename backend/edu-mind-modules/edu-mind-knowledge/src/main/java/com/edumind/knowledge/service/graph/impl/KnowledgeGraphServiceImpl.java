@@ -1,5 +1,6 @@
 package com.edumind.knowledge.service.graph.impl;
 
+import com.edumind.common.api.ai.GraphRelationSuggestApi;
 import com.edumind.common.api.analytics.KnowledgeMasteryQueryApi;
 import com.edumind.course.vo.knowledge.KnowledgePointVO;
 import com.edumind.knowledge.api.KnowledgePointQueryApi;
@@ -38,6 +39,7 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
     private final KnowledgePointQueryApi knowledgePointQueryApi;
     private final KnowledgePointRelationDao knowledgePointRelationDao;
     private final KnowledgeMasteryQueryApi knowledgeMasteryQueryApi;
+    private final GraphRelationSuggestApi graphRelationSuggestApi;
 
     @Override
     public KnowledgeGraphVO buildGraph(Long knowledgeBaseId, Integer depth, List<String> types) {
@@ -220,35 +222,14 @@ public class KnowledgeGraphServiceImpl implements KnowledgeGraphService {
             return List.of();
         }
 
-        List<Map<String, Object>> suggestions = new ArrayList<>();
-        KnowledgePointVO source = null;
-        if (sourceKnowledgePointId != null) {
-            source = points.stream().filter(p -> p.getId().equals(sourceKnowledgePointId)).findFirst().orElse(null);
+        List<Map<String, Object>> candidates = new ArrayList<>();
+        for (KnowledgePointVO point : points) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("id", point.getId());
+            row.put("title", point.getTitle());
+            candidates.add(row);
         }
-        if (source == null && !points.isEmpty()) {
-            source = points.get(0);
-        }
-        if (source == null) {
-            return List.of();
-        }
-
-        for (KnowledgePointVO target : points) {
-            if (target.getId().equals(source.getId())) {
-                continue;
-            }
-            Map<String, Object> item = new HashMap<>();
-            item.put("sourceKnowledgePointId", source.getId());
-            item.put("targetKnowledgePointId", target.getId());
-            item.put("sourceTitle", source.getTitle());
-            item.put("targetTitle", target.getTitle());
-            item.put("relationType", "prerequisite");
-            item.put("confidence", 0.90);
-            item.put("reason", "「" + source.getTitle() + "」依赖「" + target.getTitle() + "」的先修概念，建议建立前置依赖关系。");
-            suggestions.add(item);
-            if (suggestions.size() >= max) {
-                break;
-            }
-        }
-        return suggestions;
+        Long sourceId = sourceKnowledgePointId != null ? sourceKnowledgePointId : points.get(0).getId();
+        return graphRelationSuggestApi.suggestRelations(knowledgeBaseId, sourceId, candidates, max);
     }
 }

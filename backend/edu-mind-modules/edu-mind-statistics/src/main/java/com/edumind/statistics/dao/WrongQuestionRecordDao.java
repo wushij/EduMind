@@ -22,6 +22,15 @@ public class WrongQuestionRecordDao {
         return wrongQuestionRecordMapper.selectPage(page, wrapper);
     }
 
+    public Page<WrongQuestionRecordEntity> pageByStudent(Page<WrongQuestionRecordEntity> page,
+                                                         Long studentId, Long courseId) {
+        LambdaQueryWrapper<WrongQuestionRecordEntity> wrapper = new LambdaQueryWrapper<WrongQuestionRecordEntity>()
+                .eq(WrongQuestionRecordEntity::getStudentId, studentId)
+                .eq(WrongQuestionRecordEntity::getCourseId, courseId)
+                .orderByDesc(WrongQuestionRecordEntity::getWrongCount);
+        return wrongQuestionRecordMapper.selectPage(page, wrapper);
+    }
+
     public int insert(WrongQuestionRecordEntity entity) {
         return wrongQuestionRecordMapper.insert(entity);
     }
@@ -39,6 +48,17 @@ public class WrongQuestionRecordDao {
                 new LambdaQueryWrapper<WrongQuestionRecordEntity>()
                         .eq(WrongQuestionRecordEntity::getStudentId, studentId)
                         .eq(WrongQuestionRecordEntity::getQuestionId, questionId)
+                        .last("LIMIT 1")
+        );
+    }
+
+    public WrongQuestionRecordEntity findByStudentCourseAndKp(Long studentId, Long courseId, Long knowledgePointId) {
+        return wrongQuestionRecordMapper.selectOne(
+                new LambdaQueryWrapper<WrongQuestionRecordEntity>()
+                        .eq(WrongQuestionRecordEntity::getStudentId, studentId)
+                        .eq(WrongQuestionRecordEntity::getCourseId, courseId)
+                        .eq(WrongQuestionRecordEntity::getKnowledgePointId, knowledgePointId)
+                        .orderByDesc(WrongQuestionRecordEntity::getWrongCount)
                         .last("LIMIT 1")
         );
     }

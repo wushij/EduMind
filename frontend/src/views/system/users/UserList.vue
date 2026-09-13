@@ -145,7 +145,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="初始密码">
-          <el-input v-model="newUserForm.password" placeholder="默认 admin123" />
+          <el-input v-model="newUserForm.password" placeholder="默认 123456" />
         </el-form-item>
       </el-form>
 
@@ -195,7 +195,7 @@ const newUserForm = reactive({
   username: '',
   realName: '',
   role: 'TEACHER',
-  password: 'admin123'
+  password: '123456'
 });
 
 const dialogRules = reactive<FormRules>({

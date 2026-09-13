@@ -6,7 +6,7 @@
         <div class="title-with-icon">
           <el-icon class="header-icon text-blue-600"><Tickets /></el-icon>
           <h1 class="main-title">试卷与考试管理中心</h1>
-          <span class="capsule-count-tag">已收录 {{ total }} 套标准化期末试卷</span>
+          <span class="capsule-count-tag">已收录 {{ pageReady ? total : '--' }} 套标准化期末试卷</span>
         </div>
         <p class="sub-desc">
           集中管理期中/期末统一测试试卷、随堂测验与单元测试，支持双向细目表校验、AI 一键调优换题与格式化导出。
@@ -40,12 +40,12 @@
       <div class="stat-pill-item">
         <el-icon class="pill-icon text-blue-600"><Document /></el-icon>
         <span class="pill-label">试卷总数：</span>
-        <strong class="pill-val">{{ total }} 套</strong>
+        <strong class="pill-val">{{ pageReady ? `${total} 套` : '--' }}</strong>
       </div>
       <div class="stat-pill-item">
         <el-icon class="pill-icon text-emerald-600"><CircleCheck /></el-icon>
         <span class="pill-label">已排版就绪：</span>
-        <strong class="pill-val">{{ exams.length }} 套 (当前页)</strong>
+        <strong class="pill-val">{{ pageReady ? `${exams.length} 套 (当前页)` : '--' }}</strong>
       </div>
       <div class="stat-pill-item">
         <el-icon class="pill-icon text-indigo-600"><User /></el-icon>
@@ -254,9 +254,15 @@ const courseOptions = ref<Array<{ label: string; value: number | null }>>([
   { label: '全部课程', value: null }
 ]);
 
+const pageReady = ref(false);
+
 onMounted(async () => {
-  await loadCourseOptions();
-  await loadExams();
+  pageReady.value = false;
+  try {
+    await Promise.all([loadCourseOptions(), loadExams()]);
+  } finally {
+    pageReady.value = true;
+  }
 });
 
 async function loadCourseOptions() {
@@ -322,7 +328,11 @@ function handlePublish(exam: Exam) {
   width: 100%;
 
   .exam-list-content {
-    min-height: 240px;
+    min-height: 360px;
+  }
+
+  .pill-tags-track {
+    min-height: 32px;
   }
 
   .filter-right-search--full {
@@ -443,6 +453,7 @@ function handlePublish(exam: Exam) {
     align-items: center;
     gap: 14px;
     flex-wrap: wrap;
+    min-height: 36px;
 
     .stat-pill-item {
       display: inline-flex;

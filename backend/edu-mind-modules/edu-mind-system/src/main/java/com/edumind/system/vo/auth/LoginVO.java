@@ -18,4 +18,6 @@ import java.io.Serializable;
 public class LoginVO implements Serializable {
     private String token;
     private UserVO userInfo;
+    /** 登录后自动绑定的当前租户 ID */
+    private Long tenantId;
 }

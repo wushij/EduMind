@@ -16,6 +16,8 @@ public class SmartPaperComposeVO {
     private Integer distinctKnowledgePointCount;
     private Double coverageRate;
     private Double duplicateRate = 0.0;
+    private Integer shortfallCount = 0;
+    private Map<String, Integer> shortfallByDifficulty = new HashMap<>();
     private Map<String, Integer> difficultyHistogram = new HashMap<>();
     private Map<String, Integer> typeDistribution = new HashMap<>();
 }

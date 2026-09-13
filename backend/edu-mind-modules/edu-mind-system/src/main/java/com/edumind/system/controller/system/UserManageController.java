@@ -5,6 +5,7 @@ import com.edumind.common.api.ApiResult;
 import com.edumind.common.api.PageResult;
 import com.edumind.system.dto.user.UserCreateDTO;
 import com.edumind.system.dto.user.UserQueryDTO;
+import com.edumind.system.dto.user.UserResetPasswordDTO;
 import com.edumind.system.dto.user.UserStatusUpdateDTO;
 import com.edumind.system.dto.user.UserUpdateDTO;
 import com.edumind.system.service.user.UserService;
@@ -57,6 +58,14 @@ public class UserManageController {
     public ApiResult<UserVO> updateUserStatus(@PathVariable("id") Long id,
                                               @Valid @RequestBody UserStatusUpdateDTO dto) {
         return ApiResult.success(userService.updateUserStatus(id, dto));
+    }
+
+    @SaCheckPermission("system:user:edit")
+    @PutMapping("/{id}/password")
+    public ApiResult<Void> resetUserPassword(@PathVariable("id") Long id,
+                                             @Valid @RequestBody UserResetPasswordDTO dto) {
+        userService.resetPassword(id, dto.getNewPassword());
+        return ApiResult.success();
     }
 
     @SaCheckPermission("system:user:edit")

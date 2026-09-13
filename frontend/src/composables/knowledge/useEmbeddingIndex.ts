@@ -3,15 +3,13 @@ import { useRoute } from 'vue-router';
 import { VectorStoreStats, FailedVectorItem } from '@/types/knowledge/embedding';
 import { getVectorStats, getFailedVectors, triggerReindex, retryFailedVectors } from '@/api/knowledge/embedding';
 import { ElMessage } from 'element-plus';
+import { parseKnowledgeBaseId } from '@/composables/knowledge/useKnowledgeRoute';
 
 function resolveKbId(explicit?: MaybeRef<number | undefined>): number | undefined {
-  const fromArg = unref(explicit);
-  if (fromArg && fromArg > 0) return fromArg;
+  const fromArg = parseKnowledgeBaseId(unref(explicit));
+  if (fromArg) return fromArg;
   const route = useRoute();
-  const raw = route.params.id;
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  const id = Number(value);
-  return Number.isFinite(id) && id > 0 ? id : undefined;
+  return parseKnowledgeBaseId(route.params.id);
 }
 
 export function useEmbeddingIndex(kbIdInput?: MaybeRef<number | undefined>) {

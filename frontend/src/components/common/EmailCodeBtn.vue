@@ -81,7 +81,10 @@ async function handleSendCode() {
     startCountdown(60);
   } catch (err: any) {
     emit('error', err);
-    ElMessage.error(err?.response?.data?.message || err?.message || '验证码发送失败，请稍后重试');
+    // 默认走 axios 的全局错误提示，避免与拦截器重复弹窗
+    if (props.customSender) {
+      ElMessage.error(err?.response?.data?.message || err?.message || '验证码发送失败，请稍后重试');
+    }
   } finally {
     loading.value = false;
   }

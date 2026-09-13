@@ -268,11 +268,11 @@ function resetFilters() {
 }
 
 function handleOpenDetail(item: KnowledgeBase) {
-  router.push(`/knowledge/bases/${item.id}/documents`);
+  router.push(`/knowledge/${item.id}/documents`);
 }
 
 function handleUploadDoc(item: KnowledgeBase) {
-  router.push(`/knowledge/bases/${item.id}/documents`);
+  router.push(`/knowledge/${item.id}/documents`);
 }
 
 async function handleDeleteKb(item: KnowledgeBase) {

@@ -21,3 +21,13 @@ export interface GraphGapVO {
   title: string;
   missingPrerequisites: Array<{ id: number; title: string }>;
 }
+
+export interface GraphRelationSuggestion {
+  sourceKnowledgePointId: number;
+  targetKnowledgePointId: number;
+  sourceTitle: string;
+  targetTitle: string;
+  relationType: string;
+  confidence: number;
+  reason: string;
+}

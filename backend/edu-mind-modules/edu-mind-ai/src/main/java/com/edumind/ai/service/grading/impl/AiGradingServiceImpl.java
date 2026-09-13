@@ -42,7 +42,7 @@ public class AiGradingServiceImpl implements AiGradingService {
         int score = estimateScore(reply, maxScore, dto.getStudentAnswer(), dto.getReferenceAnswer());
         String status = score >= maxScore * 0.6 ? "AUTO_GRADED" : "PENDING_REVIEW";
 
-        logCall(start);
+        logCall(start, dto.getCourseId());
 
         return SubjectiveGradingVO.builder()
                 .score(score)
@@ -62,9 +62,10 @@ public class AiGradingServiceImpl implements AiGradingService {
         return Math.max(1, (int) (maxScore * 0.7));
     }
 
-    private void logCall(long start) {
+    private void logCall(long start, Long courseId) {
         AiCallLogEntity log = new AiCallLogEntity();
         log.setUserId(UserContext.getUserId());
+        log.setCourseId(courseId);
         log.setModel(llmProperties.getModel());
         log.setScene("subjective_grading");
         log.setLatencyMs((int) (System.currentTimeMillis() - start));

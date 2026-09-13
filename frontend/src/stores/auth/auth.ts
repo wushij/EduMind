@@ -88,7 +88,8 @@ export const useAuthStore = defineStore('auth', () => {
           roles: (res.data.roles || []) as RoleEnum[],
           permissions: res.data.permissions || [],
           department: res.data.department,
-          email: res.data.email
+          email: res.data.email,
+          phone: res.data.phone
         };
         setUser(user);
         return user;
@@ -124,7 +125,8 @@ export const useAuthStore = defineStore('auth', () => {
               roles: (res.data.userInfo.roles || []) as RoleEnum[],
               permissions: res.data.userInfo.permissions || [],
               department: res.data.userInfo.department,
-              email: res.data.userInfo.email
+              email: res.data.userInfo.email,
+              phone: res.data.userInfo.phone
             });
           } else {
             await fetchUserInfo();

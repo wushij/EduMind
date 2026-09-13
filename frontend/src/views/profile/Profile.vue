@@ -3,7 +3,19 @@
     <!-- 1. 顶部个人名片栏 (胶囊名片 + 演示快速切角色) -->
     <div class="profile-header-card">
       <div class="user-avatar-block">
-        <img :src="currentUser?.avatar" alt="Avatar" class="avatar-img" />
+        <el-upload
+          class="avatar-uploader"
+          :show-file-list="false"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          :before-upload="beforeAvatarUpload"
+          :http-request="handleAvatarUpload"
+        >
+          <img :src="displayAvatar" alt="Avatar" class="avatar-img" />
+          <div class="avatar-upload-mask">
+            <el-icon><Camera /></el-icon>
+            <span>更换头像</span>
+          </div>
+        </el-upload>
       </div>
 
       <div class="user-main-info">
@@ -12,7 +24,7 @@
           <span class="username-tag">@{{ currentUser?.username }}</span>
           <span class="role-badge-pill">{{ roleLabel }}</span>
         </div>
-        <p class="user-dept">{{ currentUser?.department || '教务处与信息化中心' }}</p>
+        <p class="user-dept">{{ profileForm.department || '未填写所属院系' }}</p>
       </div>
 
       <!-- 快捷角色一键切换演示器 (用于评审演示快速切视角) -->
@@ -89,24 +101,15 @@
 
           <el-form-item label="安全联系邮箱">
             <div class="email-status-card">
-              <div class="email-info-left">
-                <span class="email-address">{{ currentUser?.email || profileForm.email || '未绑定电子邮箱' }}</span>
-                <span v-if="currentUser?.email || profileForm.email" class="status-badge bound">
-                  <svg viewBox="0 0 24 24" class="badge-icon" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                  </svg>
-                  已验证绑定
-                </span>
-                <span v-else class="status-badge unbound">
-                  未绑定
-                </span>
-              </div>
+              <span class="email-address">
+                {{ currentUser?.email ? maskEmail(currentUser.email) : '未绑定电子邮箱' }}
+              </span>
               <button
                 type="button"
                 class="email-action-btn"
                 @click="openBindDialog"
               >
-                {{ (currentUser?.email || profileForm.email) ? '更换绑定' : '立即绑定' }}
+                {{ currentUser?.email ? '更换绑定' : '立即绑定' }}
               </button>
             </div>
           </el-form-item>
@@ -255,7 +258,7 @@
             <el-icon><Message /></el-icon>
           </div>
           <div class="header-titles">
-            <h3 class="title">{{ (currentUser?.email || profileForm.email) ? '更换安全绑定邮箱' : '绑定账户安全邮箱' }}</h3>
+            <h3 class="title">{{ currentUser?.email ? '更换安全绑定邮箱' : '绑定账户安全邮箱' }}</h3>
             <span class="subtitle">绑定后可用于接收安全验证码及敏感操作身份核验</span>
           </div>
         </div>
@@ -321,7 +324,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
   Management,
@@ -332,18 +335,27 @@ import {
   Lightning,
   Message,
   Key,
-  InfoFilled
+  InfoFilled,
+  Camera
 } from '@element-plus/icons-vue';
 import { useAuthStore } from '@/stores/auth/auth';
-import { updateProfile, bindEmail as bindEmailApi } from '@/api/system/user';
+import { getProfile, updateProfile, bindEmail as bindEmailApi, uploadAvatar } from '@/api/system/user';
+import { getUserPreferences, saveUserPreferences } from '@/api/profile/preferences';
+import type { UserInfo } from '@/types/auth/auth';
 import EmailCodeBtn from '@/components/common/EmailCodeBtn.vue';
 import { USE_MOCK } from '@/config/mock';
+import { DEFAULT_AVATAR } from '@/constants/auth';
+import type { UploadRequestOptions } from 'element-plus';
 
 const authStore = useAuthStore();
 const isDev = import.meta.env.DEV;
+const avatarUploading = ref(false);
 
 const currentUser = computed(() => authStore.currentUser);
 const currentRole = computed(() => authStore.currentRole || 'ADMIN');
+const displayAvatar = computed(
+  () => currentUser.value?.avatar || DEFAULT_AVATAR
+);
 
 const roleLabel = computed(() => {
   switch (currentRole.value) {
@@ -359,11 +371,68 @@ const roleLabel = computed(() => {
 });
 
 const profileForm = reactive({
-  realName: currentUser.value?.realName || '',
-  department: currentUser.value?.department || '信息化教学与网络中心',
-  email: currentUser.value?.email || 'admin@edumind.edu.cn',
-  phone: '13800138000',
-  bio: '从事智能教育技术大模型算法研发与高校混合式教学改革试点。'
+  realName: '',
+  department: '',
+  phone: '',
+  bio: ''
+});
+
+interface ProfileExtras {
+  department?: string;
+  bio?: string;
+}
+
+function parseProfileExtras(preferencesJson?: string): ProfileExtras {
+  if (!preferencesJson) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(preferencesJson) as Record<string, unknown>;
+    return {
+      department: typeof parsed.department === 'string' ? parsed.department : '',
+      bio: typeof parsed.bio === 'string' ? parsed.bio : ''
+    };
+  } catch {
+    return {};
+  }
+}
+
+function syncProfileForm(user: UserInfo, extras: ProfileExtras = {}) {
+  profileForm.realName = user.realName || '';
+  profileForm.phone = user.phone || '';
+  profileForm.department = extras.department || user.department || '';
+  profileForm.bio = extras.bio || '';
+}
+
+function maskEmail(email: string) {
+  if (!email || !email.includes('@')) return email;
+  const [name, domain] = email.split('@');
+  if (name.length <= 2) return `${name}***@${domain}`;
+  return `${name.slice(0, 2)}***${name.slice(-1)}@${domain}`;
+}
+
+async function loadProfile() {
+  try {
+    const [profileRes, prefRes] = await Promise.all([
+      getProfile(),
+      getUserPreferences().catch(() => null)
+    ]);
+    if (profileRes?.data) {
+      authStore.setUser(profileRes.data as UserInfo);
+    }
+    const user = authStore.currentUser;
+    if (user) {
+      syncProfileForm(user, parseProfileExtras(prefRes?.data?.preferencesJson));
+    }
+  } catch {
+    if (authStore.currentUser) {
+      syncProfileForm(authStore.currentUser);
+    }
+  }
+}
+
+onMounted(() => {
+  loadProfile();
 });
 
 const modelOptions = [
@@ -387,18 +456,71 @@ async function handleSwitchRole(role: 'ADMIN' | 'TEACHER' | 'STUDENT') {
   }
 }
 
+function beforeAvatarUpload(file: File) {
+  const isImage = file.type.startsWith('image/');
+  const isLt5M = file.size / 1024 / 1024 < 5;
+  if (!isImage) {
+    ElMessage.warning('只能上传 JPG/PNG/GIF/WebP 图片');
+    return false;
+  }
+  if (!isLt5M) {
+    ElMessage.warning('头像大小不能超过 5MB');
+    return false;
+  }
+  return true;
+}
+
+async function handleAvatarUpload(options: UploadRequestOptions) {
+  const file = options.file as File;
+  avatarUploading.value = true;
+  try {
+    const res = await uploadAvatar(file);
+    if (res?.data) {
+      authStore.setUser(res.data);
+      ElMessage.success('头像已更新');
+    }
+  } catch (err: any) {
+    ElMessage.error(err?.message || '头像上传失败');
+  } finally {
+    avatarUploading.value = false;
+  }
+}
+
 async function handleSaveProfile() {
   try {
     const res = await updateProfile({
-      realName: profileForm.realName,
-      department: profileForm.department,
-      email: profileForm.email
+      realName: profileForm.realName.trim(),
+      phone: profileForm.phone.trim()
     });
-    if (res.data) authStore.setUser(res.data);
+
+    let mergedPrefs: Record<string, unknown> = {};
+    try {
+      const prefRes = await getUserPreferences();
+      if (prefRes?.data?.preferencesJson) {
+        mergedPrefs = JSON.parse(prefRes.data.preferencesJson) as Record<string, unknown>;
+      }
+    } catch {
+      // 偏好接口不可用时仍保存基础资料
+    }
+
+    mergedPrefs.department = profileForm.department.trim();
+    mergedPrefs.bio = profileForm.bio.trim();
+    await saveUserPreferences({
+      preferencesJson: JSON.stringify(mergedPrefs)
+    });
+
+    if (res.data) {
+      authStore.setUser(res.data as UserInfo);
+      syncProfileForm(res.data as UserInfo, {
+        department: profileForm.department,
+        bio: profileForm.bio
+      });
+    }
     ElMessage.success('个人资料已成功更新并保存');
   } catch {
     if (USE_MOCK && authStore.currentUser) {
       authStore.currentUser.realName = profileForm.realName;
+      authStore.currentUser.phone = profileForm.phone;
       authStore.currentUser.department = profileForm.department;
       ElMessage.success('个人资料已成功更新并保存');
     } else {
@@ -446,11 +568,9 @@ async function handleConfirmBind() {
   try {
     const res = await bindEmailApi({ email, code });
     if (res?.data) {
-      authStore.setUser(res.data);
-      profileForm.email = res.data.email || email;
+      authStore.setUser(res.data as UserInfo);
     } else if (authStore.currentUser) {
       authStore.currentUser.email = email;
-      profileForm.email = email;
     }
     bindDialogVisible.value = false;
     ElMessage.success('安全邮箱绑定成功！已为您完成认证升级');
@@ -484,6 +604,17 @@ async function handleConfirmBind() {
     .user-avatar-block {
       flex-shrink: 0;
 
+      .avatar-uploader {
+        position: relative;
+        display: inline-block;
+        cursor: pointer;
+
+        :deep(.el-upload) {
+          position: relative;
+          display: inline-block;
+        }
+      }
+
       .avatar-img {
         width: 72px;
         height: 72px;
@@ -491,6 +622,32 @@ async function handleConfirmBind() {
         border: 2px solid #1677FF;
         box-shadow: 0 4px 12px rgba(22, 119, 255, 0.2);
         object-fit: cover;
+        display: block;
+      }
+
+      .avatar-upload-mask {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        border-radius: 50%;
+        background: rgba(15, 23, 42, 0.55);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 600;
+        opacity: 0;
+        transition: opacity 0.2s;
+
+        .el-icon {
+          font-size: 18px;
+        }
+      }
+
+      .avatar-uploader:hover .avatar-upload-mask {
+        opacity: 1;
       }
     }
 
@@ -675,54 +832,28 @@ async function handleConfirmBind() {
           align-items: center;
           justify-content: space-between;
           width: 100%;
-          min-height: 44px;
-          padding: 6px 14px;
+          min-height: 46px;
+          padding: 0 8px 0 18px;
           background: #F8FAFC;
           border: 1px solid #E2E8F0;
           border-radius: 9999px;
           box-sizing: border-box;
 
-          .email-info-left {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-
-            .email-address {
-              font-size: 13.5px;
-              color: #1E293B;
-              font-weight: 500;
-            }
-
-            .status-badge {
-              display: inline-flex;
-              align-items: center;
-              gap: 4px;
-              padding: 2px 10px;
-              border-radius: 9999px;
-              font-size: 11px;
-              font-weight: 600;
-
-              .badge-icon {
-                width: 12px;
-                height: 12px;
-              }
-
-              &.bound {
-                background: #ECFDF5;
-                color: #059669;
-                border: 1px solid #A7F3D0;
-              }
-
-              &.unbound {
-                background: #FFFBEB;
-                color: #D97706;
-                border: 1px solid #FDE68A;
-              }
-            }
+          .email-address {
+            flex: 1;
+            min-width: 0;
+            font-size: 14px;
+            color: #1E293B;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
           }
 
           .email-action-btn {
-            padding: 5px 14px;
+            flex-shrink: 0;
+            margin-left: 12px;
+            padding: 6px 16px;
             border-radius: 9999px;
             background: #FFFFFF;
             border: 1px solid #CBD5E1;

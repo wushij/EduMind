@@ -9,6 +9,7 @@ export interface UserInfo {
   permissions?: string[];
   department?: string;
   email?: string;
+  phone?: string;
 }
 
 export interface CaptchaVO {
@@ -41,6 +42,7 @@ export interface EmailLoginRequest {
 export interface LoginResult {
   token: string;
   userInfo: UserInfo;
+  tenantId?: number;
 }
 
 export interface RegisterParams {

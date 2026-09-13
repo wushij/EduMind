@@ -6,6 +6,7 @@ import com.edumind.question.api.QuestionQueryApi;
 import com.edumind.question.vo.question.QuestionVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -17,106 +18,64 @@ public class SmartPaperComposeService {
     private final QuestionQueryApi questionQueryApi;
 
     public SmartPaperComposeVO compose(Long courseId, List<Long> knowledgePointIds, int totalCount, Set<Long> excludeIds) {
-        SmartPaperComposeVO vo = new SmartPaperComposeVO();
-        @SuppressWarnings("unchecked")
-        List<QuestionVO> pool = (List<QuestionVO>) (List<?>) questionQueryApi.listQuestionsByCourseId(courseId);
-        if (pool == null || pool.isEmpty()) {
-            vo.setSelectedCount(0);
-            vo.setDistinctKnowledgePointCount(0);
-            vo.setCoverageRate(0.0);
-            return vo;
-        }
-
-        Set<Long> targetKp = knowledgePointIds != null && !knowledgePointIds.isEmpty()
-                ? new HashSet<>(knowledgePointIds)
-                : pool.stream().map(QuestionVO::getKnowledgePointId).filter(Objects::nonNull).collect(Collectors.toSet());
-
-        Set<Long> usedKp = new HashSet<>();
-        List<QuestionVO> selected = new ArrayList<>();
-        for (QuestionVO q : pool) {
-            if (excludeIds != null && excludeIds.contains(q.getId())) {
-                continue;
-            }
-            if (!targetKp.isEmpty()
-                    && q.getKnowledgePointId() != null
-                    && !targetKp.contains(q.getKnowledgePointId())) {
-                continue;
-            }
-            if (q.getKnowledgePointId() != null && usedKp.contains(q.getKnowledgePointId())) {
-                continue;
-            }
-            selected.add(q);
-            if (q.getKnowledgePointId() != null) {
-                usedKp.add(q.getKnowledgePointId());
-            }
-            if (selected.size() >= totalCount) {
-                break;
-            }
-        }
-        while (selected.size() < totalCount && selected.size() < pool.size()) {
-            for (QuestionVO q : pool) {
-                if (excludeIds != null && excludeIds.contains(q.getId())) {
-                    continue;
-                }
-                if (!selected.contains(q)) {
-                    selected.add(q);
-                    if (q.getKnowledgePointId() != null) {
-                        usedKp.add(q.getKnowledgePointId());
-                    }
-                    break;
-                }
-            }
-        }
-
-        vo.setQuestions(selected);
-        vo.setSelectedCount(selected.size());
-        vo.setDistinctKnowledgePointCount(usedKp.size());
-        int denominator = Math.max(1, targetKp.isEmpty() ? pool.stream()
-                .map(QuestionVO::getKnowledgePointId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet()).size() : targetKp.size());
-        vo.setCoverageRate(usedKp.size() * 1.0 / denominator);
-        return vo;
+        SmartPaperComposeDTO dto = new SmartPaperComposeDTO();
+        dto.setCourseId(courseId);
+        dto.setKnowledgePointIds(knowledgePointIds);
+        dto.setTotalCount(totalCount);
+        dto.setExcludeIds(excludeIds);
+        return composeV2(dto);
     }
 
     /**
-     * V2 组卷算法：支持难度梯度正态分布约束 (Easy/Medium/Hard)、题型比例约束与全真知识覆盖
+     * V2 组卷算法：难度分层、题型比例、认知层级过滤、去重与缺口上报
      */
     public SmartPaperComposeVO composeV2(SmartPaperComposeDTO dto) {
         Set<Long> exclude = new HashSet<>();
-        if (dto.getExcludeIds() != null) exclude.addAll(dto.getExcludeIds());
-        if (dto.getExcludeQuestionIds() != null) exclude.addAll(dto.getExcludeQuestionIds());
+        if (dto.getExcludeIds() != null) {
+            exclude.addAll(dto.getExcludeIds());
+        }
+        if (dto.getExcludeQuestionIds() != null) {
+            exclude.addAll(dto.getExcludeQuestionIds());
+        }
 
         int targetCount = dto.getTotalCount() != null && dto.getTotalCount() > 0 ? dto.getTotalCount() : 10;
-        Long courseId = dto.getCourseId() != null ? dto.getCourseId() : 102L;
+        Long courseId = dto.getCourseId();
 
         @SuppressWarnings("unchecked")
-        List<QuestionVO> pool = (List<QuestionVO>) (List<?>) questionQueryApi.listQuestionsByCourseId(courseId);
+        List<QuestionVO> pool = courseId == null
+                ? List.of()
+                : (List<QuestionVO>) (List<?>) questionQueryApi.listQuestionsByCourseId(courseId);
         if (pool == null) {
             pool = new ArrayList<>();
         }
 
-        // 1. 目标难度比例配置解析 (默认 3:5:2 正态分布)
+        Set<Long> targetKp = dto.getKnowledgePointIds() != null && !dto.getKnowledgePointIds().isEmpty()
+                ? new HashSet<>(dto.getKnowledgePointIds())
+                : Set.of();
+        Set<String> cognitiveFilter = dto.getCognitiveLevels() != null
+                ? dto.getCognitiveLevels().stream().map(String::toUpperCase).collect(Collectors.toSet())
+                : Set.of();
+
+        List<QuestionVO> filtered = pool.stream()
+                .filter(q -> !exclude.contains(q.getId()))
+                .filter(q -> targetKp.isEmpty() || q.getKnowledgePointId() == null || targetKp.contains(q.getKnowledgePointId()))
+                .filter(q -> cognitiveFilter.isEmpty() || cognitiveFilter.contains(inferCognitiveLevel(q.getDifficulty())))
+                .collect(Collectors.toCollection(ArrayList::new));
+
         double easyRatio = 0.3;
         double hardRatio = 0.2;
-        double mediumRatio = 0.5;
         if (dto.getDifficultyDistribution() != null && !dto.getDifficultyDistribution().isEmpty()) {
             easyRatio = dto.getDifficultyDistribution().getOrDefault("EASY", 0.3);
             hardRatio = dto.getDifficultyDistribution().getOrDefault("HARD", 0.2);
-            mediumRatio = dto.getDifficultyDistribution().getOrDefault("MEDIUM", Math.max(0.0, 1.0 - easyRatio - hardRatio));
         }
-
         int targetEasy = (int) Math.round(targetCount * easyRatio);
         int targetHard = (int) Math.round(targetCount * hardRatio);
         int targetMedium = targetCount - targetEasy - targetHard;
 
-        // 2. 按难度把题目分桶
         List<QuestionVO> easyPool = new ArrayList<>();
         List<QuestionVO> mediumPool = new ArrayList<>();
         List<QuestionVO> hardPool = new ArrayList<>();
-
-        for (QuestionVO q : pool) {
-            if (exclude.contains(q.getId())) continue;
+        for (QuestionVO q : filtered) {
             int d = q.getDifficulty() != null ? q.getDifficulty() : 2;
             if (d <= 1) {
                 easyPool.add(q);
@@ -127,51 +86,21 @@ public class SmartPaperComposeService {
             }
         }
 
-        // 3. 若题库某一桶题目数量不足，进行合规补齐（确保测试与各种生产题库下都能严格满足难度约束）
-        long syntheticId = 9100L;
-        while (easyPool.size() < targetEasy) {
-            QuestionVO q = new QuestionVO();
-            q.setId(syntheticId++);
-            q.setDifficulty(1);
-            q.setType(resolveTypeForRatio(dto.getTypeRatios(), easyPool.size()));
-            q.setKnowledgePointId(dto.getKnowledgePointIds() != null && !dto.getKnowledgePointIds().isEmpty() ? dto.getKnowledgePointIds().get(0) : 101L);
-            q.setScore(5);
-            q.setStem("【基础巩固题】高等数学极限与基本运算题 #" + q.getId());
-            easyPool.add(q);
-        }
-        while (mediumPool.size() < targetMedium) {
-            QuestionVO q = new QuestionVO();
-            q.setId(syntheticId++);
-            q.setDifficulty(2);
-            q.setType(resolveTypeForRatio(dto.getTypeRatios(), mediumPool.size()));
-            q.setKnowledgePointId(dto.getKnowledgePointIds() != null && !dto.getKnowledgePointIds().isEmpty() ? dto.getKnowledgePointIds().get(0) : 102L);
-            q.setScore(5);
-            q.setStem("【标准推演题】微积分中值定理与极值综合题 #" + q.getId());
-            mediumPool.add(q);
-        }
-        while (hardPool.size() < targetHard) {
-            QuestionVO q = new QuestionVO();
-            q.setId(syntheticId++);
-            q.setDifficulty(3);
-            q.setType(resolveTypeForRatio(dto.getTypeRatios(), hardPool.size()));
-            q.setKnowledgePointId(dto.getKnowledgePointIds() != null && !dto.getKnowledgePointIds().isEmpty() ? dto.getKnowledgePointIds().get(0) : 103L);
-            q.setScore(10);
-            q.setStem("【综合拔高题】多元函数偏导数高阶应用题 #" + q.getId());
-            hardPool.add(q);
-        }
-
-        // 4. 从各个分桶按严格目标配额取题
         List<QuestionVO> selected = new ArrayList<>();
-        selected.addAll(easyPool.subList(0, targetEasy));
-        selected.addAll(mediumPool.subList(0, targetMedium));
-        selected.addAll(hardPool.subList(0, targetHard));
+        selected.addAll(pickFromBucket(easyPool, targetEasy));
+        selected.addAll(pickFromBucket(mediumPool, targetMedium));
+        selected.addAll(pickFromBucket(hardPool, targetHard));
 
-        // 5. 题型配比约束执行
         if (dto.getTypeRatios() != null && !dto.getTypeRatios().isEmpty()) {
             enforceTypeRatios(selected, dto.getTypeRatios());
         }
 
-        // 6. 统计真实分布数据并返回
+        Map<String, Integer> shortfallByDifficulty = new HashMap<>();
+        shortfallByDifficulty.put("EASY", Math.max(0, targetEasy - countDifficulty(selected, "EASY")));
+        shortfallByDifficulty.put("MEDIUM", Math.max(0, targetMedium - countDifficulty(selected, "MEDIUM")));
+        shortfallByDifficulty.put("HARD", Math.max(0, targetHard - countDifficulty(selected, "HARD")));
+        int shortfallCount = Math.max(0, targetCount - selected.size());
+
         Map<String, Integer> typeDist = new HashMap<>();
         Map<String, Integer> diffHist = new HashMap<>();
         diffHist.put("EASY", 0);
@@ -179,19 +108,25 @@ public class SmartPaperComposeService {
         diffHist.put("HARD", 0);
         Set<Long> usedKp = new HashSet<>();
         double totalScore = 0.0;
+        int duplicateHits = 0;
 
         for (QuestionVO q : selected) {
             String type = q.getType() != null ? q.getType() : "SINGLE_CHOICE";
             typeDist.merge(type, 1, Integer::sum);
-            String diff = "MEDIUM";
-            if (q.getDifficulty() != null) {
-                if (q.getDifficulty() <= 1) diff = "EASY";
-                else if (q.getDifficulty() >= 3) diff = "HARD";
-            }
+            String diff = toDifficultyBucket(q.getDifficulty());
             diffHist.merge(diff, 1, Integer::sum);
-            if (q.getKnowledgePointId() != null) usedKp.add(q.getKnowledgePointId());
+            if (q.getKnowledgePointId() != null) {
+                usedKp.add(q.getKnowledgePointId());
+            }
             totalScore += (q.getScore() != null ? q.getScore() : 5.0);
+            if (exclude.contains(q.getId())) {
+                duplicateHits++;
+            }
         }
+
+        int kpDenominator = targetKp.isEmpty()
+                ? (int) pool.stream().map(QuestionVO::getKnowledgePointId).filter(Objects::nonNull).distinct().count()
+                : targetKp.size();
 
         SmartPaperComposeVO vo = new SmartPaperComposeVO();
         vo.setQuestions(selected);
@@ -199,29 +134,63 @@ public class SmartPaperComposeService {
         vo.setDistinctKnowledgePointCount(usedKp.size());
         vo.setTypeDistribution(typeDist);
         vo.setDifficultyHistogram(diffHist);
-        vo.setCoverageRate(Math.min(1.0, (double) usedKp.size() / Math.max(1, (dto.getKnowledgePointIds() != null ? dto.getKnowledgePointIds().size() : 3))));
+        vo.setCoverageRate(kpDenominator == 0 ? 0.0 : Math.min(1.0, usedKp.size() * 1.0 / kpDenominator));
         vo.setTotalScore(dto.getTotalScore() != null ? dto.getTotalScore().doubleValue() : totalScore);
-        vo.setDuplicateRate(0.0);
+        vo.setDuplicateRate(selected.isEmpty() ? 0.0 : duplicateHits * 1.0 / selected.size());
+        vo.setShortfallCount(shortfallCount);
+        vo.setShortfallByDifficulty(shortfallByDifficulty);
         return vo;
     }
 
-    private String resolveTypeForRatio(Map<String, Double> ratios, int index) {
-        if (ratios == null || ratios.isEmpty()) {
-            return "SINGLE_CHOICE";
+    private List<QuestionVO> pickFromBucket(List<QuestionVO> bucket, int count) {
+        if (count <= 0 || CollectionUtils.isEmpty(bucket)) {
+            return List.of();
         }
-        List<String> types = new ArrayList<>(ratios.keySet());
-        return types.get(index % types.size());
+        return bucket.subList(0, Math.min(count, bucket.size()));
+    }
+
+    private int countDifficulty(List<QuestionVO> questions, String bucket) {
+        int count = 0;
+        for (QuestionVO q : questions) {
+            if (bucket.equals(toDifficultyBucket(q.getDifficulty()))) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private String toDifficultyBucket(Integer difficulty) {
+        int d = difficulty != null ? difficulty : 2;
+        if (d <= 1) {
+            return "EASY";
+        }
+        if (d >= 3) {
+            return "HARD";
+        }
+        return "MEDIUM";
+    }
+
+    private String inferCognitiveLevel(Integer difficulty) {
+        int d = difficulty != null ? difficulty : 2;
+        if (d <= 1) {
+            return "REMEMBER";
+        }
+        if (d == 2) {
+            return "APPLY";
+        }
+        if (d == 3) {
+            return "ANALYZE";
+        }
+        return "EVALUATE";
     }
 
     private void enforceTypeRatios(List<QuestionVO> questions, Map<String, Double> ratios) {
         int total = questions.size();
-        int assigned = 0;
         int idx = 0;
         for (Map.Entry<String, Double> entry : ratios.entrySet()) {
             int count = (int) Math.round(total * entry.getValue());
             for (int i = 0; i < count && idx < total; i++, idx++) {
                 questions.get(idx).setType(entry.getKey());
-                assigned++;
             }
         }
         while (idx < total) {

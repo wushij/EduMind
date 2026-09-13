@@ -59,6 +59,12 @@ export const questionRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/question/exams/ExamDetail.vue'),
     meta: { title: '试卷详情与打印', requiresAuth: true }
   },
+  {
+    path: '/question/exports',
+    name: 'QuestionExportCenter',
+    component: () => import('@/views/question/export/ExportCenter.vue'),
+    meta: { title: '试卷导出中心', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
+  },
 
   // 作业管理
   {

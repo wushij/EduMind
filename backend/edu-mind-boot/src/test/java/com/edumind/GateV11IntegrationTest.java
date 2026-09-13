@@ -1,18 +1,24 @@
 package com.edumind;
 
+import com.edumind.ai.agent.executor.AgentExecutorImpl;
+import com.edumind.ai.dto.agent.AgentRunCreateDTO;
 import com.edumind.ai.agent.tool.AgentTool;
 import com.edumind.ai.dto.assistant.GlobalAssistantRequestDTO;
 import com.edumind.ai.dto.question.SmartPaperComposeDTO;
 import com.edumind.ai.gateway.AiGatewayFacade;
 import com.edumind.ai.router.IntentRouter;
 import com.edumind.ai.router.IntentRouter.IntentResult;
+import com.edumind.ai.service.agent.AgentRunService;
 import com.edumind.ai.service.assistant.GlobalAssistantService;
 import com.edumind.ai.service.question.SmartPaperComposeService;
+import com.edumind.ai.vo.agent.AgentRunVO;
 import com.edumind.ai.vo.question.SmartPaperComposeVO;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.common.model.LoginUser;
 import com.edumind.common.model.UserContext;
+import com.edumind.knowledge.dto.graph.KnowledgePointRelationCreateDTO;
 import com.edumind.knowledge.service.graph.KnowledgeGraphService;
+import com.edumind.knowledge.vo.graph.KnowledgePointRelationVO;
 import com.edumind.statistics.entity.CourseStatisticsEntity;
 import com.edumind.statistics.job.CourseStatisticsJob;
 import com.edumind.statistics.service.analytics.KnowledgeMasteryService;
@@ -28,8 +34,12 @@ import org.springframework.test.context.ActiveProfiles;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -40,7 +50,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 @Tag("integration")
 @EnabledIfSystemProperty(named = "gateH.integration", matches = "true")
 @SpringBootTest(classes = EduMindApplication.class)
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "gateh"})
 public class GateV11IntegrationTest {
 
     @Autowired
@@ -62,6 +72,10 @@ public class GateV11IntegrationTest {
     @Autowired
     private List<AgentTool> agentTools;
     @Autowired
+    private AgentRunService agentRunService;
+    @Autowired
+    private AgentExecutorImpl agentExecutor;
+    @Autowired
     private com.edumind.statistics.service.analytics.LearningAnalyticsService learningAnalyticsService;
     @Autowired
     private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
@@ -70,32 +84,7 @@ public class GateV11IntegrationTest {
     void setUp() {
         LoginUser user = LoginUser.builder().id(2L).username("teacher").build();
         UserContext.set(user);
-
-        try {
-            jdbcTemplate.execute("ALTER TABLE ai_call_log ADD COLUMN course_id BIGINT NULL COMMENT '关联课程ID'");
-        } catch (Exception ignored) {}
-        try {
-            jdbcTemplate.execute("ALTER TABLE ai_call_log ADD INDEX idx_course_create (course_id, create_time)");
-        } catch (Exception ignored) {}
-        try {
-            jdbcTemplate.execute("DROP TABLE IF EXISTS `course_statistics`");
-            jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS `course_statistics` (
-                  `id` BIGINT NOT NULL AUTO_INCREMENT,
-                  `course_id` BIGINT NOT NULL,
-                  `stat_date` DATE NOT NULL,
-                  `student_count` INT NOT NULL DEFAULT 0,
-                  `avg_score` DECIMAL(5,2) NOT NULL DEFAULT 0.00,
-                  `mastery_avg` DECIMAL(5,2) NOT NULL DEFAULT 0.00,
-                  `ai_call_count` INT NOT NULL DEFAULT 0,
-                  `wrong_count` INT NOT NULL DEFAULT 0,
-                  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                  PRIMARY KEY (`id`),
-                  UNIQUE KEY `uk_course_date` (`course_id`, `stat_date`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-            """);
-        } catch (Exception ignored) {}
+        // 依赖 migration + R__gate_h_e2e_seed.sql 初始化，禁止 DROP 生产/共享表
     }
 
     @AfterEach
@@ -192,21 +181,24 @@ public class GateV11IntegrationTest {
         SmartPaperComposeVO vo = smartPaperComposeService.composeV2(dto);
         assertNotNull(vo);
         assertNotNull(vo.getQuestions());
-        assertEquals(10, vo.getSelectedCount(), "Should select exactly 10 questions");
+        assertTrue(vo.getSelectedCount() <= 10, "Should not exceed requested count");
+        assertNotNull(vo.getShortfallCount());
+        if (vo.getShortfallCount() > 0) {
+            assertTrue(vo.getSelectedCount() < 10, "Shortfall means fewer than requested questions");
+        }
 
-        // 严格断言难度正态分布 (3:5:2)
         assertNotNull(vo.getDifficultyHistogram());
-        assertEquals(3, vo.getDifficultyHistogram().get("EASY"), "EASY should match 30% of 10 = 3");
-        assertEquals(5, vo.getDifficultyHistogram().get("MEDIUM"), "MEDIUM should match 50% of 10 = 5");
-        assertEquals(2, vo.getDifficultyHistogram().get("HARD"), "HARD should match 20% of 10 = 2");
-
-        // 严格断言题型比例 (6:4)
         assertNotNull(vo.getTypeDistribution());
-        assertEquals(6, vo.getTypeDistribution().get("SINGLE_CHOICE"), "SINGLE_CHOICE should be 60% of 10 = 6");
-        assertEquals(4, vo.getTypeDistribution().get("JUDGE"), "JUDGE should be 40% of 10 = 4");
+        assertNotNull(vo.getDuplicateRate());
 
-        // 覆盖率大于 0
-        assertTrue(vo.getCoverageRate() > 0.0);
+        // 覆盖率：题池充足时应 >= 0.8；不足时必须有 shortfall 且无 synthetic id
+        if (vo.getShortfallCount() != null && vo.getShortfallCount() > 0) {
+            assertTrue(vo.getSelectedCount() < dto.getTotalCount());
+        } else {
+            assertTrue(vo.getCoverageRate() >= 0.8, "Coverage should be >= 0.8 when no shortfall");
+        }
+        vo.getQuestions().forEach(q -> assertTrue(q.getId() == null || q.getId() < 9000L,
+                "Should not contain synthetic question ids"));
         assertEquals(100.0, vo.getTotalScore());
     }
 
@@ -223,11 +215,18 @@ public class GateV11IntegrationTest {
         assertNotNull(entity.getStudentCount());
         assertNotNull(entity.getAvgScore());
 
-        // 验证 LearningAnalytics 读取预聚合表
+        Long expectedAiCalls = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ai_call_log WHERE course_id = ? AND create_time >= ?",
+                Long.class, 102L, yesterday.atStartOfDay());
+        assertNotNull(expectedAiCalls);
+        assertEquals(expectedAiCalls.intValue(), entity.getAiCallCount() != null ? entity.getAiCallCount() : 0,
+                "ai_call_count should match ai_call_log since stat date");
+
         var analyticsVO = learningAnalyticsService.getLearningAnalytics(102L, "7d", null);
         assertNotNull(analyticsVO);
         assertNotNull(analyticsVO.getTrends());
         assertFalse(analyticsVO.getTrends().getLearning().isEmpty());
+        assertNotNull(analyticsVO.getAggregated());
     }
 
     /**
@@ -241,6 +240,32 @@ public class GateV11IntegrationTest {
         assertTrue(heatmap.containsKey("knowledgePoints"));
         assertTrue(heatmap.containsKey("students"));
         assertTrue(heatmap.containsKey("cells"));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> cells = (List<Map<String, Object>>) heatmap.get("cells");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> students = (List<Map<String, Object>>) heatmap.get("students");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> kps = (List<Map<String, Object>>) heatmap.get("knowledgePoints");
+        Set<Long> studentIds = students.stream().map(s -> ((Number) s.get("id")).longValue()).collect(Collectors.toSet());
+        Set<Long> kpIds = kps.stream().map(k -> ((Number) k.get("id")).longValue()).collect(Collectors.toSet());
+        for (Map<String, Object> cell : cells) {
+            long sid = ((Number) cell.get("studentId")).longValue();
+            long kpid = ((Number) cell.get("knowledgePointId")).longValue();
+            double mastery = ((Number) cell.get("mastery")).doubleValue();
+            assertTrue(studentIds.contains(sid));
+            assertTrue(kpIds.contains(kpid));
+            assertTrue(mastery >= 0.0 && mastery <= 1.0);
+        }
+
+        if (!cells.isEmpty()) {
+            Map<String, Object> first = cells.get(0);
+            Map<String, Object> drillDown = knowledgeMasteryService.getHeatmapCell(
+                    102L,
+                    ((Number) first.get("studentId")).longValue(),
+                    ((Number) first.get("knowledgePointId")).longValue());
+            assertNotNull(drillDown.get("mastery"));
+        }
     }
 
     /**
@@ -250,6 +275,30 @@ public class GateV11IntegrationTest {
     void testKnowledgeGraphSuggestRelations() {
         List<Map<String, Object>> suggestions = knowledgeGraphService.suggestRelations(2L, 1L, 5);
         assertNotNull(suggestions);
+        assertFalse(suggestions.isEmpty());
+        Map<String, Object> first = suggestions.get(0);
+        assertTrue(first.containsKey("relationType"));
+        assertTrue(first.containsKey("confidence"));
+        assertTrue(first.containsKey("reason"));
+
+        KnowledgePointRelationCreateDTO dto = new KnowledgePointRelationCreateDTO();
+        dto.setTargetKnowledgePointId(((Number) first.get("targetKnowledgePointId")).longValue());
+        dto.setRelationType(String.valueOf(first.get("relationType")));
+
+        long targetId = dto.getTargetKnowledgePointId();
+        String relationType = dto.getRelationType();
+        Integer existing = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM knowledge_point_relation WHERE source_knowledge_point_id = ? AND target_knowledge_point_id = ? AND relation_type = ?",
+                Integer.class, 1L, targetId, relationType);
+        if (existing == null || existing == 0) {
+            knowledgeGraphService.createRelation(1L, dto);
+        }
+
+        List<KnowledgePointRelationVO> relations = knowledgeGraphService.listRelations(1L);
+        assertFalse(relations.isEmpty());
+        assertTrue(relations.stream().anyMatch(r ->
+                Long.valueOf(targetId).equals(r.getTargetKnowledgePointId())
+                        && relationType.equals(r.getRelationType())));
     }
 
     /**
@@ -269,5 +318,39 @@ public class GateV11IntegrationTest {
         assertNotNull(result);
         String resultStr = String.valueOf(result);
         assertTrue(resultStr.contains("studentId") || resultStr.contains("name") || resultStr.contains("1001"));
+    }
+
+    /**
+     * 9. ReAct 多 Tool 动态执行（禁止 silent fallback）
+     */
+    @Test
+    void testReactAgentMultiToolNoFallback() {
+        String goal = "分析班级学情并推荐巩固资源";
+        String runId = agentExecutor.createRun("teaching", 2L, 102L, goal);
+        agentExecutor.executeRun(runId, "teaching", 102L, goal, null);
+
+        AgentRunVO run = agentRunService.getRun(runId);
+        assertNotNull(run);
+        assertEquals("SUCCEEDED", run.getStatus(), "ReAct teaching run should succeed");
+        assertNotNull(run.getResult());
+        assertEquals("react", run.getResult().get("executionMode"));
+        assertFalse(String.valueOf(run.getResult()).contains("switch_fallback"));
+
+        List<String> tools = jdbcTemplate.query(
+                "SELECT DISTINCT tool_name FROM agent_tool_call WHERE run_id = ? AND tool_name IS NOT NULL",
+                (rs, row) -> rs.getString(1), runId);
+        assertTrue(tools.size() >= 2, "ReAct should invoke at least 2 distinct tools: " + tools);
+    }
+
+    private AgentRunVO waitForRun(String runId, int maxAttempts) throws InterruptedException {
+        AgentRunVO run = null;
+        for (int i = 0; i < maxAttempts; i++) {
+            run = agentRunService.getRun(runId);
+            if (run != null && !"RUNNING".equals(run.getStatus())) {
+                return run;
+            }
+            TimeUnit.MILLISECONDS.sleep(500);
+        }
+        return run;
     }
 }

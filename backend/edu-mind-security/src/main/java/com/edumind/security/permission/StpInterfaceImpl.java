@@ -20,6 +20,10 @@ public class StpInterfaceImpl implements StpInterface {
         if (userId == null) {
             return Collections.emptyList();
         }
+        List<String> roles = getRoleList(loginId, loginType);
+        if (Long.valueOf(1L).equals(userId) || roles.contains("ADMIN") || roles.contains("ROLE_ADMIN") || roles.contains("PLATFORM_ADMIN")) {
+            return Collections.singletonList("*");
+        }
         List<String> permissions = permissionCacheService.getPermissions(userId);
         return permissions.isEmpty() ? Collections.emptyList() : permissions;
     }

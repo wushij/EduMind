@@ -24,4 +24,8 @@ public class ToolRegistry {
     public int size() {
         return tools.size();
     }
+
+    public List<AgentTool> all() {
+        return List.copyOf(tools.values());
+    }
 }

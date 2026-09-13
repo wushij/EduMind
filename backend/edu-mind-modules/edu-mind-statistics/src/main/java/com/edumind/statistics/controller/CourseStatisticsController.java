@@ -1,9 +1,8 @@
 package com.edumind.statistics.controller;
 
 import com.edumind.common.api.ApiResult;
-import com.edumind.statistics.dao.CourseStatisticsDao;
-import com.edumind.statistics.entity.CourseStatisticsEntity;
-import com.edumind.statistics.job.CourseStatisticsJob;
+import com.edumind.statistics.service.analytics.CourseStatisticsService;
+import com.edumind.statistics.vo.analytics.CourseStatisticsVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,32 +19,20 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CourseStatisticsController {
 
-    private final CourseStatisticsJob courseStatisticsJob;
-    private final CourseStatisticsDao courseStatisticsDao;
+    private final CourseStatisticsService courseStatisticsService;
 
     @PostMapping("/aggregate")
-    public ApiResult<CourseStatisticsEntity> triggerAggregate(
+    public ApiResult<CourseStatisticsVO> triggerAggregate(
             @RequestParam("courseId") Long courseId,
             @RequestParam(value = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        if (date == null) {
-            date = LocalDate.now().minusDays(1);
-        }
-        CourseStatisticsEntity entity = courseStatisticsJob.aggregateCourseStat(courseId, date);
-        return ApiResult.success(entity);
+        return ApiResult.success(courseStatisticsService.triggerAggregate(courseId, date));
     }
 
     @GetMapping("/daily")
-    public ApiResult<List<CourseStatisticsEntity>> getDailyStats(
+    public ApiResult<List<CourseStatisticsVO>> getDailyStats(
             @RequestParam("courseId") Long courseId,
             @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        if (startDate == null) {
-            startDate = LocalDate.now().minusDays(30);
-        }
-        if (endDate == null) {
-            endDate = LocalDate.now();
-        }
-        List<CourseStatisticsEntity> list = courseStatisticsDao.listByCourseAndDateRange(courseId, startDate, endDate);
-        return ApiResult.success(list);
+        return ApiResult.success(courseStatisticsService.listDailyStats(courseId, startDate, endDate));
     }
 }

@@ -1,5 +1,5 @@
 import { del, get, post } from '@/core/http/request';
-import type { GraphGapVO, KnowledgeGraphVO } from '@/types/knowledge/graph';
+import type { GraphGapVO, GraphRelationSuggestion, KnowledgeGraphVO } from '@/types/knowledge/graph';
 
 export const getKnowledgeGraph = (kbId: number, depth = 2, types?: string) =>
   get<KnowledgeGraphVO>(`/knowledge-bases/${kbId}/graph`, { depth, types });
@@ -19,3 +19,9 @@ export const listKnowledgePointRelations = (knowledgePointId: number) =>
 
 export const deleteKnowledgePointRelation = (relationId: number) =>
   del<void>(`/knowledge-points/relations/${relationId}`);
+
+export const suggestRelations = (
+  kbId: number,
+  params?: { sourceKnowledgePointId?: number; maxSuggestions?: number }
+) =>
+  post<GraphRelationSuggestion[]>(`/knowledge-bases/${kbId}/graph/suggest-relations`, params ?? {});

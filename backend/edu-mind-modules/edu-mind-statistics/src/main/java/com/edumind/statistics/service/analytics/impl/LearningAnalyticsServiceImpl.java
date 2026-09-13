@@ -84,6 +84,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
 
         // 如果存在预聚合快照，更新融合指标
         if (!preAggStats.isEmpty()) {
+            vo.setAggregated(true);
             com.edumind.statistics.entity.CourseStatisticsEntity latest = preAggStats.get(preAggStats.size() - 1);
             if (vo.getStudentCount() == 0 && latest.getStudentCount() != null) {
                 vo.setStudentCount(latest.getStudentCount());
@@ -97,6 +98,9 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         }
 
         buildTrends(vo, records, statByDate, since);
+        if (vo.getAggregated() == null) {
+            vo.setAggregated(false);
+        }
         return vo;
     }
 

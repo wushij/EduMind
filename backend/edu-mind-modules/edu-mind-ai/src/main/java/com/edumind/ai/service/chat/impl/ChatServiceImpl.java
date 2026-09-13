@@ -11,21 +11,19 @@ import com.edumind.ai.entity.MessageEntity;
 import com.edumind.ai.gateway.AiGatewayFacade;
 import com.edumind.ai.integration.llm.LlmClient;
 import com.edumind.ai.integration.llm.LlmProperties;
-import com.edumind.ai.rag.model.RagResult;
-import com.edumind.ai.rag.model.RetrievalHit;
-import com.edumind.ai.rag.pipeline.RagPipelineImpl;
+import com.edumind.ai.router.IntentRouter;
 import com.edumind.ai.service.chat.ChatService;
 import com.edumind.ai.service.chat.ChatStreamRegistry;
-import com.edumind.ai.service.prompt.PromptService;
+import com.edumind.ai.service.routing.IntentDispatchPlan;
+import com.edumind.ai.service.routing.IntentDispatchRequest;
+import com.edumind.ai.service.routing.IntentDispatchService;
 import com.edumind.ai.vo.rag.CitationVO;
-import com.edumind.ai.router.IntentRouter;
 import com.edumind.common.event.LearningActivityEvent;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.infrastructure.redis.cache.AiSessionCacheService;
-import com.edumind.security.context.LoginUserResolver;
 import com.edumind.knowledge.api.KnowledgeQueryApi;
-import com.edumind.knowledge.service.knowledge.KnowledgeAccessService;
 import com.edumind.knowledge.vo.knowledge.KnowledgeBaseVO;
+import com.edumind.security.context.LoginUserResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -48,14 +46,11 @@ public class ChatServiceImpl implements ChatService {
     private final AiGatewayFacade aiGatewayFacade;
     private final LlmProperties llmProperties;
     private final AiCallLogDao aiCallLogDao;
-    private final PromptService promptService;
     private final AiSessionCacheService aiSessionCacheService;
-    private final RagPipelineImpl ragPipeline;
     private final ChatStreamRegistry chatStreamRegistry;
     private final KnowledgeQueryApi knowledgeQueryApi;
-    private final KnowledgeAccessService knowledgeAccessService;
     private final ApplicationEventPublisher eventPublisher;
-    private final com.edumind.ai.router.IntentRouter intentRouter;
+    private final IntentDispatchService intentDispatchService;
 
     @Override
     public SseEmitter streamChat(ChatStreamDTO dto) {
@@ -104,39 +99,39 @@ public class ChatServiceImpl implements ChatService {
     private void doStream(ConversationEntity conversation, ChatStreamDTO dto, SseEmitter emitter, String streamId) {
         long start = System.currentTimeMillis();
         StringBuilder assistantContent = new StringBuilder();
-        final RagResult[] ragHolder = new RagResult[1];
         final Long knowledgeBaseId = resolveKnowledgeBaseId(dto);
-        final boolean useRag = shouldUseRag(dto, knowledgeBaseId);
         try {
-            IntentRouter.IntentResult intent = intentRouter.route(dto.getMessage(), dto.getCourseId());
+            IntentRouter.IntentResult intent = intentDispatchService.route(dto.getMessage(), dto.getCourseId());
             sendEvent(emitter, "intent", Map.of(
                     "route", intent.type(),
                     "agentCode", intent.targetCode() != null ? intent.targetCode() : "",
                     "confidence", intent.confidence()
             ));
 
-            String systemPrompt = promptService.getSystemPrompt("chat");
-            String userPrompt = dto.getMessage();
-            List<CitationVO> citations = List.of();
-            if (useRag && knowledgeBaseId != null) {
-                knowledgeAccessService.assertAccessible(knowledgeBaseId);
-                validateKnowledgeBaseCourse(knowledgeBaseId, dto.getCourseId());
-                ragHolder[0] = ragPipeline.executeDetailed(
-                        dto.getMessage(),
-                        knowledgeBaseId,
-                        5,
-                        0.65,
-                        dto.getDocumentId(),
-                        false
-                );
-                userPrompt = ragHolder[0].getPromptPreview();
-                citations = toCitations(ragHolder[0]);
-                if (!citations.isEmpty()) {
-                    sendEvent(emitter, "citation", Map.of("citations", citations));
-                }
+            boolean useRag = shouldUseRag(dto, knowledgeBaseId, intent);
+            IntentDispatchRequest dispatchRequest = IntentDispatchRequest.builder()
+                    .message(dto.getMessage())
+                    .courseId(dto.getCourseId())
+                    .knowledgeBaseId(useRag ? knowledgeBaseId : null)
+                    .documentId(dto.getDocumentId())
+                    .intent(intent)
+                    .build();
+            IntentDispatchPlan plan = intentDispatchService.prepare(dispatchRequest);
+
+            if ("navigate".equals(plan.getRoute()) && plan.getNavigatePayload() != null) {
+                sendEvent(emitter, "navigate", plan.getNavigatePayload());
             }
+
+            String systemPrompt = plan.getSystemPrompt();
+            String userPrompt = plan.getUserPrompt();
+            List<CitationVO> citations = plan.getCitations() != null ? plan.getCitations() : List.of();
+            if (!citations.isEmpty()) {
+                sendEvent(emitter, "citation", Map.of("citations", citations));
+            }
+
             final String promptForLog = userPrompt;
             final List<CitationVO> citationsForSave = citations;
+            final boolean ragUsed = useRag && knowledgeBaseId != null;
             aiGatewayFacade.streamChat("CHAT", systemPrompt, userPrompt, new LlmClient.StreamCallback() {
                 @Override
                 public void onChunk(String content) {
@@ -165,9 +160,12 @@ public class ChatServiceImpl implements ChatService {
                     Map<String, String> done = new HashMap<>();
                     done.put("conversationId", conversation.getId());
                     done.put("messageId", assistantMsg.getId());
+                    if (plan.getAgentCode() != null) {
+                        done.put("agentCode", plan.getAgentCode());
+                    }
                     sendEvent(emitter, "done", done);
                     emitter.complete();
-                    logCall(start, useRag, knowledgeBaseId, conversation.getCourseId(), promptForLog, assistantContent.toString(), ragHolder[0]);
+                    logCall(start, ragUsed, knowledgeBaseId, conversation.getCourseId(), promptForLog, assistantContent.toString(), citationsForSave);
                     publishChatActivity(conversation);
                     chatStreamRegistry.remove(streamId);
                 }
@@ -186,24 +184,6 @@ public class ChatServiceImpl implements ChatService {
             emitter.completeWithError(ex);
             chatStreamRegistry.remove(streamId);
         }
-    }
-
-    private List<CitationVO> toCitations(RagResult ragResult) {
-        if (ragResult == null || ragResult.getRetrievalResults() == null) {
-            return List.of();
-        }
-        return ragResult.getRetrievalResults().stream().map(this::toCitation).collect(Collectors.toList());
-    }
-
-    private CitationVO toCitation(RetrievalHit hit) {
-        CitationVO citation = new CitationVO();
-        citation.setDocumentName(hit.getDocumentName());
-        citation.setPageNo(hit.getPageNo());
-        citation.setChunkId(hit.getChunkId());
-        citation.setScore(hit.getScore());
-        citation.setExcerpt(hit.getExcerpt());
-        citation.setChunkIndex(hit.getChunkIndex());
-        return citation;
     }
 
     private MessageEntity saveMessage(String conversationId, String role, String content, String citationsJson) {
@@ -242,31 +222,18 @@ public class ChatServiceImpl implements ChatService {
         return knowledgeBases.isEmpty() ? null : knowledgeBases.get(0).getId();
     }
 
-    private boolean shouldUseRag(ChatStreamDTO dto, Long knowledgeBaseId) {
+    private boolean shouldUseRag(ChatStreamDTO dto, Long knowledgeBaseId, IntentRouter.IntentResult intent) {
         if (dto.getUseRag() != null) {
             return dto.getUseRag();
         }
-        // 基于 IntentRouter 统一意图判断分流
-        IntentRouter.IntentResult intent = intentRouter.route(dto.getMessage(), dto.getCourseId());
         if ("rag".equalsIgnoreCase(intent.type())) {
             return true;
         }
-        return knowledgeBaseId != null;
-    }
-
-    private void validateKnowledgeBaseCourse(Long knowledgeBaseId, Long courseId) {
-        if (courseId == null) {
-            return;
-        }
-        boolean matched = knowledgeQueryApi.listKnowledgeBasesByCourseId(courseId).stream()
-                .anyMatch(kb -> knowledgeBaseId.equals(kb.getId()));
-        if (!matched) {
-            throw new BusinessException("知识库与课程不匹配");
-        }
+        return knowledgeBaseId != null && "chat".equalsIgnoreCase(intent.type());
     }
 
     private void logCall(long start, boolean useRag, Long knowledgeBaseId, Long courseId, String prompt, String completion,
-                         RagResult ragResult) {
+                         List<CitationVO> citations) {
         AiCallLogEntity log = new AiCallLogEntity();
         log.setUserId(LoginUserResolver.resolveUserId());
         log.setCourseId(courseId);
@@ -276,13 +243,8 @@ public class ChatServiceImpl implements ChatService {
         log.setKnowledgeBaseId(knowledgeBaseId);
         log.setPromptTokens(estimateTokens(prompt));
         log.setCompletionTokens(estimateTokens(completion));
-        if (ragResult != null && ragResult.getRetrievalResults() != null) {
-            log.setRetrievalHitCount(ragResult.getRetrievalResults().size());
-            String docIds = ragResult.getRetrievalResults().stream()
-                    .map(hit -> String.valueOf(hit.getDocumentId()))
-                    .distinct()
-                    .collect(Collectors.joining(","));
-            log.setCitationDocIds(docIds);
+        if (citations != null && !citations.isEmpty()) {
+            log.setRetrievalHitCount(citations.size());
         }
         aiCallLogDao.insert(log);
     }

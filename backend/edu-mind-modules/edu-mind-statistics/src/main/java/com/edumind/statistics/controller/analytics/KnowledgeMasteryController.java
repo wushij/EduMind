@@ -34,4 +34,13 @@ public class KnowledgeMasteryController {
             @RequestParam(required = false) String range) {
         return ApiResult.success(knowledgeMasteryService.getHeatmap(courseId, range));
     }
+
+    @SaCheckPermission("course:view")
+    @GetMapping("/heatmap/cell")
+    public ApiResult<java.util.Map<String, Object>> getHeatmapCell(
+            @RequestParam Long courseId,
+            @RequestParam Long studentId,
+            @RequestParam Long knowledgePointId) {
+        return ApiResult.success(knowledgeMasteryService.getHeatmapCell(courseId, studentId, knowledgePointId));
+    }
 }

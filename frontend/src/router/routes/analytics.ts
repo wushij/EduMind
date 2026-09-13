@@ -36,5 +36,11 @@ export const analyticsRoutes: RouteRecordRaw[] = [
     name: 'AnalyticsTeachingReport',
     component: () => import('@/views/analytics/TeachingReport.vue'),
     meta: { title: '教学质量分析报告', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
+  },
+  {
+    path: '/analytics/interventions',
+    name: 'AnalyticsTeachingIntervention',
+    component: () => import('@/views/analytics/interventions/InterventionCenter.vue'),
+    meta: { title: '教学干预决策工作台', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
   }
 ];

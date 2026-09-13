@@ -24,6 +24,12 @@ axiosInstance.interceptors.request.use(
       config.headers['satoken'] = token;
     }
 
+    // 注入多租户隔离上下文
+    const tenantId = storage.get('edumind_tenant_id');
+    if (tenantId) {
+      config.headers['X-Tenant-Id'] = String(tenantId);
+    }
+
     const timestamp = getTimestamp();
     const nonce = generateNonce();
     config.headers['X-Timestamp'] = String(timestamp);
@@ -96,6 +102,11 @@ axiosInstance.interceptors.response.use(
         return Promise.reject(new Error(msg));
       }
 
+      if (res.code === 429) {
+        showErrorMessage('操作过于频繁，请稍后重试');
+        return Promise.reject(new Error(msg));
+      }
+
       if (!silent) {
         showErrorMessage(msg);
       }
@@ -124,6 +135,11 @@ axiosInstance.interceptors.response.use(
 
     if (status === 401) {
       handleUnauthorized(apiMessage);
+      return Promise.reject(error);
+    }
+
+    if (status === 429) {
+      showErrorMessage('操作过于频繁，请稍后重试');
       return Promise.reject(error);
     }
 

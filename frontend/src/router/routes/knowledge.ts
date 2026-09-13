@@ -14,6 +14,12 @@ export const knowledgeRoutes: RouteRecordRaw[] = [
     meta: { title: '创建知识库', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
   },
   {
+    path: '/knowledge/ocr',
+    name: 'KnowledgeOcrWorkspace',
+    component: () => import('@/views/knowledge/ocr/OcrWorkspace.vue'),
+    meta: { title: '多模态 OCR 识别与校对', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
+  },
+  {
     path: '/knowledge/:id',
     name: 'KnowledgeBaseDetail',
     component: () => import('@/views/knowledge/KnowledgeBaseDetail.vue'),

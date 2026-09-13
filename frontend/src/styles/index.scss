@@ -3,5 +3,7 @@
 @use "./layout.scss";
 @use "./mixins.scss" as *;
 @use "./element.scss";
+@use "./dialog-shell.scss";
 @use "./pagination.scss";
 @use "./transition.scss";
+@use "./print.scss";

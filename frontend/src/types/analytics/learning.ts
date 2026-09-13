@@ -21,6 +21,7 @@ export interface LearningAnalyticsVO {
   avgStudyMinutes: number;
   knowledgeMasteryAvg: number;
   aiUsageCount: number;
+  aggregated?: boolean;
   trends: LearningTrendData;
 }
 

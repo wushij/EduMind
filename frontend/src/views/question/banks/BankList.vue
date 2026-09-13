@@ -52,7 +52,7 @@
 
     <!-- 题库卡片网格 -->
     <div v-loading="loading" class="banks-grid-wrapper">
-      <div v-if="banks.length > 0" class="banks-grid">
+      <div v-if="banks.length > 0" class="banks-stack">
         <div
           v-for="b in banks"
           :key="b.id"
@@ -241,9 +241,10 @@ async function handleCreateBank() {
 
 <style scoped lang="scss">
 .bank-list-page-container {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
 
   .bank-header-dock {
     display: flex;
@@ -251,10 +252,9 @@ async function handleCreateBank() {
     align-items: center;
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 16px;
-    padding: 24px 32px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03);
+    border-radius: 18px;
+    padding: 24px 28px;
+    box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
 
     .header-left {
       .title-with-icon {
@@ -315,11 +315,13 @@ async function handleCreateBank() {
   }
 
   .filter-capsule-card {
+    width: 100%;
+    box-sizing: border-box;
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 14px 24px;
-    margin-bottom: 24px;
+    border-radius: 18px;
+    padding: 18px 24px;
+    box-shadow: 0 2px 12px rgba(30, 80, 150, 0.03);
 
     .filter-row {
       display: flex;
@@ -362,26 +364,33 @@ async function handleCreateBank() {
     }
   }
 
-  .banks-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  .banks-grid-wrapper {
+    width: 100%;
+  }
+
+  .banks-stack {
+    display: flex;
+    flex-direction: column;
     gap: 20px;
+    width: 100%;
   }
 
   .bank-card-item {
+    width: 100%;
+    box-sizing: border-box;
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    padding: 20px 24px;
+    border-radius: 18px;
+    padding: 24px 28px;
+    box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.22s ease;
     display: flex;
     flex-direction: column;
 
     &:hover {
       border-color: #93c5fd;
-      transform: translateY(-3px);
-      box-shadow: 0 12px 24px -6px rgba(37, 99, 235, 0.08);
+      box-shadow: 0 8px 24px rgba(22, 119, 255, 0.08);
     }
 
     .card-top-header {
@@ -393,20 +402,21 @@ async function handleCreateBank() {
       .course-chip {
         font-size: 12px;
         font-weight: 600;
-        color: #475569;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        padding: 2px 10px;
-        border-radius: 6px;
+        color: #1677ff;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        padding: 2px 12px;
+        border-radius: 9999px;
       }
 
       .count-tag {
         font-size: 12px;
-        color: #10b981;
+        color: #059669;
         background: #ecfdf5;
-        padding: 2px 8px;
-        border-radius: 4px;
+        padding: 2px 10px;
+        border-radius: 9999px;
         font-weight: 600;
+        border: 1px solid #a7f3d0;
       }
     }
 

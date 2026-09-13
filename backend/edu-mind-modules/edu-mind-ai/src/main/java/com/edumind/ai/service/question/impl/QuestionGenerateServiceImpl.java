@@ -61,7 +61,7 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
                     promptService.getSystemPrompt("question_generate") + "\n" + userPrompt, params);
 
             List<QuestionVO> result = parseQuestions(json, dto);
-            logCall("question_generate", start);
+            logCall("question_generate", start, dto.getCourseId());
             return result;
         } finally {
             aiSessionCacheService.finishGenerating("question", userId);
@@ -92,9 +92,10 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
         return list;
     }
 
-    private void logCall(String scene, long start) {
+    private void logCall(String scene, long start, Long courseId) {
         AiCallLogEntity log = new AiCallLogEntity();
         log.setUserId(UserContext.getUserId());
+        log.setCourseId(courseId);
         log.setModel(llmProperties.getModel());
         log.setScene(scene);
         log.setLatencyMs((int) (System.currentTimeMillis() - start));

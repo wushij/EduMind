@@ -40,6 +40,7 @@ public class TeachingReportServiceImpl implements TeachingReportService {
     private final WrongQuestionRecordDao wrongQuestionRecordDao;
     private final LearningAnalyticsService learningAnalyticsService;
     private final KnowledgeQueryApi knowledgeQueryApi;
+    private final com.edumind.statistics.dao.CourseStatisticsDao courseStatisticsDao;
 
     @Override
     public TeachingReportVO buildReport(Long courseId, String range) {
@@ -53,7 +54,7 @@ public class TeachingReportServiceImpl implements TeachingReportService {
         List<RecommendedResourceVO> resources = recommendationService.recommendResources(courseId, null, 5);
         report.setRecommendedQuestions(questions.size());
         report.setRecommendedResources(resources.size());
-        report.setAiCallCount(countAiCallsByCourse(courseId));
+        report.setAiCallCount(countAiCallsByCourse(courseId, effectiveRange));
         SubmissionStatsVO submissionStats = submissionQueryApi.getCourseSubmissionStats(courseId);
         report.setAvgSubmissionRate(submissionStats.getAvgSubmissionRate() != null ? submissionStats.getAvgSubmissionRate() : 0);
 
@@ -94,7 +95,21 @@ public class TeachingReportServiceImpl implements TeachingReportService {
         return report;
     }
 
-    private int countAiCallsByCourse(Long courseId) {
+    private int countAiCallsByCourse(Long courseId, String range) {
+        java.time.LocalDate endDate = java.time.LocalDate.now();
+        java.time.LocalDate startDate = endDate.minusDays("30d".equals(range) ? 30 : 7);
+        List<com.edumind.statistics.entity.CourseStatisticsEntity> stats =
+                courseStatisticsDao.listByCourseAndDateRange(courseId, startDate, endDate);
+        if (!stats.isEmpty()) {
+            return stats.stream()
+                    .mapToInt(s -> s.getAiCallCount() != null ? s.getAiCallCount() : 0)
+                    .sum();
+        }
+        java.time.LocalDateTime since = java.time.LocalDateTime.now().minusDays("30d".equals(range) ? 30 : 7);
+        long direct = aiAuditQueryApi.countCallsByCourse(courseId, since);
+        if (direct > 0) {
+            return (int) direct;
+        }
         List<Long> kbIds = knowledgeQueryApi.listKnowledgeBasesByCourseId(courseId).stream()
                 .map(KnowledgeBaseVO::getId)
                 .collect(Collectors.toList());

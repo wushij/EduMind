@@ -132,5 +132,13 @@ export const aiRoutes: RouteRecordRaw[] = [
       roles: ['ADMIN', 'TEACHER'],
       activeMenu: '/ai/agent'
     }
+  },
+
+  // Agent 长期记忆与隐私治理 (V2.0)
+  {
+    path: '/ai/memory',
+    name: 'AIAgentMemory',
+    component: () => import('@/views/ai/memory/MemoryList.vue'),
+    meta: { title: 'Agent 长期记忆与隐私', requiresAuth: true }
   }
 ];

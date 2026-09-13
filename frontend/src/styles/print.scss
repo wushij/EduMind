@@ -1,0 +1,49 @@
+// EduMind 智教云 · 全局考务与文档打印样式规范
+// 确保在执行 window.print() 时，彻底隐藏所有系统外壳（侧边栏、顶部导航、悬浮工具、模态框等），
+// 并且释放固定视口高度，使试卷/文档以标准纸张尺寸顶格、居中、高保真渲染输出。
+
+@media print {
+  // 1. 彻底隐藏全局系统外壳、导航条、侧边栏、悬浮窗、通用按钮与非打印内容
+  .app-header,
+  .app-sidebar,
+  .global-assistant-drawer,
+  .page-hero-banner,
+  .no-print,
+  .el-overlay,
+  .el-message,
+  .el-message-box__wrapper,
+  .el-notification,
+  .el-drawer__wrapper,
+  .el-dialog__wrapper,
+  .el-popper,
+  .ai-floating-assistant {
+    display: none !important;
+  }
+
+  // 2. 破除视口高度限制与滚动条截断，让页面内容按真实文档长度自如分页
+  html,
+  body,
+  #app,
+  .app-layout,
+  .layout-body,
+  .app-content,
+  .app-content-body {
+    height: auto !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    background: #FFFFFF !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  // 3. 页面打印尺寸标准配置
+  @page {
+    size: auto;
+    margin: 8mm 12mm 8mm 12mm;
+  }
+}

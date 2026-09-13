@@ -9,6 +9,9 @@ export interface GatewayMetricsVO {
   successRate: number;
   avgLatencyMs: number;
   fallbackCount: number;
+  circuitOpenCount?: number;
+  rateLimitedCount?: number;
+  retryCount?: number;
   byProvider: GatewayProviderMetricVO[];
 }
 
