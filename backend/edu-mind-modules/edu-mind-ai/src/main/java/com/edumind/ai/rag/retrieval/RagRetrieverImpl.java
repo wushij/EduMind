@@ -1,6 +1,7 @@
 package com.edumind.ai.rag.retrieval;
 
 import com.edumind.common.api.embedding.EmbeddingApi;
+import com.edumind.common.context.TenantContext;
 import com.edumind.infrastructure.vector.VectorSearchResult;
 import com.edumind.infrastructure.vector.VectorStore;
 import com.edumind.infrastructure.vector.config.MilvusProperties;
@@ -56,6 +57,10 @@ public class RagRetrieverImpl implements RagRetriever {
         filter.put("knowledgeBaseId", knowledgeBaseId);
         if (documentId != null) {
             filter.put("documentId", documentId);
+        }
+        Long tenantId = TenantContext.getTenantId();
+        if (tenantId != null && tenantId > 0) {
+            filter.put("tenantId", tenantId);
         }
         List<VectorSearchResult> results = vectorStore.searchNearest(
                 milvusProperties.getCollection(), queryVector, topK * 2, filter);

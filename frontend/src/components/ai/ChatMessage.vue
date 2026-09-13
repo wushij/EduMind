@@ -6,7 +6,14 @@
         <img class="assistant-brand-logo" src="@/assets/images/logo.png" alt="EduMind" />
       </div>
       <div v-else class="user-avatar-circle">
-        <svg viewBox="0 0 24 24" class="user-svg" fill="currentColor">
+        <img
+          v-if="userAvatarSrc && !userAvatarBroken"
+          :src="userAvatarSrc"
+          class="user-avatar-img"
+          alt="avatar"
+          @error="userAvatarBroken = true"
+        />
+        <svg v-else viewBox="0 0 24 24" class="user-svg" fill="currentColor">
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
         </svg>
       </div>
@@ -19,58 +26,22 @@
         <span class="msg-time">{{ message.createdAt }}</span>
       </div>
 
-      <div class="msg-bubble" :class="{ 'is-streaming': message.isStreaming }">
-        <!-- 结构化分块渲染：文本块与高亮代码块 -->
-        <div class="msg-blocks-flow">
-          <template v-for="(block, idx) in parsedBlocks" :key="idx">
-            <!-- 普通文本块 (支持格式化、加粗、无序列表) -->
-            <div v-if="block.type === 'text'" class="formatted-text-block">
-              <template v-for="(line, lineIdx) in block.lines" :key="lineIdx">
-                <!-- 列表项 -->
-                <div v-if="line.startsWith('• ') || line.startsWith('- ')" class="bullet-line">
-                  <span class="bullet-dot">•</span>
-                  <span class="bullet-content" v-html="formatInlineText(line.replace(/^[•\-]\s*/, ''))"></span>
-                </div>
-                <!-- 数字序号项 -->
-                <div v-else-if="/^\d+\.\s/.test(line)" class="numbered-line">
-                  <span class="number-badge">{{ line.match(/^\d+\./)?.[0] }}</span>
-                  <span class="numbered-content" v-html="formatInlineText(line.replace(/^\d+\.\s*/, ''))"></span>
-                </div>
-                <!-- 普通段落行 -->
-                <div v-else-if="line.trim()" class="paragraph-line" v-html="formatInlineText(line)"></div>
-                <!-- 空行换行 -->
-                <div v-else class="empty-spacer-line"></div>
-              </template>
-            </div>
+      <AIThinking
+        v-if="message.role === 'assistant' && (thinkingDisplay || (message.isStreaming && !answerContent))"
+        :content="thinkingDisplay"
+        :folded="message.reasoningFolded ?? true"
+        :active="!!message.isStreaming && !!message.isReasoningActive"
+        :has-answer-body="!!answerContent"
+        :phase-message="message.streamPhaseMessage"
+        @update:folded="message.reasoningFolded = $event"
+      />
 
-            <!-- 专业代码块 (带语言标、复制代码、行号) -->
-            <div v-else-if="block.type === 'code'" class="code-snippet-box">
-              <div class="code-header-bar">
-                <div class="code-lang-tag">
-                  <span class="lang-pill">{{ block.lang || 'code' }}</span>
-                </div>
-                <button
-                  type="button"
-                  class="copy-code-action-btn"
-                  @click="copySnippet(block.code)"
-                >
-                  <el-icon class="copy-icon"><DocumentCopy /></el-icon>
-                  <span>{{ copiedSnippet === block.code ? '已复制！' : '复制代码' }}</span>
-                </button>
-              </div>
-
-              <div class="code-body-container">
-                <div class="code-gutter-col">
-                  <span v-for="n in (block.codeLines || []).length" :key="n" class="line-num">{{ n }}</span>
-                </div>
-                <pre class="code-pre-content"><code><div v-for="(codeLine, cIdx) in (block.codeLines || [])" :key="cIdx" class="code-source-line" v-html="highlightSyntax(codeLine, block.lang)"></div></code></pre>
-              </div>
-            </div>
-          </template>
-        </div>
+      <div ref="bubbleRef" class="msg-bubble" :class="{ 'is-streaming': message.isStreaming }">
+        <!-- 统一使用标准高保真 Markdown / KaTeX / Mermaid / 代码高亮解析 -->
+        <div class="markdown-body chat-md-content" v-html="renderedHtml" />
 
         <!-- 打字机闪烁光标 -->
-        <span v-if="message.isStreaming" class="stream-cursor">▋</span>
+        <span v-if="message.isStreaming && answerContent" class="stream-cursor">▋</span>
 
         <!-- 气泡底端内联时间 (对齐原型设计) -->
         <div class="bubble-timestamp-corner">
@@ -100,149 +71,131 @@
           <el-icon><Star /></el-icon>
           <span>{{ liked ? '已标记有启发' : '有启发' }}</span>
         </button>
+        <button
+          type="button"
+          class="pill-action-btn"
+          title="重新生成此回答"
+          @click="$emit('regenerate')"
+        >
+          <el-icon><RefreshRight /></el-icon>
+          <span>重新生成</span>
+        </button>
+        <button
+          type="button"
+          class="pill-action-btn pill-action-btn--danger"
+          title="删除本轮问答"
+          @click="$emit('delete')"
+        >
+          <el-icon><Delete /></el-icon>
+          <span>删除</span>
+        </button>
+      </div>
+
+      <!-- 推荐探索长条胶囊 (对标侧边栏快捷追问) -->
+      <div
+        v-if="message.role === 'assistant' && !message.isStreaming && isLast && activeFollowUps.length > 0"
+        class="message-followup-tray"
+      >
+        <div class="followup-tray-title">
+          <span class="followup-sparkle">✦</span>
+          <span>推荐继续探索：</span>
+        </div>
+        <div class="followup-pills-list">
+          <button
+            v-for="(fp, fIdx) in activeFollowUps"
+            :key="fIdx"
+            type="button"
+            class="followup-pill-btn"
+            :title="fp"
+            @click="$emit('send-prompt', fp)"
+          >
+            <span class="followup-pill-text">{{ fp }}</span>
+            <span class="followup-pill-arrow">↗</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
-import { DocumentCopy, Star } from '@element-plus/icons-vue';
+import { DocumentCopy, Star, RefreshRight, Delete } from '@element-plus/icons-vue';
 import type { ChatMessage } from '@/composables/ai/useAIStream';
 import CitationList from '@/components/knowledge/CitationList.vue';
+import AIThinking from '@/components/ai/AIChat/AIThinking.vue';
+import { splitCopilotStream } from '@/utils/ai/copilot-stream-split';
+import { renderChatMarkdown, bindMarkdownCodeCopy, renderMermaidInElement } from '@/utils/ai/chat-markdown';
+import { useAuthStore } from '@/stores/auth/auth';
+import { DEFAULT_AVATAR } from '@/constants/auth';
+import { normalizeAvatarUrl } from '@/utils/format/file';
 
-const props = defineProps<{
-  message: ChatMessage;
+const props = withDefaults(
+  defineProps<{
+    message: ChatMessage;
+    isLast?: boolean;
+    followUpPrompts?: string[];
+  }>(),
+  {
+    isLast: false,
+    followUpPrompts: () => []
+  }
+);
+
+defineEmits<{
+  (e: 'regenerate'): void;
+  (e: 'delete'): void;
+  (e: 'send-prompt', prompt: string): void;
 }>();
+
+const authStore = useAuthStore();
+const userAvatarBroken = ref(false);
+const userAvatarSrc = computed(() => {
+  const avatar = authStore.currentUser?.avatar;
+  return normalizeAvatarUrl(avatar) || DEFAULT_AVATAR;
+});
+
+const bubbleRef = ref<HTMLDivElement | null>(null);
+
+const answerContent = computed(() => splitCopilotStream(props.message.content || '').answer || props.message.content || '');
+
+const thinkingDisplay = computed(() => {
+  const native = props.message.reasoningContent?.trim();
+  if (native) return native;
+  return splitCopilotStream(props.message.content).thinking;
+});
+
+const renderedHtml = computed(() => renderChatMarkdown(answerContent.value));
+
+const activeFollowUps = computed(() => {
+  if (props.message.followUpPrompts && props.message.followUpPrompts.length > 0) {
+    return props.message.followUpPrompts;
+  }
+  return props.followUpPrompts || [];
+});
+
+function refreshMarkdownUi() {
+  nextTick(() => {
+    if (!bubbleRef.value) return;
+    bindMarkdownCodeCopy(bubbleRef.value);
+    renderMermaidInElement(bubbleRef.value);
+  });
+}
+
+watch(renderedHtml, () => refreshMarkdownUi());
+onMounted(() => refreshMarkdownUi());
 
 const liked = ref(false);
 const copyText = ref('复制全文');
-const copiedSnippet = ref('');
-
-interface Block {
-  type: 'text' | 'code';
-  lines?: string[];
-  lang?: string;
-  code?: string;
-  codeLines?: string[];
-}
-
-// 解析消息内容中的代码块和文字块
-const parsedBlocks = computed<Block[]>(() => {
-  const content = props.message.content || '';
-  if (!content.includes('```')) {
-    return [
-      {
-        type: 'text',
-        lines: content.split('\n')
-      }
-    ];
-  }
-
-  const blocks: Block[] = [];
-  const codeBlockRegex = /```([a-zA-Z0-9_\-\+\#]*)\n([\s\S]*?)(?:```|$)/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = codeBlockRegex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      const textBefore = content.slice(lastIndex, match.index);
-      if (textBefore.trim()) {
-        blocks.push({
-          type: 'text',
-          lines: textBefore.replace(/^\n+|\n+$/g, '').split('\n')
-        });
-      }
-    }
-
-    const lang = match[1]?.trim().toLowerCase() || 'java';
-    const code = match[2] || '';
-    blocks.push({
-      type: 'code',
-      lang,
-      code: code.trimEnd(),
-      codeLines: code.trimEnd().split('\n')
-    });
-
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (lastIndex < content.length) {
-    const remainingText = content.slice(lastIndex);
-    if (remainingText.trim()) {
-      blocks.push({
-        type: 'text',
-        lines: remainingText.replace(/^\n+|\n+$/g, '').split('\n')
-      });
-    }
-  }
-
-  return blocks;
-});
-
-// 行内文本格式化 (加粗、高亮关键词)
-function formatInlineText(text: string): string {
-  if (!text) return '';
-  let sanitized = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-  // **加粗**
-  sanitized = sanitized.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  // `行内代码`
-  sanitized = sanitized.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
-  return sanitized;
-}
-
-// 简单轻量语法着色器 (支持 Java / Python / JS)
-function highlightSyntax(line: string, _lang = 'java'): string {
-  if (!line) return '&nbsp;';
-  let s = line
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-
-  // 注释高亮
-  if (s.trim().startsWith('//') || s.trim().startsWith('#')) {
-    return `<span class="syntax-comment">${s}</span>`;
-  }
-
-  // 字符串高亮
-  s = s.replace(/(".*?"|'.*?'|`.*?`)/g, '<span class="syntax-string">$1</span>');
-
-  // Java/通用关键字高亮
-  const keywords = [
-    'public', 'private', 'protected', 'class', 'interface', 'extends', 'implements',
-    'void', 'int', 'String', 'boolean', 'double', 'float', 'long', 'char',
-    'return', 'new', 'this', 'super', 'if', 'else', 'for', 'while', 'switch', 'case',
-    'try', 'catch', 'finally', 'throw', 'throws', 'import', 'package', 'static', 'final'
-  ];
-  const regex = new RegExp(`\\b(${keywords.join('|')})\\b`, 'g');
-  s = s.replace(regex, '<span class="syntax-keyword">$1</span>');
-
-  return s;
-}
 
 function handleCopy() {
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(props.message.content);
+    navigator.clipboard.writeText(answerContent.value);
     copyText.value = '已复制全文！';
     ElMessage.success('已复制对话内容');
     setTimeout(() => {
       copyText.value = '复制全文';
-    }, 1500);
-  }
-}
-
-function copySnippet(code?: string) {
-  if (!code) return;
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(code);
-    copiedSnippet.value = code;
-    ElMessage.success('代码已复制到剪贴板');
-    setTimeout(() => {
-      copiedSnippet.value = '';
     }, 1500);
   }
 }
@@ -289,6 +242,14 @@ function copySnippet(code?: string) {
       align-items: center;
       justify-content: center;
       box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+      overflow: hidden;
+
+      .user-avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
 
       .user-svg {
         width: 22px;
@@ -390,6 +351,7 @@ function copySnippet(code?: string) {
       border-radius: 4px 18px 18px 18px;
       box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
       color: #1E293B;
+      overflow: hidden;
     }
   }
 
@@ -474,119 +436,283 @@ function copySnippet(code?: string) {
   }
 }
 
-// 原型同款代码块容器
-.code-snippet-box {
-  margin: 8px 0;
-  border-radius: 8px;
-  border: 1px solid #E2E8F0;
-  background: #FAFAFA;
-  overflow: hidden;
-  max-width: 100%;
-  box-sizing: border-box;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+/* 工业级 Markdown 渲染排版 */
+.chat-md-content {
+  :deep(p) {
+    margin: 8px 0;
+    &:first-child { margin-top: 0; }
+    &:last-child { margin-bottom: 0; }
+  }
 
-  .code-header-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 14px;
-    background: #F1F5F9;
-    border-bottom: 1px solid #E2E8F0;
+  :deep(strong) {
+    font-weight: 700;
+    color: #0958d9;
+  }
 
-    .code-lang-tag {
-      .lang-pill {
+  :deep(h1), :deep(h2), :deep(h3), :deep(h4) {
+    margin: 14px 0 8px;
+    color: #0f172a;
+    font-weight: 700;
+  }
+
+  :deep(h1) { font-size: 1.25em; }
+  :deep(h2) { font-size: 1.15em; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
+  :deep(h3) { font-size: 1.05em; }
+
+  :deep(ul), :deep(ol) {
+    margin: 8px 0;
+    padding-left: 1.5em;
+  }
+
+  :deep(li) {
+    margin: 4px 0;
+  }
+
+  :deep(blockquote) {
+    margin: 10px 0;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-left: 3px solid #1677ff;
+    color: #64748b;
+    border-radius: 4px;
+    font-size: 12.5px;
+  }
+
+  :deep(hr) {
+    margin: 14px 0;
+    border: none;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  /* Code Compass Copilot 同款：表格横向滑动 + 公式不被 word-break 拆碎 */
+  :deep(.katex) {
+    word-break: normal;
+    overflow-wrap: normal;
+  }
+
+  :deep(.table-wrap) {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 10px 0 12px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #fafbfc;
+    box-sizing: border-box;
+  }
+
+  :deep(.table-wrap::-webkit-scrollbar) {
+    height: 4px;
+  }
+
+  :deep(.table-wrap::-webkit-scrollbar-button) {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  :deep(table) {
+    width: 100%;
+    min-width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    line-height: 1.55;
+    table-layout: auto;
+  }
+
+  :deep(th),
+  :deep(td) {
+    border: 1px solid #e2e8f0;
+    padding: 6px 10px;
+    text-align: left;
+    vertical-align: top;
+    word-break: break-word;
+    min-width: 72px;
+  }
+
+  :deep(th) {
+    background: #f8fafc;
+    font-weight: 600;
+    color: #1677ff;
+    white-space: nowrap;
+  }
+
+  :deep(.code-block-wrapper) {
+    margin: 12px 0;
+    border-radius: 8px;
+    background: #1e1e1e;
+    overflow: hidden;
+    border: 1px solid #333333;
+
+    .code-header {
+      background: #252526;
+      padding: 6px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .code-lang {
         font-size: 11px;
+        color: #9cdcfe;
         font-weight: 700;
-        color: #64748B;
-        text-transform: lowercase;
+        text-transform: uppercase;
+      }
+
+      .code-copy-btn {
+        background: #3c3c3c;
+        color: #cccccc;
+        border: none;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 10.5px;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+          background: #505050;
+          color: #ffffff;
+        }
+
+        &.is-copied {
+          background: #52c41a;
+          color: #ffffff;
+        }
       }
     }
 
-    .copy-code-action-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 2px 8px;
-      border-radius: 6px;
-      border: 1px solid #CBD5E1;
-      background: #FFFFFF;
-      font-size: 11px;
-      color: #475569;
-      cursor: pointer;
-      transition: all 0.2s ease;
+    pre {
+      margin: 0;
+      padding: 10px 12px;
+      overflow-x: auto;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+  }
 
-      .copy-icon {
-        font-size: 12px;
+  /* Mermaid 图谱容器排版 */
+  :deep(.mermaid-diagram-wrapper) {
+    margin: 14px 0;
+    border-radius: 10px;
+    border: 1px solid rgba(22, 119, 255, 0.22);
+    background: #fdfdfd;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+
+    .mermaid-header {
+      background: #f0f7ff;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #1677ff;
+      border-bottom: 1px solid rgba(22, 119, 255, 0.15);
+    }
+
+    .mermaid-diagram {
+      padding: 14px 10px;
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+
+      svg {
+        max-width: 100%;
+        height: auto;
       }
 
-      &:hover {
-        color: #1677FF;
-        border-color: #93C5FD;
-        background: #EFF6FF;
+      .mermaid-loading {
+        color: #8c8c8c;
+        font-size: 12px;
       }
     }
   }
 
-  .code-body-container {
-    display: flex;
-    font-family: 'Fira Code', Consolas, Monaco, monospace;
-    font-size: 12.5px;
-    line-height: 1.65;
-    padding: 10px 0;
-    overflow-x: auto;
+  :deep(.math-fallback) {
+    font-family: 'Fira Code', Consolas, monospace;
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  :deep(img) {
     max-width: 100%;
-    box-sizing: border-box;
-
-    .code-gutter-col {
-      display: flex;
-      flex-direction: column;
-      padding: 0 10px;
-      border-right: 1px solid #E2E8F0;
-      user-select: none;
-      text-align: right;
-      flex-shrink: 0;
-
-      .line-num {
-        color: #94A3B8;
-        font-size: 11.5px;
-      }
-    }
-
-    .code-pre-content {
-      margin: 0;
-      padding: 0 14px;
-      flex: 1;
-      min-width: 0;
-      overflow-x: auto;
-
-      code {
-        font-family: inherit;
-      }
-
-      .code-source-line {
-        white-space: pre-wrap;
-        word-break: break-word;
-
-        :deep(.syntax-keyword) {
-          color: #7C3AED;
-          font-weight: 600;
-        }
-
-        :deep(.syntax-string) {
-          color: #059669;
-        }
-
-        :deep(.syntax-comment) {
-          color: #94A3B8;
-          font-style: italic;
-        }
-      }
-    }
+    height: auto;
+    border-radius: 8px;
+    margin: 10px 0;
+    display: block;
   }
 }
 
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+.pill-action-btn--danger:hover {
+  background: rgba(239, 68, 68, 0.08) !important;
+  color: #ef4444 !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+}
+
+/* 推荐探索长条胶囊 */
+.message-followup-tray {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(22, 119, 255, 0.04);
+  border: 1px dashed rgba(22, 119, 255, 0.25);
+
+  .followup-tray-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #1677ff;
+    margin-bottom: 8px;
+
+    .followup-sparkle {
+      font-size: 13px;
+    }
+  }
+
+  .followup-pills-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .followup-pill-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 12px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid rgba(22, 119, 255, 0.16);
+    color: #334155;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    text-align: left;
+
+    &:hover {
+      background: #eff6ff;
+      border-color: #1677ff;
+      color: #1677ff;
+      transform: translateX(2px);
+    }
+
+    .followup-pill-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .followup-pill-arrow {
+      color: #94a3b8;
+      font-size: 12px;
+      margin-left: 8px;
+      flex-shrink: 0;
+    }
+  }
 }
 </style>

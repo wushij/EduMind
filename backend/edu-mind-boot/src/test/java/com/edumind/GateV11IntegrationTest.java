@@ -13,6 +13,7 @@ import com.edumind.ai.service.assistant.GlobalAssistantService;
 import com.edumind.ai.service.question.SmartPaperComposeService;
 import com.edumind.ai.vo.agent.AgentRunVO;
 import com.edumind.ai.vo.question.SmartPaperComposeVO;
+import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.common.model.LoginUser;
 import com.edumind.common.model.UserContext;
@@ -84,12 +85,14 @@ public class GateV11IntegrationTest {
     void setUp() {
         LoginUser user = LoginUser.builder().id(2L).username("teacher").build();
         UserContext.set(user);
+        TenantContext.setTenantId(1L);
         // 依赖 migration + R__gate_h_e2e_seed.sql 初始化，禁止 DROP 生产/共享表
     }
 
     @AfterEach
     void tearDown() {
         UserContext.clear();
+        TenantContext.clear();
     }
 
     @Test

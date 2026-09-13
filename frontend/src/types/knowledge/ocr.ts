@@ -1,13 +1,18 @@
 export interface OcrPageVO {
   id: number;
   taskId: number;
-  pageNumber: number;
-  imageUrl: string;
+  pageNo?: number;
+  pageNumber?: number;
+  imageUrl?: string;
+  rawText?: string;
   rawOcrText?: string;
   proofreadText?: string;
   formulaLatex?: string;
+  blocksJson?: string;
   boundingBoxesJson?: string;
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  confidenceScore?: number;
+  proofreadStatus?: boolean;
+  status?: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 }
 
 export interface OcrTaskVO {

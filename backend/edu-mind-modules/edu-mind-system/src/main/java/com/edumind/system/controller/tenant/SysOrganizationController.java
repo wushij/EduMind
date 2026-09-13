@@ -7,6 +7,7 @@ import com.edumind.common.context.TenantContext;
 import com.edumind.system.dto.tenant.OrgCreateDTO;
 import com.edumind.system.dto.tenant.OrgUpdateDTO;
 import com.edumind.system.service.SysOrganizationService;
+import com.edumind.system.vo.tenant.OrganizationMemberVO;
 import com.edumind.system.vo.tenant.OrganizationNodeVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,13 @@ public class SysOrganizationController {
     public ApiResult<List<OrganizationNodeVO>> getTree() {
         Long tenantId = TenantContext.requireTenantId();
         return ApiResult.success(sysOrganizationService.getTree(tenantId));
+    }
+
+    @GetMapping("/{id}/members")
+    @SaCheckPermission(value = {"system:organization:list", "system:organization:view", "system:user:view"}, mode = SaMode.OR)
+    public ApiResult<List<OrganizationMemberVO>> getOrgMembers(@PathVariable("id") Long id) {
+        Long tenantId = TenantContext.requireTenantId();
+        return ApiResult.success(sysOrganizationService.getOrgMembers(tenantId, id));
     }
 
     @PostMapping

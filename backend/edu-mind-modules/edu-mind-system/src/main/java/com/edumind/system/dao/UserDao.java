@@ -65,4 +65,11 @@ public class UserDao {
         wrapper.orderByDesc(UserEntity::getCreateTime);
         return userMapper.selectPage(page, wrapper);
     }
+
+    public java.util.List<UserEntity> listAllActive() {
+        return userMapper.selectList(new LambdaQueryWrapper<UserEntity>()
+                .eq(UserEntity::getStatus, "1")
+                .orderByAsc(UserEntity::getId)
+                .last("LIMIT 100"));
+    }
 }

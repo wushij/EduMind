@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 public class KnowledgeBaseEntity implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private String name;
     private String description;
     private Long courseId;
@@ -24,4 +25,12 @@ public class KnowledgeBaseEntity implements Serializable {
     private Integer status;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+
+    public Long getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(Long tenantId) {
+        this.tenantId = tenantId;
+    }
 }

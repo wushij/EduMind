@@ -1,6 +1,7 @@
 package com.edumind.ai.dao;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.edumind.common.context.TenantContext;
 import com.edumind.ai.entity.ConversationEntity;
 import com.edumind.ai.mapper.ConversationMapper;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,9 @@ public class ConversationDao {
     }
 
     public int insert(ConversationEntity entity) {
+        if (entity.getTenantId() == null && TenantContext.getTenantId() != null && TenantContext.getTenantId() > 0) {
+            entity.setTenantId(TenantContext.getTenantId());
+        }
         return conversationMapper.insert(entity);
     }
 

@@ -57,4 +57,53 @@ public class SysConfigConverter {
             target.setPassword(dto.getPassword().trim());
         }
     }
+
+    public com.edumind.system.vo.config.SmsLogVO toSmsLogVO(com.edumind.system.entity.SysSmsLogEntity entity) {
+        if (entity == null) {
+            return null;
+        }
+        return com.edumind.system.vo.config.SmsLogVO.builder()
+                .id(entity.getId())
+                .phone(entity.getPhone())
+                .content(entity.getContent())
+                .smsType(entity.getSmsType())
+                .templateId(entity.getTemplateId())
+                .provider(entity.getProvider())
+                .status(entity.getStatus())
+                .resultMsg(entity.getResultMsg())
+                .bizId(entity.getBizId())
+                .sendTime(entity.getSendTime())
+                .createTime(entity.getCreateTime())
+                .build();
+    }
+
+    public com.edumind.system.vo.config.EmailLogVO toEmailLogVO(com.edumind.system.entity.SysEmailLogEntity entity) {
+        if (entity == null) {
+            return null;
+        }
+        return com.edumind.system.vo.config.EmailLogVO.builder()
+                .id(entity.getId())
+                .email(entity.getEmail())
+                .subject(entity.getSubject())
+                .content(entity.getContent())
+                .scene(entity.getScene())
+                .provider(entity.getProvider())
+                .status(entity.getStatus())
+                .resultMsg(entity.getResultMsg())
+                .ip(entity.getIp())
+                .createTime(entity.getCreateTime())
+                .build();
+    }
+
+    public com.edumind.system.vo.config.SysConfigGroupVO toGroupVO(com.edumind.system.entity.SysConfigEntity entity) {
+        if (entity == null) {
+            return null;
+        }
+        return com.edumind.system.vo.config.SysConfigGroupVO.builder()
+                .groupCode(entity.getConfigGroup())
+                .groupName(entity.getConfigName())
+                .configValue(entity.getConfigValue())
+                .remark(entity.getRemark())
+                .build();
+    }
 }

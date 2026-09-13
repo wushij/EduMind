@@ -6,7 +6,6 @@
       maxlength="6"
       size="large"
       class="captcha-input"
-      :prefix-icon="Key"
       @update:model-value="$emit('update:modelValue', $event)"
       @keyup.enter="$emit('enter')"
     />
@@ -23,8 +22,6 @@
 </template>
 
 <script setup lang="ts">
-import { Key } from '@element-plus/icons-vue';
-
 defineProps<{
   modelValue: string;
   captchaImg: string;

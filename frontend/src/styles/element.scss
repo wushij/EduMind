@@ -1,18 +1,25 @@
 // ==========================================
-// EduMind Capsule Design System - Element Plus 深度定制
-// 严格对齐登录页面输入框与按钮的长圆跑道美学 (border-radius: 9999px)
+// EduMind Capsule Design System - Element Plus 视觉规范
+// 统一长圆胶囊边框 (border-radius: 999px)、防畸变步进器与现代微边框
 // ==========================================
 
-// 1. 全局长圆按钮 (Buttons)
+:root {
+  --admin-radius-sm: 999px;
+  --admin-radius-md: 999px;
+  --admin-radius-lg: 14px;
+  --el-border-radius-base: 999px;
+  --el-border-radius-small: 999px;
+}
+
+// 1. 按钮 (Buttons) - 全局长圆胶囊按钮
 .el-button {
   font-weight: 500;
-  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
-  // 普通实体按钮全部采用长圆胶囊形态
-  &:not(.is-link):not(.is-text):not(.el-button--text) {
-    border-radius: 9999px !important;
-    padding-left: 20px;
-    padding-right: 20px;
+  &:not(.is-link):not(.is-text) {
+    border-radius: 999px !important;
+    padding-left: 18px;
+    padding-right: 18px;
 
     &.el-button--small {
       padding-left: 14px;
@@ -20,151 +27,337 @@
     }
 
     &.el-button--large {
-      padding-left: 26px;
-      padding-right: 26px;
+      padding-left: 24px;
+      padding-right: 24px;
     }
   }
 
+  &.is-circle {
+    border-radius: 50% !important;
+    padding: 8px !important;
+  }
+
   &--primary:not(.is-link):not(.is-text):not(.is-plain) {
-    --el-button-text-color: #FFFFFF;
-    --el-button-bg-color: #1677FF;
-    --el-button-border-color: #1677FF;
-    --el-button-hover-bg-color: #4096FF;
-    --el-button-hover-border-color: #4096FF;
-    --el-button-hover-text-color: #FFFFFF;
-    --el-button-active-bg-color: #0958D9;
-    --el-button-active-border-color: #0958D9;
-    --el-button-active-text-color: #FFFFFF;
-    color: #FFFFFF !important;
-    box-shadow: 0 2px 6px rgba(22, 119, 255, 0.2);
+    --el-button-text-color: #ffffff;
+    --el-button-bg-color: #1677ff;
+    --el-button-border-color: #1677ff;
+    --el-button-hover-bg-color: #4096ff;
+    --el-button-hover-border-color: #4096ff;
+    --el-button-hover-text-color: #ffffff;
+    --el-button-active-bg-color: #0958d9;
+    --el-button-active-border-color: #0958d9;
+    color: #ffffff !important;
+    box-shadow: 0 1px 3px rgba(22, 119, 255, 0.2);
 
     .el-icon {
-      color: #FFFFFF !important;
+      color: #ffffff !important;
     }
 
     &:hover:not(.is-disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(22, 119, 255, 0.32);
-    }
-
-    &:active:not(.is-disabled) {
-      transform: translateY(0);
+      box-shadow: 0 4px 12px rgba(22, 119, 255, 0.28);
     }
   }
 
   &--primary.is-plain {
-    --el-button-bg-color: #EFF6FF;
-    --el-button-border-color: #BFDBFE;
-    --el-button-text-color: #1677FF;
-    --el-button-hover-bg-color: #1677FF;
-    --el-button-hover-border-color: #1677FF;
-    --el-button-hover-text-color: #FFFFFF;
-    color: #1677FF;
+    --el-button-bg-color: #eff6ff;
+    --el-button-border-color: #bfdbfe;
+    --el-button-text-color: #1677ff;
+    --el-button-hover-bg-color: #1677ff;
+    --el-button-hover-border-color: #1677ff;
+    --el-button-hover-text-color: #ffffff;
+    color: #1677ff;
 
     &:hover:not(.is-disabled) {
-      color: #FFFFFF !important;
-      background-color: #1677FF !important;
-      border-color: #1677FF !important;
+      color: #ffffff !important;
+      background-color: #1677ff !important;
+      border-color: #1677ff !important;
 
       .el-icon {
-        color: #FFFFFF !important;
+        color: #ffffff !important;
       }
     }
   }
 
   &--default:not(.is-link):not(.is-text) {
-    border: 1px solid #E2E8F0;
+    border: 1px solid #e2e8f0;
     color: #475569;
-    background: #FFFFFF;
+    background: #ffffff;
 
     &:hover:not(.is-disabled) {
-      color: #1677FF;
-      border-color: #93C5FD;
-      background: #F0F7FF;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(30, 80, 150, 0.08);
+      color: #1677ff;
+      border-color: #93c5fd;
+      background: #f0f7ff;
     }
-  }
-
-  // 纯圆图标按钮
-  &.is-circle {
-    padding: 8px !important;
-    border-radius: 50% !important;
   }
 }
 
-// 2. 全局长圆输入框 (Inputs) - 1:1 复刻登录页面输入框质感
+// 2. 输入框 (Inputs) - 全局长圆跑道边框
 .el-input {
-  --el-input-hover-border-color: #CBD5E1;
-  --el-input-focus-border-color: #1677FF;
+  --el-input-hover-border-color: #93c5fd;
+  --el-input-focus-border-color: #1677ff;
 
   .el-input__wrapper {
-    border-radius: 9999px !important; // 长圆跑道胶囊
-    background-color: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    box-shadow: none !important;
-    padding: 4px 18px !important;
-    transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 999px !important;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 1px #dcdfe6 inset !important;
+    padding: 2px 16px !important;
+    transition: all 0.2s ease;
 
     &:hover {
-      border-color: #CBD5E1;
+      box-shadow: 0 0 0 1px #93c5fd inset !important;
     }
 
     &.is-focus {
-      border-color: #1677FF !important;
-      box-shadow: 0 0 0 2.5px rgba(22, 119, 255, 0.16) !important;
+      box-shadow: 0 0 0 1px #1677ff inset, 0 0 0 3px rgba(22, 119, 255, 0.12) !important;
     }
 
     .el-input__inner {
-      color: #1E293B;
+      color: #1e293b;
       font-size: 14px;
 
       &::placeholder {
-        color: #94A3B8;
+        color: #94a3b8;
         font-size: 13.5px;
       }
     }
   }
 
-  // 尺寸变体
   &--large .el-input__wrapper {
-    height: 46px;
-    padding: 0 22px !important;
+    height: 42px;
+    padding: 0 20px !important;
   }
 
   &--small .el-input__wrapper {
-    height: 32px;
-    padding: 0 14px !important;
+    height: 28px;
+    padding: 0 12px !important;
   }
 }
 
-// 3. 全局长圆下拉选择器 (Selects)
-.el-select {
-  .el-select__wrapper {
-    border-radius: 9999px !important;
-    border: 1px solid #E2E8F0;
-    background-color: #FFFFFF;
-    box-shadow: none !important;
-    padding: 4px 18px !important;
-    transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+// 解决 Chrome / Edge 浏览器 autofill 导致内层背景色畸变及样式溢出
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #1e293b !important;
+  transition: background-color 5000s ease-in-out 0s;
+  border-radius: 999px !important;
+}
+
+// 前缀与后缀插槽长圆处理
+.el-input-group {
+  .el-input-group__prepend {
+    border-radius: 999px 0 0 999px !important;
+    background-color: #f8fafc;
+    border-color: #dcdfe6;
+  }
+  .el-input-group__append {
+    border-radius: 0 999px 999px 0 !important;
+    background-color: #f8fafc;
+    border-color: #dcdfe6;
+  }
+  &.el-input-group--prepend .el-input__wrapper {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+  }
+  &.el-input-group--append .el-input__wrapper {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+  }
+}
+
+// 3. 文本域 (Textarea) - 多行文本采用圆润边框
+.el-textarea {
+  .el-textarea__inner {
+    border-radius: 18px !important;
+    box-shadow: 0 0 0 1px #dcdfe6 inset !important;
+    padding: 12px 18px !important;
+    color: #1e293b;
+    font-size: 14px;
+    transition: all 0.2s ease;
 
     &:hover {
-      border-color: #CBD5E1;
+      box-shadow: 0 0 0 1px #93c5fd inset !important;
+    }
+
+    &:focus {
+      box-shadow: 0 0 0 1px #1677ff inset, 0 0 0 3px rgba(22, 119, 255, 0.12) !important;
+    }
+  }
+}
+
+// 4. 下拉选择器 (Selects) - 全局长圆跑道边框
+.el-select {
+  .el-select__wrapper {
+    border-radius: 999px !important;
+    box-shadow: 0 0 0 1px #dcdfe6 inset !important;
+    background-color: #ffffff;
+    padding: 2px 16px !important;
+    transition: all 0.2s ease;
+
+    &:hover {
+      box-shadow: 0 0 0 1px #93c5fd inset !important;
     }
 
     &.is-focused {
-      border-color: #1677FF !important;
-      box-shadow: 0 0 0 2.5px rgba(22, 119, 255, 0.16) !important;
+      box-shadow: 0 0 0 1px #1677ff inset, 0 0 0 3px rgba(22, 119, 255, 0.12) !important;
     }
   }
 }
 
-// 4. 全局长圆药丸标签 (Tags)
+// 5. 数字步进器 (Input Number) - 长圆胶囊外框 + 精致非畸变加减按钮
+.el-input-number {
+  border-radius: 999px !important;
+  overflow: hidden !important;
+  border: 1px solid #dcdfe6 !important;
+  background-color: #ffffff !important;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  position: relative;
+
+  &:hover {
+    border-color: #93c5fd !important;
+  }
+
+  &.is-focus,
+  &:focus-within {
+    border-color: #1677ff !important;
+    box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12) !important;
+  }
+
+  .el-input {
+    display: block;
+    width: 100%;
+
+    .el-input__wrapper {
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      padding: 0 8px !important;
+
+      &:hover,
+      &.is-focus {
+        box-shadow: none !important;
+      }
+
+      .el-input__inner {
+        text-align: center;
+        font-weight: 500;
+        color: #1e293b;
+      }
+    }
+  }
+
+  // 步进按钮通用
+  .el-input-number__decrease,
+  .el-input-number__increase {
+    width: 32px !important;
+    background-color: #f8fafc !important;
+    color: #64748b !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s ease;
+    border: none !important;
+
+    .el-icon {
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    &:hover:not(.is-disabled) {
+      color: #1677ff !important;
+      background-color: #eff6ff !important;
+    }
+
+    &:active:not(.is-disabled) {
+      color: #0958d9 !important;
+      background-color: #dbeafe !important;
+    }
+
+    &.is-disabled {
+      color: #cbd5e1 !important;
+      background-color: #f8fafc !important;
+      cursor: not-allowed;
+    }
+  }
+
+  // 1) 左右两端布局：左减、右加
+  &:not(.is-controls-right) {
+    .el-input-number__decrease {
+      border-right: 1px solid #e2e8f0 !important;
+      border-radius: 999px 0 0 999px !important;
+      left: 0;
+      top: 0;
+      bottom: 0;
+    }
+
+    .el-input-number__increase {
+      border-left: 1px solid #e2e8f0 !important;
+      border-radius: 0 999px 999px 0 !important;
+      right: 0;
+      top: 0;
+      bottom: 0;
+    }
+
+    .el-input__wrapper {
+      padding-left: 36px !important;
+      padding-right: 36px !important;
+    }
+  }
+
+  // 2) 右侧上下堆叠布局（controls-position="right"）
+  &.is-controls-right {
+    .el-input__wrapper {
+      padding-left: 14px !important;
+      padding-right: 36px !important;
+
+      .el-input__inner {
+        text-align: left !important;
+      }
+    }
+
+    .el-input-number__decrease,
+    .el-input-number__increase {
+      right: 0;
+      width: 32px !important;
+      border-left: 1px solid #e2e8f0 !important;
+    }
+
+    .el-input-number__increase {
+      top: 0;
+      height: 50% !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+      border-radius: 0 999px 0 0 !important;
+    }
+
+    .el-input-number__decrease {
+      bottom: 0;
+      height: 50% !important;
+      border-radius: 0 0 999px 0 !important;
+    }
+  }
+}
+
+// 6. 单选按钮组 (Radio Button Group) - 两端长圆胶囊
+.el-radio-group {
+  .el-radio-button:first-child .el-radio-button__inner {
+    border-radius: 999px 0 0 999px !important;
+  }
+
+  .el-radio-button:last-child .el-radio-button__inner {
+    border-radius: 0 999px 999px 0 !important;
+  }
+}
+
+// 7. 标签 (Tags) - 长圆药丸
 .el-tag {
-  border-radius: 9999px !important; // 胶囊药丸造型
+  border-radius: 999px !important;
   padding: 0 12px;
   font-weight: 500;
-  letter-spacing: 0.2px;
 
   &--small {
     padding: 0 8px;
@@ -173,181 +366,82 @@
   }
 }
 
-// 5. 大圆角卡片 (Cards) - 外方内圆，呼吸科技感
-.el-card {
-  border-radius: 16px;
-  border: 1px solid #EBF1F7;
-  background: #FFFFFF;
-  box-shadow: 0 4px 20px rgba(30, 80, 150, 0.05);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+// 8. 折叠面板 (Collapse) - 圆润清爽
+.el-collapse {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
 
-  &.is-hover-shadow:hover {
-    box-shadow: 0 10px 30px rgba(30, 80, 150, 0.1);
-    transform: translateY(-2px);
+  .el-collapse-item__header {
+    padding: 0 16px;
+    font-weight: 600;
+    font-size: 14px;
+    color: #1e293b;
+  }
+
+  .el-collapse-item__content {
+    padding: 16px 20px;
   }
 }
 
-// 6. 分页器 (Pagination)
+// 9. 卡片 (Cards)
+.el-card {
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: none;
+  transition: all 0.2s ease;
+}
+
+// 10. 分页器 (Pagination)
 .el-pagination {
   .el-pager li,
   .btn-prev,
   .btn-next {
-    border-radius: 9999px !important;
-    border: 1px solid transparent;
+    border-radius: 999px !important;
     transition: all 0.2s;
 
     &:hover {
-      color: #1677FF;
-      border-color: #DBEAFE;
-      background: #EFF6FF;
+      color: #1677ff;
+      background: #eff6ff;
     }
 
     &.is-active {
-      background: #1677FF !important;
-      color: #FFFFFF !important;
+      background: #1677ff !important;
+      color: #ffffff !important;
       font-weight: 600;
-      box-shadow: 0 2px 8px rgba(22, 119, 255, 0.3);
     }
   }
 }
 
-// 7. 弹窗 (Dialog)
+// 11. 弹窗 (Dialog)
 .el-dialog {
-  border-radius: 20px !important;
+  border-radius: 16px !important;
   overflow: hidden;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.15);
 
   .el-dialog__header {
     margin-right: 0;
-    padding: 20px 24px;
-    border-bottom: 1px solid #F1F5F9;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f1f5f9;
 
     .el-dialog__title {
       font-weight: 600;
-      color: #0F172A;
+      color: #0f172a;
     }
   }
 
   .el-dialog__body {
-    padding: 24px;
+    padding: 20px;
   }
 
   .el-dialog__footer {
-    padding: 16px 24px;
-    border-top: 1px solid #F1F5F9;
-    background: #F8FAFC;
+    padding: 14px 20px;
+    border-top: 1px solid #f1f5f9;
+    background: #f8fafc;
   }
 }
 
-// 8. 全局长圆单选胶囊组 (Radio Button Group)
-.el-radio-group {
-  .el-radio-button {
-    .el-radio-button__inner {
-      border-radius: 9999px !important;
-      border: 1px solid #E2E8F0 !important;
-      background: #FFFFFF;
-      color: #64748B;
-      font-size: 13px;
-      padding: 7px 18px;
-      box-shadow: none !important;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      margin-right: 6px;
-
-      &:hover {
-        color: #1677FF;
-        border-color: #93C5FD !important;
-        background: #F0F7FF;
-      }
-    }
-
-    &:last-child .el-radio-button__inner {
-      margin-right: 0;
-    }
-
-    &.is-active .el-radio-button__inner {
-      background: #1677FF !important;
-      border-color: #1677FF !important;
-      color: #FFFFFF !important;
-      font-weight: 600;
-      box-shadow: 0 2px 8px rgba(22, 119, 255, 0.28) !important;
-    }
-  }
+// 12. 警告提示 (Alert)
+.el-alert {
+  border-radius: 10px !important;
 }
-
-// 9. 全局长圆数字步进器 (Input Number)
-.el-input-number {
-  border-radius: 9999px !important;
-
-  .el-input__wrapper {
-    border-radius: 9999px !important;
-  }
-
-  .el-input-number__decrease,
-  .el-input-number__increase {
-    border: none !important;
-    background: #F1F5F9 !important;
-    color: #475569 !important;
-    transition: all 0.2s;
-
-    &:hover:not(.is-disabled) {
-      background: #E2E8F0 !important;
-      color: #1677FF !important;
-    }
-  }
-
-  // 默认布局：左右圆形加减按钮
-  &:not(.is-controls-right) {
-    .el-input-number__decrease,
-    .el-input-number__increase {
-      border-radius: 50% !important;
-      width: 24px !important;
-      height: 24px !important;
-      top: 50% !important;
-      transform: translateY(-50%) !important;
-    }
-
-    .el-input-number__decrease {
-      left: 4px !important;
-      right: auto !important;
-    }
-
-    .el-input-number__increase {
-      right: 4px !important;
-      left: auto !important;
-    }
-  }
-
-  // 右侧上下堆叠布局（controls-position="right"）
-  &.is-controls-right {
-    .el-input__wrapper {
-      padding-right: 42px !important;
-    }
-
-    .el-input-number__decrease,
-    .el-input-number__increase {
-      left: auto !important;
-      right: 4px !important;
-      width: 32px !important;
-      height: calc(50% - 2px) !important;
-      transform: none !important;
-      border-radius: 0 !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-    }
-
-    .el-input-number__increase {
-      top: 1px !important;
-      bottom: auto !important;
-      border-bottom: 1px solid #E2E8F0 !important;
-      border-radius: 0 12px 0 0 !important;
-    }
-
-    .el-input-number__decrease {
-      top: auto !important;
-      bottom: 1px !important;
-      border-radius: 0 0 12px 0 !important;
-    }
-  }
-}
-

@@ -3,7 +3,7 @@ import { getAITools } from '@/api/ai/tools';
 import { AITool } from '@/types/ai/tool';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_AI_TOOLS } from '@/mock/ai-tools';
-import type { IconTheme } from '@/components/common/ColorIcon.vue';
+import type { IconTheme } from '@/types/common/icon';
 
 // 专属色彩与图标配置表 (让每个 AI 工具都具有鲜明的视觉标识，告别单一重复)
 interface ToolStyleConfig {

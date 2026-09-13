@@ -8,9 +8,10 @@
   opacity: 0;
 }
 
-// 路由切换：仅入场动画，避免 out-in 导致内容区高度塌陷抖动
-.page-switch-enter-active {
-  transition: opacity 0.22s ease, transform 0.22s ease;
+// 路由切换：先离场再入场，避免两页同屏叠层闪烁
+.page-switch-enter-active,
+.page-switch-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
 .page-switch-enter-from {
@@ -18,8 +19,9 @@
   transform: translateY(8px);
 }
 
-.page-switch-leave-active {
-  display: none;
+.page-switch-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 @keyframes em-page-in {

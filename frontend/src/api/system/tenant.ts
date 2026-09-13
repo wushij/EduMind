@@ -8,6 +8,7 @@ import type {
   OrganizationNodeVO,
   OrgCreateRequest,
   OrgUpdateRequest,
+  OrganizationMemberVO,
   TenantQuotaVO,
   QuotaUpdateRequest
 } from '@/types/system/tenant';
@@ -59,6 +60,10 @@ export function updateOrgNode(id: number, data: OrgUpdateRequest): Promise<ApiRe
 
 export function deleteOrgNode(id: number): Promise<ApiResponse<void>> {
   return del<void>(`/system/organizations/${id}`);
+}
+
+export function getOrgMembers(id: number): Promise<ApiResponse<OrganizationMemberVO[]>> {
+  return get<OrganizationMemberVO[]>(`/system/organizations/${id}/members`, undefined, { silent: true });
 }
 
 // ===== 租户配额管控 =====

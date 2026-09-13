@@ -290,7 +290,7 @@
                 maxlength="6"
                 size="large"
                 placeholder="请输入 6 位验证码"
-                :prefix-icon="Key"
+                :prefix-icon="Message"
                 class="code-input"
               />
               <EmailCodeBtn
@@ -334,7 +334,6 @@ import {
   Cpu,
   Lightning,
   Message,
-  Key,
   InfoFilled,
   Camera
 } from '@element-plus/icons-vue';

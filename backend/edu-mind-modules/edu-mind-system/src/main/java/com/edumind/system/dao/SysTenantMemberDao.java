@@ -26,6 +26,15 @@ public class SysTenantMemberDao {
                 .eq(SysTenantMemberEntity::getUserId, userId));
     }
 
+    public List<SysTenantMemberEntity> listByIds(Long tenantId, List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return sysTenantMemberMapper.selectList(new LambdaQueryWrapper<SysTenantMemberEntity>()
+                .eq(SysTenantMemberEntity::getTenantId, tenantId)
+                .in(SysTenantMemberEntity::getId, ids));
+    }
+
     public int insert(SysTenantMemberEntity entity) {
         return sysTenantMemberMapper.insert(entity);
     }

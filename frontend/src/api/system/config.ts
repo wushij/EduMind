@@ -28,3 +28,38 @@ export const updateSecurityConfig = (data: SecurityConfigDTO) => put<void>('/sys
 
 export const getBaseInfo = () => get<Record<string, any>>('/system/configs/base');
 
+// 12 大通用配置分组 API
+export const getConfigGroups = () => get<any[]>('/system/configs/groups');
+
+export const getConfigGroup = (groupCode: string) =>
+  get<{ groupCode: string; groupName: string; configValue: string; remark?: string }>(
+    `/system/configs/groups/${groupCode}`
+  );
+
+export const updateConfigGroup = (groupCode: string, configValue: string) =>
+  put<void>(`/system/configs/groups/${groupCode}`, { configValue });
+
+export const testSms = (data: { phone: string; templateCode?: string }) =>
+  post<boolean>('/system/configs/test-sms', data);
+
+export const getRecentSmsLogs = (limit = 5) =>
+  get<any[]>('/system/configs/sms-logs/recent', { limit });
+
+export const getSmsLogs = (params: { page?: number; size?: number; phone?: string; status?: number }) =>
+  get<{ total: number; list: any[] }>('/system/configs/sms-logs', params);
+
+export const testPayment = (data: { type: 'wechat' | 'alipay' }) =>
+  post<Record<string, string>>('/system/configs/test-payment', data);
+
+export const getRecentEmailLogs = (limit = 5) =>
+  get<any[]>('/system/configs/email-logs/recent', { limit });
+
+export const getEmailLogs = (params: { page?: number; size?: number; email?: string; status?: number }) =>
+  get<{ total: number; list: any[] }>('/system/configs/email-logs', params);
+
+export const getRoleOptions = () =>
+  get<any[]>('/system/configs/role-options');
+
+export const getUserOptions = () =>
+  get<any[]>('/system/configs/user-options');
+

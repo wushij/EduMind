@@ -6,16 +6,23 @@ import com.edumind.common.exception.BusinessException;
 import com.edumind.system.api.OrganizationQueryApi;
 import com.edumind.system.dao.SysMemberOrgDao;
 import com.edumind.system.dao.SysOrganizationDao;
+import com.edumind.system.dao.SysTenantMemberDao;
+import com.edumind.system.dao.UserDao;
 import com.edumind.system.entity.SysMemberOrgEntity;
 import com.edumind.system.entity.SysOrganizationEntity;
+import com.edumind.system.entity.SysTenantMemberEntity;
+import com.edumind.system.entity.UserEntity;
 import com.edumind.system.service.SysOrganizationService;
+import com.edumind.system.vo.tenant.OrganizationMemberVO;
 import com.edumind.system.vo.tenant.OrganizationNodeVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,14 +35,78 @@ public class SysOrganizationServiceImpl implements SysOrganizationService, Organ
 
     private final SysOrganizationDao sysOrganizationDao;
     private final SysMemberOrgDao sysMemberOrgDao;
+    private final SysTenantMemberDao sysTenantMemberDao;
+    private final UserDao userDao;
+
+    private Long resolveAndVerifyTenantId(Long explicitTenantId) {
+        Long currentTenantId = TenantContext.requireTenantId();
+        if (explicitTenantId != null && !explicitTenantId.equals(currentTenantId)) {
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权访问其他学校组织架构");
+        }
+        return currentTenantId;
+    }
 
     @Override
     public List<OrganizationNodeVO> getTree(Long tenantId) {
-        if (tenantId == null) {
-            tenantId = TenantContext.requireTenantId();
+        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
+        List<SysOrganizationEntity> entities = sysOrganizationDao.listByTenantId(resolvedTenantId);
+        return buildTree(entities, resolvedTenantId);
+    }
+
+    @Override
+    public List<OrganizationMemberVO> getOrgMembers(Long tenantId, Long orgId) {
+        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
+        SysOrganizationEntity org = sysOrganizationDao.findByIdAndTenantId(orgId, resolvedTenantId);
+        if (org == null) {
+            return Collections.emptyList();
         }
-        List<SysOrganizationEntity> entities = sysOrganizationDao.listByTenantId(tenantId);
-        return buildTree(entities, tenantId);
+
+        List<SysMemberOrgEntity> relations = sysMemberOrgDao.listByOrgId(resolvedTenantId, orgId);
+        if (CollectionUtils.isEmpty(relations)) {
+            return Collections.emptyList();
+        }
+
+        Map<Long, String> roleTypeByMemberId = relations.stream()
+                .collect(Collectors.toMap(
+                        SysMemberOrgEntity::getMemberId,
+                        SysMemberOrgEntity::getRoleType,
+                        (left, right) -> left));
+
+        List<Long> memberIds = relations.stream()
+                .map(SysMemberOrgEntity::getMemberId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        List<SysTenantMemberEntity> members = sysTenantMemberDao.listByIds(tenantId, memberIds);
+        return members.stream().map(member -> {
+            UserEntity user = userDao.findById(member.getUserId());
+            String displayName = member.getRealName() != null ? member.getRealName() : "学员 " + member.getUserId();
+            String avatar = user != null && user.getAvatar() != null && !user.getAvatar().isBlank()
+                    ? user.getAvatar()
+                    : "https://api.dicebear.com/7.x/avataaars/svg?seed=" + displayName;
+            return OrganizationMemberVO.builder()
+                    .id(member.getId())
+                    .userId(member.getUserId())
+                    .studentNo(member.getMemberNo() != null ? member.getMemberNo() : "STU-" + member.getUserId())
+                    .name(displayName)
+                    .role(resolveOrgRoleLabel(roleTypeByMemberId.get(member.getId())))
+                    .avatar(avatar)
+                    .masteryRate(null)
+                    .lastActive(null)
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+    private String resolveOrgRoleLabel(String roleType) {
+        if (roleType == null || roleType.isBlank()) {
+            return "成员";
+        }
+        return switch (roleType) {
+            case "HEAD_TEACHER" -> "班主任";
+            case "TEACHER" -> "任课教师";
+            case "STUDENT" -> "学生";
+            default -> roleType;
+        };
     }
 
     private List<OrganizationNodeVO> buildTree(List<SysOrganizationEntity> entities, Long tenantId) {
@@ -71,20 +142,18 @@ public class SysOrganizationServiceImpl implements SysOrganizationService, Organ
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createNode(Long tenantId, String name, String orgType, Long parentId, Integer sortOrder) {
-        if (tenantId == null) {
-            tenantId = TenantContext.requireTenantId();
-        }
+        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
 
         // 若指定了父节点，校验父节点是否同属当前租户
         if (parentId != null && parentId > 0) {
-            SysOrganizationEntity parent = sysOrganizationDao.findByIdAndTenantId(parentId, tenantId);
+            SysOrganizationEntity parent = sysOrganizationDao.findByIdAndTenantId(parentId, resolvedTenantId);
             if (parent == null) {
                 throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "上级组织节点不存在或不属于当前学校");
             }
         }
 
         SysOrganizationEntity entity = new SysOrganizationEntity();
-        entity.setTenantId(tenantId);
+        entity.setTenantId(resolvedTenantId);
         entity.setName(name);
         entity.setOrgType(orgType);
         entity.setParentId(parentId != null ? parentId : 0L);
@@ -150,10 +219,11 @@ public class SysOrganizationServiceImpl implements SysOrganizationService, Organ
 
     @Override
     public List<Map<String, Object>> listOrgsByMemberId(Long tenantId, Long memberId) {
-        List<SysMemberOrgEntity> relations = sysMemberOrgDao.listByMemberId(tenantId, memberId);
+        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
+        List<SysMemberOrgEntity> relations = sysMemberOrgDao.listByMemberId(resolvedTenantId, memberId);
         List<Map<String, Object>> result = new ArrayList<>();
         for (SysMemberOrgEntity rel : relations) {
-            SysOrganizationEntity org = sysOrganizationDao.findByIdAndTenantId(rel.getOrganizationId(), tenantId);
+            SysOrganizationEntity org = sysOrganizationDao.findByIdAndTenantId(rel.getOrganizationId(), resolvedTenantId);
             if (org != null) {
                 Map<String, Object> map = new HashMap<>();
                 map.put("id", org.getId());
@@ -168,6 +238,7 @@ public class SysOrganizationServiceImpl implements SysOrganizationService, Organ
 
     @Override
     public List<Long> listMemberIdsByOrgId(Long tenantId, Long organizationId) {
-        return sysMemberOrgDao.listMemberIdsByOrgId(tenantId, organizationId);
+        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
+        return sysMemberOrgDao.listMemberIdsByOrgId(resolvedTenantId, organizationId);
     }
 }

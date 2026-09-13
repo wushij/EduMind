@@ -1,5 +1,6 @@
 package com.edumind.knowledge.service.knowledge.impl;
 
+import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.knowledge.converter.KnowledgeBaseConverter;
 import com.edumind.knowledge.dao.KnowledgeBaseDao;
@@ -26,6 +27,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     @Override
     public Long create(KnowledgeBaseCreateDTO dto) {
         KnowledgeBaseEntity entity = knowledgeBaseConverter.toEntity(dto);
+        if (entity.getTenantId() == null) {
+            entity.setTenantId(TenantContext.requireTenantId());
+        }
         knowledgeBaseDao.insert(entity);
         return entity.getId();
     }

@@ -1,5 +1,7 @@
 package com.edumind.system.controller.storage;
 
+import com.edumind.common.context.TenantContext;
+import com.edumind.common.utils.TenantObjectKeyBuilder;
 import com.edumind.infrastructure.oss.FileStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -37,6 +39,13 @@ public class StorageFileController {
 
         if (objectName.isBlank()) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            return;
+        }
+
+        Long currentTenantId = TenantContext.getTenantId();
+        if (!TenantObjectKeyBuilder.validateTenantOwnership(currentTenantId, objectName)) {
+            log.warn("拒绝跨租户下载存储文件: tenantId={}, bucket={}, objectName={}", currentTenantId, bucket, objectName);
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
 

@@ -21,6 +21,7 @@ import com.edumind.course.vo.course.CourseVO;
 import com.edumind.course.vo.knowledge.KnowledgePointVO;
 import com.edumind.system.api.UserQueryApi;
 import com.edumind.system.vo.user.UserVO;
+import com.edumind.common.context.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -100,6 +101,9 @@ public class CourseServiceImpl implements CourseService {
             throw new BusinessException("无权限创建课程");
         }
         CourseEntity entity = courseConverter.toEntity(dto, currentUserId);
+        if (entity.getTenantId() == null) {
+            entity.setTenantId(TenantContext.requireTenantId());
+        }
         courseDao.insert(entity);
         return entity.getId();
     }

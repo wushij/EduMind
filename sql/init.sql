@@ -128,6 +128,43 @@ CREATE TABLE IF NOT EXISTS sys_config (
     KEY idx_config_group (config_group)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统全局参数配置表';
 
+CREATE TABLE IF NOT EXISTS sys_sms_log (
+    id              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    phone           VARCHAR(32)  NOT NULL COMMENT '接收手机号',
+    content         VARCHAR(128) DEFAULT NULL COMMENT '验证码或短信内容摘要',
+    sms_type        VARCHAR(64)  DEFAULT 'VERIFY_CODE' COMMENT '短信业务类型',
+    template_id     VARCHAR(64)  DEFAULT NULL COMMENT '短信模板ID/CODE',
+    template_params VARCHAR(512) DEFAULT NULL COMMENT '模板参数(JSON)',
+    provider        VARCHAR(32)  NOT NULL DEFAULT 'aliyunAuth' COMMENT '服务商(aliyunAuth/tencent)',
+    status          INT          NOT NULL DEFAULT 1 COMMENT '发送状态(0-发送中 1-成功 2-失败)',
+    result_msg      VARCHAR(512) DEFAULT NULL COMMENT '回执或错误原因明细',
+    biz_id          VARCHAR(128) DEFAULT NULL COMMENT '第三方回执业务ID',
+    send_time       DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '发送时间',
+    user_id         BIGINT       DEFAULT NULL COMMENT '触发用户ID',
+    biz_type        VARCHAR(64)  DEFAULT NULL COMMENT '关联业务模块',
+    ip              VARCHAR(64)  DEFAULT NULL COMMENT '调用方客户端IP',
+    create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (id),
+    KEY idx_phone (phone),
+    KEY idx_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='短信发信记录与审计表';
+
+CREATE TABLE IF NOT EXISTS sys_email_log (
+    id          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    email       VARCHAR(128) NOT NULL COMMENT '接收邮箱',
+    subject     VARCHAR(256) DEFAULT NULL COMMENT '邮件主题',
+    content     VARCHAR(256) DEFAULT NULL COMMENT '验证码或邮件摘要',
+    scene       VARCHAR(64)  DEFAULT 'VERIFY_CODE' COMMENT '邮件应用场景',
+    provider    VARCHAR(32)  DEFAULT 'custom' COMMENT '发件服务类型',
+    status      INT          NOT NULL DEFAULT 1 COMMENT '发送状态(1-成功 2-失败)',
+    result_msg  VARCHAR(512) DEFAULT NULL COMMENT '回执信息或失败异常',
+    ip          VARCHAR(64)  DEFAULT NULL COMMENT '调用方客户端IP',
+    create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (id),
+    KEY idx_email (email),
+    KEY idx_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='邮件发信记录与审计表';
+
 -- -----------------------------------------------------------------------------
 -- 二、课程教学（课程 / 章节 / 知识点 / 选课成员）
 -- -----------------------------------------------------------------------------
@@ -135,6 +172,7 @@ CREATE TABLE IF NOT EXISTS sys_config (
 
 CREATE TABLE IF NOT EXISTS course (
     id          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '课程ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     title       VARCHAR(128) NOT NULL COMMENT '课程名称',
     code        VARCHAR(64)  DEFAULT NULL COMMENT '课程编码',
     teacher_id  BIGINT       DEFAULT NULL COMMENT '责任教师用户ID',
@@ -202,6 +240,7 @@ CREATE TABLE IF NOT EXISTS question_bank (
 
 CREATE TABLE IF NOT EXISTS edu_question (
     id                 BIGINT       NOT NULL COMMENT '题目ID（支持分布式雪花ID）',
+    tenant_id          BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     bank_id            BIGINT       DEFAULT NULL COMMENT '所属题库ID',
     course_id          BIGINT       DEFAULT NULL COMMENT '所属课程ID',
     knowledge_point_id BIGINT       DEFAULT NULL COMMENT '关联知识点ID',
@@ -336,6 +375,7 @@ CREATE TABLE IF NOT EXISTS grading_result (
 
 CREATE TABLE IF NOT EXISTS knowledge_base (
     id             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '知识库ID',
+    tenant_id      BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     name           VARCHAR(128) NOT NULL COMMENT '知识库名称',
     course_id      BIGINT       DEFAULT NULL COMMENT '关联课程ID',
     description    TEXT         DEFAULT NULL COMMENT '知识库描述',
@@ -484,6 +524,7 @@ CREATE TABLE IF NOT EXISTS ai_tool (
 
 CREATE TABLE IF NOT EXISTS ai_conversation (
     id            VARCHAR(64)  NOT NULL COMMENT '会话UUID',
+    tenant_id     BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     user_id       BIGINT       NOT NULL COMMENT '发起用户ID',
     course_id     BIGINT       DEFAULT NULL COMMENT '关联课程ID（可选）',
     title         VARCHAR(128) DEFAULT NULL COMMENT '会话标题',
@@ -502,6 +543,7 @@ CREATE TABLE IF NOT EXISTS ai_message (
     conversation_id VARCHAR(64) NOT NULL COMMENT '所属会话ID',
     role            VARCHAR(16) NOT NULL COMMENT '发送方角色（user/assistant/system）',
     content         TEXT        DEFAULT NULL COMMENT '消息文本',
+    reasoning_content TEXT      DEFAULT NULL COMMENT 'DeepSeek 思考链原文',
     citations_json  TEXT        DEFAULT NULL COMMENT '引用 JSON（RAG 溯源）',
     token_count     INT         DEFAULT 0 COMMENT '本次Token消耗',
     create_time     DATETIME    DEFAULT CURRENT_TIMESTAMP COMMENT '发送时间',
@@ -511,6 +553,7 @@ CREATE TABLE IF NOT EXISTS ai_message (
 
 CREATE TABLE IF NOT EXISTS ai_call_log (
     id                  BIGINT      NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+    tenant_id           BIGINT      NOT NULL DEFAULT 1 COMMENT '租户ID',
     user_id             BIGINT      DEFAULT NULL COMMENT '调用用户ID',
     course_id           BIGINT      DEFAULT NULL COMMENT '关联课程ID (NULL表示全局/无课程上下文)',
     model               VARCHAR(64) DEFAULT NULL COMMENT '调用的LLM模型名',
@@ -678,17 +721,27 @@ CREATE TABLE IF NOT EXISTS knowledge_point_relation (
 
 CREATE TABLE IF NOT EXISTS ai_model_config (
     id                  BIGINT       NOT NULL AUTO_INCREMENT COMMENT '配置ID',
-    model_key           VARCHAR(64)  NOT NULL COMMENT '模型标识',
+    config_name         VARCHAR(128) NOT NULL COMMENT '配置唯一标识',
+    model_key           VARCHAR(64)  NOT NULL COMMENT 'Gateway 路由键',
     provider            VARCHAR(32)  NOT NULL COMMENT '提供商',
+    config_type         VARCHAR(16)  NOT NULL DEFAULT 'chat' COMMENT 'chat|embedding',
+    model_name          VARCHAR(128) NOT NULL DEFAULT '' COMMENT '上游模型型号',
+    base_url            VARCHAR(512) DEFAULT '' COMMENT '接口 Base URL',
+    api_key_cipher      TEXT COMMENT 'API Key SM4 密文',
     enabled             TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '是否启用',
     priority            INT          NOT NULL DEFAULT 1 COMMENT '路由优先级',
     fallback_model_key  VARCHAR(64)  DEFAULT NULL COMMENT '降级模型',
     max_tokens          INT          DEFAULT 4096 COMMENT '最大 Token',
     temperature         DECIMAL(3,2) DEFAULT 0.70 COMMENT '温度参数',
+    is_default          TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '同类型默认模型',
+    reasoning_effort    VARCHAR(16)  NOT NULL DEFAULT 'low' COMMENT '思考强度',
+    dimension           INT          NOT NULL DEFAULT 0 COMMENT 'Embedding 向量维度',
+    sort_order          INT          NOT NULL DEFAULT 0 COMMENT '排序',
     create_time         DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time         DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_model_key (model_key)
+    UNIQUE KEY uk_model_key (model_key),
+    UNIQUE KEY uk_config_name (config_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 模型配置';
 
 CREATE TABLE IF NOT EXISTS ai_gateway_route (
@@ -1053,10 +1106,20 @@ SELECT 3, id FROM sys_permission WHERE permission_code IN (
     'course:view', 'assignment:view', 'exam:view', 'knowledge:view', 'ai:chat', 'resource:view', 'notice:view'
 );
 
--- 5. 系统全局配置
+-- 5. 系统全局配置（V2.0.1 十二大分组 + 邮件 SMTP）
 INSERT IGNORE INTO sys_config (config_key, config_value, config_name, config_group, remark) VALUES
+('sys.site.config', '{"platformName":"智教云 · EduMind","platformSubtitle":"AI 智能教学赋能平台","loginWelcome":"欢迎登录智教云平台","registerTitle":"开启智教未来之旅","copyright":"Copyright © 2026 EduMind. All rights reserved.","icpEnabled":true,"icpNumber":"京ICP备20260001号-1","icpUrl":"https://beian.miit.gov.cn"}', '平台基础与品牌信息', 'site', '系统网站名称、副标题、版权与工信部ICP备案信息'),
+('sys.session.config', '{"tokenExpireHours":24,"sessionSignExpireHours":24}', '会话令牌与安全凭据', 'session', 'Sa-Token 令牌时效与临时签名/传输密钥生命周期配置'),
+('sys.storage.policy', '{"maxSizeMb":50,"allowedExtensions":"jpg,jpeg,png,gif,webp,bmp,svg,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,md,json,xml,zip,rar,mp4,mp3,wav,avi,mov"}', '文件上传限制与扩展名白名单', 'storage', '全平台单文件最大体积与允许上传格式白名单'),
+('sys.rateLimit.config', '{"captchaPerIpMinute":40,"loginPerIpMinute":30,"registerPerIpMinute":10,"smsPerIpMinute":5,"smsSendIntervalSeconds":60,"smsPerPhoneDaily":10,"smsPerIpDaily":30,"aiChatPerUserMinute":8}', '全站敏感接口防刷限流矩阵', 'rateLimit', '登录、注册、人机校验、短信发送与AI对话速率限制'),
+('sys.login.config', '{"captchaEnabled":true,"captchaType":"image","smsLoginEnabled":false,"smsLoginSliderCaptchaEnabled":false,"emailLoginEnabled":true,"emailLoginSliderCaptchaEnabled":false,"rememberMe":true,"maxRetryCount":5,"maxRetryCountIp":20,"lockTime":10}', '用户登录认证与防爆破策略', 'login', '登录人机校验、短信/邮箱验证码登录开关、账户防撞库锁定'),
+('sys.register.config', '{"enabled":true,"captchaEnabled":true,"captchaType":"image","defaultRoleCode":"STUDENT","needAudit":false,"minPasswordLength":6,"auditorUserIds":[]}', '新用户注册准入与角色分配', 'register', '自主注册总开关、人机校验、密码强度、新账号默认角色及审核流'),
+('sys.thirdParty.config', '{"wechat":{"enabled":false,"appId":"","appSecret":""},"alipay":{"enabled":false,"appId":"","privateKey":"","publicKey":""},"github":{"enabled":false,"clientId":"","clientSecret":""},"google":{"enabled":false,"clientId":"","clientSecret":"","redirectUri":""}}', '第三方 OAuth 授权登录', 'thirdParty', '微信开放平台、支付宝、GitHub、Google OAuth 登录凭据'),
+('sys.payment.config', '{"wechatPay":{"enabled":false,"mchId":"","appId":"","apiV3Key":"","privateKey":"","certSerialNo":"","notifyUrl":""},"alipay":{"enabled":false,"appId":"","privateKey":"","publicKey":"","signType":"RSA2","gatewayUrl":"https://openapi.alipay.com/gateway.do","notifyUrl":"","returnUrl":""}}', '支付服务网关参数', 'payment', '微信支付 APIv3 与支付宝官方支付网关配置'),
+('sys.sms.config', '{"enabled":false,"provider":"aliyunAuth","accessKeyId":"","accessKeySecret":"","signName":"智教云","tencentAppId":"","templateVerifyCode":"100001","templateModifyPhone":"100002","templateResetPassword":"100003","templateBindPhone":"100004","templateVerifyBindPhone":"100005","schemeName":"","codeExpireMinutes":5}', '短信发信服务与模板映射', 'sms', '阿里云认证/腾讯云短信服务商密钥与业务短信模板映射'),
 ('sys.mail.config', '{"enabled":false,"host":"smtp.qq.com","port":465,"username":"","password":"","fromName":"智教云 · EduMind","useSsl":true,"codeExpireMinutes":5,"codeIntervalSeconds":60,"dailyLimitPerEmail":10}', '邮件发送服务配置(SMTP)', 'mail', 'SMTP发信参数、发信人名称与验证码防刷策略'),
-('sys.base.info', '{"platformName":"智教云 · EduMind","subTitle":"AI 智能教学赋能平台","copyright":"© 2026 EduMind. All rights reserved.","icp":"京ICP备20260001号-1"}', '平台基础信息配置', 'base', '平台站点标题、副标与备案声明');
+('sys.ai.config', '{"assistantEnabled":true,"globalKnowledge":"","answerScope":"focus","tokensPerUserDaily":100000,"roleTokenQuotas":[]}', 'AI 助手全局与 Token 差异化配额', 'ai', '悬浮AI教学助手开关、回答边界及全员/各角色每日Token配额矩阵'),
+('sys.base.info', '{"platformName":"智教云 · EduMind","subTitle":"AI 智能教学赋能平台","copyright":"© 2026 EduMind. All rights reserved.","icp":"京ICP备20260001号-1"}', '平台基础信息配置', 'base', '平台站点标题、副标与备案声明（兼容旧版读取）');
 
 -- 6. Prompt 模板（RAG 对话默认模板）
 INSERT IGNORE INTO prompt_template (code, name, category, status, version, content, variables) VALUES
@@ -1300,10 +1363,15 @@ INSERT IGNORE INTO statistics_daily_snapshot (id, stat_date, course_id, active_s
 (7, CURDATE(),                           101, 85, 260, 205000, 88.5);
 
 -- 30. AI Gateway 默认模型与场景路由（V1.0）
-INSERT IGNORE INTO ai_model_config (model_key, provider, enabled, priority, fallback_model_key, max_tokens, temperature) VALUES
-('deepseek-chat', 'deepseek', 1, 1, 'mock', 4096, 0.70),
-('qwen-turbo', 'qwen', 1, 2, 'mock', 4096, 0.70),
-('mock', 'mock', 1, 99, NULL, 4096, 0.70);
+INSERT IGNORE INTO ai_model_config (
+    config_name, model_key, provider, config_type, model_name, base_url,
+    enabled, priority, fallback_model_key, max_tokens, temperature,
+    is_default, reasoning_effort, dimension, sort_order
+) VALUES
+('deepseek-chat', 'deepseek-chat', 'deepseek', 'chat', 'deepseek-chat', 'https://api.deepseek.com/v1', 1, 1, 'mock', 4096, 0.70, 1, 'low', 0, 1),
+('qwen-turbo', 'qwen-turbo', 'qwen', 'chat', 'qwen-turbo', 'https://dashscope.aliyuncs.com/compatible-mode/v1', 1, 2, 'mock', 4096, 0.70, 0, 'medium', 0, 2),
+('mock', 'mock', 'mock', 'chat', 'mock', '', 1, 99, NULL, 4096, 0.70, 0, 'low', 0, 99),
+('bge-large-zh', 'bge-large-zh', 'bge', 'embedding', 'bge-large-zh-v1.5', 'http://127.0.0.1:8080/v1', 1, 1, NULL, 512, 0.00, 1, 'low', 1024, 1);
 
 INSERT IGNORE INTO ai_gateway_route (scene, primary_model_key, fallback_model_key) VALUES
 ('CHAT', 'deepseek-chat', 'mock'),
@@ -1377,6 +1445,13 @@ INSERT IGNORE INTO sys_tenant_member (tenant_id, user_id, member_no, real_name, 
 (1, 3, 'S2026001',    '统招学生李思源',   1, 1),
 (1, 4, 'S2026002',    '统招学生王浩然',   1, 0),
 (2, 1, 'DELEGATE-001','系统管理员(代管)', 1, 0);
+
+INSERT IGNORE INTO sys_member_org (tenant_id, member_id, organization_id, role_type) VALUES
+(1, 2, 4, 'HEAD_TEACHER'),
+(1, 3, 4, 'STUDENT'),
+(1, 4, 4, 'STUDENT'),
+(1, 3, 5, 'STUDENT'),
+(1, 2, 2, 'TEACHER');
 
 -- 34. V2.0 模块演示样本（记忆/OCR/导出/干预/国密/Agent/配额）
 INSERT IGNORE INTO sys_ai_quota (user_id, daily_token_limit, daily_call_limit, used_tokens_today, used_calls_today) VALUES

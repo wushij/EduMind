@@ -76,23 +76,27 @@
         </div>
       </div>
 
-      <!-- 指标 3：会话与访问防护 -->
+      <!-- 指标 3：当前会话与身份 -->
       <div class="metric-card session-card">
         <div class="metric-header">
-          <span class="metric-title">会话防护与防重放机制</span>
-          <span class="status-pill active">
-            <span class="pulse-dot"></span>
-            <span>保护中</span>
+          <span class="metric-title">当前会话与身份状态</span>
+          <span class="status-pill" :class="sessionActive ? 'active' : 'unbound'">
+            <span v-if="sessionActive" class="pulse-dot"></span>
+            <span>{{ sessionActive ? '会话活跃' : '未登录' }}</span>
           </span>
         </div>
         <div class="metric-body">
           <div class="session-info-row">
-            <span class="session-label">鉴权引擎：</span>
-            <span class="session-val">Sa-Token v1.38 (分布式会话)</span>
+            <span class="session-label">登录账号：</span>
+            <span class="session-val">@{{ currentUser?.username || '—' }}</span>
           </div>
           <div class="session-info-row">
-            <span class="session-label">安全签名：</span>
-            <span class="session-val">国密 SM3-HMAC / 13位时间戳防重放</span>
+            <span class="session-label">显示名称：</span>
+            <span class="session-val">{{ displayName }}</span>
+          </div>
+          <div class="session-info-row">
+            <span class="session-label">绑定手机：</span>
+            <span class="session-val">{{ userPhone ? maskPhone(userPhone) : '未绑定' }}</span>
           </div>
           <div class="card-action-row">
             <button type="button" class="card-text-btn danger" @click="handleLogoutConfirm">
@@ -164,7 +168,7 @@
 
             <el-form-item label="设定新密码">
               <div class="capsule-input-box">
-                <el-icon class="input-icon"><Key /></el-icon>
+                <el-icon class="input-icon"><Lock /></el-icon>
                 <input
                   v-model="pwdForm.newPassword"
                   :type="showNewPwd ? 'text' : 'password'"
@@ -194,7 +198,7 @@
 
             <el-form-item label="确认新密码">
               <div class="capsule-input-box">
-                <el-icon class="input-icon"><Key /></el-icon>
+                <el-icon class="input-icon"><Lock /></el-icon>
                 <input
                   v-model="pwdForm.confirmPassword"
                   :type="showConfirmPwd ? 'text' : 'password'"
@@ -247,6 +251,7 @@
             <el-form label-position="top" class="security-capsule-form" autocomplete="off" @submit.prevent="handleEmailResetPassword">
               <el-form-item label="密保邮箱">
                 <div class="email-status-card">
+                  <el-icon class="email-prefix-icon"><Message /></el-icon>
                   <span class="email-address">{{ maskEmail(userEmail) }}</span>
                   <button type="button" class="email-action-btn" @click="openBindDialog">
                     更换绑定
@@ -257,7 +262,7 @@
               <el-form-item label="邮箱验证码">
                 <div class="capsule-code-row">
                   <div class="capsule-input-box code-input">
-                    <el-icon class="input-icon"><Finished /></el-icon>
+                    <el-icon class="input-icon"><Message /></el-icon>
                     <input
                       v-model="emailResetForm.code"
                       type="text"
@@ -317,7 +322,7 @@
 
               <el-form-item label="确认新密码">
                 <div class="capsule-input-box">
-                  <el-icon class="input-icon"><Key /></el-icon>
+                  <el-icon class="input-icon"><Lock /></el-icon>
                   <input
                     v-model="emailResetForm.confirmPassword"
                     :type="showEmailConfirmPwd ? 'text' : 'password'"
@@ -423,7 +428,7 @@
           <div class="env-info-list">
             <div class="env-row">
               <span class="label">登录用户名</span>
-              <span class="val">@{{ currentUser?.username || 'admin' }}</span>
+              <span class="val">@{{ currentUser?.username || '—' }}</span>
             </div>
             <div class="env-row">
               <span class="label">所属角色身份</span>
@@ -483,7 +488,7 @@
           <label class="group-label">邮箱验证码</label>
           <div class="capsule-code-row">
             <div class="capsule-input-box code-input">
-              <el-icon class="input-icon"><Finished /></el-icon>
+              <el-icon class="input-icon"><Message /></el-icon>
               <input
                 v-model="bindForm.code"
                 type="text"
@@ -541,7 +546,6 @@ import {
   Lock,
   Key,
   Message,
-  Finished,
   Check,
   CircleCheckFilled,
   CircleCloseFilled,
@@ -606,8 +610,28 @@ const bindForm = reactive({
 // 邮箱正则
 const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-// 计算属性：用户当前绑定邮箱
-const userEmail = computed(() => currentUser.value?.email || '');
+// 计算属性：用户资料（来自后端实时数据）
+const userEmail = computed(() => currentUser.value?.email?.trim() || '');
+const userPhone = computed(() => currentUser.value?.phone?.trim() || '');
+const displayName = computed(() => {
+  const user = currentUser.value;
+  if (!user) return '—';
+  return user.realName?.trim() || user.username || '—';
+});
+const sessionActive = computed(() => !!authStore.token);
+
+// 安全要素检测（按账号实际填写情况）
+const securityFactors = computed(() => ({
+  hasSession: sessionActive.value,
+  hasRole: !!(currentUser.value?.roles?.length),
+  hasEmail: !!userEmail.value,
+  hasPhone: !!userPhone.value,
+  hasRealName: !!(
+    currentUser.value?.realName?.trim() &&
+    currentUser.value.realName.trim() !== currentUser.value.username
+  ),
+  hasAvatar: !!currentUser.value?.avatar?.trim()
+}));
 
 // 计算属性：角色中文名
 const roleLabel = computed(() => {
@@ -638,24 +662,55 @@ const pwdStrength = computed(() => {
   return { score: 3, label: '极强 (安全稳固)', class: 'strong', color: '#10b981' };
 });
 
-// 综合安全评分
+// 综合安全评分（按资料完整度动态计算，非固定满分）
 const securityScore = computed(() => {
-  let score = 50;
-  if (userEmail.value) score += 35;
-  if (currentUser.value?.roles?.length) score += 15;
+  const f = securityFactors.value;
+  let score = 0;
+  if (f.hasSession) score += 20;
+  if (f.hasRole) score += 10;
+  if (f.hasEmail) score += 30;
+  if (f.hasPhone) score += 15;
+  if (f.hasRealName) score += 10;
+  if (f.hasAvatar) score += 5;
+  if (f.hasEmail && f.hasPhone) score += 10;
   return Math.min(score, 100);
 });
 
-// 安全等级
+// 安全等级与提示（根据缺失项生成）
 const securityLevel = computed(() => {
   const score = securityScore.value;
-  if (score >= 90) {
-    return { label: '安全极佳', class: 'excellent', color: '#10b981', tip: '已开启密保邮箱与分布式安全会话保护，防御系数极高' };
+  const f = securityFactors.value;
+  const missing: string[] = [];
+  if (!f.hasEmail) missing.push('密保邮箱');
+  if (!f.hasPhone) missing.push('手机号码');
+  if (!f.hasRealName) missing.push('真实姓名');
+
+  if (score >= 85) {
+    return {
+      label: '安全极佳',
+      class: 'excellent',
+      color: '#10b981',
+      tip: '密保邮箱与联系方式已完善，账号防护要素齐全'
+    };
   }
-  if (score >= 70) {
-    return { label: '防护良好', class: 'good', color: '#3b82f6', tip: '密保邮箱已生效，建议每 90 天定期更新一次登录密码' };
+  if (score >= 60) {
+    return {
+      label: '防护良好',
+      class: 'good',
+      color: '#3b82f6',
+      tip: missing.length
+        ? `建议继续完善：${missing.join('、')}`
+        : '基础防护已就绪，建议每 90 天定期更新登录密码'
+    };
   }
-  return { label: '等级偏低', class: 'warn', color: '#f59e0b', tip: '尚未绑定安全邮箱，建议立即绑定以防密码遗忘丢失' };
+  return {
+    label: '等级偏低',
+    class: 'warn',
+    color: '#f59e0b',
+    tip: missing.length
+      ? `账号资料不完整，请优先绑定：${missing.join('、')}`
+      : '请完善账号安全资料以降低密码找回与异地登录风险'
+  };
 });
 
 // 邮箱脱敏展示
@@ -664,6 +719,15 @@ function maskEmail(email: string) {
   const [name, domain] = email.split('@');
   if (name.length <= 2) return `${name}***@${domain}`;
   return `${name.slice(0, 2)}***${name.slice(-1)}@${domain}`;
+}
+
+function maskPhone(phone: string) {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 7) return phone;
+  if (digits.length === 11) {
+    return `${digits.slice(0, 3)}****${digits.slice(-4)}`;
+  }
+  return `${digits.slice(0, 2)}****${digits.slice(-2)}`;
 }
 
 // 1. 原密码修改逻辑
@@ -882,9 +946,7 @@ async function handleLogoutConfirm() {
 }
 
 onMounted(() => {
-  if (!currentUser.value?.email) {
-    authStore.fetchUserInfo();
-  }
+  authStore.fetchUserInfo();
 });
 
 onBeforeUnmount(() => {
@@ -1320,11 +1382,18 @@ onBeforeUnmount(() => {
     justify-content: space-between;
     width: 100%;
     min-height: 46px;
-    padding: 0 8px 0 18px;
+    padding: 0 8px 0 16px;
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 9999px;
     box-sizing: border-box;
+
+    .email-prefix-icon {
+      font-size: 16px;
+      color: #94a3b8;
+      margin-right: 10px;
+      flex-shrink: 0;
+    }
 
     .email-address {
       flex: 1;
@@ -1375,6 +1444,10 @@ onBeforeUnmount(() => {
       background: #ffffff;
       border-color: #2563eb;
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    &.no-prefix-icon {
+      padding-left: 18px;
     }
 
     .input-icon {

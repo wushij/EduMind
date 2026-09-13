@@ -1,6 +1,7 @@
 package com.edumind.knowledge.dao;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.edumind.common.context.TenantContext;
 import com.edumind.knowledge.entity.KnowledgeBaseEntity;
 import com.edumind.knowledge.mapper.KnowledgeBaseMapper;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +50,9 @@ public class KnowledgeBaseDao {
     }
 
     public int insert(KnowledgeBaseEntity entity) {
+        if (entity.getTenantId() == null && TenantContext.getTenantId() != null && TenantContext.getTenantId() > 0) {
+            entity.setTenantId(TenantContext.getTenantId());
+        }
         return knowledgeBaseMapper.insert(entity);
     }
 

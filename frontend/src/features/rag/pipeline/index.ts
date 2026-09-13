@@ -1,4 +1,4 @@
-import { CitationItem } from '@/components/knowledge/CitationList.vue';
+import type { CitationItem } from '@/types/ai/assistant';
 
 export interface SSEMessageEvent {
   type: 'delta' | 'citation' | 'done' | 'error';

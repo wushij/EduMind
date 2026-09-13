@@ -1,6 +1,8 @@
 package com.edumind.knowledge.service.knowledge.impl;
 
+import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
+import com.edumind.common.utils.TenantObjectKeyBuilder;
 import com.edumind.infrastructure.oss.FileStorageService;
 import com.edumind.knowledge.converter.KnowledgeBaseConverter;
 import com.edumind.knowledge.dao.KnowledgeBaseDao;
@@ -50,7 +52,8 @@ public class DocumentServiceImpl implements DocumentService {
             throw new BusinessException("上传文件不能为空");
         }
         String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "document";
-        String objectKey = "knowledge/" + knowledgeBaseId + "/" + UUID.randomUUID() + "/" + originalFilename;
+        Long tenantId = knowledgeBase.getTenantId() != null ? knowledgeBase.getTenantId() : TenantContext.getTenantId();
+        String objectKey = TenantObjectKeyBuilder.knowledgeDocument(tenantId, knowledgeBaseId, UUID.randomUUID().toString(), originalFilename);
         try {
             fileStorageService.uploadFile(bucketName, objectKey, file.getInputStream(), file.getContentType());
         } catch (IOException ex) {

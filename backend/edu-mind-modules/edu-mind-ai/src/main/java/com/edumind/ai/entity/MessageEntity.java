@@ -16,6 +16,7 @@ public class MessageEntity implements Serializable {
     private String conversationId;
     private String role;
     private String content;
+    private String reasoningContent;
     private String citationsJson;
     private Integer tokenCount;
     private LocalDateTime createTime;

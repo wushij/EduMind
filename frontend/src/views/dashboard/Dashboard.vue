@@ -124,7 +124,8 @@
 import { ref, onMounted, onUnmounted, nextTick, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 import DashboardHero from '@/components/dashboard/DashboardHero.vue';
-import ColorIcon, { type IconTheme } from '@/components/common/ColorIcon.vue';
+import ColorIcon from '@/components/common/ColorIcon.vue';
+import type { IconTheme } from '@/types/common/icon';
 import {
   EditPen,
   Tickets,

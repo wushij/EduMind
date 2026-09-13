@@ -40,7 +40,7 @@
           type="button"
           class="session-del-btn"
           title="删除会话"
-          @click.stop="$emit('delete', item.id)"
+          @click.stop="handleDeleteSession(item)"
         >
           <el-icon><Close /></el-icon>
         </button>
@@ -57,6 +57,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, ChatDotRound, Close, Search } from '@element-plus/icons-vue';
 import type { ChatSession } from '@/composables/ai/useAIStream';
 
@@ -65,11 +66,29 @@ const props = defineProps<{
   currentId: string;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'select', id: string): void;
   (e: 'create'): void;
   (e: 'delete', id: string): void;
 }>();
+
+function handleDeleteSession(item: ChatSession) {
+  ElMessageBox.confirm(
+    `确定要删除会话「${item.title || '当前会话'}」吗？删除后该会话全部问答记录将不可恢复。`,
+    '删除会话二次确认',
+    {
+      confirmButtonText: '确定删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+      lockScroll: false
+    }
+  )
+    .then(() => {
+      emit('delete', item.id);
+      ElMessage.success('已删除会话');
+    })
+    .catch(() => {});
+}
 
 const keyword = ref('');
 

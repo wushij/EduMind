@@ -2,6 +2,7 @@ package com.edumind.question.service.question.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.edumind.common.api.PageResult;
+import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.question.api.QuestionQueryApi;
 import com.edumind.question.converter.QuestionConverter;
@@ -33,6 +34,9 @@ public class QuestionServiceImpl implements QuestionService {
     @Override
     public Long createQuestion(QuestionCreateDTO dto) {
         QuestionEntity entity = questionConverter.toEntity(dto);
+        if (entity.getTenantId() == null) {
+            entity.setTenantId(TenantContext.requireTenantId());
+        }
         questionDao.insert(entity);
         return entity.getId();
     }
@@ -41,11 +45,15 @@ public class QuestionServiceImpl implements QuestionService {
     @Transactional(rollbackFor = Exception.class)
     public QuestionBatchSaveVO batchSave(QuestionBatchCreateDTO dto) {
         List<Long> questionIds = new ArrayList<>();
+        Long currentTenantId = TenantContext.requireTenantId();
         for (QuestionCreateDTO item : dto.getQuestions()) {
             if (item.getCourseId() == null && dto.getCourseId() != null) {
                 item.setCourseId(dto.getCourseId());
             }
             QuestionEntity entity = questionConverter.toEntity(item);
+            if (entity.getTenantId() == null) {
+                entity.setTenantId(currentTenantId);
+            }
             questionDao.insert(entity);
             questionIds.add(entity.getId());
         }

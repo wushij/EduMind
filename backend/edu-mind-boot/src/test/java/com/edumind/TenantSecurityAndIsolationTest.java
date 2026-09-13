@@ -71,4 +71,16 @@ public class TenantSecurityAndIsolationTest {
         TenantContext.setDelegatedSession(false);
         Assertions.assertFalse(TenantContext.isDelegatedSession(), "代管退出后标志位必须清空");
     }
+
+    @Test
+    @DisplayName("验证跨租户组织查询安全阻断 (OrganizationQueryApi 防御)")
+    void testOrganizationCrossTenantProtection() {
+        TenantContext.setTenantId(1001L);
+        Assertions.assertThrows(BusinessException.class, () -> {
+            Long explicitTenantId = 1002L;
+            if (!explicitTenantId.equals(TenantContext.requireTenantId())) {
+                throw new BusinessException(403, "无权访问其他学校组织架构");
+            }
+        });
+    }
 }

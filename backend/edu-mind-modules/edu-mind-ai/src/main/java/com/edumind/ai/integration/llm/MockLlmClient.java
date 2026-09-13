@@ -121,10 +121,28 @@ public class MockLlmClient implements LlmClient {
             callback.onError("Mock LLM 未启用");
             return;
         }
-        String reply = chat(systemPrompt, userPrompt);
-        for (char c : reply.toCharArray()) {
-            callback.onChunk(String.valueOf(c));
+        try {
+            String[] reasoningSteps = {
+                    "对齐课程知识库与教学大纲检索结果…",
+                    "\n规划：要点梳理 + 代码示例 + 学习建议"
+            };
+            for (String step : reasoningSteps) {
+                callback.onReasoning(step);
+                Thread.sleep(50);
+            }
+            callback.onStatus("composing", "思考已完成，正在撰写回答正文…");
+
+            String reply = chat(systemPrompt, userPrompt);
+            int chunkSize = 3;
+            for (int i = 0; i < reply.length(); i += chunkSize) {
+                int end = Math.min(i + chunkSize, reply.length());
+                callback.onChunk(reply.substring(i, end));
+                Thread.sleep(28);
+            }
+            callback.onComplete();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            callback.onError("Mock 流式中断");
         }
-        callback.onComplete();
     }
 }

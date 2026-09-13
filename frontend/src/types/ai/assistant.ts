@@ -1,10 +1,34 @@
+/** RAG 引用切片（课程 AI / 全局助手 / 知识库溯源共用） */
+export interface CitationItem {
+  id?: number | string;
+  docTitle?: string;
+  documentName?: string;
+  page?: number;
+  pageNo?: number;
+  chunkId?: number | string;
+  chunkIndex?: number;
+  snippet?: string;
+  excerpt?: string;
+  content?: string;
+  score?: number;
+}
+
 export interface GlobalAssistantMessage {
+  id?: string | number;
   role: 'user' | 'assistant';
   content: string;
+  reasoningContent?: string;
+  reasoningFolded?: boolean;
+  isReasoningActive?: boolean;
+  streamPhaseMessage?: string;
   intent?: string;
   intentDesc?: string;
   targetCode?: string;
   streaming?: boolean;
+  citations?: CitationItem[];
+  followUpPrompts?: string[];
+  createdAt?: string | number;
+  error?: boolean;
 }
 
 export interface GlobalAssistantChatRequest {
@@ -19,7 +43,8 @@ export interface GlobalAssistantAskResponse {
   intentDesc: string;
   targetCode?: string;
   content: string;
-  citations?: unknown[];
+  reasoningContent?: string;
+  citations?: CitationItem[];
 }
 
 export interface GlobalAssistantIntentEvent {
@@ -28,3 +53,12 @@ export interface GlobalAssistantIntentEvent {
   confidence?: number;
   slots?: Record<string, unknown>;
 }
+
+export interface GlobalAssistantSession {
+  id: string;
+  title: string;
+  updatedAt: number | string;
+  messageCount?: number;
+  messages?: GlobalAssistantMessage[];
+}
+

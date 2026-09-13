@@ -13,4 +13,7 @@ public class LlmProperties {
     private Integer timeoutMs = 60000;
     private Boolean mockEnabled = true;
     private Boolean streamEnabled = true;
+    private Double temperature = 0.7;
+    private String reasoningEffort = "low";
+    private Integer maxTokens = 4096;
 }

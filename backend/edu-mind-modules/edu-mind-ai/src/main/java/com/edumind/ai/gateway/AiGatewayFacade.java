@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -21,7 +22,7 @@ public class AiGatewayFacade {
     private static final String DEFAULT_CIRCUIT_KEY = "default";
 
     private final LlmClientRegistry llmClientRegistry;
-    private final ModelRouterImpl modelRouter;
+    private final ModelRouter modelRouter;
     private final GatewayResilienceStore resilienceStore;
 
     @Value("${edumind.ai.gateway.force-fail-model:}")
@@ -62,7 +63,8 @@ public class AiGatewayFacade {
 
         if (resilienceStore.isCircuitOpen(primary)) {
             log.warn("Gateway circuit OPEN for {}, fast-falling back", primary);
-            return executeFallback(scene, primary, systemPrompt, userPrompt, start);
+            return executeFallback(scene, primary, systemPrompt, userPrompt, start,
+                    new IllegalStateException("模型熔断保护中，请稍后重试"));
         }
 
         try {
@@ -86,12 +88,13 @@ public class AiGatewayFacade {
                 return retryResult;
             } catch (Exception retryEx) {
                 resilienceStore.recordFailure(primary);
-                return executeFallback(scene, primary, systemPrompt, userPrompt, start);
+                return executeFallback(scene, primary, systemPrompt, userPrompt, start, retryEx);
             }
         }
     }
 
-    private String executeFallback(String scene, String primary, String systemPrompt, String userPrompt, long start) {
+    private String executeFallback(String scene, String primary, String systemPrompt, String userPrompt,
+                                     long start, Exception cause) {
         String fallback = modelRouter.resolveFallback(primary);
         if (fallback != null && !fallback.equals(primary)) {
             log.warn("Gateway fallback {} -> {} scene={}", primary, fallback, scene);
@@ -106,7 +109,14 @@ public class AiGatewayFacade {
             }
         }
         resilienceStore.recordFailed();
-        throw new BusinessException("AI 服务暂不可用，主模型与备用模型均失败");
+        throw new BusinessException(buildUnavailableMessage(cause));
+    }
+
+    private String buildUnavailableMessage(Exception cause) {
+        if (cause != null && StringUtils.hasText(cause.getMessage())) {
+            return "AI 服务暂不可用：" + cause.getMessage();
+        }
+        return "AI 服务暂不可用，请稍后重试";
     }
 
     public String generateQuestions(String scene, String modelKey, String prompt, Map<String, Object> params) {
@@ -123,8 +133,11 @@ public class AiGatewayFacade {
         } catch (Exception ex) {
             resilienceStore.recordFailure(primary);
             String fallback = modelRouter.resolveFallback(primary);
-            resilienceStore.recordFallback();
-            return llmClientRegistry.get(fallback != null ? fallback : "mock").generateQuestions(prompt, params);
+            if (StringUtils.hasText(fallback) && !fallback.equals(primary)) {
+                resilienceStore.recordFallback();
+                return llmClientRegistry.get(fallback).generateQuestions(prompt, params);
+            }
+            throw new BusinessException(buildUnavailableMessage(ex));
         }
     }
 
@@ -139,7 +152,8 @@ public class AiGatewayFacade {
         String primary = modelRouter.resolveModelKey(scene, modelKey);
 
         if (resilienceStore.isCircuitOpen(primary)) {
-            streamFallback(primary, systemPrompt, userPrompt, callback);
+            streamFallback(primary, systemPrompt, userPrompt, callback,
+                    new IllegalStateException("模型熔断保护中，请稍后重试"));
             return;
         }
 
@@ -153,12 +167,12 @@ public class AiGatewayFacade {
             log.warn("Gateway stream primary failed for {}: {}", primary, ex.getMessage());
             resilienceStore.recordRetry();
             resilienceStore.recordFailure(primary);
-            streamFallback(primary, systemPrompt, userPrompt, callback);
+            streamFallback(primary, systemPrompt, userPrompt, callback, ex);
         }
     }
 
     private void streamFallback(String primary, String systemPrompt, String userPrompt,
-                                LlmClient.StreamCallback callback) {
+                                LlmClient.StreamCallback callback, Exception cause) {
         String fallback = modelRouter.resolveFallback(primary);
         if (fallback != null && !fallback.equals(primary)) {
             resilienceStore.recordFallback();
@@ -166,7 +180,7 @@ public class AiGatewayFacade {
             return;
         }
         resilienceStore.recordFailed();
-        throw new BusinessException("AI 流式服务暂不可用");
+        callback.onError(buildUnavailableMessage(cause));
     }
 
     private boolean shouldForceFail(String modelKey) {

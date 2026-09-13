@@ -9,7 +9,7 @@ import com.edumind.ai.dao.AgentStepDao;
 import com.edumind.ai.dto.agent.AgentRunCreateDTO;
 import com.edumind.ai.entity.AgentRunEntity;
 import com.edumind.ai.entity.AgentStepEntity;
-import com.edumind.ai.gateway.ModelRouterImpl;
+import com.edumind.ai.gateway.ModelRouter;
 import com.edumind.ai.integration.llm.LlmProperties;
 import com.edumind.ai.service.agent.AgentRunService;
 import com.edumind.ai.service.agent.AgentRunStreamRegistry;
@@ -34,7 +34,7 @@ public class AgentRunServiceImpl implements AgentRunService {
     private final AgentRunDao agentRunDao;
     private final AgentStepDao agentStepDao;
     private final ToolRegistry toolRegistry;
-    private final ModelRouterImpl modelRouter;
+    private final ModelRouter modelRouter;
     private final AgentRunStreamRegistry streamRegistry;
     private final LlmProperties llmProperties;
 

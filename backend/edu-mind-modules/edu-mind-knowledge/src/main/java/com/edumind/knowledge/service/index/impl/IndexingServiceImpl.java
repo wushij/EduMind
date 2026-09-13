@@ -1,6 +1,7 @@
 package com.edumind.knowledge.service.index.impl;
 
 import com.edumind.common.api.embedding.EmbeddingApi;
+import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.infrastructure.vector.VectorStore;
 import com.edumind.infrastructure.vector.config.MilvusProperties;
@@ -53,6 +54,7 @@ public class IndexingServiceImpl implements IndexingService {
     public void triggerIndex(Long knowledgeBaseId, String mode) {
         KnowledgeBaseEntity knowledgeBase = knowledgeAccessService.assertAccessible(knowledgeBaseId);
         Long operatorId = UserContext.getUserId();
+        Long tenantId = knowledgeBase.getTenantId() != null ? knowledgeBase.getTenantId() : TenantContext.getTenantId();
         KnowledgeIndexTaskEntity task = new KnowledgeIndexTaskEntity();
         task.setKnowledgeBaseId(knowledgeBaseId);
         task.setMode(mode != null ? mode : "FULL");
@@ -66,87 +68,97 @@ public class IndexingServiceImpl implements IndexingService {
 
         knowledgeBase.setIndexStatus("INDEXING");
         knowledgeBaseDao.updateById(knowledgeBase);
-        runIndexAsync(task.getId(), knowledgeBaseId, task.getMode(), operatorId);
+        runIndexAsync(task.getId(), knowledgeBaseId, task.getMode(), operatorId, tenantId);
     }
 
     @Async("knowledgeTaskExecutor")
-    public void runIndexAsync(Long taskId, Long knowledgeBaseId, String mode, Long operatorId) {
-        KnowledgeIndexTaskEntity task = knowledgeIndexTaskDao.findLatestByKnowledgeBaseId(knowledgeBaseId);
-        if (task == null || !task.getId().equals(taskId)) {
-            return;
+    public void runIndexAsync(Long taskId, Long knowledgeBaseId, String mode, Long operatorId, Long tenantId) {
+        if (tenantId != null && tenantId > 0) {
+            TenantContext.setTenantId(tenantId);
         }
-        List<KnowledgeDocumentChunkEntity> chunks = knowledgeDocumentChunkDao.findByKnowledgeBaseId(knowledgeBaseId);
-        if ("INCREMENTAL".equalsIgnoreCase(mode)) {
-            chunks = chunks.stream()
-                    .filter(chunk -> {
-                        KnowledgeChunkIndexEntity index = knowledgeChunkIndexDao.findByChunkId(chunk.getId());
-                        return index == null || "FAILED".equals(index.getEmbedStatus());
-                    })
-                    .collect(Collectors.toList());
-        }
-        int indexed = 0;
-        int failed = 0;
-        List<IndexStatusVO.IndexErrorVO> errors = new ArrayList<>();
-        if (chunks.isEmpty()) {
-            task.setStatus("INDEXED");
-            task.setIndexedChunks(0);
-            task.setFailedChunks(0);
-            task.setFinishedAt(LocalDateTime.now());
-            knowledgeIndexTaskDao.updateById(task);
-            KnowledgeBaseEntity emptyKb = knowledgeBaseDao.findById(knowledgeBaseId);
-            if (emptyKb != null) {
-                emptyKb.setIndexStatus("INDEXED");
-                knowledgeBaseDao.updateById(emptyKb);
-            }
-            notifyIndexResult(operatorId, knowledgeBaseId, "INDEXED", 0, 0);
-            return;
-        }
-        List<String> texts = chunks.stream().map(KnowledgeDocumentChunkEntity::getContent).toList();
         try {
-            List<List<Float>> vectors = embeddingApi.embed(texts);
-            if (vectors == null || vectors.size() != chunks.size()) {
-                throw new IllegalStateException("Embedding 结果数量与 Chunk 不一致");
+            KnowledgeIndexTaskEntity task = knowledgeIndexTaskDao.findLatestByKnowledgeBaseId(knowledgeBaseId);
+            if (task == null || !task.getId().equals(taskId)) {
+                return;
             }
-            for (int i = 0; i < chunks.size(); i++) {
-                KnowledgeDocumentChunkEntity chunk = chunks.get(i);
-                try {
-                    String vectorId = String.valueOf(chunk.getId());
-                    Map<String, Object> metadata = new HashMap<>();
-                    metadata.put("chunkId", chunk.getId());
-                    metadata.put("documentId", chunk.getDocumentId());
-                    metadata.put("knowledgeBaseId", chunk.getKnowledgeBaseId());
-                    metadata.put("pageNo", chunk.getPageNo());
-                    vectorStore.save(milvusProperties.getCollection(), vectorId, vectors.get(i), metadata);
-                    upsertChunkIndex(chunk, vectorId, "INDEXED", null);
-                    indexed++;
-                } catch (Exception ex) {
-                    failed++;
-                    upsertChunkIndex(chunk, String.valueOf(chunk.getId()), "FAILED", ex.getMessage());
-                    IndexStatusVO.IndexErrorVO error = new IndexStatusVO.IndexErrorVO();
-                    error.setChunkId(chunk.getId());
-                    error.setMessage(ex.getMessage());
-                    errors.add(error);
+            List<KnowledgeDocumentChunkEntity> chunks = knowledgeDocumentChunkDao.findByKnowledgeBaseId(knowledgeBaseId);
+            if ("INCREMENTAL".equalsIgnoreCase(mode)) {
+                chunks = chunks.stream()
+                        .filter(chunk -> {
+                            KnowledgeChunkIndexEntity index = knowledgeChunkIndexDao.findByChunkId(chunk.getId());
+                            return index == null || "FAILED".equals(index.getEmbedStatus());
+                        })
+                        .collect(Collectors.toList());
+            }
+            int indexed = 0;
+            int failed = 0;
+            List<IndexStatusVO.IndexErrorVO> errors = new ArrayList<>();
+            if (chunks.isEmpty()) {
+                task.setStatus("INDEXED");
+                task.setIndexedChunks(0);
+                task.setFailedChunks(0);
+                task.setFinishedAt(LocalDateTime.now());
+                knowledgeIndexTaskDao.updateById(task);
+                KnowledgeBaseEntity emptyKb = knowledgeBaseDao.findById(knowledgeBaseId);
+                if (emptyKb != null) {
+                    emptyKb.setIndexStatus("INDEXED");
+                    knowledgeBaseDao.updateById(emptyKb);
                 }
+                notifyIndexResult(operatorId, knowledgeBaseId, "INDEXED", 0, 0);
+                return;
             }
-            task.setStatus(failed > 0 && indexed == 0 ? "INDEX_FAILED" : "INDEXED");
-            task.setIndexedChunks(indexed);
-            task.setFailedChunks(failed);
-            task.setFinishedAt(LocalDateTime.now());
-            knowledgeIndexTaskDao.updateById(task);
+            List<String> texts = chunks.stream().map(KnowledgeDocumentChunkEntity::getContent).toList();
+            try {
+                List<List<Float>> vectors = embeddingApi.embed(texts);
+                if (vectors == null || vectors.size() != chunks.size()) {
+                    throw new IllegalStateException("Embedding 结果数量与 Chunk 不一致");
+                }
+                for (int i = 0; i < chunks.size(); i++) {
+                    KnowledgeDocumentChunkEntity chunk = chunks.get(i);
+                    try {
+                        String vectorId = String.valueOf(chunk.getId());
+                        Map<String, Object> metadata = new HashMap<>();
+                        metadata.put("chunkId", chunk.getId());
+                        metadata.put("documentId", chunk.getDocumentId());
+                        metadata.put("knowledgeBaseId", chunk.getKnowledgeBaseId());
+                        metadata.put("pageNo", chunk.getPageNo());
+                        if (tenantId != null && tenantId > 0) {
+                            metadata.put("tenantId", tenantId);
+                        }
+                        vectorStore.save(milvusProperties.getCollection(), vectorId, vectors.get(i), metadata);
+                        upsertChunkIndex(chunk, vectorId, "INDEXED", null);
+                        indexed++;
+                    } catch (Exception ex) {
+                        failed++;
+                        upsertChunkIndex(chunk, String.valueOf(chunk.getId()), "FAILED", ex.getMessage());
+                        IndexStatusVO.IndexErrorVO error = new IndexStatusVO.IndexErrorVO();
+                        error.setChunkId(chunk.getId());
+                        error.setMessage(ex.getMessage());
+                        errors.add(error);
+                    }
+                }
+                task.setStatus(failed > 0 && indexed == 0 ? "INDEX_FAILED" : "INDEXED");
+                task.setIndexedChunks(indexed);
+                task.setFailedChunks(failed);
+                task.setFinishedAt(LocalDateTime.now());
+                knowledgeIndexTaskDao.updateById(task);
 
-            KnowledgeBaseEntity knowledgeBase = knowledgeBaseDao.findById(knowledgeBaseId);
-            if (knowledgeBase != null) {
-                knowledgeBase.setIndexStatus(task.getStatus());
-                knowledgeBaseDao.updateById(knowledgeBase);
+                KnowledgeBaseEntity knowledgeBase = knowledgeBaseDao.findById(knowledgeBaseId);
+                if (knowledgeBase != null) {
+                    knowledgeBase.setIndexStatus(task.getStatus());
+                    knowledgeBaseDao.updateById(knowledgeBase);
+                }
+                notifyIndexResult(operatorId, knowledgeBaseId, task.getStatus(), indexed, failed);
+            } catch (Exception ex) {
+                log.error("索引任务失败 knowledgeBaseId={}", knowledgeBaseId, ex);
+                task.setStatus("INDEX_FAILED");
+                task.setErrorMessage(ex.getMessage());
+                task.setFinishedAt(LocalDateTime.now());
+                knowledgeIndexTaskDao.updateById(task);
+                notifyIndexResult(operatorId, knowledgeBaseId, "INDEX_FAILED", 0, 0);
             }
-            notifyIndexResult(operatorId, knowledgeBaseId, task.getStatus(), indexed, failed);
-        } catch (Exception ex) {
-            log.error("索引任务失败 knowledgeBaseId={}", knowledgeBaseId, ex);
-            task.setStatus("INDEX_FAILED");
-            task.setErrorMessage(ex.getMessage());
-            task.setFinishedAt(LocalDateTime.now());
-            knowledgeIndexTaskDao.updateById(task);
-            notifyIndexResult(operatorId, knowledgeBaseId, "INDEX_FAILED", 0, 0);
+        } finally {
+            TenantContext.clear();
         }
     }
 

@@ -2,7 +2,7 @@
   <main class="app-content">
     <div class="app-content-body">
       <router-view v-slot="{ Component, route }">
-        <transition name="page-switch" appear>
+        <transition name="page-switch" mode="out-in" appear>
           <component :is="Component" :key="route.fullPath" />
         </transition>
       </router-view>

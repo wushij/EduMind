@@ -55,9 +55,19 @@ public class LoggingLlmClient implements LlmClient {
             private final StringBuilder buffer = new StringBuilder();
 
             @Override
+            public void onReasoning(String content) {
+                callback.onReasoning(content);
+            }
+
+            @Override
             public void onChunk(String content) {
                 buffer.append(content);
                 callback.onChunk(content);
+            }
+
+            @Override
+            public void onStatus(String phase, String message) {
+                callback.onStatus(phase, message);
             }
 
             @Override

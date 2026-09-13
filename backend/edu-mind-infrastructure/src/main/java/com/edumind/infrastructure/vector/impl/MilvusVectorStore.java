@@ -39,6 +39,7 @@ public class MilvusVectorStore implements VectorStore {
     private static final String VECTOR_FIELD = "embedding";
     private static final String KB_FIELD = "knowledge_base_id";
     private static final String DOC_FIELD = "document_id";
+    private static final String TENANT_FIELD = "tenant_id";
 
     private final MilvusProperties milvusProperties;
     private final Map<String, MilvusServiceClient> clients = new ConcurrentHashMap<>();
@@ -131,6 +132,9 @@ public class MilvusVectorStore implements VectorStore {
         }
         if (filter.get("documentId") != null) {
             parts.add(DOC_FIELD + " == " + filter.get("documentId"));
+        }
+        if (filter.get("tenantId") != null) {
+            parts.add(TENANT_FIELD + " == " + filter.get("tenantId"));
         }
         return parts.isEmpty() ? null : String.join(" && ", parts);
     }

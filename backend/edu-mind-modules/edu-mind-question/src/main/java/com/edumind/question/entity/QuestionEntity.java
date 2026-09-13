@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class QuestionEntity {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
+    private Long tenantId;
     private Long bankId;
     private Long courseId;
     private Long knowledgePointId;
@@ -27,4 +28,12 @@ public class QuestionEntity {
     private Integer deleted;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+
+    public Long getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(Long tenantId) {
+        this.tenantId = tenantId;
+    }
 }

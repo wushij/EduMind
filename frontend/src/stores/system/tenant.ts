@@ -37,21 +37,9 @@ export const useTenantStore = defineStore('tenant', () => {
           storage.set(CAMPUS_ID_KEY, res.data.campuses[0].id);
         }
       }
-    } catch (e) {
-      // Fallback default for demo
-      if (!currentTenant.value) {
-        currentTenant.value = {
-          id: 1,
-          tenantCode: 'DEFAULT_SCHOOL',
-          name: '智教云示范第一中学',
-          domain: 'demo.edumind.edu.cn',
-          status: 1,
-          campuses: [
-            { id: 1, tenantId: 1, campusCode: 'MAIN', name: '本部校区', isMain: true, status: 1 },
-            { id: 2, tenantId: 1, campusCode: 'EAST', name: '东校区', isMain: false, status: 1 }
-          ]
-        };
-      }
+    } catch (e: any) {
+      currentTenant.value = null;
+      ElMessage.error(e?.message || '获取当前租户信息失败');
     } finally {
       loading.value = false;
     }
@@ -60,19 +48,10 @@ export const useTenantStore = defineStore('tenant', () => {
   const fetchAvailable = async () => {
     try {
       const res = await getAvailableTenants();
-      if (res?.data && res.data.length > 0) {
-        availableTenants.value = res.data;
-      } else {
-        availableTenants.value = [
-          { id: 1, tenantCode: 'DEFAULT_SCHOOL', name: '智教云示范第一中学', status: 1, campusCount: 2, memberCount: 1250 },
-          { id: 2, tenantCode: 'TECH_COLLEGE', name: '前沿软件技术职业学院', status: 1, campusCount: 1, memberCount: 860 }
-        ];
-      }
-    } catch (e) {
-      availableTenants.value = [
-        { id: 1, tenantCode: 'DEFAULT_SCHOOL', name: '智教云示范第一中学', status: 1, campusCount: 2, memberCount: 1250 },
-        { id: 2, tenantCode: 'TECH_COLLEGE', name: '前沿软件技术职业学院', status: 1, campusCount: 1, memberCount: 860 }
-      ];
+      availableTenants.value = res?.data || [];
+    } catch (e: any) {
+      availableTenants.value = [];
+      ElMessage.error(e?.message || '获取可用租户列表失败');
     }
   };
 

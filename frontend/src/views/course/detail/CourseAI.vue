@@ -141,6 +141,17 @@
                 </template>
               </el-dropdown>
 
+              <!-- 开启新对话 -->
+              <button
+                type="button"
+                class="toolbar-pill-btn new-chat-btn"
+                title="开启新问答会话"
+                @click="handleCreateNewSession"
+              >
+                <el-icon><Plus /></el-icon>
+                <span>新对话</span>
+              </button>
+
               <!-- 历史记录抽屉触发按钮 -->
               <button
                 type="button"
@@ -164,12 +175,50 @@
               </button>
             </div>
 
-            <!-- 消息流列表 -->
+            <!-- 历史已结算消息列表 -->
             <ChatMessage
-              v-for="msg in allDisplayMessages"
-              :key="msg.id"
+              v-for="(msg, idx) in allDisplayMessages"
+              :key="msg.id || idx"
               :message="msg"
+              :is-last="idx === allDisplayMessages.length - 1 && !streaming"
+              :follow-up-prompts="followUpPrompts"
+              @send-prompt="handleSendPrompt"
+              @regenerate="handleRegenerate(idx)"
+              @delete="confirmDeleteMessage(idx)"
             />
+
+            <!-- 正在流式生成的进行时消息卡片 (对标侧边栏真流式) -->
+            <div v-if="streaming" class="streaming-active-row">
+              <div class="streaming-avatar-box">
+                <img class="assistant-brand-logo" src="@/assets/images/logo.png" alt="EduMind" />
+              </div>
+              <div class="streaming-body-box">
+                <div class="msg-meta-header">
+                  <span class="sender-name">EduMind 课程 AI 助教</span>
+                  <span class="streaming-badge-tag">正在生成研读解析...</span>
+                </div>
+
+                <!-- 深度思考状态卡片 (动态脉冲，正文输出时自动折叠) -->
+                <AIThinking
+                  v-if="!streamingAnswerBody || streamingThinkingDisplay"
+                  :content="streamingThinkingDisplay"
+                  :folded="isReasoningFolded"
+                  :active="!streamingAnswerBody && (isReasoningActive || !streamingThinkingDisplay)"
+                  :has-answer-body="!!streamingAnswerBody"
+                  :phase-message="streamPhaseMessage || '正在深度研读本门课程知识大纲与切片...'"
+                  @update:folded="isReasoningFolded = $event"
+                />
+
+                <!-- 正文流式渲染 (useStreamingMarkdown 增量输出) -->
+                <div v-if="streamingAnswerBody" class="msg-bubble is-streaming">
+                  <div class="markdown-body chat-md-content" v-html="streamingRenderedHtml" />
+                  <span class="stream-cursor">▋</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 不可见物理锚点，用于 requestAnimationFrame 顺畅跟随贴底向上滚动 -->
+            <div ref="streamAnchorRef" class="stream-bottom-anchor" />
           </div>
 
           <!-- 底部多功能自适应输入框组件 -->
@@ -262,7 +311,7 @@
         :current-id="currentSessionId"
         @select="handleSelectSession"
         @create="handleCreateNewSession"
-        @delete="deleteSession"
+        @delete="handleDeleteSession"
       />
     </el-drawer>
   </div>
@@ -270,7 +319,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, markRaw } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import {
   Search,
@@ -280,6 +329,7 @@ import {
   Connection,
   Download,
   EditPen,
+  Plus,
   Reading,
   VideoCamera,
   FolderOpened,
@@ -297,12 +347,24 @@ import { useAIStream } from '@/composables/ai/useAIStream';
 import ChatMessage from '@/components/ai/ChatMessage.vue';
 import ChatInput from '@/components/ai/ChatInput.vue';
 import ChatSessionList from '@/components/ai/ChatSessionList.vue';
+import AIThinking from '@/components/ai/AIChat/AIThinking.vue';
 
 const props = defineProps<{
+
   course?: CourseVO | null;
 }>();
 
 const router = useRouter();
+const route = useRoute();
+
+/** 优先用路由 :id，避免刷新时 course prop 尚未加载导致 courseId 错乱 */
+function resolveCourseId(): number | undefined {
+  const routeId = Number(route.params.id);
+  if (!Number.isNaN(routeId) && routeId > 0) return routeId;
+  const propId = props.course?.id ? Number(props.course.id) : NaN;
+  if (!Number.isNaN(propId) && propId > 0) return propId;
+  return undefined;
+}
 
 // ======================= 1. 顶部 Banner 与 5 大胶囊 (组件库矢量图标) =======================
 const quickActionPills = [
@@ -353,7 +415,7 @@ function mapChapterTree(nodes: Chapter[], expandedFirst = true): ChapterNode[] {
 }
 
 async function loadChapters() {
-  const courseId = props.course?.id ? Number(props.course.id) : 0;
+  const courseId = resolveCourseId() ?? 0;
   if (!courseId) return;
   chaptersLoading.value = true;
   try {
@@ -429,7 +491,9 @@ const currentModelKey = ref<string | undefined>(undefined);
 async function loadModels() {
   try {
     const chatModels = await getChatModels();
-    modelOptions.value = chatModels.map((m) => ({
+    modelOptions.value = chatModels
+      .filter((m) => m.modelKey !== 'mock' && (m.provider || '').toLowerCase() !== 'mock')
+      .map((m) => ({
       name: m.name,
       key: m.modelKey,
       desc: m.provider || 'LLM'
@@ -454,7 +518,6 @@ function handleModelSelect(modelKey: string) {
 }
 
 const historyDrawerVisible = ref(false);
-const messagesScrollRef = ref<HTMLDivElement | null>(null);
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null);
 
 // useAIStream 状态与方法
@@ -463,12 +526,29 @@ const {
   currentSessionId,
   messages,
   streaming,
+  messagesScrollRef,
+  streamAnchorRef,
+  streamingReasoning,
+  streamingContent,
+  streamingCitations,
+  streamingRenderedHtml,
+  streamingAnswerBody,
+  streamingThinkingDisplay,
+  isReasoningFolded,
+  isReasoningActive,
+  streamPhaseMessage,
+  followUpPrompts,
   loadSessions,
   switchSession,
   sendMessage,
   stopStream,
   createNewSession,
-  deleteSession
+  startNewChat,
+  deleteSession,
+  handleRegenerate: regenerateStreamMessage,
+  confirmDeleteMessage,
+  scrollToBottomSmooth,
+  scrollToBottomInstant
 } = useAIStream();
 
 const welcomeMessage = computed(() => ({
@@ -486,27 +566,32 @@ const allDisplayMessages = computed(() => {
   return messages.value;
 });
 
-function scrollToBottom() {
-  nextTick(() => {
-    if (messagesScrollRef.value) {
-      messagesScrollRef.value.scrollTop = messagesScrollRef.value.scrollHeight;
-    }
-  });
+function handleDeleteSession(id: string) {
+  void deleteSession(id, resolveCourseId());
 }
 
 function handleSelectSession(id: string) {
-  switchSession(id);
+  switchSession(id, resolveCourseId());
   historyDrawerVisible.value = false;
 }
 
 function handleCreateNewSession() {
-  createNewSession(props.course?.id ? Number(props.course.id) : 101);
+  const courseId = resolveCourseId();
+  if (!courseId) {
+    ElMessage.warning('课程信息加载中，请稍后再试');
+    return;
+  }
+  startNewChat(courseId);
   historyDrawerVisible.value = false;
   ElMessage.success('已开启新问答会话');
 }
 
 function handleSend(promptText: string) {
-  const courseId = props.course?.id ? Number(props.course.id) : 101;
+  const courseId = resolveCourseId();
+  if (!courseId) {
+    ElMessage.warning('课程信息加载中，请稍后再试');
+    return;
+  }
   let finalPrompt = promptText;
   if (activeSectionTitle.value) {
     finalPrompt = `[当前章节: ${activeSectionTitle.value}] ${finalPrompt}`;
@@ -515,7 +600,19 @@ function handleSend(promptText: string) {
     chapterId: activeChapterId.value,
     modelKey: currentModelKey.value
   });
-  scrollToBottom();
+}
+
+function handleSendPrompt(promptText: string) {
+  handleSend(promptText);
+}
+
+function handleRegenerate(idx: number) {
+  const courseId = resolveCourseId();
+  if (!courseId) return;
+  regenerateStreamMessage(idx, courseId, {
+    chapterId: activeChapterId.value,
+    modelKey: currentModelKey.value
+  });
 }
 
 // ======================= 4. 右栏：资源、推荐问题与 8 宫格学习工具 =======================
@@ -584,20 +681,10 @@ function exportChatMarkdown() {
   ElMessage.success('已导出当前问答记录为 Markdown 文件');
 }
 
-// 自动滚动跟随
-watch(
-  () => [allDisplayMessages.value.length, allDisplayMessages.value[allDisplayMessages.value.length - 1]?.content],
-  () => {
-    scrollToBottom();
-  },
-  { deep: true }
-);
-
 onMounted(() => {
   loadChapters();
   loadModels();
-  loadSessions(props.course?.id ? Number(props.course.id) : undefined);
-  scrollToBottom();
+  scrollToBottomInstant();
   nextTick(() => {
     const appContent = document.querySelector('.app-content');
     if (appContent) {
@@ -605,6 +692,16 @@ onMounted(() => {
     }
   });
 });
+
+watch(
+  () => resolveCourseId(),
+  (courseId) => {
+    if (courseId) {
+      void loadSessions(courseId);
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped lang="scss">
@@ -753,9 +850,10 @@ onMounted(() => {
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    height: 640px;
-    min-height: 580px;
+    height: clamp(640px, calc(100vh - 160px), 960px);
+    min-height: 640px;
     box-sizing: border-box;
+    overflow-x: hidden;
 
     .workbench-col {
       min-width: 0;
@@ -1013,6 +1111,16 @@ onMounted(() => {
                 border-color: #1677FF;
                 color: #1677FF;
               }
+
+              &.new-chat-btn {
+                border-color: rgba(22, 119, 255, 0.35);
+                color: #1677FF;
+                background: rgba(22, 119, 255, 0.06);
+
+                &:hover {
+                  background: rgba(22, 119, 255, 0.12);
+                }
+              }
             }
           }
         }
@@ -1058,6 +1166,100 @@ onMounted(() => {
                 color: #1E40AF;
               }
             }
+          }
+
+          /* 正在流式生成的进行时卡片 (与结算完成后的 ChatMessage 保持 100% 结构一致) */
+          .streaming-active-row {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            max-width: 100%;
+            margin-bottom: 22px;
+            box-sizing: border-box;
+
+            .streaming-avatar-box {
+              width: 40px;
+              height: 40px;
+              border-radius: 50%;
+              overflow: hidden;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+              box-shadow: 0 4px 14px rgba(37, 99, 235, 0.18);
+              position: sticky;
+              top: 0;
+
+              .assistant-brand-logo {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+              }
+            }
+
+            .streaming-body-box {
+              max-width: 86%;
+              min-width: 0;
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+
+              .msg-meta-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 5px;
+
+                .sender-name {
+                  font-size: 12.5px;
+                  font-weight: 600;
+                  color: #1E293B;
+                }
+
+                .streaming-badge-tag {
+                  font-size: 11px;
+                  padding: 1px 8px;
+                  border-radius: 999px;
+                  background: rgba(22, 119, 255, 0.1);
+                  color: #1677ff;
+                  font-weight: 500;
+                  animation: pulse 1.5s infinite ease-in-out;
+                }
+              }
+
+              .msg-bubble.is-streaming {
+                position: relative;
+                max-width: 100%;
+                min-width: 0;
+                box-sizing: border-box;
+                padding: 16px 20px 24px;
+                font-size: 13.5px;
+                line-height: 1.7;
+                word-break: break-word;
+                background: #F8FAFC;
+                border: 1px solid #E2E8F0;
+                border-radius: 4px 18px 18px 18px;
+                box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+                color: #1E293B;
+                overflow: hidden;
+
+                .stream-cursor {
+                  display: inline-block;
+                  margin-left: 2px;
+                  color: #1677FF;
+                  font-size: 14px;
+                  animation: blink 0.9s infinite;
+                }
+              }
+            }
+          }
+
+          .stream-bottom-anchor {
+            height: 1px;
+            width: 100%;
+            pointer-events: none;
+            visibility: hidden;
           }
         }
 

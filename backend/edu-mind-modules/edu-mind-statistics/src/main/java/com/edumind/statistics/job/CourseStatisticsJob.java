@@ -1,6 +1,7 @@
 package com.edumind.statistics.job;
 
 import com.edumind.ai.api.AiAuditQueryApi;
+import com.edumind.common.context.TenantContext;
 import com.edumind.statistics.dao.CourseStatisticsDao;
 import com.edumind.statistics.dao.KnowledgeMasteryDao;
 import com.edumind.statistics.dao.LearningRecordDao;
@@ -8,6 +9,7 @@ import com.edumind.statistics.dao.WrongQuestionRecordDao;
 import com.edumind.statistics.entity.CourseStatisticsEntity;
 import com.edumind.statistics.entity.KnowledgeMasteryEntity;
 import com.edumind.statistics.entity.LearningRecordEntity;
+import com.edumind.system.api.TenantQueryApi;
 import com.edumind.teaching.api.SubmissionQueryApi;
 import com.edumind.teaching.vo.submission.SubmissionStatsVO;
 import lombok.RequiredArgsConstructor;
@@ -40,15 +42,39 @@ public class CourseStatisticsJob {
     private final SubmissionQueryApi submissionQueryApi;
     private final AiAuditQueryApi aiAuditQueryApi;
     private final WrongQuestionRecordDao wrongQuestionRecordDao;
+    private final TenantQueryApi tenantQueryApi;
 
     /**
-     * 每日凌晨 02:00 定时执行前一日统计聚合
+     * 每日凌晨 02:00 定时执行前一日统计聚合 (按租户分片，防跨校串染)
      */
     @Scheduled(cron = "0 0 2 * * ?")
     public void executeDailyAggregation() {
         LocalDate yesterday = LocalDate.now().minusDays(1);
         log.info("Starting CourseStatisticsJob for date: {}", yesterday);
-        // 查找有学习记录的所有课程
+
+        TenantContext.runWithoutTenant(() -> {
+            List<Long> tenantIds = tenantQueryApi != null ? tenantQueryApi.listActiveTenantIds() : List.of();
+            if (tenantIds == null || tenantIds.isEmpty()) {
+                tenantIds = List.of(1L);
+            }
+            for (Long tid : tenantIds) {
+                TenantContext.setTenantId(tid);
+                try {
+                    aggregateForTenant(tid, yesterday);
+                } catch (Exception ex) {
+                    log.error("Failed to aggregate course statistics for tenantId={}: {}", tid, ex.getMessage());
+                } finally {
+                    TenantContext.clear();
+                }
+            }
+        });
+        log.info("Completed CourseStatisticsJob for date: {}", yesterday);
+    }
+
+    /**
+     * 按租户独立执行课程学情日聚合
+     */
+    public void aggregateForTenant(Long tenantId, LocalDate date) {
         List<LearningRecordEntity> records = learningRecordDao.listAll();
         Set<Long> courseIds = records.stream()
                 .map(LearningRecordEntity::getCourseId)
@@ -57,12 +83,11 @@ public class CourseStatisticsJob {
 
         for (Long courseId : courseIds) {
             try {
-                aggregateCourseStat(courseId, yesterday);
+                aggregateCourseStat(courseId, date);
             } catch (Exception ex) {
-                log.error("Failed to aggregate course statistics for courseId={}: {}", courseId, ex.getMessage());
+                log.error("Failed to aggregate course statistics for tenantId={}, courseId={}: {}", tenantId, courseId, ex.getMessage());
             }
         }
-        log.info("Completed CourseStatisticsJob for {} courses", courseIds.size());
     }
 
     /**

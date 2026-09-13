@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 public class CourseEntity implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private String title;
     private String code;
     private Long teacherId;
@@ -24,4 +25,12 @@ public class CourseEntity implements Serializable {
     private Integer status;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+
+    public Long getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(Long tenantId) {
+        this.tenantId = tenantId;
+    }
 }

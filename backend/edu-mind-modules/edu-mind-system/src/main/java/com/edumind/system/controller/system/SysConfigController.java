@@ -114,9 +114,9 @@ public class SysConfigController {
      */
     @GetMapping("/base")
     public ApiResult<Map<String, Object>> getBaseInfo() {
-        String json = sysConfigService.getConfigValue("sys.base.info");
-        if (json != null && !json.isBlank()) {
-            return ApiResult.success(JSON.parseObject(json));
+        com.edumind.system.vo.config.SysConfigGroupVO group = sysConfigService.getByGroupCode("site");
+        if (group != null && group.getConfigValue() != null && !group.getConfigValue().isBlank()) {
+            return ApiResult.success(JSON.parseObject(group.getConfigValue()));
         }
         return ApiResult.success(Map.of(
                 "platformName", "智教云 · EduMind",
@@ -124,5 +124,118 @@ public class SysConfigController {
                 "copyright", "© 2026 EduMind. All rights reserved.",
                 "icp", "京ICP备20260001号-1"
         ));
+    }
+
+    /**
+     * 获取全部系统配置分组列表
+     */
+    @SaCheckRole("ADMIN")
+    @GetMapping("/groups")
+    public ApiResult<java.util.List<com.edumind.system.vo.config.SysConfigGroupVO>> listAllGroups() {
+        return ApiResult.success(sysConfigService.listAllGroups());
+    }
+
+    /**
+     * 获取指定配置分组
+     */
+    @SaCheckRole("ADMIN")
+    @GetMapping("/groups/{groupCode}")
+    public ApiResult<com.edumind.system.vo.config.SysConfigGroupVO> getGroup(@org.springframework.web.bind.annotation.PathVariable String groupCode) {
+        return ApiResult.success(sysConfigService.getByGroupCode(groupCode));
+    }
+
+    /**
+     * 更新指定配置分组
+     */
+    @SaCheckRole("ADMIN")
+    @PutMapping("/groups/{groupCode}")
+    public ApiResult<Void> updateGroup(
+            @org.springframework.web.bind.annotation.PathVariable String groupCode,
+            @RequestBody com.edumind.system.dto.config.SysConfigGroupDTO dto) {
+        sysConfigService.updateConfigGroup(groupCode, dto.getConfigValue());
+        return ApiResult.success();
+    }
+
+    /**
+     * 测试发送短信
+     */
+    @SaCheckRole("ADMIN")
+    @PostMapping("/test-sms")
+    public ApiResult<Boolean> testSms(@Valid @RequestBody com.edumind.system.dto.config.TestSmsDTO dto) {
+        return ApiResult.success(sysConfigService.testSms(dto));
+    }
+
+    /**
+     * 获取最近短信发送记录
+     */
+    @SaCheckRole("ADMIN")
+    @GetMapping("/sms-logs/recent")
+    public ApiResult<java.util.List<com.edumind.system.vo.config.SmsLogVO>> getRecentSmsLogs(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "5") Integer limit) {
+        return ApiResult.success(sysConfigService.getRecentSmsLogs(limit));
+    }
+
+    /**
+     * 分页查询短信发送记录
+     */
+    @SaCheckRole("ADMIN")
+    @GetMapping("/sms-logs")
+    public ApiResult<com.edumind.common.api.PageResult<com.edumind.system.vo.config.SmsLogVO>> pageSmsLogs(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "1") Integer page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") Integer size,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String phone,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer status) {
+        return ApiResult.success(sysConfigService.pageSmsLogs(page, size, phone, status));
+    }
+
+    /**
+     * 创建测试支付订单
+     */
+    @SaCheckRole("ADMIN")
+    @PostMapping("/test-payment")
+    public ApiResult<java.util.Map<String, String>> testPayment(
+            @Valid @RequestBody com.edumind.system.dto.config.TestPaymentDTO dto) {
+        return ApiResult.success(sysConfigService.testPayment(dto));
+    }
+
+    /**
+     * 获取最近邮件发送记录
+     */
+    @SaCheckRole("ADMIN")
+    @GetMapping("/email-logs/recent")
+    public ApiResult<java.util.List<com.edumind.system.vo.config.EmailLogVO>> getRecentEmailLogs(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "5") Integer limit) {
+        return ApiResult.success(sysConfigService.getRecentEmailLogs(limit));
+    }
+
+    /**
+     * 分页查询邮件发送记录
+     */
+    @SaCheckRole("ADMIN")
+    @GetMapping("/email-logs")
+    public ApiResult<com.edumind.common.api.PageResult<com.edumind.system.vo.config.EmailLogVO>> pageEmailLogs(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "1") Integer page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") Integer size,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String email,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer status) {
+        return ApiResult.success(sysConfigService.pageEmailLogs(page, size, email, status));
+    }
+
+    /**
+     * 获取可用角色选项
+     */
+    @SaCheckRole("ADMIN")
+    @GetMapping("/role-options")
+    public ApiResult<java.util.List<com.edumind.system.vo.config.RoleOptionVO>> getRoleOptions() {
+        return ApiResult.success(sysConfigService.getRoleOptions());
+    }
+
+    /**
+     * 获取可用用户选项
+     */
+    @SaCheckRole("ADMIN")
+    @GetMapping("/user-options")
+    public ApiResult<java.util.List<com.edumind.system.vo.config.UserOptionVO>> getUserOptions() {
+        return ApiResult.success(sysConfigService.getUserOptions());
     }
 }

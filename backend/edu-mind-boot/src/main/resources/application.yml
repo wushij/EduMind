@@ -40,6 +40,8 @@ sa-token:
   is-log: false
 
 edumind:
+  tenant:
+    demo-auto-bind-enabled: true
   rate-limit:
     enabled: true
   ai:

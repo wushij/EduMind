@@ -4,7 +4,9 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.edumind.common.api.PageResult;
+import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
+import com.edumind.common.utils.TenantObjectKeyBuilder;
 import com.edumind.system.converter.UserConverter;
 import com.edumind.system.dao.UserDao;
 import com.edumind.system.dao.UserRoleDao;
@@ -100,13 +102,11 @@ public class UserServiceImpl implements UserService {
         if (StringUtils.hasText(originalFilename) && originalFilename.contains(".")) {
             ext = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
         }
-        String username = StringUtils.hasText(entity.getUsername())
-                ? entity.getUsername().trim().toLowerCase().replaceAll("[^a-zA-Z0-9_-]", "_")
-                : "user_" + userId;
-        String objectKey = String.format("users/%s/avatar/avatar_%s.%s",
-                username,
+        String filename = String.format("avatar_%s.%s",
                 UUID.randomUUID().toString().replace("-", "").substring(0, 16),
                 ext);
+        Long currentTenantId = TenantContext.getTenantId();
+        String objectKey = TenantObjectKeyBuilder.userAvatar(currentTenantId, entity.getId(), filename);
 
         try {
             String avatarUrl = fileStorageService.uploadFile("edumind", objectKey, file.getInputStream(), contentType);

@@ -21,9 +21,12 @@ ai:
     stream-enabled: true
 
 edumind:
+  tenant:
+    demo-auto-bind-enabled: true
   security:
     sm-enabled: false
   ai:
+    model-key-secret: EduMind_AI_Model_KEK_2026
     gateway:
       enabled: true
       force-fail-model: ''

@@ -65,17 +65,9 @@ public class GatewayResilienceStore {
     }
 
     public void recordFailure(String modelKey) {
-        CircuitBreakerState state = getCircuitState(modelKey);
-        if (state.getStatus() == CircuitBreakerState.Status.HALF_OPEN) {
-            openCircuit(modelKey, state);
-            return;
-        }
-        state.setConsecutiveFailures(state.getConsecutiveFailures() + 1);
-        if (state.getConsecutiveFailures() >= FAILURE_THRESHOLD) {
-            openCircuit(modelKey, state);
-        } else {
-            saveCircuitState(modelKey, state);
-        }
+        // 彻底禁用自动熔断锁定，不再把状态置为 OPEN，避免网络波动或超时导致全平台 AI 助教瘫痪
+        incrementMetric("failedCount");
+        localFailedCount.incrementAndGet();
     }
 
     public void forceOpenCircuit(String modelKey) {
@@ -84,8 +76,7 @@ public class GatewayResilienceStore {
     }
 
     public void resetCircuit(String modelKey) {
-        CircuitBreakerState state = new CircuitBreakerState();
-        saveCircuitState(modelKey, state);
+        redisService.delete(CIRCUIT_PREFIX + modelKey);
     }
 
     public void recordFallback() {

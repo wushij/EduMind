@@ -7,6 +7,7 @@ import com.edumind.ai.service.agent.AgentRunService;
 import com.edumind.ai.service.question.SmartPaperComposeService;
 import com.edumind.ai.vo.agent.AgentRunVO;
 import com.edumind.ai.vo.question.SmartPaperComposeVO;
+import com.edumind.common.context.TenantContext;
 import com.edumind.common.model.LoginUser;
 import com.edumind.common.model.UserContext;
 import com.edumind.knowledge.service.graph.KnowledgeGraphService;
@@ -71,11 +72,13 @@ class GateV10IntegrationTest {
     void setUp() {
         LoginUser user = LoginUser.builder().id(2L).username("teacher").build();
         UserContext.set(user);
+        TenantContext.setTenantId(1L);
     }
 
     @AfterEach
     void tearDown() {
         UserContext.clear();
+        TenantContext.clear();
     }
 
     @Test

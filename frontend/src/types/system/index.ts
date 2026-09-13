@@ -171,3 +171,5 @@ export interface SecurityConfigDTO {
   registerCaptchaEnabled: boolean;
   antiDebugEnabled: boolean;
 }
+
+export * from './config';

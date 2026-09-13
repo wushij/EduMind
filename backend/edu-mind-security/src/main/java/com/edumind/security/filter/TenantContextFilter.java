@@ -52,10 +52,10 @@ public class TenantContextFilter extends OncePerRequestFilter {
                         isDelegated = true;
                     }
 
-                    // 2. 平台超级管理员专用代管通道：仅当拥有 PLATFORM_ADMIN 角色时才允许通过 Header 临时切换代管租户
+                    // 2. 平台超级管理员专用代管通道：仅当拥有 PLATFORM_ADMIN / ADMIN / ROLE_ADMIN 角色或为平台超管时允许通过 Header 临时切换代管租户
                     String headerTid = request.getHeader(TENANT_HEADER_KEY);
                     if (headerTid != null && !headerTid.isBlank()) {
-                        if (StpUtil.hasRole(ROLE_PLATFORM_ADMIN)) {
+                        if (StpUtil.hasRole(ROLE_PLATFORM_ADMIN) || StpUtil.hasRole("ADMIN") || StpUtil.hasRole("ROLE_ADMIN") || Long.valueOf(1L).equals(StpUtil.getLoginIdAsLong())) {
                             try {
                                 Long targetTenantId = Long.parseLong(headerTid.trim());
                                 if (targetTenantId > 0) {

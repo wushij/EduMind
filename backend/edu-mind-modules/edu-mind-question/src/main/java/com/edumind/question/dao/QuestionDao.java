@@ -2,6 +2,7 @@ package com.edumind.question.dao;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.edumind.common.context.TenantContext;
 import com.edumind.question.dto.question.QuestionQueryDTO;
 import com.edumind.question.entity.QuestionEntity;
 import com.edumind.question.mapper.QuestionMapper;
@@ -84,6 +85,9 @@ public class QuestionDao {
     }
 
     public int insert(QuestionEntity entity) {
+        if (entity.getTenantId() == null && TenantContext.getTenantId() != null && TenantContext.getTenantId() > 0) {
+            entity.setTenantId(TenantContext.getTenantId());
+        }
         return questionMapper.insert(entity);
     }
 

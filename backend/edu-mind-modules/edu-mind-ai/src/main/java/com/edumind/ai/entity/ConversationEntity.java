@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 public class ConversationEntity implements Serializable {
     @TableId(type = IdType.ASSIGN_UUID)
     private String id;
+    private Long tenantId;
     private Long userId;
     private Long courseId;
     private String title;
@@ -25,4 +26,12 @@ public class ConversationEntity implements Serializable {
     private Integer deleted;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+
+    public Long getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(Long tenantId) {
+        this.tenantId = tenantId;
+    }
 }

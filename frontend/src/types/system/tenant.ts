@@ -87,3 +87,15 @@ export interface QuotaUpdateRequest {
   limitValue?: number;
   warningThreshold?: number;
 }
+
+export interface OrganizationMemberVO {
+  id: number;
+  userId: number;
+  studentNo: string;
+  name: string;
+  role: string;
+  avatar?: string;
+  masteryRate?: number;
+  lastActive?: string;
+}
+

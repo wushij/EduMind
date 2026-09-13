@@ -24,11 +24,16 @@ public class SysMemberOrgDao {
                 .eq(SysMemberOrgEntity::getOrganizationId, organizationId));
     }
 
-    public List<Long> listMemberIdsByOrgId(Long tenantId, Long organizationId) {
-        List<SysMemberOrgEntity> list = sysMemberOrgMapper.selectList(new LambdaQueryWrapper<SysMemberOrgEntity>()
+    public List<SysMemberOrgEntity> listByOrgId(Long tenantId, Long organizationId) {
+        return sysMemberOrgMapper.selectList(new LambdaQueryWrapper<SysMemberOrgEntity>()
                 .eq(SysMemberOrgEntity::getTenantId, tenantId)
                 .eq(SysMemberOrgEntity::getOrganizationId, organizationId));
-        return list.stream().map(SysMemberOrgEntity::getMemberId).collect(Collectors.toList());
+    }
+
+    public List<Long> listMemberIdsByOrgId(Long tenantId, Long organizationId) {
+        return listByOrgId(tenantId, organizationId).stream()
+                .map(SysMemberOrgEntity::getMemberId)
+                .collect(Collectors.toList());
     }
 
     public List<SysMemberOrgEntity> listByMemberId(Long tenantId, Long memberId) {

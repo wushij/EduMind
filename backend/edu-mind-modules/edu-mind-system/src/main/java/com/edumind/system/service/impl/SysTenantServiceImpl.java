@@ -43,6 +43,9 @@ public class SysTenantServiceImpl implements SysTenantService, TenantQueryApi {
     private final SysTenantMemberDao sysTenantMemberDao;
     private final TenantConverter tenantConverter;
 
+    @org.springframework.beans.factory.annotation.Value("${edumind.tenant.demo-auto-bind-enabled:true}")
+    private boolean demoAutoBindEnabled = true;
+
     @Override
     public Page<TenantListVO> pageTenants(int page, int pageSize, String keyword, Integer status) {
         Page<SysTenantEntity> entityPage = sysTenantDao.page(page, pageSize, keyword, status);
@@ -143,13 +146,32 @@ public class SysTenantServiceImpl implements SysTenantService, TenantQueryApi {
                     .map(SysTenantMemberEntity::getTenantId)
                     .findFirst()
                     .orElse(members.get(0).getTenantId());
-        } else if (StpUtil.hasRole("ADMIN")) {
+        } else if (Long.valueOf(1L).equals(userId) || StpUtil.hasRole("ADMIN") || StpUtil.hasRole("PLATFORM_ADMIN") || StpUtil.hasRole("ROLE_ADMIN")) {
             SysTenantEntity defaultTenant = sysTenantDao.findById(1L);
             if (defaultTenant != null && defaultTenant.getStatus() == 1) {
                 tenantId = 1L;
                 isDelegated = true;
                 log.info("[登录初始化] 管理员 userId={} 无租户成员关系，代管进入默认租户 tenantId=1", userId);
             }
+        } else if (demoAutoBindEnabled) {
+            // 普通用户若无租户绑定，且开启了 demo 自动绑定特性，自动绑定默认示范租户 1
+            SysTenantEntity defaultTenant = sysTenantDao.findById(1L);
+            if (defaultTenant != null && defaultTenant.getStatus() == 1) {
+                tenantId = 1L;
+                SysTenantMemberEntity newMember = new SysTenantMemberEntity();
+                newMember.setTenantId(1L);
+                newMember.setUserId(userId);
+                newMember.setMemberNo("USER-" + userId);
+                newMember.setRealName("学员用户");
+                newMember.setStatus(1);
+                newMember.setIsDefault(1);
+                sysTenantMemberDao.insert(newMember);
+                log.info("[登录初始化] 普通用户 userId={} 自动绑定默认租户 tenantId=1 (demo 自动绑定模式)", userId);
+            }
+        } else {
+            // 正式多校环境：未加入任何学校的用户禁止登录，返回 null
+            log.warn("[登录初始化] 用户 userId={} 未加入任何学校/租户且未启用 demo 自动绑定，拒绝登录", userId);
+            tenantId = null;
         }
 
         if (tenantId != null) {
@@ -175,7 +197,7 @@ public class SysTenantServiceImpl implements SysTenantService, TenantQueryApi {
 
         if (!isMember) {
             // 检查当前用户是否为平台超级管理员 (具有全局管理权)
-            if (StpUtil.hasRole("ADMIN")) {
+            if (Long.valueOf(1L).equals(userId) || StpUtil.hasRole("ADMIN") || StpUtil.hasRole("PLATFORM_ADMIN") || StpUtil.hasRole("ROLE_ADMIN")) {
                 isDelegated = true;
                 log.info("[安全审计] 管理员 userId={} 申请代管进入租户 tenantId={}, 原因: {}",
                         userId, dto.getTargetTenantId(), dto.getReason());
@@ -233,5 +255,12 @@ public class SysTenantServiceImpl implements SysTenantService, TenantQueryApi {
     public boolean isUserMemberOfTenant(Long userId, Long tenantId) {
         SysTenantMemberEntity member = sysTenantMemberDao.findByTenantAndUser(tenantId, userId);
         return member != null && member.getStatus() == 1;
+    }
+
+    @Override
+    public List<Long> listActiveTenantIds() {
+        return sysTenantDao.listAllActive().stream()
+                .map(SysTenantEntity::getId)
+                .collect(Collectors.toList());
     }
 }

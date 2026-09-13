@@ -1,34 +1,46 @@
 package com.edumind.ai.integration.llm;
 
+import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
+import com.edumind.ai.util.ReasoningEffortNormalizer;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.web.client.RestTemplate;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.StringUtils;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RequiredArgsConstructor
 public class OpenAiCompatibleLlmClient implements LlmClient {
 
     private final LlmProperties properties;
-    private final RestTemplate restTemplate = createRestTemplate();
 
     @Override
     public String chat(String systemPrompt, String userPrompt) {
-        Map<String, Object> body = buildChatBody(systemPrompt, userPrompt, false);
-        HttpHeaders headers = buildHeaders();
-        JSONObject response = restTemplate.postForObject(
-                normalizeBaseUrl() + "/chat/completions",
-                new HttpEntity<>(body, headers),
-                JSONObject.class
-        );
-        return extractContent(response);
+        StringBuilder content = new StringBuilder();
+        streamChat(systemPrompt, userPrompt, new StreamCallback() {
+            @Override
+            public void onChunk(String chunk) {
+                content.append(chunk);
+            }
+
+            @Override
+            public void onError(String message) {
+                throw new IllegalStateException(message);
+            }
+        });
+        return content.toString();
     }
 
     @Override
@@ -39,8 +51,111 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
 
     @Override
     public void streamChat(String systemPrompt, String userPrompt, StreamCallback callback) {
+        if (!Boolean.TRUE.equals(properties.getStreamEnabled())) {
+            pseudoStream(systemPrompt, userPrompt, callback);
+            return;
+        }
         try {
-            String content = chat(systemPrompt, userPrompt);
+            streamFromUpstream(systemPrompt, userPrompt, callback);
+            callback.onComplete();
+        } catch (Exception ex) {
+            log.warn("LLM stream failed: {}", ex.getMessage());
+            callback.onError(ex.getMessage() != null ? ex.getMessage() : "流式请求失败");
+        }
+    }
+
+    private void streamFromUpstream(String systemPrompt, String userPrompt, StreamCallback callback) throws Exception {
+        Map<String, Object> body = buildChatBody(systemPrompt, userPrompt, true);
+        String json = JSON.toJSONString(body);
+        String url = normalizeBaseUrl() + "/chat/completions";
+
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(properties.getTimeoutMs()))
+                .build();
+
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMillis(properties.getTimeoutMs()))
+                .header("Content-Type", "application/json")
+                .header("Accept", "text/event-stream")
+                .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8));
+
+        if (StringUtils.hasText(properties.getApiKey())) {
+            builder.header("Authorization", "Bearer " + properties.getApiKey());
+        }
+
+        HttpResponse<java.io.InputStream> response = client.send(
+                builder.build(),
+                HttpResponse.BodyHandlers.ofInputStream()
+        );
+
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            String errBody = new String(response.body().readAllBytes(), StandardCharsets.UTF_8);
+            throw new IllegalStateException("上游响应异常 (" + response.statusCode() + "): " + errBody);
+        }
+
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith(":")) {
+                    continue;
+                }
+                if (!line.startsWith("data:")) {
+                    continue;
+                }
+                String data = line.substring(5).trim();
+                if ("[DONE]".equals(data)) {
+                    break;
+                }
+                parseSseData(data, callback);
+            }
+        }
+    }
+
+    private void parseSseData(String data, StreamCallback callback) {
+        JSONObject chunk;
+        try {
+            chunk = JSON.parseObject(data);
+        } catch (Exception ex) {
+            return;
+        }
+        JSONArray choices = chunk.getJSONArray("choices");
+        if (choices == null || choices.isEmpty()) {
+            return;
+        }
+        JSONObject delta = choices.getJSONObject(0).getJSONObject("delta");
+        if (delta == null) {
+            return;
+        }
+        String reasoning = delta.getString("reasoning_content");
+        if (StringUtils.hasText(reasoning)) {
+            callback.onReasoning(reasoning);
+        }
+        String content = delta.getString("content");
+        if (StringUtils.hasText(content)) {
+            callback.onChunk(content);
+        }
+    }
+
+    private void pseudoStream(String systemPrompt, String userPrompt, StreamCallback callback) {
+        try {
+            Map<String, Object> body = buildChatBody(systemPrompt, userPrompt, false);
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofMillis(properties.getTimeoutMs()))
+                    .build();
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(normalizeBaseUrl() + "/chat/completions"))
+                    .timeout(Duration.ofMillis(properties.getTimeoutMs()))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(JSON.toJSONString(body), StandardCharsets.UTF_8));
+            if (StringUtils.hasText(properties.getApiKey())) {
+                builder.header("Authorization", "Bearer " + properties.getApiKey());
+            }
+            HttpResponse<String> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            JSONObject json = JSON.parseObject(response.body());
+            String content = extractContent(json);
             for (char c : content.toCharArray()) {
                 callback.onChunk(String.valueOf(c));
             }
@@ -54,6 +169,16 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         Map<String, Object> body = new HashMap<>();
         body.put("model", properties.getModel());
         body.put("stream", stream);
+        if (stream) {
+            body.put("stream_options", Map.of("include_usage", true));
+        }
+        int maxTokens = properties.getMaxTokens() != null && properties.getMaxTokens() > 0
+                ? properties.getMaxTokens() : 8192;
+        body.put("max_tokens", maxTokens);
+        if (properties.getTemperature() != null) {
+            body.put("temperature", properties.getTemperature());
+        }
+        applyReasoningEffort(body);
         body.put("messages", List.of(
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userPrompt)
@@ -61,15 +186,26 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         return body;
     }
 
-    private HttpHeaders buildHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(properties.getApiKey());
-        return headers;
+    private void applyReasoningEffort(Map<String, Object> body) {
+        String provider = properties.getProvider() != null ? properties.getProvider().toLowerCase() : "";
+        if (!provider.contains("deepseek")) {
+            return;
+        }
+        String model = properties.getModel() != null ? properties.getModel().toLowerCase() : "";
+        // deepseek-v4-flash 等对话模型不支持 thinking / reasoning_effort，仅 reasoner 系列需要
+        if (!model.contains("reasoner") && !model.contains("-r1") && !model.contains("think")) {
+            return;
+        }
+        String effort = ReasoningEffortNormalizer.normalize(properties.getReasoningEffort());
+        body.put("reasoning_effort", effort);
+        body.put("thinking", Map.of("type", "enabled"));
     }
 
     private String normalizeBaseUrl() {
         String baseUrl = properties.getBaseUrl();
+        if (!StringUtils.hasText(baseUrl)) {
+            baseUrl = "https://api.deepseek.com";
+        }
         if (baseUrl.endsWith("/")) {
             baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
         }
@@ -89,12 +225,5 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         }
         JSONObject message = choices.getJSONObject(0).getJSONObject("message");
         return message != null ? message.getString("content") : "";
-    }
-
-    private RestTemplate createRestTemplate() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(properties.getTimeoutMs());
-        factory.setReadTimeout(properties.getTimeoutMs());
-        return new RestTemplate(factory);
     }
 }

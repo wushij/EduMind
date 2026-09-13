@@ -15,4 +15,10 @@ public class ChatStreamDTO {
     private Boolean useRag;
     private Long chapterId;
     private Long documentId;
+
+    /** 前端选择的模型配置标识（config_name / model_key），为空时使用默认对话模型 */
+    private String modelKey;
+
+    /** 是否为重新生成：为 true 时不重复保存用户消息，并替换上一轮 assistant 回复 */
+    private Boolean regenerate;
 }

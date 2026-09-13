@@ -13,6 +13,7 @@ import com.edumind.ai.service.prompt.PromptManageService;
 import com.edumind.ai.service.prompt.PromptService;
 import com.edumind.ai.vo.audit.TokenAuditSummaryVO;
 import com.edumind.common.constant.SecurityConstant;
+import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.common.model.LoginUser;
 import com.edumind.common.model.UserContext;
@@ -96,6 +97,7 @@ class GateFV05IntegrationTest {
     @BeforeEach
     void assumeInfrastructureAndSeed() {
         assumeTrue(canConnectDatabase(), "MySQL edumind 不可用，跳过 Gate F 集成测试");
+        TenantContext.setTenantId(1L);
         KnowledgeBaseEntity gateKb = knowledgeBaseDao.findById(GATE_F_KB_ID);
         assumeTrue(gateKb != null, "请先执行 sql/migration/R__gate_f_e2e_seed.sql");
         loginAsTeacher();
@@ -104,6 +106,7 @@ class GateFV05IntegrationTest {
     @AfterEach
     void clearUserContext() {
         UserContext.clear();
+        TenantContext.clear();
     }
 
     @Test

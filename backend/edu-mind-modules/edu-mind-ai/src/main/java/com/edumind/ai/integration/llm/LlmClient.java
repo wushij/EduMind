@@ -10,9 +10,17 @@ public interface LlmClient {
 
     void streamChat(String systemPrompt, String userPrompt, StreamCallback callback);
 
-    @FunctionalInterface
     interface StreamCallback {
+        /** 正文 token */
         void onChunk(String content);
+
+        /** 思考链 token（DeepSeek reasoning_content） */
+        default void onReasoning(String content) {
+        }
+
+        /** 阶段状态（reasoning / composing） */
+        default void onStatus(String phase, String message) {
+        }
 
         default void onComplete() {
         }

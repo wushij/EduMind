@@ -42,7 +42,7 @@
                 <el-input
                   v-model="step1Form.code"
                   placeholder="请输入6位验证码"
-                  :prefix-icon="Key"
+                  :prefix-icon="Message"
                   maxlength="6"
                   size="large"
                   @keyup.enter="handleVerifyStep1"
@@ -135,7 +135,7 @@
 <script setup lang="ts">
 import { ref, reactive, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
-import { Message, Lock, Key, Back, CircleCheckFilled } from '@element-plus/icons-vue';
+import { Message, Lock, Back, CircleCheckFilled } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { sendEmailCode, verifyResetCode, resetPassword } from '@/api/auth/auth';
 

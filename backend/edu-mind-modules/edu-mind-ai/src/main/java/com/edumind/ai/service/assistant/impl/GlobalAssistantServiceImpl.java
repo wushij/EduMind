@@ -7,6 +7,7 @@ import com.edumind.ai.entity.AiCallLogEntity;
 import com.edumind.ai.gateway.AiGatewayFacade;
 import com.edumind.ai.integration.llm.LlmClient;
 import com.edumind.ai.integration.llm.LlmProperties;
+import com.edumind.ai.integration.llm.LlmStreamRelay;
 import com.edumind.ai.router.IntentRouter;
 import com.edumind.ai.service.assistant.GlobalAssistantService;
 import com.edumind.ai.service.routing.IntentDispatchPlan;
@@ -62,13 +63,27 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                 }
 
                 StringBuilder contentBuilder = new StringBuilder();
+                StringBuilder reasoningBuilder = new StringBuilder();
                 long start = System.currentTimeMillis();
 
+                LlmClient.StreamCallback relay = LlmStreamRelay.create(
+                        (eventName, payload) -> sendEvent(emitter, eventName, payload),
+                        contentBuilder,
+                        reasoningBuilder);
                 aiGatewayFacade.streamChat("global_assistant", plan.getSystemPrompt(), plan.getUserPrompt(), new LlmClient.StreamCallback() {
                     @Override
+                    public void onReasoning(String chunk) {
+                        relay.onReasoning(chunk);
+                    }
+
+                    @Override
                     public void onChunk(String chunk) {
-                        contentBuilder.append(chunk);
-                        sendEvent(emitter, "delta", Map.of("content", chunk));
+                        relay.onChunk(chunk);
+                    }
+
+                    @Override
+                    public void onStatus(String phase, String message) {
+                        relay.onStatus(phase, message);
                     }
 
                     @Override
@@ -76,6 +91,9 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                         Map<String, Object> done = new HashMap<>();
                         done.put("conversationId", convId);
                         done.put("citations", plan.getCitations() != null ? plan.getCitations() : List.of());
+                        if (!reasoningBuilder.isEmpty()) {
+                            done.put("reasoningContent", reasoningBuilder.toString());
+                        }
                         if (plan.getAgentCode() != null) {
                             done.put("agentCode", plan.getAgentCode());
                         }
@@ -87,7 +105,7 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                     @Override
                     public void onError(String error) {
                         log.error("Global assistant stream error: {}", error);
-                        sendEvent(emitter, "error", Map.of("message", error));
+                        relay.onError(error);
                         emitter.completeWithError(new RuntimeException(error));
                     }
                 });

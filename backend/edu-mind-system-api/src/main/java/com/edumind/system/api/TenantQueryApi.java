@@ -27,4 +27,9 @@ public interface TenantQueryApi {
      * 校验用户是否属于指定租户
      */
     boolean isUserMemberOfTenant(Long userId, Long tenantId);
+
+    /**
+     * 获取当前所有处于启用状态的有效租户 ID 列表
+     */
+    List<Long> listActiveTenantIds();
 }

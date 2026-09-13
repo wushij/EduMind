@@ -12,6 +12,7 @@ public class MessageVO {
     private String conversationId;
     private String role;
     private String content;
+    private String reasoningContent;
     private List<CitationVO> citations;
     private LocalDateTime createTime;
 }

@@ -64,18 +64,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { Document, ArrowDown } from '@element-plus/icons-vue';
-
-export interface CitationItem {
-  id?: number | string;
-  docTitle?: string;
-  documentName?: string;
-  page?: number;
-  pageNo?: number;
-  snippet?: string;
-  excerpt?: string;
-  content?: string;
-  score?: number;
-}
+import type { CitationItem } from '@/types/ai/assistant';
 
 defineProps<{
   citations: CitationItem[];

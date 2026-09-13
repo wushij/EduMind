@@ -96,6 +96,10 @@ public class AuthServiceImpl implements AuthService {
         permissionCacheService.evictUser(user.getId());
         StpUtil.login(user.getId());
         Long tenantId = sysTenantService.initializeLoginTenantSession(user.getId());
+        if (tenantId == null) {
+            StpUtil.logout(user.getId());
+            throw new BusinessException("未加入任何学校");
+        }
 
         return LoginVO.builder()
                 .token(StpUtil.getTokenValue())
@@ -126,6 +130,10 @@ public class AuthServiceImpl implements AuthService {
         permissionCacheService.evictUser(user.getId());
         StpUtil.login(user.getId());
         Long tenantId = sysTenantService.initializeLoginTenantSession(user.getId());
+        if (tenantId == null) {
+            StpUtil.logout(user.getId());
+            throw new BusinessException("未加入任何学校");
+        }
 
         return LoginVO.builder()
                 .token(StpUtil.getTokenValue())

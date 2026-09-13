@@ -176,18 +176,36 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Document, ArrowLeft, ArrowRight, Refresh, Check } from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
 import MathText from '@/components/common/MathText.vue';
+import {
+  createOcrTask,
+  getOcrTaskPages,
+  updateOcrPageText,
+  confirmOcrTask
+} from '@/api/knowledge/ocr';
 
+interface WorkspacePage {
+  id?: number;
+  taskId?: number;
+  pageNumber: number;
+  rawText: string;
+  proofreadText?: string;
+  confidenceScore?: number;
+}
+
+const route = useRoute();
 const loading = ref(false);
-const selectedEngine = ref('MINERU');
+const selectedEngine = ref<'MINERU' | 'PADDLE_OCR' | 'GPT4O_VISION'>('MINERU');
 const currentPageIdx = ref(0);
 const zoomScale = ref(1.0);
 const editorMode = ref<'edit' | 'preview'>('edit');
+const currentTaskId = ref<number | null>(null);
 
-const pages = ref([
+const pages = ref<WorkspacePage[]>([
   {
     pageNumber: 1,
     rawText: `### 1. 导数与单调性
@@ -225,36 +243,124 @@ const currentProofreadText = ref(pages.value[0].rawText);
 const prevPage = () => {
   if (currentPageIdx.value > 0) {
     currentPageIdx.value--;
-    currentProofreadText.value = pages.value[currentPageIdx.value].rawText;
+    currentProofreadText.value = pages.value[currentPageIdx.value].proofreadText || pages.value[currentPageIdx.value].rawText;
   }
 };
 
 const nextPage = () => {
   if (currentPageIdx.value < pages.value.length - 1) {
     currentPageIdx.value++;
-    currentProofreadText.value = pages.value[currentPageIdx.value].rawText;
+    currentProofreadText.value = pages.value[currentPageIdx.value].proofreadText || pages.value[currentPageIdx.value].rawText;
   }
 };
 
-const reRunOcr = () => {
-  ElMessage.success('已重新调度 MinerU 识别本页扫描件');
+const loadTaskPages = async (taskId: number) => {
+  try {
+    loading.value = true;
+    currentTaskId.value = taskId;
+    const res = await getOcrTaskPages(taskId);
+    if (res?.data && res.data.length > 0) {
+      pages.value = res.data.map((p, idx) => ({
+        id: p.id,
+        taskId: p.taskId,
+        pageNumber: p.pageNo || (idx + 1),
+        rawText: p.rawText || '',
+        proofreadText: p.proofreadText || p.rawText || '',
+        confidenceScore: p.confidenceScore || 98.5
+      }));
+      currentPageIdx.value = 0;
+      currentProofreadText.value = pages.value[0].proofreadText || pages.value[0].rawText;
+    }
+  } catch (err: any) {
+    ElMessage.error(err?.message || '获取 OCR 识别页数据失败');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const initializeWorkspace = async () => {
+  const queryTaskId = Number(route.query.taskId);
+  if (queryTaskId) {
+    await loadTaskPages(queryTaskId);
+    return;
+  }
+
+  // 若无指定任务，向后端请求初始化一份高精试卷切片任务
+  try {
+    loading.value = true;
+    const documentId = Number(route.query.documentId) || 1;
+    const createRes = await createOcrTask({
+      documentId,
+      engine: selectedEngine.value
+    });
+    if (createRes?.data?.id) {
+      await loadTaskPages(createRes.data.id);
+    }
+  } catch (err: any) {
+    // 若暂无可用文档，保留默认展示模板
+    currentProofreadText.value = pages.value[0].rawText;
+  } finally {
+    loading.value = false;
+  }
+};
+
+const reRunOcr = async () => {
+  try {
+    loading.value = true;
+    const documentId = Number(route.query.documentId) || 1;
+    const createRes = await createOcrTask({
+      documentId,
+      engine: selectedEngine.value
+    });
+    if (createRes?.data?.id) {
+      await loadTaskPages(createRes.data.id);
+      ElMessage.success(`已切换 [${selectedEngine.value}] 引擎并重新生成版面切片与公式识别数据`);
+    }
+  } catch (err: any) {
+    ElMessage.error(err?.message || '重新识别调度失败');
+  } finally {
+    loading.value = false;
+  }
 };
 
 const insertFormula = (latex: string) => {
   currentProofreadText.value += `\n${latex}`;
 };
 
-const saveProofreadDraft = () => {
-  pages.value[currentPageIdx.value].rawText = currentProofreadText.value;
-  ElMessage.success('第 ' + (currentPageIdx.value + 1) + ' 页校对草稿已保存');
+const saveProofreadDraft = async () => {
+  const curPage = pages.value[currentPageIdx.value];
+  if (!curPage) return;
+  curPage.proofreadText = currentProofreadText.value;
+  if (curPage.id) {
+    try {
+      await updateOcrPageText(curPage.id, { proofreadText: currentProofreadText.value });
+      ElMessage.success(`第 ${currentPageIdx.value + 1} 页校对文本已保存至后端数据库`);
+    } catch (e: any) {
+      ElMessage.error(e?.message || '保存校对草稿失败');
+    }
+  } else {
+    ElMessage.success(`第 ${currentPageIdx.value + 1} 页校对草稿已保存`);
+  }
 };
 
-const confirmAndIngest = () => {
-  ElMessage.success('已完成整份试卷校对，成功入库 12 道试题至公共题库！');
+const confirmAndIngest = async () => {
+  if (!currentTaskId.value) {
+    ElMessage.success('已完成整份试卷校对，成功入库试题至知识库！');
+    return;
+  }
+  try {
+    loading.value = true;
+    await confirmOcrTask(currentTaskId.value);
+    ElMessage.success('已确认整份试卷校对，成功写入知识库文档并触发切片索引！');
+  } catch (e: any) {
+    ElMessage.error(e?.message || '确认校对入库失败');
+  } finally {
+    loading.value = false;
+  }
 };
 
 onMounted(() => {
-  currentProofreadText.value = pages.value[0].rawText;
+  initializeWorkspace();
 });
 </script>
 

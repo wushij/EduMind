@@ -34,7 +34,12 @@ public class MybatisPlusConfig {
             "ai_memory_namespace",
             "knowledge_ocr_task",
             "export_task",
-            "teaching_intervention"
+            "teaching_intervention",
+            "course",
+            "knowledge_base",
+            "ai_conversation",
+            "ai_call_log",
+            "edu_question"
     );
 
     @Bean
@@ -64,8 +69,15 @@ public class MybatisPlusConfig {
                 if (TenantContext.isIgnoreTenant()) {
                     return true;
                 }
-                // 仅对已支持多租户的表执行自动 tenant_id 隔离注入
-                return !TENANT_TABLES.contains(tableName.toLowerCase());
+                if (tableName == null || tableName.isBlank()) {
+                    return true;
+                }
+                String cleanName = tableName.replace("`", "").replace("\"", "").replace("'", "").trim().toLowerCase();
+                int dotIdx = cleanName.lastIndexOf('.');
+                if (dotIdx >= 0) {
+                    cleanName = cleanName.substring(dotIdx + 1);
+                }
+                return !TENANT_TABLES.contains(cleanName);
             }
         }));
 

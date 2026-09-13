@@ -8,8 +8,10 @@ import { getModelConfigs } from '@/api/system/model';
 interface ChatModelVO {
   id: number;
   modelKey: string;
+  name?: string;
   provider: string;
   enabled?: boolean;
+  isDefault?: boolean;
 }
 
 export const getConversations = (courseId?: number) =>
@@ -34,10 +36,10 @@ export const cancelChatStream = (streamId: string) => del<void>(`/ai/chat/stream
 function mapChatModelVo(list: ChatModelVO[]): ModelProviderConfig[] {
   return list
     .filter((m) => m.enabled !== false)
-    .map((m, index) => ({
+    .map((m) => ({
       id: m.id,
       modelKey: m.modelKey,
-      name: m.modelKey,
+      name: m.name || m.modelKey,
       provider: (m.provider || 'DeepSeek') as ModelProviderConfig['provider'],
       endpoint: '',
       apiKeyMasked: '',
@@ -48,7 +50,7 @@ function mapChatModelVo(list: ChatModelVO[]): ModelProviderConfig[] {
       supportsEmbedding: false,
       supportsVision: false,
       enabled: true,
-      isDefault: index === 0,
+      isDefault: !!m.isDefault,
       costPer1kPrompt: 0,
       costPer1kCompletion: 0,
       healthStatus: 'HEALTHY' as const

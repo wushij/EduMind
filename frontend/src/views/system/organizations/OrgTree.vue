@@ -165,7 +165,7 @@
                 </div>
               </div>
 
-              <el-table :data="filteredMembers" stripe style="width: 100%;">
+              <el-table :data="filteredMembers" v-loading="membersLoading" stripe style="width: 100%;">
                 <el-table-column prop="studentNo" label="学号/工号" width="130" />
                 <el-table-column prop="name" label="姓名" width="120">
                   <template #default="{ row }">
@@ -248,10 +248,11 @@ import {
   Delete
 } from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
-import { getOrgTree, createOrgNode, updateOrgNode, deleteOrgNode } from '@/api/system/tenant';
-import type { OrganizationNodeVO } from '@/types/system/tenant';
+import { getOrgTree, createOrgNode, updateOrgNode, deleteOrgNode, getOrgMembers } from '@/api/system/tenant';
+import type { OrganizationNodeVO, OrganizationMemberVO } from '@/types/system/tenant';
 
 const loading = ref(false);
+const membersLoading = ref(false);
 const treeSearchKeyword = ref('');
 const treeRef = ref();
 const treeData = ref<OrganizationNodeVO[]>([]);
@@ -277,13 +278,7 @@ const nodeForm = ref({
   sortOrder: 1
 });
 
-const members = ref([
-  { id: 1, studentNo: '20240101', name: '王小凡', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix', role: '班长', masteryRate: 92, lastActive: '10分钟前' },
-  { id: 2, studentNo: '20240102', name: '李青青', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lily', role: '学习委员', masteryRate: 88, lastActive: '25分钟前' },
-  { id: 3, studentNo: '20240103', name: '赵子轩', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jack', role: '学生', masteryRate: 64, lastActive: '2小时前' },
-  { id: 4, studentNo: '20240104', name: '陈梓涵', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mia', role: '学生', masteryRate: 79, lastActive: '昨天 19:40' },
-  { id: 5, studentNo: '20240105', name: '孙浩天', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Leo', role: '学生', masteryRate: 53, lastActive: '3天前' }
-]);
+const members = ref<OrganizationMemberVO[]>([]);
 
 const filteredMembers = computed(() => {
   if (!memberKeyword.value) return members.value;
@@ -443,18 +438,39 @@ const loadTree = async () => {
       treeData.value = defaultTreeData;
       selectedNode.value = treeData.value[0]?.children?.[0]?.children?.[0] || treeData.value[0];
     }
+    if (selectedNode.value?.id) {
+      loadMembers(selectedNode.value.id);
+    }
   } catch (e) {
     if (!treeData.value || treeData.value.length === 0) {
       treeData.value = defaultTreeData;
       selectedNode.value = treeData.value[0]?.children?.[0]?.children?.[0] || treeData.value[0];
+    }
+    if (selectedNode.value?.id) {
+      loadMembers(selectedNode.value.id);
     }
   } finally {
     loading.value = false;
   }
 };
 
+const loadMembers = async (orgId: number) => {
+  try {
+    membersLoading.value = true;
+    const res = await getOrgMembers(orgId);
+    members.value = res?.data ?? [];
+  } catch {
+    members.value = [];
+  } finally {
+    membersLoading.value = false;
+  }
+};
+
 const handleNodeClick = (node: OrganizationNodeVO) => {
   selectedNode.value = node;
+  if (node?.id) {
+    loadMembers(node.id);
+  }
 };
 
 const openAddRootDialog = () => {

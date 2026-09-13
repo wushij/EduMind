@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 public class AiCallLogEntity implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private Long userId;
     private Long courseId;
     private String model;
@@ -24,4 +25,12 @@ public class AiCallLogEntity implements Serializable {
     private Integer retrievalHitCount;
     private String citationDocIds;
     private LocalDateTime createTime;
+
+    public Long getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(Long tenantId) {
+        this.tenantId = tenantId;
+    }
 }

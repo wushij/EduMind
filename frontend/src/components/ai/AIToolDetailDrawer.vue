@@ -78,7 +78,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
-import ColorIcon, { type IconTheme } from '@/components/common/ColorIcon.vue';
+import ColorIcon from '@/components/common/ColorIcon.vue';
+import type { IconTheme } from '@/types/common/icon';
 import type { AITool } from '@/types/ai/tool';
 import { launchAITool } from '@/utils/ai/launch-tool';
 

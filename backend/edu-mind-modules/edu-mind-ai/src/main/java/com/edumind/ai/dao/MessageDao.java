@@ -29,4 +29,24 @@ public class MessageDao {
     public int insert(MessageEntity entity) {
         return messageMapper.insert(entity);
     }
+
+    public int deleteById(String id) {
+        if (id == null) {
+            return 0;
+        }
+        return messageMapper.deleteById(id);
+    }
+
+    public MessageEntity findLastByConversationIdAndRole(String conversationId, String role) {
+        if (conversationId == null || role == null) {
+            return null;
+        }
+        return messageMapper.selectOne(
+                new LambdaQueryWrapper<MessageEntity>()
+                        .eq(MessageEntity::getConversationId, conversationId)
+                        .eq(MessageEntity::getRole, role)
+                        .orderByDesc(MessageEntity::getCreateTime)
+                        .last("LIMIT 1")
+        );
+    }
 }

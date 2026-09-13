@@ -4,6 +4,7 @@ import com.edumind.ai.dao.AiGatewayRouteDao;
 import com.edumind.ai.dao.AiModelConfigDao;
 import com.edumind.ai.entity.AiGatewayRouteEntity;
 import com.edumind.ai.entity.AiModelConfigEntity;
+import com.edumind.ai.integration.llm.LlmProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -14,30 +15,88 @@ public class ModelRouterImpl implements ModelRouter {
 
     private final AiGatewayRouteDao aiGatewayRouteDao;
     private final AiModelConfigDao aiModelConfigDao;
+    private final LlmProperties llmProperties;
 
     @Override
     public String resolveModelKey(String scene, String explicitModelKey) {
         if (StringUtils.hasText(explicitModelKey)) {
-            return explicitModelKey;
+            return normalizeModelKey(explicitModelKey);
         }
+
+        AiModelConfigEntity defaultChat = aiModelConfigDao.findDefaultByType("chat");
+        if (defaultChat != null && isInvokable(defaultChat)) {
+            return configLookupKey(defaultChat);
+        }
+
         if (StringUtils.hasText(scene)) {
             AiGatewayRouteEntity route = aiGatewayRouteDao.findByScene(scene);
             if (route != null && StringUtils.hasText(route.getPrimaryModelKey())) {
-                return route.getPrimaryModelKey();
+                AiModelConfigEntity routed = findConfig(route.getPrimaryModelKey());
+                if (routed != null && isInvokable(routed)) {
+                    return configLookupKey(routed);
+                }
             }
         }
+
         return aiModelConfigDao.listEnabled().stream()
+                .filter(this::isInvokable)
+                .map(this::configLookupKey)
                 .findFirst()
-                .map(AiModelConfigEntity::getModelKey)
                 .orElse("mock");
     }
 
+    @Override
     public String resolveFallback(String modelKey) {
-        AiModelConfigEntity config = aiModelConfigDao.findByModelKey(modelKey);
-        if (config != null && StringUtils.hasText(config.getFallbackModelKey())) {
+        AiModelConfigEntity config = findConfig(modelKey);
+        if (config != null && StringUtils.hasText(config.getFallbackModelKey())
+                && !isMockKey(config.getFallbackModelKey())) {
             return config.getFallbackModelKey();
         }
         AiGatewayRouteEntity route = aiGatewayRouteDao.findByScene("CHAT");
-        return route != null ? route.getFallbackModelKey() : "mock";
+        String routeFallback = route != null ? route.getFallbackModelKey() : null;
+        if (StringUtils.hasText(routeFallback) && !isMockKey(routeFallback)) {
+            return routeFallback;
+        }
+        return null;
+    }
+
+    private boolean isMockKey(String modelKey) {
+        return "mock".equalsIgnoreCase(modelKey);
+    }
+
+    private String normalizeModelKey(String modelKey) {
+        AiModelConfigEntity config = findConfig(modelKey);
+        return config != null ? configLookupKey(config) : modelKey.trim();
+    }
+
+    private AiModelConfigEntity findConfig(String modelKey) {
+        if (!StringUtils.hasText(modelKey)) {
+            return null;
+        }
+        AiModelConfigEntity byKey = aiModelConfigDao.findByModelKey(modelKey);
+        if (byKey != null) {
+            return byKey;
+        }
+        return aiModelConfigDao.findByConfigName(modelKey);
+    }
+
+    private String configLookupKey(AiModelConfigEntity config) {
+        if (StringUtils.hasText(config.getConfigName())) {
+            return config.getConfigName();
+        }
+        return config.getModelKey();
+    }
+
+    private boolean isInvokable(AiModelConfigEntity config) {
+        if (config == null || !Boolean.TRUE.equals(config.getEnabled())) {
+            return false;
+        }
+        if ("mock".equalsIgnoreCase(config.getProvider()) || "mock".equalsIgnoreCase(config.getModelKey())) {
+            return false;
+        }
+        if (StringUtils.hasText(config.getApiKeyCipher())) {
+            return true;
+        }
+        return StringUtils.hasText(llmProperties.getApiKey());
     }
 }

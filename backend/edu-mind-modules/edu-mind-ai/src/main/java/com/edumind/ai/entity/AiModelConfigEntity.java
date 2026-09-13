@@ -14,13 +14,27 @@ import java.time.LocalDateTime;
 public class AiModelConfigEntity implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;
+    /** 配置唯一标识（管理端业务键，对齐 goblog name） */
+    private String configName;
+    /** Gateway 路由键，默认与 configName 一致 */
     private String modelKey;
     private String provider;
+    /** chat | embedding */
+    private String configType;
+    /** 上游模型型号 */
+    private String modelName;
+    private String baseUrl;
+    private String apiKeyCipher;
     private Boolean enabled;
     private Integer priority;
     private String fallbackModelKey;
     private Integer maxTokens;
     private BigDecimal temperature;
+    private Boolean isDefault;
+    /** low | medium | high | max */
+    private String reasoningEffort;
+    private Integer dimension;
+    private Integer sortOrder;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

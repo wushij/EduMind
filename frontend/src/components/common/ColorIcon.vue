@@ -14,16 +14,7 @@
 import { computed, type Component } from 'vue';
 import * as ElementPlusIcons from '@element-plus/icons-vue';
 import { MagicStick } from '@element-plus/icons-vue';
-
-export type IconTheme =
-  | 'blue'
-  | 'cyan'
-  | 'emerald'
-  | 'amber'
-  | 'rose'
-  | 'purple'
-  | 'indigo'
-  | 'teal';
+import type { IconTheme } from '@/types/common/icon';
 
 const THEME_GRADIENTS: Record<IconTheme, string> = {
   blue: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',

@@ -12,7 +12,7 @@ import com.edumind.ai.entity.AgentRunEntity;
 import com.edumind.ai.entity.AgentStepEntity;
 import com.edumind.ai.entity.AgentToolCallEntity;
 import com.edumind.ai.gateway.AiGatewayFacade;
-import com.edumind.ai.gateway.ModelRouterImpl;
+import com.edumind.ai.gateway.ModelRouter;
 import com.edumind.ai.rag.context.RagCitationMapper;
 import com.edumind.ai.rag.model.RagResult;
 import com.edumind.ai.rag.pipeline.RagPipelineImpl;
@@ -46,7 +46,7 @@ public class AgentExecutorImpl {
     private final AgentStepDao agentStepDao;
     private final AgentToolCallDao agentToolCallDao;
     private final AiGatewayFacade aiGatewayFacade;
-    private final ModelRouterImpl modelRouter;
+    private final ModelRouter modelRouter;
     private final AgentRunStreamRegistry streamRegistry;
     private final RagPipelineImpl ragPipeline;
     private final KnowledgeQueryApi knowledgeQueryApi;
