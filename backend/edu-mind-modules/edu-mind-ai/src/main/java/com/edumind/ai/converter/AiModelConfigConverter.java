@@ -20,6 +20,7 @@ public class AiModelConfigConverter {
         vo.setModelName(StringUtils.hasText(entity.getModelName()) ? entity.getModelName() : entity.getModelKey());
         vo.setBaseUrl(entity.getBaseUrl());
         vo.setHasApiKey(StringUtils.hasText(entity.getApiKeyCipher()));
+        vo.setKeyVersion(entity.getKeyVersion() != null ? entity.getKeyVersion() : 1);
         vo.setTemperature(entity.getTemperature());
         vo.setReasoningEffort(StringUtils.hasText(entity.getReasoningEffort()) ? entity.getReasoningEffort() : "low");
         vo.setDimension(entity.getDimension());

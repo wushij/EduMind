@@ -325,7 +325,8 @@ function buildModuleDefinitions(): NavModule[] {
         { path: '/system/prompts', name: 'Prompt 模板', icon: ChatLineSquare },
         { path: '/system/tools', name: 'AI 工具', icon: Operation },
         { path: '/system/gateway', name: 'AI 网关', icon: Connection },
-        { path: '/system/quotas', name: '算力与配额', icon: Money }
+        { path: '/system/quotas', name: '算力与配额', icon: Money },
+        { path: '/system/audit', name: 'AI 审计日志', icon: Clock }
       ]
     },
 
@@ -343,7 +344,6 @@ function buildModuleDefinitions(): NavModule[] {
         { path: '/system/permissions', name: '权限分配', icon: Key },
         { path: '/system/tenants', name: '租户与校区', icon: School },
         { path: '/system/organizations', name: '组织架构', icon: Connection },
-        { path: '/system/audit', name: 'AI 审计日志', icon: Clock },
         { path: '/system/oper-log', name: '操作日志', icon: Memo, permissions: ['system:operlog:query'] },
         {
           path: '/system/notification-broadcast',

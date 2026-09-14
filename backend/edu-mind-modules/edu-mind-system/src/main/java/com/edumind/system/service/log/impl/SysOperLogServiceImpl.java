@@ -1,7 +1,9 @@
 package com.edumind.system.service.log.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.edumind.common.api.ResultCode;
 import com.edumind.common.context.TenantContext;
+import com.edumind.common.exception.BusinessException;
 import com.edumind.system.converter.SysOperLogConverter;
 import com.edumind.system.dao.SysOperLogDao;
 import com.edumind.system.dao.UserDao;
@@ -46,10 +48,7 @@ public class SysOperLogServiceImpl implements SysOperLogService {
 
     @Override
     public SysOperLogVO getById(Long id) {
-        SysOperLogEntity entity = sysOperLogDao.selectById(id);
-        if (entity == null) {
-            return null;
-        }
+        SysOperLogEntity entity = requireAccessibleLog(id);
         SysOperLogVO vo = sysOperLogConverter.toVO(entity);
         enrichOperatorInfo(Collections.singletonList(vo));
         return vo;
@@ -72,14 +71,34 @@ public class SysOperLogServiceImpl implements SysOperLogService {
 
     @Override
     public void delete(Long id) {
+        requireAccessibleLog(id);
         sysOperLogDao.deleteById(id);
     }
 
     @Override
     public void batchDelete(List<Long> ids) {
         if (ids != null && !ids.isEmpty()) {
+            for (Long id : ids) {
+                requireAccessibleLog(id);
+            }
             sysOperLogDao.deleteBatchIds(ids);
         }
+    }
+
+    private SysOperLogEntity requireAccessibleLog(Long id) {
+        if (id == null) {
+            throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "日志ID不能为空");
+        }
+        SysOperLogEntity entity = sysOperLogDao.findByIdIgnoreTenant(id);
+        if (entity == null) {
+            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "操作日志不存在: " + id);
+        }
+        Long currentTenantId = TenantContext.getTenantId();
+        if (currentTenantId != null && entity.getTenantId() != null && !currentTenantId.equals(entity.getTenantId())) {
+            log.warn("[IDOR越权拦截] 租户 {} 试图越权操作属于租户 {} 的操作日志 ID: {}", currentTenantId, entity.getTenantId(), id);
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权访问其他租户的操作日志 (IDOR Forbidden)");
+        }
+        return entity;
     }
 
     @Override

@@ -2,7 +2,9 @@ package com.edumind.system.controller.security;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaMode;
+import com.edumind.common.annotation.OperationLog;
 import com.edumind.common.api.ApiResult;
+import com.edumind.common.enums.BusinessType;
 import com.edumind.system.dto.security.SecurityKeyRotateDTO;
 import com.edumind.system.service.security.SecurityKeyVersionService;
 import com.edumind.system.vo.security.SecurityKeyVersionVO;
@@ -47,8 +49,16 @@ public class SecurityKeyVersionController {
 
     @PostMapping("/rotate")
     @SaCheckPermission(value = {"security:key:rotate", "admin"}, mode = SaMode.OR)
+    @OperationLog(module = "国密KMS", title = "轮换数据密钥", businessType = BusinessType.GRANT)
     public ApiResult<SecurityKeyVersionVO> rotateKey(@RequestBody(required = false) SecurityKeyRotateDTO dto) {
         SecurityKeyRotateDTO rotateDTO = dto != null ? dto : new SecurityKeyRotateDTO();
         return ApiResult.success(securityKeyVersionService.rotateKey(rotateDTO));
     }
+
+    @PostMapping("/crypto-test")
+    @SaCheckPermission(value = {"security:key:view", "admin"}, mode = SaMode.OR)
+    public ApiResult<com.edumind.system.vo.security.SecurityKeyCryptoTestVO> testCrypto(@jakarta.validation.Valid @RequestBody com.edumind.system.dto.security.SecurityKeyCryptoTestDTO dto) {
+        return ApiResult.success(securityKeyVersionService.testCrypto(dto));
+    }
 }
+

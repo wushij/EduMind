@@ -62,15 +62,26 @@ function showErrorMessage(msg: string) {
   ElMessage.error(msg);
 }
 
+function isAuthEntryPath() {
+  const path = window.location.pathname;
+  return (
+    path.startsWith('/auth/login')
+    || path.startsWith('/auth/register')
+    || path.startsWith('/auth/forgot')
+  );
+}
+
 function handleUnauthorized(message = '登录状态已失效，请重新登录') {
   storage.remove(TOKEN_KEY);
   storage.remove('edumind_user_info');
-  showErrorMessage(message);
-  if (!window.location.pathname.startsWith('/auth/login')) {
-    setTimeout(() => {
-      window.location.href = '/auth/login';
-    }, 500);
+  // 已在登录/注册页时，通常是本地残留过期 Token 被 bootstrap 校验失败，静默清理即可
+  if (isAuthEntryPath()) {
+    return;
   }
+  showErrorMessage(message);
+  setTimeout(() => {
+    window.location.href = '/auth/login';
+  }, 500);
 }
 
 // 响应拦截器

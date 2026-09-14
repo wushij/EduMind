@@ -1,4 +1,5 @@
 import { get, put } from '@/core/http/request';
+import type { HttpRequestConfig } from '@/core/http/types';
 
 export interface UserPreferenceVO {
   theme: string;
@@ -9,7 +10,8 @@ export interface UserPreferenceVO {
   preferencesJson?: string;
 }
 
-export const getUserPreferences = () => get<UserPreferenceVO>('/users/me/preferences');
+export const getUserPreferences = (config?: HttpRequestConfig) =>
+  get<UserPreferenceVO>('/users/me/preferences', undefined, config);
 
 export const saveUserPreferences = (data: Partial<UserPreferenceVO>) =>
   put<UserPreferenceVO>('/users/me/preferences', data);

@@ -2,7 +2,9 @@ package com.edumind.statistics.controller.intervention;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.edumind.common.annotation.OperationLog;
 import com.edumind.common.api.ApiResult;
+import com.edumind.common.enums.BusinessType;
 import com.edumind.statistics.dto.intervention.InterventionActionDTO;
 import com.edumind.statistics.dto.intervention.InterventionCreateDTO;
 import com.edumind.statistics.service.intervention.TeachingInterventionService;
@@ -38,12 +40,14 @@ public class TeachingInterventionController {
 
     @PostMapping
     @SaCheckPermission("analytics:intervention:manage")
+    @OperationLog(module = "教学干预", title = "创建干预预案", businessType = BusinessType.INSERT)
     public ApiResult<TeachingInterventionVO> createIntervention(@Valid @RequestBody InterventionCreateDTO dto) {
         return ApiResult.success(teachingInterventionService.createIntervention(dto));
     }
 
     @PostMapping("/{id}/approve")
     @SaCheckPermission("analytics:intervention:manage")
+    @OperationLog(module = "教学干预", title = "审批通过干预预案", businessType = BusinessType.GRANT)
     public ApiResult<Void> approveIntervention(@PathVariable("id") Long id, @RequestBody(required = false) InterventionActionDTO dto) {
         teachingInterventionService.approveIntervention(id, dto);
         return ApiResult.success();
@@ -51,6 +55,7 @@ public class TeachingInterventionController {
 
     @PostMapping("/{id}/reject")
     @SaCheckPermission("analytics:intervention:manage")
+    @OperationLog(module = "教学干预", title = "驳回干预预案", businessType = BusinessType.DELETE)
     public ApiResult<Void> rejectIntervention(@PathVariable("id") Long id) {
         teachingInterventionService.rejectIntervention(id);
         return ApiResult.success();
@@ -58,6 +63,7 @@ public class TeachingInterventionController {
 
     @PostMapping("/{id}/dispatch")
     @SaCheckPermission("analytics:intervention:manage")
+    @OperationLog(module = "教学干预", title = "派发干预预案", businessType = BusinessType.GRANT)
     public ApiResult<Void> dispatchIntervention(@PathVariable("id") Long id) {
         teachingInterventionService.dispatchIntervention(id);
         return ApiResult.success();

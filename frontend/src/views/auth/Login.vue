@@ -119,8 +119,8 @@
               </div>
             </el-form-item>
 
-            <!-- 图形验证码 (与云盘 AuthCaptchaField 模式一致) -->
-            <el-form-item class="auth-captcha-item">
+            <!-- 图形验证码 (当系统策略为字符图片验证码时展示) -->
+            <el-form-item v-if="captchaType === 'image'" class="auth-captcha-item">
               <AuthCaptchaField
                 v-model="loginForm.captcha"
                 :captcha-img="captchaImg"
@@ -308,6 +308,11 @@
         </div>
       </div>
     </div>
+    <SliderCaptchaModal
+      v-model="sliderModalVisible"
+      :username="loginForm.username.trim()"
+      @success="handleSliderSuccess"
+    />
   </div>
 </template>
 
@@ -322,8 +327,9 @@ import { useAuthStore } from '@/stores/auth/auth';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_USERS } from '@/mock/users';
 import AuthCaptchaField from '@/components/common/AuthCaptchaField.vue';
+import SliderCaptchaModal from '@/components/common/SliderCaptchaModal.vue';
 import EmailCodeBtn from '@/components/common/EmailCodeBtn.vue';
-import { getCaptcha, login as loginApi, emailLogin as emailLoginApi } from '@/api/auth/auth';
+import { getCaptcha, getCaptchaPolicy, login as loginApi, emailLogin as emailLoginApi } from '@/api/auth/auth';
 import { toCaptchaDataUrl } from '@/utils/captcha';
 import { storage } from '@/core/storage/local';
 import { TENANT_ID_KEY } from '@/stores/system/tenant';
@@ -339,7 +345,10 @@ const rememberMe = ref(false);
 const showPassword = ref(false);
 const loading = ref(false);
 
-// 验证码状态 (云盘同款：后端 Hutool LineCaptcha 130×48)
+// 验证码策略与状态 (支持字符图形验证码与 Code Compass 滑块验证码)
+const captchaType = ref<'image' | 'slider'>('slider');
+const sliderModalVisible = ref(false);
+const captchaToken = ref('');
 const captchaId = ref('');
 const captchaImg = ref('');
 
@@ -387,7 +396,13 @@ const refreshCaptcha = async () => {
   }
 };
 
-// 登录提交 (云盘同款：ElMessage 提示，不显示表单内红色错误)
+// 滑块验证码校验通过回调 (对齐 Code Compass)
+const handleSliderSuccess = (payload: { captchaToken: string }) => {
+  captchaToken.value = payload.captchaToken;
+  handleLogin();
+};
+
+// 登录提交 (支持图形验证码与 Code Compass 滑块安全验证)
 const handleLogin = async () => {
   if (loading.value) return;
 
@@ -399,7 +414,15 @@ const handleLogin = async () => {
     ElMessage.warning('请输入用户名和密码');
     return;
   }
-  if (!captcha) {
+
+  // 若系统采用滑块验证且尚未完成人机验证，弹出滑块弹窗
+  if (captchaType.value === 'slider' && !captchaToken.value) {
+    sliderModalVisible.value = true;
+    return;
+  }
+
+  // 若系统采用字符图形验证码且未填写
+  if (captchaType.value === 'image' && !captcha) {
     ElMessage.warning('请完成图形验证码');
     return;
   }
@@ -409,9 +432,11 @@ const handleLogin = async () => {
     const res = await loginApi({
       username,
       password,
-      captcha,
-      captchaId: captchaId.value
+      captcha: captchaType.value === 'image' ? captcha : undefined,
+      captchaId: captchaType.value === 'image' ? captchaId.value : undefined,
+      captchaToken: captchaType.value === 'slider' ? captchaToken.value : undefined
     });
+    captchaToken.value = '';
     if (res?.data?.token) {
       applyLoginSession(res.data);
       if (!res.data.userInfo) {
@@ -444,8 +469,11 @@ const handleLogin = async () => {
     const redirect = (route.query.redirect as string) || '/dashboard';
     router.push(redirect);
   } catch {
-    // 业务错误已由 axios 全局拦截器统一 ElMessage 提示，此处仅刷新验证码
-    refreshCaptcha();
+    // 登录失败时销毁当前票据，避免重试漏验
+    captchaToken.value = '';
+    if (captchaType.value === 'image') {
+      refreshCaptcha();
+    }
   } finally {
     loading.value = false;
   }
@@ -556,7 +584,7 @@ const handleThirdLogin = (platform: string) => {
   ElMessage.info(`正在连接【${platform}】高校统一身份认证 (SSO)...`);
 };
 
-onMounted(() => {
+onMounted(async () => {
   const savedUsername = localStorage.getItem('edumind_saved_username');
   if (savedUsername) {
     loginForm.username = savedUsername;
@@ -566,7 +594,17 @@ onMounted(() => {
   if (savedEmail) {
     emailForm.email = savedEmail;
   }
-  refreshCaptcha();
+  try {
+    const policyRes = await getCaptchaPolicy();
+    if (policyRes?.data?.captchaType) {
+      captchaType.value = policyRes.data.captchaType;
+    }
+  } catch {
+    // 获取失败默认采用滑块模式
+  }
+  if (captchaType.value === 'image') {
+    refreshCaptcha();
+  }
 });
 </script>
 

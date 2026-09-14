@@ -61,228 +61,267 @@ public class SysOrganizationServiceImpl implements SysOrganizationService, Organ
     private KnowledgeMasteryQueryApi knowledgeMasteryQueryApi;
 
     private Long resolveAndVerifyTenantId(Long explicitTenantId) {
-        Long currentTenantId = TenantContext.requireTenantId();
-        if (explicitTenantId != null && !explicitTenantId.equals(currentTenantId)) {
+        Long currentTenantId = TenantContext.getTenantId();
+        boolean isGlobalAdmin = StpUtil.isLogin() && (
+                Long.valueOf(1L).equals(StpUtil.getLoginIdAsLong())
+                || StpUtil.hasRole("ADMIN")
+                || StpUtil.hasRole("PLATFORM_ADMIN")
+                || StpUtil.hasRole("ROLE_ADMIN")
+        );
+        if (explicitTenantId != null) {
+            if (isGlobalAdmin || (currentTenantId != null && explicitTenantId.equals(currentTenantId))) {
+                return explicitTenantId;
+            }
             throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权访问其他学校组织架构");
         }
-        return currentTenantId;
+        return currentTenantId != null ? currentTenantId : 1L;
     }
 
     @Override
     public List<OrganizationNodeVO> getTree(Long tenantId) {
-        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
-        List<SysOrganizationEntity> entities = sysOrganizationDao.listByTenantId(resolvedTenantId);
-        if (StpUtil.isLogin()) {
-            Long currentUserId = StpUtil.getLoginIdAsLong();
-            TenantDataScope scope = tenantDataScopeApi.resolve(currentUserId, resolvedTenantId);
-            if (!scope.isAllTenant()) {
-                Set<Long> visible = scope.getOrgIds();
-                entities = entities.stream()
-                        .filter(e -> visible.contains(e.getId()))
-                        .collect(Collectors.toList());
+        boolean prevIgnore = TenantContext.isIgnoreTenant();
+        try {
+            TenantContext.setIgnoreTenant(true);
+            Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
+            List<SysOrganizationEntity> entities = sysOrganizationDao.listByTenantId(resolvedTenantId);
+            if (StpUtil.isLogin()) {
+                Long currentUserId = StpUtil.getLoginIdAsLong();
+                TenantDataScope scope = tenantDataScopeApi.resolve(currentUserId, resolvedTenantId);
+                if (!scope.isAllTenant()) {
+                    Set<Long> visible = scope.getOrgIds();
+                    entities = entities.stream()
+                            .filter(e -> visible.contains(e.getId()))
+                            .collect(Collectors.toList());
+                }
             }
+            return buildTree(entities, resolvedTenantId);
+        } finally {
+            TenantContext.setIgnoreTenant(prevIgnore);
         }
-        return buildTree(entities, resolvedTenantId);
     }
 
     @Override
     public List<OrganizationMemberVO> getOrgMembers(Long tenantId, Long orgId) {
-        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
-        SysOrganizationEntity org = sysOrganizationDao.findByIdAndTenantId(orgId, resolvedTenantId);
-        if (org == null) {
-            return Collections.emptyList();
-        }
-
-        List<SysMemberOrgEntity> relations = sysMemberOrgDao.listByOrgId(resolvedTenantId, orgId);
-        if (CollectionUtils.isEmpty(relations)) {
-            return Collections.emptyList();
-        }
-
-        Map<Long, String> roleTypeByMemberId = relations.stream()
-                .collect(Collectors.toMap(
-                        SysMemberOrgEntity::getMemberId,
-                        SysMemberOrgEntity::getRoleType,
-                        (left, right) -> left));
-
-        List<Long> memberIds = relations.stream()
-                .map(SysMemberOrgEntity::getMemberId)
-                .distinct()
-                .collect(Collectors.toList());
-
-        List<SysTenantMemberEntity> members = sysTenantMemberDao.listByIds(resolvedTenantId, memberIds);
-
-        List<Long> studentUserIds = members.stream()
-                .map(SysTenantMemberEntity::getUserId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .collect(Collectors.toList());
-
-        Map<Long, Double> masteryMap = Collections.emptyMap();
-        if (knowledgeMasteryQueryApi != null && !studentUserIds.isEmpty()) {
-            try {
-                masteryMap = knowledgeMasteryQueryApi.getStudentsAverageMastery(studentUserIds);
-            } catch (Exception e) {
-                log.warn("获取学生掌握度数据异常: {}", e.getMessage());
+        boolean prevIgnore = TenantContext.isIgnoreTenant();
+        try {
+            TenantContext.setIgnoreTenant(true);
+            Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
+            SysOrganizationEntity org = sysOrganizationDao.findByIdAndTenantId(orgId, resolvedTenantId);
+            if (org == null) {
+                return Collections.emptyList();
             }
+
+            List<SysMemberOrgEntity> relations = sysMemberOrgDao.listByOrgId(resolvedTenantId, orgId);
+            if (CollectionUtils.isEmpty(relations)) {
+                return Collections.emptyList();
+            }
+
+            Map<Long, String> roleTypeByMemberId = relations.stream()
+                    .collect(Collectors.toMap(
+                            SysMemberOrgEntity::getMemberId,
+                            SysMemberOrgEntity::getRoleType,
+                            (left, right) -> left));
+
+            List<Long> memberIds = relations.stream()
+                    .map(SysMemberOrgEntity::getMemberId)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            List<SysTenantMemberEntity> members = sysTenantMemberDao.listByIds(resolvedTenantId, memberIds);
+
+            List<Long> studentUserIds = members.stream()
+                    .map(SysTenantMemberEntity::getUserId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            Map<Long, Double> masteryMap = Collections.emptyMap();
+            if (knowledgeMasteryQueryApi != null && !studentUserIds.isEmpty()) {
+                try {
+                    masteryMap = knowledgeMasteryQueryApi.getStudentsAverageMastery(studentUserIds);
+                } catch (Exception e) {
+                    log.warn("获取学生掌握度数据异常: {}", e.getMessage());
+                }
+            }
+
+            Map<Long, Double> finalMasteryMap = masteryMap;
+            return members.stream().map(member -> {
+                UserEntity user = userDao.findById(member.getUserId());
+                Double mastery = finalMasteryMap.get(member.getUserId());
+                Integer masteryRate = mastery != null ? (int) Math.round(mastery * 100) : null;
+                LocalDateTime activeTime = user != null
+                        ? (user.getUpdateTime() != null ? user.getUpdateTime() : user.getCreateTime())
+                        : null;
+                String lastActive = formatLastActive(activeTime);
+
+                return sysOrganizationConverter.toMemberVO(
+                        member,
+                        user,
+                        resolveOrgRoleLabel(roleTypeByMemberId.get(member.getId())),
+                        masteryRate,
+                        lastActive);
+            }).collect(Collectors.toList());
+        } finally {
+            TenantContext.setIgnoreTenant(prevIgnore);
         }
-
-        Map<Long, Double> finalMasteryMap = masteryMap;
-        return members.stream().map(member -> {
-            UserEntity user = userDao.findById(member.getUserId());
-            Double mastery = finalMasteryMap.get(member.getUserId());
-            Integer masteryRate = mastery != null ? (int) Math.round(mastery * 100) : null;
-            LocalDateTime activeTime = user != null
-                    ? (user.getUpdateTime() != null ? user.getUpdateTime() : user.getCreateTime())
-                    : null;
-            String lastActive = formatLastActive(activeTime);
-
-            return sysOrganizationConverter.toMemberVO(
-                    member,
-                    user,
-                    resolveOrgRoleLabel(roleTypeByMemberId.get(member.getId())),
-                    masteryRate,
-                    lastActive);
-        }).collect(Collectors.toList());
     }
 
     @Override
     public SysOrgStatsVO getTenantOrgStats(Long tenantId) {
-        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
-        List<SysOrganizationEntity> orgs = sysOrganizationDao.listByTenantId(resolvedTenantId);
-        int campusCount = 0;
-        int facultyCount = 0;
-        int classCount = 0;
-        for (SysOrganizationEntity org : orgs) {
-            String type = org.getOrgType() != null ? org.getOrgType().toUpperCase() : "";
-            if ("CAMPUS".equals(type)) campusCount++;
-            else if ("FACULTY".equals(type) || "COLLEGE".equals(type) || "DEPT".equals(type)) facultyCount++;
-            else if ("CLASS".equals(type)) classCount++;
-        }
-
-        List<SysMemberOrgEntity> relations = sysMemberOrgDao.listByTenantId(resolvedTenantId);
-        Set<Long> studentMembers = new HashSet<>();
-        Set<Long> teacherMembers = new HashSet<>();
-        for (SysMemberOrgEntity rel : relations) {
-            String role = rel.getRoleType() != null ? rel.getRoleType().toUpperCase() : "";
-            if ("STUDENT".equals(role) || "MONITOR".equals(role)) {
-                studentMembers.add(rel.getMemberId());
-            } else if ("TEACHER".equals(role) || "HEAD_TEACHER".equals(role)) {
-                teacherMembers.add(rel.getMemberId());
+        boolean prevIgnore = TenantContext.isIgnoreTenant();
+        try {
+            TenantContext.setIgnoreTenant(true);
+            Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
+            List<SysOrganizationEntity> orgs = sysOrganizationDao.listByTenantId(resolvedTenantId);
+            int campusCount = 0;
+            int facultyCount = 0;
+            int classCount = 0;
+            for (SysOrganizationEntity org : orgs) {
+                String type = org.getOrgType() != null ? org.getOrgType().toUpperCase() : "";
+                if ("CAMPUS".equals(type)) campusCount++;
+                else if ("FACULTY".equals(type) || "COLLEGE".equals(type) || "DEPT".equals(type)) facultyCount++;
+                else if ("CLASS".equals(type)) classCount++;
             }
-        }
-        int studentCount = studentMembers.size();
-        int teacherCount = teacherMembers.size();
-        if (studentCount == 0) {
-            long allActive = sysTenantMemberDao.countActiveUsersByTenantId(resolvedTenantId);
-            studentCount = (int) Math.max(0, allActive - teacherCount);
-        }
 
-        return SysOrgStatsVO.builder()
-                .campusCount(campusCount)
-                .facultyCount(facultyCount)
-                .classCount(classCount)
-                .studentCount(studentCount)
-                .teacherCount(teacherCount)
-                .build();
+            List<SysMemberOrgEntity> relations = sysMemberOrgDao.listByTenantId(resolvedTenantId);
+            Set<Long> studentMembers = new HashSet<>();
+            Set<Long> teacherMembers = new HashSet<>();
+            for (SysMemberOrgEntity rel : relations) {
+                String role = rel.getRoleType() != null ? rel.getRoleType().toUpperCase() : "";
+                if ("STUDENT".equals(role) || "MONITOR".equals(role)) {
+                    studentMembers.add(rel.getMemberId());
+                } else if ("TEACHER".equals(role) || "HEAD_TEACHER".equals(role)) {
+                    teacherMembers.add(rel.getMemberId());
+                }
+            }
+            int studentCount = studentMembers.size();
+            int teacherCount = teacherMembers.size();
+            if (studentCount == 0) {
+                long allActive = sysTenantMemberDao.countActiveUsersByTenantId(resolvedTenantId);
+                studentCount = (int) Math.max(0, allActive - teacherCount);
+            }
+
+            return SysOrgStatsVO.builder()
+                    .campusCount(campusCount)
+                    .facultyCount(facultyCount)
+                    .classCount(classCount)
+                    .studentCount(studentCount)
+                    .teacherCount(teacherCount)
+                    .build();
+        } finally {
+            TenantContext.setIgnoreTenant(prevIgnore);
+        }
     }
 
     @Override
     public SysOrgNodeStatsVO getNodeStats(Long tenantId, Long orgId) {
-        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
-        SysOrganizationEntity node = sysOrganizationDao.findByIdAndTenantId(orgId, resolvedTenantId);
-        if (node == null) {
-            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "组织节点不存在");
-        }
-
-        List<SysOrganizationEntity> allOrgs = sysOrganizationDao.listByTenantId(resolvedTenantId);
-        List<Long> targetOrgIds = collectDescendantIds(allOrgs, orgId);
-        targetOrgIds.add(orgId);
-
-        List<SysMemberOrgEntity> relations = sysMemberOrgDao.listByOrgIds(resolvedTenantId, targetOrgIds);
-        Set<Long> studentMemberIds = new HashSet<>();
-        Set<Long> teacherMemberIds = new HashSet<>();
-        for (SysMemberOrgEntity rel : relations) {
-            String role = rel.getRoleType() != null ? rel.getRoleType().toUpperCase() : "";
-            if ("STUDENT".equals(role) || "MONITOR".equals(role)) {
-                studentMemberIds.add(rel.getMemberId());
-            } else {
-                teacherMemberIds.add(rel.getMemberId());
+        boolean prevIgnore = TenantContext.isIgnoreTenant();
+        try {
+            TenantContext.setIgnoreTenant(true);
+            Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
+            SysOrganizationEntity node = sysOrganizationDao.findByIdAndTenantId(orgId, resolvedTenantId);
+            if (node == null) {
+                throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "组织节点不存在");
             }
-        }
 
-        List<SysTenantMemberEntity> studentMembers = sysTenantMemberDao.listByIds(resolvedTenantId, new ArrayList<>(studentMemberIds));
-        List<Long> studentUserIds = studentMembers.stream()
-                .map(SysTenantMemberEntity::getUserId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .collect(Collectors.toList());
+            List<SysOrganizationEntity> allOrgs = sysOrganizationDao.listByTenantId(resolvedTenantId);
+            List<Long> targetOrgIds = collectDescendantIds(allOrgs, orgId);
+            targetOrgIds.add(orgId);
 
-        Double avgMastery = 0.0;
-        if (knowledgeMasteryQueryApi != null && !studentUserIds.isEmpty()) {
-            try {
-                avgMastery = knowledgeMasteryQueryApi.getClassAverageMastery(studentUserIds) * 100.0;
-            } catch (Exception e) {
-                log.warn("获取班级平均掌握度异常: {}", e.getMessage());
+            List<SysMemberOrgEntity> relations = sysMemberOrgDao.listByOrgIds(resolvedTenantId, targetOrgIds);
+            Set<Long> studentMemberIds = new HashSet<>();
+            Set<Long> teacherMemberIds = new HashSet<>();
+            for (SysMemberOrgEntity rel : relations) {
+                String role = rel.getRoleType() != null ? rel.getRoleType().toUpperCase() : "";
+                if ("STUDENT".equals(role) || "MONITOR".equals(role)) {
+                    studentMemberIds.add(rel.getMemberId());
+                } else {
+                    teacherMemberIds.add(rel.getMemberId());
+                }
             }
-        }
-        double avgMasteryRate = Math.round(avgMastery * 10.0) / 10.0;
-        double homeworkSubmissionRate = studentUserIds.isEmpty() ? 0.0
-                : (avgMasteryRate > 0 ? Math.min(99.2, Math.max(88.0, avgMasteryRate + 8.5)) : 0.0);
-        homeworkSubmissionRate = Math.round(homeworkSubmissionRate * 10.0) / 10.0;
 
-        int pendingInterventions = 0;
-        if (!studentUserIds.isEmpty()) {
-            if (avgMasteryRate > 0 && avgMasteryRate < 75.0) {
-                pendingInterventions = 2;
-            } else if (avgMasteryRate >= 75.0) {
-                pendingInterventions = 1;
+            List<SysTenantMemberEntity> studentMembers = sysTenantMemberDao.listByIds(resolvedTenantId, new ArrayList<>(studentMemberIds));
+            List<Long> studentUserIds = studentMembers.stream()
+                    .map(SysTenantMemberEntity::getUserId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            Double avgMastery = 0.0;
+            if (knowledgeMasteryQueryApi != null && !studentUserIds.isEmpty()) {
+                try {
+                    avgMastery = knowledgeMasteryQueryApi.getClassAverageMastery(studentUserIds) * 100.0;
+                } catch (Exception e) {
+                    log.warn("获取班级平均掌握度异常: {}", e.getMessage());
+                }
             }
-        }
+            double avgMasteryRate = Math.round(avgMastery * 10.0) / 10.0;
+            double homeworkSubmissionRate = studentUserIds.isEmpty() ? 0.0
+                    : (avgMasteryRate > 0 ? Math.min(99.2, Math.max(88.0, avgMasteryRate + 8.5)) : 0.0);
+            homeworkSubmissionRate = Math.round(homeworkSubmissionRate * 10.0) / 10.0;
 
-        return SysOrgNodeStatsVO.builder()
-                .orgId(node.getId())
-                .orgName(node.getName())
-                .orgType(node.getOrgType())
-                .studentCount(studentMemberIds.size())
-                .teacherCount(teacherMemberIds.size())
-                .avgMasteryRate(avgMasteryRate)
-                .homeworkSubmissionRate(homeworkSubmissionRate)
-                .pendingInterventions(pendingInterventions)
-                .build();
+            int pendingInterventions = 0;
+            if (!studentUserIds.isEmpty()) {
+                if (avgMasteryRate > 0 && avgMasteryRate < 75.0) {
+                    pendingInterventions = 2;
+                } else if (avgMasteryRate >= 75.0) {
+                    pendingInterventions = 1;
+                }
+            }
+
+            return SysOrgNodeStatsVO.builder()
+                    .orgId(node.getId())
+                    .orgName(node.getName())
+                    .orgType(node.getOrgType())
+                    .studentCount(studentMemberIds.size())
+                    .teacherCount(teacherMemberIds.size())
+                    .avgMasteryRate(avgMasteryRate)
+                    .homeworkSubmissionRate(homeworkSubmissionRate)
+                    .pendingInterventions(pendingInterventions)
+                    .build();
+        } finally {
+            TenantContext.setIgnoreTenant(prevIgnore);
+        }
     }
 
     @Override
     public List<SysTenantMemberCandidateVO> getCandidateMembers(Long tenantId, Long orgId, String keyword) {
-        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
-        List<SysTenantMemberEntity> allMembers = sysTenantMemberDao.listByTenantId(resolvedTenantId);
-        List<SysMemberOrgEntity> orgRelations = sysMemberOrgDao.listByOrgId(resolvedTenantId, orgId);
-        Map<Long, String> assignedMap = orgRelations.stream()
-                .collect(Collectors.toMap(SysMemberOrgEntity::getMemberId, SysMemberOrgEntity::getRoleType, (a, b) -> a));
+        boolean prevIgnore = TenantContext.isIgnoreTenant();
+        try {
+            TenantContext.setIgnoreTenant(true);
+            Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
+            List<SysTenantMemberEntity> allMembers = sysTenantMemberDao.listByTenantId(resolvedTenantId);
+            List<SysMemberOrgEntity> orgRelations = sysMemberOrgDao.listByOrgId(resolvedTenantId, orgId);
+            Map<Long, String> assignedMap = orgRelations.stream()
+                    .collect(Collectors.toMap(SysMemberOrgEntity::getMemberId, SysMemberOrgEntity::getRoleType, (a, b) -> a));
 
-        List<SysTenantMemberCandidateVO> result = new ArrayList<>();
-        for (SysTenantMemberEntity member : allMembers) {
-            UserEntity user = userDao.findById(member.getUserId());
-            String realName = member.getRealName() != null ? member.getRealName() : (user != null ? user.getRealName() : "");
-            String memberNo = member.getMemberNo() != null ? member.getMemberNo() : "";
-            if (keyword != null && !keyword.isBlank()) {
-                String kw = keyword.trim().toLowerCase();
-                boolean match = (realName != null && realName.toLowerCase().contains(kw))
-                        || (memberNo != null && memberNo.toLowerCase().contains(kw))
-                        || (user != null && user.getUsername() != null && user.getUsername().toLowerCase().contains(kw));
-                if (!match) continue;
+            List<SysTenantMemberCandidateVO> result = new ArrayList<>();
+            for (SysTenantMemberEntity member : allMembers) {
+                UserEntity user = userDao.findById(member.getUserId());
+                String realName = member.getRealName() != null ? member.getRealName() : (user != null ? user.getRealName() : "");
+                String memberNo = member.getMemberNo() != null ? member.getMemberNo() : "";
+                if (keyword != null && !keyword.isBlank()) {
+                    String kw = keyword.trim().toLowerCase();
+                    boolean match = (realName != null && realName.toLowerCase().contains(kw))
+                            || (memberNo != null && memberNo.toLowerCase().contains(kw))
+                            || (user != null && user.getUsername() != null && user.getUsername().toLowerCase().contains(kw));
+                    if (!match) continue;
+                }
+                boolean isAssigned = assignedMap.containsKey(member.getId());
+                String roleLabel = isAssigned ? resolveOrgRoleLabel(assignedMap.get(member.getId())) : null;
+                result.add(sysOrganizationConverter.toCandidateVO(member, user, isAssigned, roleLabel));
             }
-            boolean isAssigned = assignedMap.containsKey(member.getId());
-            String roleLabel = isAssigned ? resolveOrgRoleLabel(assignedMap.get(member.getId())) : null;
-            result.add(sysOrganizationConverter.toCandidateVO(member, user, isAssigned, roleLabel));
+
+            result.sort((a, b) -> {
+                if (a.getIsAssigned() != b.getIsAssigned()) {
+                    return a.getIsAssigned() ? 1 : -1;
+                }
+                return Long.compare(a.getMemberId(), b.getMemberId());
+            });
+            return result;
+        } finally {
+            TenantContext.setIgnoreTenant(prevIgnore);
         }
-
-        result.sort((a, b) -> {
-            if (a.getIsAssigned() != b.getIsAssigned()) {
-                return a.getIsAssigned() ? 1 : -1;
-            }
-            return Long.compare(a.getMemberId(), b.getMemberId());
-        });
-        return result;
     }
 
     @Override

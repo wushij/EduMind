@@ -54,7 +54,7 @@ public class LlmClientRegistry {
             props.setProvider(config.getProvider());
             props.setModel(StringUtils.hasText(config.getModelName()) ? config.getModelName() : modelKey);
             props.setBaseUrl(StringUtils.hasText(config.getBaseUrl()) ? config.getBaseUrl() : llmProperties.getBaseUrl());
-            props.setApiKey(aiApiKeyCipherService.decrypt(config.getApiKeyCipher()));
+            props.setApiKey(aiApiKeyCipherService.decrypt(config.getApiKeyCipher(), config.getKeyVersion()));
             if (!StringUtils.hasText(props.getApiKey())) {
                 props.setApiKey(llmProperties.getApiKey());
             }

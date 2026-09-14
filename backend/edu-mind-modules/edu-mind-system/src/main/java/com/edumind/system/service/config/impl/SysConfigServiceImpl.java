@@ -5,6 +5,7 @@ import com.alibaba.fastjson2.TypeReference;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.infrastructure.mail.MailClient;
 import com.edumind.infrastructure.mail.MailConfig;
+import com.edumind.infrastructure.sms.SmsConfig;
 import com.edumind.infrastructure.oss.StorageConfig;
 import com.edumind.infrastructure.redis.RedisKeyBuilder;
 import com.edumind.infrastructure.redis.RedisService;
@@ -29,6 +30,8 @@ public class SysConfigServiceImpl implements SysConfigService {
 
     public static final String MAIL_CONFIG_KEY = "sys.mail.config";
 
+    public static final String SMS_CONFIG_KEY = "sys.sms.config";
+
     public static final String STORAGE_CONFIG_KEY = "sys.storage.config";
     public static final String SECURITY_CONFIG_KEY = "sys.security.config";
 
@@ -42,6 +45,7 @@ public class SysConfigServiceImpl implements SysConfigService {
     private final com.edumind.system.dao.SysEmailLogDao sysEmailLogDao;
     private final com.edumind.system.dao.RoleDao roleDao;
     private final com.edumind.system.dao.UserDao userDao;
+    private final com.edumind.system.service.sms.SmsSenderFactory smsSenderFactory;
 
     @jakarta.annotation.PostConstruct
     public void initStorageAndSecurity() {
@@ -256,6 +260,37 @@ public class SysConfigServiceImpl implements SysConfigService {
             config = MailConfig.builder().build();
         }
 
+        try {
+            redisService.set(cacheKey, JSON.toJSONString(config), 3600);
+        } catch (Exception ignored) {
+        }
+        return config;
+    }
+
+    @Override
+    public SmsConfig getSmsConfig() {
+        String cacheKey = RedisKeyBuilder.sysConfig(SMS_CONFIG_KEY);
+        try {
+            String cachedJson = redisService.get(cacheKey);
+            if (cachedJson != null && !cachedJson.isBlank()) {
+                SmsConfig cached = JSON.parseObject(cachedJson, SmsConfig.class);
+                if (cached != null) {
+                    return cached;
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("读取短信配置 Redis 缓存异常: {}", ex.getMessage());
+        }
+
+        SysConfigEntity entity = sysConfigDao.findByKey(SMS_CONFIG_KEY);
+        if (entity == null || entity.getConfigValue() == null || entity.getConfigValue().isBlank()) {
+            return JSON.parseObject(getDefaultConfigJson("sms"), SmsConfig.class);
+        }
+
+        SmsConfig config = JSON.parseObject(entity.getConfigValue(), SmsConfig.class);
+        if (config == null) {
+            config = JSON.parseObject(getDefaultConfigJson("sms"), SmsConfig.class);
+        }
         try {
             redisService.set(cacheKey, JSON.toJSONString(config), 3600);
         } catch (Exception ignored) {
@@ -525,23 +560,23 @@ public class SysConfigServiceImpl implements SysConfigService {
 
     @Override
     public boolean testSms(com.edumind.system.dto.config.TestSmsDTO dto) {
+        SmsConfig config = getSmsConfig();
+        String phone = dto.getPhone().trim();
         String code = String.valueOf((int) ((Math.random() * 9 + 1) * 100000));
-        log.info("【EduMind短信测试】向手机号 [{}] 发送验证码短信: [{}]", dto.getPhone(), code);
+        String templateCode = org.springframework.util.StringUtils.hasText(dto.getTemplateCode())
+                ? dto.getTemplateCode().trim()
+                : config.getTemplateVerifyCode();
 
-        com.edumind.system.entity.SysSmsLogEntity logEntity = com.edumind.system.entity.SysSmsLogEntity.builder()
-                .phone(dto.getPhone().trim())
-                .content(code)
-                .smsType("TEST_VERIFY")
-                .templateId(dto.getTemplateCode() != null && !dto.getTemplateCode().isBlank() ? dto.getTemplateCode() : "100001")
-                .provider("aliyunAuth")
-                .status(1)
-                .resultMsg("短信测试发送成功（验证码：" + code + "）")
-                .bizId("TEST_" + System.currentTimeMillis())
-                .sendTime(java.time.LocalDateTime.now())
-                .createTime(java.time.LocalDateTime.now())
-                .build();
-        sysSmsLogDao.insert(logEntity);
-        return true;
+        boolean success = smsSenderFactory.sendCode(config, phone, code, templateCode);
+        if (success) {
+            return true;
+        }
+
+        com.edumind.system.entity.SysSmsLogEntity latest = sysSmsLogDao.findLatestByPhone(phone);
+        String detail = latest != null && org.springframework.util.StringUtils.hasText(latest.getResultMsg())
+                ? latest.getResultMsg()
+                : "请检查签名、模板 ID 与密钥是否正确";
+        throw new BusinessException("短信发送失败：" + detail);
     }
 
     @Override

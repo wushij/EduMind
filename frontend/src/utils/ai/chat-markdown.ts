@@ -259,4 +259,4 @@ export function renderReasoningMarkdown(raw: string): string {
   return html;
 }
 
-export { bindMarkdownCodeCopy, renderMermaidInElement } from '@/utils/markdown';
+export { bindMarkdownCodeCopy, cleanupOrphanMermaidDom, renderMermaidInElement } from '@/utils/markdown';

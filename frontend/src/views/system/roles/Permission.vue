@@ -311,7 +311,6 @@ function getDefaultPermissionMock(): PermissionVO[] {
     { id: 25, permissionCode: 'system:tenant:view', permissionName: '租户校区管理' },
     { id: 35, permissionCode: 'system:tenant:edit', permissionName: '租户校区编辑' },
     { id: 26, permissionCode: 'system:org:view', permissionName: '组织架构管理' },
-    { id: 36, permissionCode: 'system:audit:view', permissionName: '系统调用审计日志' },
     { id: 46, permissionCode: 'system:operlog:query', permissionName: '操作日志查询浏览' },
     { id: 47, permissionCode: 'system:operlog:delete', permissionName: '操作日志删除记录' },
     { id: 48, permissionCode: 'system:operlog:clear', permissionName: '操作日志一键清空' },
@@ -340,6 +339,7 @@ function getDefaultPermissionMock(): PermissionVO[] {
     { id: 44, permissionCode: 'system:gateway:view', permissionName: 'AI 网关监控调度' },
     { id: 29, permissionCode: 'system:quota:view', permissionName: '算力与配额管控' },
     { id: 45, permissionCode: 'system:quota:edit', permissionName: '配额限流与充值' },
+    { id: 36, permissionCode: 'system:audit:view', permissionName: 'AI 调用审计日志' },
 
     // 知识库
     { id: 15, permissionCode: 'knowledge:view', permissionName: '知识库列表' },

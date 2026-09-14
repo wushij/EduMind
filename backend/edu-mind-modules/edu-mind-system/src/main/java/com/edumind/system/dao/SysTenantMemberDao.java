@@ -46,6 +46,10 @@ public class SysTenantMemberDao {
         return sysTenantMemberMapper.insert(entity);
     }
 
+    public int updateById(SysTenantMemberEntity entity) {
+        return sysTenantMemberMapper.updateById(entity);
+    }
+
     public int deleteByTenantId(Long tenantId) {
         return sysTenantMemberMapper.delete(new LambdaQueryWrapper<SysTenantMemberEntity>()
                 .eq(SysTenantMemberEntity::getTenantId, tenantId));
@@ -79,6 +83,11 @@ public class SysTenantMemberDao {
         }
         return sysTenantMemberMapper.selectList(new LambdaQueryWrapper<SysTenantMemberEntity>()
                 .eq(SysTenantMemberEntity::getTenantId, tenantId)
+                .eq(SysTenantMemberEntity::getStatus, 1));
+    }
+
+    public long countAllActive() {
+        return sysTenantMemberMapper.selectCount(new LambdaQueryWrapper<SysTenantMemberEntity>()
                 .eq(SysTenantMemberEntity::getStatus, 1));
     }
 }

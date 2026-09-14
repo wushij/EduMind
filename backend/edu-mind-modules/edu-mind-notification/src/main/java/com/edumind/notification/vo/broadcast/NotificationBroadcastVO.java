@@ -17,6 +17,7 @@ public class NotificationBroadcastVO implements Serializable {
     private Integer priority;
     private Long senderId;
     private String senderName;
+    private String senderAvatar;
     private Integer totalCount;
     private Integer readCount;
     private LocalDateTime createTime;

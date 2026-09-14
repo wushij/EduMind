@@ -687,7 +687,11 @@ async function handleDelete(row: OperLogVO) {
     ElMessage.success('操作日志已成功删除');
     loadData();
     loadStats();
-  } catch {}
+  } catch (err: any) {
+    if (err !== 'cancel' && err !== 'close') {
+      ElMessage.error(err?.response?.data?.message || err?.message || '删除日志失败，请检查操作权限');
+    }
+  }
 }
 
 async function handleBatchDelete() {
@@ -707,7 +711,11 @@ async function handleBatchDelete() {
     selectedRowIds.value = [];
     loadData();
     loadStats();
-  } catch {}
+  } catch (err: any) {
+    if (err !== 'cancel' && err !== 'close') {
+      ElMessage.error(err?.response?.data?.message || err?.message || '批量删除日志失败，请检查操作权限');
+    }
+  }
 }
 
 async function handleClean() {
@@ -725,7 +733,11 @@ async function handleClean() {
     ElMessage.success('当前租户操作日志已全部清空');
     loadData();
     loadStats();
-  } catch {}
+  } catch (err: any) {
+    if (err !== 'cancel' && err !== 'close') {
+      ElMessage.error(err?.response?.data?.message || err?.message || '清空日志失败，请检查操作权限');
+    }
+  }
 }
 
 function exportCsv() {

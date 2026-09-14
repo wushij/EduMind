@@ -5,7 +5,7 @@
 
 import type { SysMenu } from '@/types/system/menu';
 
-export const MENU_STORAGE_KEY = 'edumind_sys_menu_v2_5';
+export const MENU_STORAGE_KEY = 'edumind_sys_menu_v2_6';
 
 /**
  * 默认预设的 EduMind 8 大核心业务模块菜单树
@@ -778,6 +778,19 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
         sort: 5,
         status: 1,
         visible: true
+      },
+      {
+        id: 706,
+        parentId: 700,
+        name: 'AI 审计日志',
+        type: 2,
+        path: '/system/audit',
+        component: 'views/system/audit/AuditLog.vue',
+        icon: 'Clock',
+        permission: 'system:audit:view',
+        sort: 6,
+        status: 1,
+        visible: true
       }
     ]
   },
@@ -953,22 +966,7 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
         visible: true
       },
 
-      // 7. 系统审计日志
-      {
-        id: 807,
-        parentId: 800,
-        name: 'AI 审计日志',
-        type: 2,
-        path: '/system/audit',
-        component: 'views/system/audit/AuditLog.vue',
-        icon: 'Clock',
-        permission: 'system:audit:view',
-        sort: 7,
-        status: 1,
-        visible: true
-      },
-
-      // 7.1 业务操作日志
+      // 7. 业务操作日志
       {
         id: 8071,
         parentId: 800,
@@ -1154,6 +1152,60 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
   }
 ];
 
+function hasMenuPath(nodes: SysMenu[], path: string): boolean {
+  return nodes.some((n) => n.path === path || (n.children && hasMenuPath(n.children, path)));
+}
+
+function removeMenuByPath(nodes: SysMenu[], path: string): boolean {
+  const idx = nodes.findIndex((n) => n.path === path);
+  if (idx !== -1) {
+    nodes.splice(idx, 1);
+    return true;
+  }
+  for (const node of nodes) {
+    if (node.children && removeMenuByPath(node.children, path)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * 将「AI 审计日志」从系统管理迁移至 AI 智算中心，与侧边栏架构保持一致
+ */
+function migrateAuditMenuToAiCompute(tree: SysMenu[]): boolean {
+  const aiComputeMod = tree.find((m) => m.id === 700);
+  if (!aiComputeMod || !aiComputeMod.children) {
+    return false;
+  }
+
+  const alreadyInAiCompute = aiComputeMod.children.some((c) => c.path === '/system/audit');
+  const auditInSystem = hasMenuPath(tree.find((m) => m.id === 800)?.children || [], '/system/audit');
+
+  if (alreadyInAiCompute && !auditInSystem) {
+    return false;
+  }
+
+  let changed = false;
+
+  if (auditInSystem) {
+    changed = removeMenuByPath(tree.find((m) => m.id === 800)?.children || [], '/system/audit') || changed;
+  }
+
+  if (!alreadyInAiCompute) {
+    const defaultAuditNode = DEFAULT_MENU_TREE
+      .find((m) => m.id === 700)
+      ?.children?.find((c) => c.path === '/system/audit');
+    if (defaultAuditNode) {
+      aiComputeMod.children.push(JSON.parse(JSON.stringify(defaultAuditNode)));
+      aiComputeMod.children.sort((a, b) => (a.sort || 0) - (b.sort || 0));
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
 /**
  * 获取本地存储的菜单列表
  */
@@ -1163,6 +1215,9 @@ export function getStoredMenuTree(): SysMenu[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        if (migrateAuditMenuToAiCompute(parsed)) {
+          saveStoredMenuTree(parsed);
+        }
         // 自动校验并注入「操作日志」菜单节点，防止历史 localStorage 遗漏
         const hasOperLog = (nodes: SysMenu[]): boolean => {
           return nodes.some(n => n.path === '/system/oper-log' || (n.children && hasOperLog(n.children)));

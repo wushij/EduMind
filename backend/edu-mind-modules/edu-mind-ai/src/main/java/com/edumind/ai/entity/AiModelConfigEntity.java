@@ -25,6 +25,8 @@ public class AiModelConfigEntity implements Serializable {
     private String modelName;
     private String baseUrl;
     private String apiKeyCipher;
+    /** KMS 密钥版本号 (>= 1) */
+    private Integer keyVersion;
     private Boolean enabled;
     private Integer priority;
     private String fallbackModelKey;

@@ -188,31 +188,6 @@ CREATE TABLE IF NOT EXISTS sys_email_log (
     KEY idx_create_time (create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='邮件发信记录与审计表';
 
-CREATE TABLE IF NOT EXISTS sys_oper_log (
-    id             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    tenant_id      BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
-    title          VARCHAR(64)  DEFAULT NULL COMMENT '模块标题',
-    business_type  INT          NOT NULL DEFAULT 0 COMMENT '业务类型(0其它 1新增 2修改 3删除 4查询 5导出 6导入 7授权/变更)',
-    method         VARCHAR(255) DEFAULT NULL COMMENT 'Java方法名称',
-    request_method VARCHAR(16)  DEFAULT NULL COMMENT '请求方式(GET/POST/PUT/DELETE)',
-    oper_user_id   BIGINT       DEFAULT NULL COMMENT '操作人用户ID',
-    oper_name      VARCHAR(64)  DEFAULT NULL COMMENT '操作人员账号/姓名',
-    oper_url       VARCHAR(255) DEFAULT NULL COMMENT '请求URL',
-    oper_ip        VARCHAR(128) DEFAULT NULL COMMENT '客户端主机IP地址',
-    oper_param     TEXT         DEFAULT NULL COMMENT '请求参数(JSON，含action/diffItems/params，已脱敏)',
-    json_result    TEXT         DEFAULT NULL COMMENT '返回参数(JSON，已截断)',
-    status         INT          NOT NULL DEFAULT 0 COMMENT '操作状态(0正常 1异常)',
-    error_msg      TEXT         DEFAULT NULL COMMENT '错误消息/异常摘要',
-    cost_time      BIGINT       NOT NULL DEFAULT 0 COMMENT '消耗时间(ms)',
-    oper_time      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
-    PRIMARY KEY (id),
-    KEY idx_oper_tenant_time (tenant_id, oper_time),
-    KEY idx_oper_name (oper_name),
-    KEY idx_oper_title (title),
-    KEY idx_oper_user_id (oper_user_id),
-    KEY idx_oper_time_status (oper_time, status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统业务操作日志表';
-
 -- -----------------------------------------------------------------------------
 -- 二、课程教学（课程 / 章节 / 知识点 / 选课成员）
 -- -----------------------------------------------------------------------------
@@ -783,6 +758,7 @@ CREATE TABLE IF NOT EXISTS ai_model_config (
     model_name          VARCHAR(128) NOT NULL DEFAULT '' COMMENT '上游模型型号',
     base_url            VARCHAR(512) DEFAULT '' COMMENT '接口 Base URL',
     api_key_cipher      TEXT COMMENT 'API Key SM4 密文',
+    key_version         INT          NOT NULL DEFAULT 1 COMMENT 'API Key SM4密钥版本',
     enabled             TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '是否启用',
     priority            INT          NOT NULL DEFAULT 1 COMMENT '路由优先级',
     fallback_model_key  VARCHAR(64)  DEFAULT NULL COMMENT '降级模型',
@@ -955,6 +931,21 @@ CREATE TABLE IF NOT EXISTS sys_tenant_quota (
     UNIQUE KEY uk_tenant_quota (tenant_id, quota_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='租户资源配额表';
 
+CREATE TABLE IF NOT EXISTS sys_org_quota (
+    id                BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    tenant_id         BIGINT      NOT NULL COMMENT '租户ID',
+    org_id            BIGINT      NOT NULL COMMENT '组织节点ID(关联sys_organization.id)',
+    quota_type        VARCHAR(32) NOT NULL DEFAULT 'TOKEN' COMMENT '配额类型(TOKEN/STORAGE/SEATS)',
+    limit_value       BIGINT      NOT NULL DEFAULT 10000000 COMMENT '配额分配上限(Tokens/MB/席位)',
+    used_value        BIGINT      NOT NULL DEFAULT 0 COMMENT '当前已使用量',
+    warning_threshold INT         NOT NULL DEFAULT 85 COMMENT '预警水位线百分比',
+    create_time       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_tenant_org_quota (tenant_id, org_id, quota_type),
+    KEY idx_tenant_org (tenant_id, org_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='组织院系算力配额分配表';
+
 CREATE TABLE IF NOT EXISTS ai_memory_namespace (
     id             BIGINT      NOT NULL AUTO_INCREMENT COMMENT '命名空间ID',
     tenant_id      BIGINT      NOT NULL COMMENT '租户ID',
@@ -1065,6 +1056,31 @@ CREATE TABLE IF NOT EXISTS teaching_intervention (
     PRIMARY KEY (id),
     KEY idx_tenant_course (tenant_id, course_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='教学干预建议决策表';
+
+CREATE TABLE IF NOT EXISTS sys_oper_log (
+    id             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    tenant_id      BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
+    title          VARCHAR(64)  DEFAULT NULL COMMENT '模块标题',
+    business_type  INT          NOT NULL DEFAULT 0 COMMENT '业务类型(0其它 1新增 2修改 3删除 4查询 5导出 6导入 7授权/变更 8清空)',
+    method         VARCHAR(255) DEFAULT NULL COMMENT 'Java方法名称',
+    request_method VARCHAR(16)  DEFAULT NULL COMMENT '请求方式(GET/POST/PUT/DELETE)',
+    oper_user_id   BIGINT       DEFAULT NULL COMMENT '操作人用户ID',
+    oper_name      VARCHAR(64)  DEFAULT NULL COMMENT '操作人员账号/姓名',
+    oper_url       VARCHAR(255) DEFAULT NULL COMMENT '请求URL',
+    oper_ip        VARCHAR(128) DEFAULT NULL COMMENT '客户端主机IP地址',
+    oper_param     TEXT         DEFAULT NULL COMMENT '请求参数(JSON，含action/diffItems/params，已脱敏)',
+    json_result    TEXT         DEFAULT NULL COMMENT '返回参数(JSON，已截断)',
+    status         INT          NOT NULL DEFAULT 0 COMMENT '操作状态(0正常 1异常)',
+    error_msg      TEXT         DEFAULT NULL COMMENT '错误消息/异常摘要',
+    cost_time      BIGINT       NOT NULL DEFAULT 0 COMMENT '消耗时间(ms)',
+    oper_time      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+    PRIMARY KEY (id),
+    KEY idx_oper_tenant_time (tenant_id, oper_time),
+    KEY idx_oper_name (oper_name),
+    KEY idx_oper_title (title),
+    KEY idx_oper_user_id (oper_user_id),
+    KEY idx_oper_time_status (oper_time, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统业务操作日志表';
 
 SET FOREIGN_KEY_CHECKS = 1;
 
@@ -1703,6 +1719,23 @@ INSERT IGNORE INTO sys_tenant_quota (tenant_id, quota_type, limit_value, used_va
 (2, 'QPS',          100,       20, 90),
 (2, 'SEATS',        800,      320, 85);
 
+INSERT IGNORE INTO sys_org_quota (tenant_id, org_id, quota_type, limit_value, used_value, warning_threshold) VALUES
+(1, 2, 'TOKEN', 15000000, 4528000, 85),
+(1, 2, 'STORAGE', 150, 42, 85),
+(1, 2, 'SEATS', 600, 180, 85),
+(1, 3, 'TOKEN', 18000000, 5124000, 85),
+(1, 3, 'STORAGE', 200, 56, 85),
+(1, 3, 'SEATS', 800, 210, 85),
+(1, 4, 'TOKEN', 5000000, 1820000, 85),
+(1, 4, 'STORAGE', 50, 12, 85),
+(1, 4, 'SEATS', 200, 48, 85),
+(1, 5, 'TOKEN', 5000000, 980000, 85),
+(1, 5, 'STORAGE', 50, 8, 85),
+(1, 5, 'SEATS', 200, 35, 85),
+(1, 6, 'TOKEN', 4000000, 405000, 85),
+(1, 6, 'STORAGE', 30, 6, 85),
+(1, 6, 'SEATS', 150, 25, 85);
+
 INSERT IGNORE INTO sys_tenant_member (tenant_id, user_id, member_no, real_name, status, is_default) VALUES
 (1, 1, 'ADMIN-001',   '系统管理员',       1, 1),
 (1, 2, 'T2026001',    '骨干教师张教授',   1, 1),
@@ -1742,7 +1775,8 @@ INSERT IGNORE INTO export_task (id, tenant_id, user_id, biz_type, biz_id, status
 (1, 1, 2, 'EXAM_PAPER', 502, 'SUCCESS', '/exports/exam-502-demo.pdf', DATE_ADD(NOW(), INTERVAL 7 DAY));
 
 INSERT IGNORE INTO security_key_version (id, tenant_id, key_alias, key_version, algorithm, status) VALUES
-(1, 1, 'edumind-data-key', 1, 'SM4_GCM', 'ACTIVE');
+(1, 1, 'edumind-data-key', 1, 'SM4_GCM', 'ACTIVE'),
+(2, 1, 'edumind-model-key', 1, 'SM4_GCM', 'ACTIVE');
 
 INSERT IGNORE INTO teaching_intervention (id, tenant_id, course_id, trigger_type, proposal_json, status, approved_by) VALUES
 (1, 1, 102, 'EXAM_WEAK', '{"title":"强化多态与集合框架","summary":"近7日该知识点掌握度偏低","actions":["推送专项练习","安排课堂答疑"]}', 'PENDING', NULL);
@@ -1756,7 +1790,6 @@ INSERT IGNORE INTO agent_step (id, run_id, step_index, step_type, title, tool_na
 
 INSERT IGNORE INTO agent_tool_call (id, run_id, step_id, tool_name, input_json, output_json, status, duration_ms) VALUES
 (1, 'run_demo_001', 2, 'generate_question', '{"count":3,"type":"SINGLE"}', '{"generated":3}', 'SUCCESS', 820);
-
 
 SELECT '=============================================================================' AS EDUMIND_INIT_NOTICE;
 SELECT ' EduMind init.sql 执行完毕（未 DROP 任何表，仅补表/补种）' AS EDUMIND_INIT_NOTICE;

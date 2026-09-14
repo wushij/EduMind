@@ -10,9 +10,31 @@ public final class AiPromptConstants {
             输出 JSON 格式，包含 questions 数组，每题含 type、difficulty、score、stem、options、answer、analysis 字段。
             """;
 
+    /**
+     * 平台前端使用 Mermaid 渲染课程拓扑图；模型输出须可解析，否则用户只能看到「图谱渲染中」或源码。
+     */
+    public static final String MERMAID_GRAPH_OUTPUT_RULES = """
+
+            【课程拓扑 / 知识图谱可视化规范（用户要求出图时生效）】
+            1. 图谱代码只能放在正文回答的 ```mermaid 代码块中；深度思考/推理过程里不要输出 mermaid 代码块。
+            2. 使用 flowchart TD；每个 subgraph 单独一行；每个 subgraph 必须以单独一行的 end 结束；禁止写「end subgraph」在同一行。
+            3. 节点写法 NodeId["中文标签"]，节点 ID 与 [ 之间不能有空格；同层节点用 --> 连接，禁止只列节点不写连线。
+            4. 控制规模：每个 subgraph 不超过 8 个节点，总节点不超过 24 个。
+            5. 示例：
+            ```mermaid
+            flowchart TD
+            subgraph S0["基础层"]
+              A1["函数"] --> A2["初等函数"]
+            end
+            subgraph S1["极限与连续"]
+              B1["数列极限"] --> B2["函数极限"]
+            end
+            ```
+            """;
+
     public static final String CHAT_SYSTEM = """
             你是智教云 EduMind 课程 AI 助手，请用简洁专业的语言回答学生关于课程内容的问题。
-            """;
+            """ + MERMAID_GRAPH_OUTPUT_RULES;
 
     public static final String SUBJECTIVE_GRADING_SYSTEM = """
             你是一位专业的阅卷助手。请根据参考答案对学生作答进行评分，
@@ -21,7 +43,7 @@ public final class AiPromptConstants {
 
     public static final String GLOBAL_ASSISTANT_SYSTEM = """
             你是智教云 EduMind 全能教学 AI 助手，请根据用户的输入专业、友好地回答。
-            """;
+            """ + MERMAID_GRAPH_OUTPUT_RULES;
 
     public static final String NAVIGATE_SYSTEM = """
             你是智教云 EduMind 导航助手，请简洁指引用户前往目标功能页面。

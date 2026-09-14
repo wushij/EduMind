@@ -2,7 +2,9 @@ package com.edumind.question.controller.export;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.edumind.common.annotation.OperationLog;
 import com.edumind.common.api.ApiResult;
+import com.edumind.common.enums.BusinessType;
 import com.edumind.question.dto.export.PaperExportRequestDTO;
 import com.edumind.question.service.export.ExportTaskService;
 import com.edumind.question.vo.export.ExportTaskVO;
@@ -32,6 +34,7 @@ public class ExportTaskController {
     private final ExportTaskService exportTaskService;
 
     @PostMapping("/paper")
+    @OperationLog(module = "试卷导出", title = "创建导出任务", businessType = BusinessType.EXPORT)
     public ApiResult<ExportTaskVO> createPaperExportTask(@Valid @RequestBody PaperExportRequestDTO dto) {
         return ApiResult.success(exportTaskService.createPaperExportTask(dto));
     }

@@ -58,6 +58,7 @@
 
           <div class="tree-wrapper">
             <el-tree
+              v-if="treeData && treeData.length > 0"
               ref="treeRef"
               :data="treeData"
               node-key="id"
@@ -104,6 +105,22 @@
                 </div>
               </template>
             </el-tree>
+            <div v-else class="empty-tree-state">
+              <el-empty
+                :image-size="80"
+                description="暂无组织架构数据"
+              >
+                <template #default>
+                  <p class="empty-tree-desc">
+                    当前学校尚未建立任何校区与教学组织
+                  </p>
+                  <el-button type="primary" size="small" class="gradient-pill-btn" @click="openAddRootDialog">
+                    <el-icon><Plus /></el-icon>
+                    <span>初始化新建校区</span>
+                  </el-button>
+                </template>
+              </el-empty>
+            </div>
           </div>
         </div>
 
@@ -301,7 +318,16 @@
           </template>
 
           <div v-else class="empty-selection">
-            <el-empty description="请从左侧选择校区、院系或班级节点查看具体层级与师生名单" />
+            <el-empty
+              :description="treeData && treeData.length > 0 ? '请从左侧选择校区、院系或班级节点查看具体层级与师生名单' : '当前学校尚未建立组织架构，请先在左侧初始化校区'"
+            >
+              <template #default v-if="!treeData || treeData.length === 0">
+                <el-button type="primary" class="gradient-pill-btn" @click="openAddRootDialog">
+                  <el-icon><Plus /></el-icon>
+                  <span>+ 新增首个校区实体</span>
+                </el-button>
+              </template>
+            </el-empty>
           </div>
         </div>
       </div>
@@ -333,6 +359,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
+import { useTenantStore } from '@/stores/system/tenant';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   Connection,
@@ -371,6 +399,9 @@ import type {
   OrgStatsVO,
   OrgNodeStatsVO
 } from '@/types/system/tenant';
+
+const route = useRoute();
+const tenantStore = useTenantStore();
 
 const loading = ref(false);
 const membersLoading = ref(false);
@@ -439,7 +470,7 @@ const filteredMembers = computed(() => {
 // 动态面包屑路径
 const fullNodePath = computed(() => {
   if (!selectedNode.value) return '';
-  const tenantSchoolName = '华东师范大学附属实验学校';
+  const tenantSchoolName = tenantStore.currentTenant?.name || tenantStore.activeTenantName || '当前学校组织';
   const pathParts: string[] = [];
 
   const findAncestors = (nodes: OrganizationNodeVO[], targetId: number, currentPath: string[]): boolean => {
@@ -502,53 +533,13 @@ const getRoleClass = (role?: string) => {
   }
 };
 
-const defaultTreeData: OrganizationNodeVO[] = [
-  {
-    id: 1,
-    tenantId: 1,
-    name: '主校区(普陀本部)',
-    orgType: 'CAMPUS',
-    parentId: 0,
-    sortOrder: 1,
-    studentCount: 3,
-    children: [
-      {
-        id: 2,
-        tenantId: 1,
-        name: '高中数学教研组',
-        orgType: 'COLLEGE',
-        parentId: 1,
-        sortOrder: 1,
-        studentCount: 3,
-        children: [
-          { id: 4, tenantId: 1, name: '高三(1)班 [理科实验班]', orgType: 'CLASS', parentId: 2, sortOrder: 1, studentCount: 3 },
-          { id: 5, tenantId: 1, name: '高三(2)班 [数学拔尖班]', orgType: 'CLASS', parentId: 2, sortOrder: 2, studentCount: 1 }
-        ]
-      },
-      {
-        id: 3,
-        tenantId: 1,
-        name: '计算机与信息工程组',
-        orgType: 'COLLEGE',
-        parentId: 1,
-        sortOrder: 2,
-        studentCount: 0,
-        children: [
-          { id: 6, tenantId: 1, name: '高二(1)班 [创客先锋班]', orgType: 'CLASS', parentId: 3, sortOrder: 1, studentCount: 0 }
-        ]
-      }
-    ]
-  }
-];
-
-const loadStats = async () => {
+const loadStats = async (tenantId?: number) => {
   try {
-    const res = await getTenantOrgStats();
+    const res = await getTenantOrgStats(tenantId);
     if (res?.data) {
       tenantStats.value = res.data;
     }
   } catch {
-    // calculate fallback
     countTreeNodes(treeData.value);
   }
 };
@@ -564,12 +555,13 @@ const countTreeNodes = (list: OrganizationNodeVO[]) => {
     }
   };
   traverse(list);
-  tenantStats.value.campusCount = campus || 1;
-  tenantStats.value.facultyCount = faculty || 2;
-  tenantStats.value.classCount = clazz || 3;
+  tenantStats.value.campusCount = campus;
+  tenantStats.value.facultyCount = faculty;
+  tenantStats.value.classCount = clazz;
 };
 
 const loadNodeStats = async (orgId: number) => {
+  if (!orgId) return;
   try {
     statsLoading.value = true;
     const res = await getOrgNodeStats(orgId);
@@ -582,11 +574,11 @@ const loadNodeStats = async (orgId: number) => {
       orgId,
       orgName: selectedNode.value?.name || '',
       orgType: selectedNode.value?.orgType || '',
-      studentCount: members.value.filter(m => m.role === '学生' || m.role === '班长').length || 3,
-      teacherCount: members.value.filter(m => m.role === '任课教师' || m.role === '班主任').length || 1,
-      avgMasteryRate: 78.5,
-      homeworkSubmissionRate: 96.5,
-      pendingInterventions: 1
+      studentCount: members.value.filter(m => m.role === '学生' || m.role === '班长').length || 0,
+      teacherCount: members.value.filter(m => m.role === '任课教师' || m.role === '班主任').length || 0,
+      avgMasteryRate: 0,
+      homeworkSubmissionRate: 0,
+      pendingInterventions: 0
     };
   } finally {
     statsLoading.value = false;
@@ -596,7 +588,8 @@ const loadNodeStats = async (orgId: number) => {
 const loadTree = async () => {
   try {
     loading.value = true;
-    const res = await getOrgTree();
+    const targetTenantId = route.query.tenantId ? Number(route.query.tenantId) : (tenantStore.currentTenant?.id || undefined);
+    const res = await getOrgTree(targetTenantId);
     if (res?.data && res.data.length > 0) {
       treeData.value = res.data;
       const findFirstClass = (nodes: OrganizationNodeVO[]): OrganizationNodeVO | null => {
@@ -609,31 +602,36 @@ const loadTree = async () => {
         }
         return null;
       };
-      if (!selectedNode.value) {
+
+      const existsInTree = (nodes: OrganizationNodeVO[], id: number): boolean => {
+        for (const n of nodes) {
+          if (n.id === id) return true;
+          if (n.children && existsInTree(n.children, id)) return true;
+        }
+        return false;
+      };
+
+      if (!selectedNode.value || !existsInTree(res.data, selectedNode.value.id)) {
         selectedNode.value = findFirstClass(res.data) || res.data[0];
       }
     } else {
-      treeData.value = defaultTreeData;
-      if (!selectedNode.value) {
-        selectedNode.value = treeData.value[0]?.children?.[0]?.children?.[0] || treeData.value[0];
-      }
+      treeData.value = [];
+      selectedNode.value = null;
+      members.value = [];
     }
 
-    loadStats();
+    loadStats(targetTenantId);
     if (selectedNode.value?.id) {
       loadMembers(selectedNode.value.id);
       loadNodeStats(selectedNode.value.id);
+    } else {
+      members.value = [];
     }
   } catch {
-    if (!treeData.value || treeData.value.length === 0) {
-      treeData.value = defaultTreeData;
-      selectedNode.value = treeData.value[0]?.children?.[0]?.children?.[0] || treeData.value[0];
-    }
+    treeData.value = [];
+    selectedNode.value = null;
+    members.value = [];
     loadStats();
-    if (selectedNode.value?.id) {
-      loadMembers(selectedNode.value.id);
-      loadNodeStats(selectedNode.value.id);
-    }
   } finally {
     loading.value = false;
   }
@@ -768,7 +766,18 @@ const exportRoster = () => {
   ElMessage.success(`已生成并下载【${className}】花名册报表（共 ${filteredMembers.value.length} 名师生）！`);
 };
 
-onMounted(() => {
+watch(
+  [() => route.query.tenantId, () => tenantStore.currentTenant?.id],
+  () => {
+    selectedNode.value = null;
+    loadTree();
+  }
+);
+
+onMounted(async () => {
+  if (!tenantStore.currentTenant) {
+    await tenantStore.fetchCurrent();
+  }
   loadTree();
 });
 </script>
@@ -972,6 +981,22 @@ onMounted(() => {
                 color: #0F172A;
               }
             }
+          }
+        }
+
+        .empty-tree-state {
+          padding: 36px 12px;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+
+          .empty-tree-desc {
+            font-size: 13px;
+            color: #64748B;
+            margin: 6px 0 16px;
+            line-height: 1.5;
           }
         }
       }

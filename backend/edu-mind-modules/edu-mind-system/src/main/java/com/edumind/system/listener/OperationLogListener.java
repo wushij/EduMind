@@ -1,5 +1,6 @@
 package com.edumind.system.listener;
 
+import com.edumind.common.context.TenantContext;
 import com.edumind.common.event.OperationLogEvent;
 import com.edumind.system.entity.SysOperLogEntity;
 import com.edumind.system.service.log.SysOperLogService;
@@ -27,28 +28,31 @@ public class OperationLogListener {
         }
 
         OperationLogEvent.OperationLogPayload p = event.getPayload();
-        try {
-            SysOperLogEntity entity = SysOperLogEntity.builder()
-                    .tenantId(p.getTenantId())
-                    .title(p.getTitle())
-                    .businessType(p.getBusinessType())
-                    .method(p.getMethod())
-                    .requestMethod(p.getRequestMethod())
-                    .operUserId(p.getOperUserId())
-                    .operName(p.getOperName())
-                    .operUrl(p.getOperUrl())
-                    .operIp(p.getOperIp())
-                    .operParam(p.getOperParam())
-                    .jsonResult(p.getJsonResult())
-                    .status(p.getStatus())
-                    .errorMsg(p.getErrorMsg())
-                    .costTime(p.getCostTime())
-                    .operTime(p.getOperTime())
-                    .build();
+        Long tenantId = p.getTenantId() != null && p.getTenantId() > 0 ? p.getTenantId() : 1L;
+        TenantContext.runWithTenant(tenantId, () -> {
+            try {
+                SysOperLogEntity entity = SysOperLogEntity.builder()
+                        .tenantId(tenantId)
+                        .title(p.getTitle())
+                        .businessType(p.getBusinessType())
+                        .method(p.getMethod())
+                        .requestMethod(p.getRequestMethod())
+                        .operUserId(p.getOperUserId())
+                        .operName(p.getOperName())
+                        .operUrl(p.getOperUrl())
+                        .operIp(p.getOperIp())
+                        .operParam(p.getOperParam())
+                        .jsonResult(p.getJsonResult())
+                        .status(p.getStatus())
+                        .errorMsg(p.getErrorMsg())
+                        .costTime(p.getCostTime())
+                        .operTime(p.getOperTime())
+                        .build();
 
-            sysOperLogService.recordLog(entity);
-        } catch (Exception e) {
-            log.error("异步落库操作日志失败", e);
-        }
+                sysOperLogService.recordLog(entity);
+            } catch (Exception e) {
+                log.error("异步落库操作日志失败", e);
+            }
+        });
     }
 }

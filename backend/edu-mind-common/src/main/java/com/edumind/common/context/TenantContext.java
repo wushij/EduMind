@@ -87,6 +87,23 @@ public final class TenantContext {
     }
 
     /**
+     * 在指定租户上下文中执行特定代码块（执行完毕自动恢复，专用于异步任务/事件监听器）
+     */
+    public static void runWithTenant(Long tenantId, Runnable runnable) {
+        Long previous = getTenantId();
+        try {
+            setTenantId(tenantId);
+            runnable.run();
+        } finally {
+            if (previous != null) {
+                setTenantId(previous);
+            } else {
+                TENANT_HOLDER.remove();
+            }
+        }
+    }
+
+    /**
      * 清理当前线程上下文
      */
     public static void clear() {

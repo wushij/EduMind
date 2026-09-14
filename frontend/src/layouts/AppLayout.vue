@@ -12,7 +12,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import { cleanupOrphanMermaidDom } from '@/utils/markdown';
 import AppSidebar from './components/AppSidebar.vue';
 import AppHeader from './components/AppHeader.vue';
 import AppContent from './components/AppContent.vue';
@@ -27,8 +29,10 @@ import { tokenUtil } from '@/core/auth/token';
 const { isCollapsed, toggle } = useSidebar();
 const notifyStore = useNotifyStore();
 const { setupListener, checkUnreadPriority } = useBroadcastPush();
+const route = useRoute();
 
 onMounted(() => {
+  cleanupOrphanMermaidDom();
   if (tokenUtil.get()) {
     notifyStore.startWs();
     setupListener();
@@ -39,6 +43,11 @@ onMounted(() => {
 onUnmounted(() => {
   notifyStore.stopWs();
 });
+
+watch(
+  () => route.fullPath,
+  () => cleanupOrphanMermaidDom()
+);
 </script>
 
 <style scoped lang="scss">

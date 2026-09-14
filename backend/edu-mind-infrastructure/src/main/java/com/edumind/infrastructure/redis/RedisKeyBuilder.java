@@ -59,6 +59,10 @@ public final class RedisKeyBuilder {
         return RedisConstant.EMAIL_RESET_TICKET_KEY + ticket.trim();
     }
 
+    public static String smsOutId(String phone) {
+        return RedisConstant.PREFIX + "sms:outId:" + phone.trim();
+    }
+
     public static String sysConfig(String key) {
         return RedisConstant.CONFIG_CACHE_KEY + key.trim();
     }

@@ -66,7 +66,13 @@ public class AiModelManageServiceImpl implements AiModelManageService {
 
         AiModelConfigEntity entity = buildEntityFromDto(dto, configName, configType, null);
         if (StringUtils.hasText(dto.getApiKey())) {
-            entity.setApiKeyCipher(aiApiKeyCipherService.encrypt(dto.getApiKey()));
+            AiApiKeyCipherService.EncryptResult enc = aiApiKeyCipherService.encryptWithVersion(dto.getApiKey());
+            if (enc != null) {
+                entity.setApiKeyCipher(enc.getCiphertext());
+                entity.setKeyVersion(enc.getKeyVersion());
+            }
+        } else {
+            entity.setKeyVersion(1);
         }
         aiModelConfigDao.insert(entity);
         llmClientRegistry.invalidateAll();
@@ -87,7 +93,11 @@ public class AiModelManageServiceImpl implements AiModelManageService {
 
         applyDto(existing, dto, configType);
         if (StringUtils.hasText(dto.getApiKey())) {
-            existing.setApiKeyCipher(aiApiKeyCipherService.encrypt(dto.getApiKey()));
+            AiApiKeyCipherService.EncryptResult enc = aiApiKeyCipherService.encryptWithVersion(dto.getApiKey());
+            if (enc != null) {
+                existing.setApiKeyCipher(enc.getCiphertext());
+                existing.setKeyVersion(enc.getKeyVersion());
+            }
         }
         aiModelConfigDao.updateById(existing);
         llmClientRegistry.invalidateAll();
@@ -131,7 +141,7 @@ public class AiModelManageServiceImpl implements AiModelManageService {
     @Override
     public AiModelTestResultVO testSavedModel(String configName) {
         AiModelConfigEntity entity = requireByConfigName(configName);
-        String apiKey = aiApiKeyCipherService.decrypt(entity.getApiKeyCipher());
+        String apiKey = aiApiKeyCipherService.decrypt(entity.getApiKeyCipher(), entity.getKeyVersion());
         long latency = aiModelConnectivityTester.test(
                 entity.getProvider(),
                 entity.getConfigType(),
@@ -154,7 +164,7 @@ public class AiModelManageServiceImpl implements AiModelManageService {
         if (!StringUtils.hasText(apiKey) && StringUtils.hasText(dto.getName())) {
             AiModelConfigEntity existing = aiModelConfigDao.findByConfigName(dto.getName().trim());
             if (existing != null) {
-                apiKey = aiApiKeyCipherService.decrypt(existing.getApiKeyCipher());
+                apiKey = aiApiKeyCipherService.decrypt(existing.getApiKeyCipher(), existing.getKeyVersion());
             }
         }
         long latency = aiModelConnectivityTester.test(

@@ -1,17 +1,25 @@
 import { get, post, put, del } from '@/core/http/request';
-import type { ApiResponse, PageResult } from '@/types/common/api';
+import type { ApiResponse } from '@/types/common/api';
 import type {
   TenantListVO,
   TenantDetailVO,
+  TenantOverviewStatsVO,
   TenantCreateRequest,
+  TenantUpdateRequest,
+  CampusVO,
+  CampusCreateRequest,
+  CampusUpdateRequest,
   TenantSwitchRequest,
   OrganizationNodeVO,
   OrgCreateRequest,
   OrgUpdateRequest,
   OrganizationMemberVO,
   TenantQuotaVO,
-  QuotaUpdateRequest
+  QuotaUpdateRequest,
+  OrgQuotaVO,
+  OrgQuotaUpdateRequest
 } from '@/types/system/tenant';
+
 
 // ===== 租户基础管理 =====
 
@@ -27,13 +35,34 @@ export function switchTenant(data: TenantSwitchRequest): Promise<ApiResponse<{ t
   return post<{ token: string; tenantId: number }>('/system/tenants/switch', data);
 }
 
-export function pageTenants(params: {
+export function getTenantOverviewStats(): Promise<ApiResponse<TenantOverviewStatsVO>> {
+  return get<TenantOverviewStatsVO>('/system/tenants/stats');
+}
+
+export async function pageTenants(params: {
   page?: number;
   pageSize?: number;
   keyword?: string;
   status?: number;
-}): Promise<ApiResponse<PageResult<TenantListVO>>> {
-  return get<PageResult<TenantListVO>>('/system/tenants', params);
+}): Promise<ApiResponse<{ list: TenantListVO[]; total: number }>> {
+  const res = await get<any>('/system/tenants', params);
+  if (res && res.data) {
+    const rawList = Array.isArray(res.data.records)
+      ? res.data.records
+      : (Array.isArray(res.data.list) ? res.data.list : (Array.isArray(res.data) ? res.data : []));
+    const total = typeof res.data.total === 'number' ? res.data.total : rawList.length;
+    return {
+      ...res,
+      data: {
+        list: rawList.map((item: any) => ({
+          ...item,
+          tenantCode: item.tenantCode || item.code
+        })),
+        total
+      }
+    };
+  }
+  return res;
 }
 
 export function getTenantDetail(id: number): Promise<ApiResponse<TenantDetailVO>> {
@@ -41,7 +70,44 @@ export function getTenantDetail(id: number): Promise<ApiResponse<TenantDetailVO>
 }
 
 export function createTenant(data: TenantCreateRequest): Promise<ApiResponse<number>> {
-  return post<number>('/system/tenants', data);
+  return post<number>('/system/tenants', {
+    ...data,
+    code: data.code || data.tenantCode
+  });
+}
+
+export function updateTenant(id: number, data: TenantUpdateRequest): Promise<ApiResponse<void>> {
+  return put<void>(`/system/tenants/${id}`, data);
+}
+
+export function updateTenantStatus(id: number, status: number): Promise<ApiResponse<void>> {
+  return put<void>(`/system/tenants/${id}/status`, undefined, { params: { status } });
+}
+
+export function deleteTenant(id: number): Promise<ApiResponse<void>> {
+  return del<void>(`/system/tenants/${id}`);
+}
+
+// ===== 校区管理 =====
+
+export function listCampuses(tenantId: number): Promise<ApiResponse<CampusVO[]>> {
+  return get<CampusVO[]>(`/system/tenants/${tenantId}/campuses`);
+}
+
+export function createCampus(tenantId: number, data: CampusCreateRequest): Promise<ApiResponse<number>> {
+  return post<number>(`/system/tenants/${tenantId}/campuses`, data);
+}
+
+export function updateCampus(tenantId: number, campusId: number, data: CampusUpdateRequest): Promise<ApiResponse<void>> {
+  return put<void>(`/system/tenants/${tenantId}/campuses/${campusId}`, data);
+}
+
+export function updateCampusStatus(tenantId: number, campusId: number, status: number): Promise<ApiResponse<void>> {
+  return put<void>(`/system/tenants/${tenantId}/campuses/${campusId}/status`, undefined, { params: { status } });
+}
+
+export function deleteCampus(tenantId: number, campusId: number): Promise<ApiResponse<void>> {
+  return del<void>(`/system/tenants/${tenantId}/campuses/${campusId}`);
 }
 
 // ===== 组织架构与班级 =====
@@ -50,8 +116,8 @@ export function getOrgTree(tenantId?: number): Promise<ApiResponse<OrganizationN
   return get<OrganizationNodeVO[]>('/system/organizations/tree', { tenantId });
 }
 
-export function getTenantOrgStats(): Promise<ApiResponse<import('@/types/system/tenant').OrgStatsVO>> {
-  return get<import('@/types/system/tenant').OrgStatsVO>('/system/organizations/stats');
+export function getTenantOrgStats(tenantId?: number): Promise<ApiResponse<import('@/types/system/tenant').OrgStatsVO>> {
+  return get<import('@/types/system/tenant').OrgStatsVO>('/system/organizations/stats', { tenantId });
 }
 
 export function getOrgNodeStats(id: number): Promise<ApiResponse<import('@/types/system/tenant').OrgNodeStatsVO>> {
@@ -102,5 +168,13 @@ export function listTenantQuotas(tenantId?: number): Promise<ApiResponse<TenantQ
 
 export function updateTenantQuota(data: QuotaUpdateRequest): Promise<ApiResponse<void>> {
   return put<void>('/system/tenant-quotas', data);
+}
+
+export function listOrgQuotas(tenantId?: number): Promise<ApiResponse<OrgQuotaVO[]>> {
+  return get<OrgQuotaVO[]>('/system/tenant-quotas/organizations', { tenantId });
+}
+
+export function updateOrgQuota(data: OrgQuotaUpdateRequest): Promise<ApiResponse<void>> {
+  return put<void>('/system/tenant-quotas/organizations', data);
 }
 

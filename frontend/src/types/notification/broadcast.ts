@@ -14,6 +14,7 @@ export interface NotificationBroadcastVO {
   priority: number;
   senderId: number;
   senderName: string;
+  senderAvatar?: string;
   totalCount: number;
   readCount: number;
   createTime: string;

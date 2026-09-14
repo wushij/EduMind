@@ -39,4 +39,14 @@ public class SysSmsLogDao {
         wrapper.orderByDesc(SysSmsLogEntity::getCreateTime);
         return smsLogMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     }
+
+    public SysSmsLogEntity findLatestByPhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return null;
+        }
+        return smsLogMapper.selectOne(new LambdaQueryWrapper<SysSmsLogEntity>()
+                .eq(SysSmsLogEntity::getPhone, phone.trim())
+                .orderByDesc(SysSmsLogEntity::getCreateTime)
+                .last("LIMIT 1"));
+    }
 }

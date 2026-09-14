@@ -365,6 +365,7 @@ import type { Chapter } from '@/types/course/chapter';
 import { getChapters } from '@/api/course/chapter';
 import { getChatModels } from '@/api/ai/chat';
 import { useAIStream } from '@/composables/ai/useAIStream';
+import { usePreferenceStore } from '@/stores/user/preference';
 import ChatMessage from '@/components/ai/ChatMessage.vue';
 import ChatInput from '@/components/ai/ChatInput.vue';
 import ChatSessionList from '@/components/ai/ChatSessionList.vue';
@@ -519,7 +520,10 @@ async function loadModels() {
       key: m.modelKey,
       desc: m.provider || 'LLM'
     }));
-    const defaultModel = chatModels.find((m) => m.isDefault) || chatModels[0];
+    const prefStore = usePreferenceStore();
+    const userPreferredKey = prefStore.preferences.defaultModel;
+    const preferredModel = userPreferredKey ? chatModels.find((m) => m.modelKey === userPreferredKey) : undefined;
+    const defaultModel = preferredModel || chatModels.find((m) => m.isDefault) || chatModels[0];
     if (defaultModel) {
       currentModel.value = defaultModel.name;
       currentModelKey.value = defaultModel.modelKey;

@@ -35,6 +35,8 @@
         <edumind.version>1.0.0-SNAPSHOT</edumind.version>
         <redisson.version>3.34.1</redisson.version>
         <milvus-sdk.version>2.4.4</milvus-sdk.version>
+        <aliyun-dypns.version>2.0.0</aliyun-dypns.version>
+        <tencent-sms.version>3.1.754</tencent-sms.version>
     </properties>
 
     <modules>
@@ -188,6 +190,19 @@
                 <groupId>io.milvus</groupId>
                 <artifactId>milvus-sdk-java</artifactId>
                 <version>${milvus-sdk.version}</version>
+            </dependency>
+
+            <!-- 阿里云号码认证 / 短信认证 SDK -->
+            <dependency>
+                <groupId>com.aliyun</groupId>
+                <artifactId>dypnsapi20170525</artifactId>
+                <version>${aliyun-dypns.version}</version>
+            </dependency>
+            <!-- 腾讯云短信 SDK -->
+            <dependency>
+                <groupId>com.tencentcloudapi</groupId>
+                <artifactId>tencentcloud-sdk-java-sms</artifactId>
+                <version>${tencent-sms.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

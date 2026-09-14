@@ -21,6 +21,9 @@ public class LoginDTO implements Serializable {
 
     private String captchaId;
 
+    /** 滑块验证成功凭证 (一次性 Token) */
+    private String captchaToken;
+
     /** 前端契约字段别名 */
     private String captchaKey;
 

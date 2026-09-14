@@ -1,5 +1,5 @@
 <template>
-  <div class="gateway-dashboard-page" v-loading="loading">
+  <div class="gateway-dashboard-page">
     <!-- 顶部专属 SaaS 英雄大盘 (参照 TenantQuota 视觉范式) -->
     <PageHeroBanner
       title="AI 模型网关与算力调度监控 · 全链路治理大盘"
@@ -41,45 +41,51 @@
     <div class="main-content-layout">
       <!-- 顶部控制条：时间跨度筛选、自动刷新与快捷导航 -->
       <div class="dashboard-control-bar">
-        <div class="left-status-box">
-          <span class="pulse-dot" :class="{ warning: (metrics?.circuitOpenCount ?? 0) > 0 }"></span>
-          <span class="status-label">网关运行状态：</span>
-          <el-tag :type="(metrics?.circuitOpenCount ?? 0) > 0 ? 'danger' : 'success'" size="small" effect="light">
-            {{ (metrics?.circuitOpenCount ?? 0) > 0 ? '触发熔断隔离' : '正常转发中' }}
-          </el-tag>
-          <span class="sync-time">数据最后同步: {{ lastSyncTime }}</span>
-        </div>
+        <div class="filter-tools">
+          <div class="range-segmented-control">
+            <button
+              v-for="opt in rangeOptions"
+              :key="opt.value"
+              type="button"
+              class="range-tab-item"
+              :class="{ 'is-active': range === opt.value }"
+              @click="selectRange(opt.value)"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
 
-        <div class="right-actions-box">
-          <el-radio-group v-model="range" size="default" class="range-radio-group" @change="loadMetrics">
-            <el-radio-button value="1h">近 1 小时</el-radio-button>
-            <el-radio-button value="24h">近 24 小时</el-radio-button>
-            <el-radio-button value="7d">近 7 天</el-radio-button>
-            <el-radio-button value="30d">近 30 天</el-radio-button>
-          </el-radio-group>
-
-          <div class="auto-refresh-switch">
-            <el-switch v-model="autoRefresh" size="small" inline-prompt active-text="开" inactive-text="关" @change="toggleAutoRefresh" />
+          <div class="auto-refresh-switch" :class="{ 'is-active': autoRefresh }">
+            <el-switch
+              v-model="autoRefresh"
+              size="small"
+              @change="toggleAutoRefresh"
+            />
             <span class="switch-tip">30s 自动刷新</span>
           </div>
 
-          <el-button plain size="default" :loading="loading" @click="loadMetrics">
-            <el-icon><Refresh /></el-icon>
-            <span>刷新</span>
-          </el-button>
+          <span class="sync-time">数据最后同步：{{ lastSyncTime || '--:--:--' }}</span>
+        </div>
 
-          <el-button type="primary" size="default" class="gradient-btn" @click="router.push('/system/gateway/routes')">
-            <el-icon><Connection /></el-icon>
-            <span>路由规则配置 →</span>
-          </el-button>
+        <div class="action-buttons">
+            <el-button plain round class="refresh-btn" @click="loadMetrics">
+              <el-icon :class="{ 'is-loading': loading }"><Refresh /></el-icon>
+              <span>刷新</span>
+            </el-button>
 
-          <el-button plain size="default" @click="openTraceDrawer">
-            <el-icon><Document /></el-icon>
-            <span>调用 Trace 明细</span>
-          </el-button>
+            <el-button type="primary" round class="gradient-btn" @click="router.push('/system/gateway/routes')">
+              <el-icon><Connection /></el-icon>
+              <span>路由规则配置</span>
+            </el-button>
+
+            <el-button plain round @click="openTraceDrawer">
+              <el-icon><Document /></el-icon>
+              <span>Trace 明细</span>
+            </el-button>
         </div>
       </div>
 
+      <div class="dashboard-metrics-body" v-loading="loading">
       <!-- Mock 提示 -->
       <el-alert
         v-if="usedMockFallback"
@@ -366,6 +372,7 @@
           </el-table-column>
         </el-table>
       </div>
+      </div>
     </div>
 
     <!-- 实时调用链路 Trace 抽屉 -->
@@ -458,6 +465,12 @@ const router = useRouter();
 const loading = ref(false);
 const usedMockFallback = ref(false);
 const range = ref('24h');
+const rangeOptions = [
+  { label: '近 1 小时', value: '1h' },
+  { label: '近 24 小时', value: '24h' },
+  { label: '近 7 天', value: '7d' },
+  { label: '近 30 天', value: '30d' }
+];
 const metrics = ref<GatewayMetricsVO | null>(null);
 const lastSyncTime = ref<string>('');
 const modelSearchKey = ref('');
@@ -544,6 +557,12 @@ function translateSceneName(scene: string) {
     case 'agent': return 'Agent 任务规划';
     default: return scene;
   }
+}
+
+function selectRange(value: string) {
+  if (range.value === value) return;
+  range.value = value;
+  loadMetrics();
 }
 
 // 加载指标
@@ -732,77 +751,124 @@ onUnmounted(() => {
   }
 
   // 顶部控制条
+  .dashboard-metrics-body {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 200px;
+  }
+
   .dashboard-control-bar {
     background: #FFFFFF;
     border-radius: 14px;
-    padding: 14px 20px;
+    padding: 14px 18px;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
     border: 1px solid #E2E8F0;
-    flex-wrap: wrap;
-    gap: 14px;
 
-    .left-status-box {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-
-      .pulse-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background-color: #10B981;
-        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
-        animation: pulse 2s infinite;
-
-        &.warning {
-          background-color: #EF4444;
-          box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
-        }
-      }
-
-      .status-label {
-        font-size: 13.5px;
-        font-weight: 600;
-        color: #1E293B;
-      }
-
-      .sync-time {
-        font-size: 12px;
-        color: #94A3B8;
-        margin-left: 8px;
-      }
-    }
-
-    .right-actions-box {
+    .filter-tools {
       display: flex;
       align-items: center;
       gap: 12px;
       flex-wrap: wrap;
+      min-width: 0;
+    }
 
-      .auto-refresh-switch {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        background: #F8FAFC;
-        padding: 4px 10px;
-        border-radius: 8px;
-        border: 1px solid #E2E8F0;
+    .sync-time {
+      font-size: 12px;
+      color: #94A3B8;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      flex-shrink: 0;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+    }
+
+    .action-buttons {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .range-segmented-control {
+      display: inline-flex;
+      align-items: center;
+      background: #F1F5F9;
+      border: 1px solid #E2E8F0;
+      border-radius: 999px;
+      padding: 3px;
+      gap: 2px;
+      flex-shrink: 0;
+
+      .range-tab-item {
+        border: none;
+        background: transparent;
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #64748B;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+
+        &:hover {
+          color: #1E293B;
+        }
+
+        &.is-active {
+          background: #FFFFFF;
+          color: #1677FF;
+          box-shadow: inset 0 0 0 1px rgba(22, 119, 255, 0.12), 0 2px 8px rgba(15, 23, 42, 0.08);
+        }
+      }
+    }
+
+    .refresh-btn {
+      min-width: 84px;
+    }
+
+    .auto-refresh-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #F8FAFC;
+      padding: 5px 12px 5px 10px;
+      border-radius: 999px;
+      border: 1px solid #E2E8F0;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+      flex-shrink: 0;
+
+      &.is-active {
+        background: #EFF6FF;
+        border-color: #BFDBFE;
 
         .switch-tip {
-          font-size: 12px;
-          color: #64748B;
+          color: #2563EB;
         }
       }
 
-      .gradient-btn {
-        background: linear-gradient(135deg, #2563EB 0%, #4F46E5 100%);
-        border: none;
-        border-radius: 8px;
-        color: #FFFFFF;
+      .switch-tip {
+        font-size: 12px;
+        font-weight: 500;
+        color: #64748B;
+        white-space: nowrap;
       }
+    }
+
+    .gradient-btn {
+      background: linear-gradient(135deg, #2563EB 0%, #4F46E5 100%);
+      border: none;
+      color: #FFFFFF;
     }
   }
 

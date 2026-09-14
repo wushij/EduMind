@@ -2,7 +2,9 @@ package com.edumind.knowledge.controller.ocr;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.edumind.common.annotation.OperationLog;
 import com.edumind.common.api.ApiResult;
+import com.edumind.common.enums.BusinessType;
 import com.edumind.knowledge.dto.ocr.OcrPageUpdateDTO;
 import com.edumind.knowledge.dto.ocr.OcrTaskCreateDTO;
 import com.edumind.knowledge.service.ocr.KnowledgeOcrService;
@@ -33,6 +35,7 @@ public class KnowledgeOcrController {
     private final KnowledgeOcrService knowledgeOcrService;
 
     @PostMapping
+    @OperationLog(module = "智能OCR", title = "创建OCR任务", businessType = BusinessType.INSERT)
     public ApiResult<KnowledgeOcrTaskVO> createOcrTask(@Valid @RequestBody OcrTaskCreateDTO dto) {
         return ApiResult.success(knowledgeOcrService.createOcrTask(dto.getDocumentId(), dto.getEngine()));
     }
@@ -48,12 +51,14 @@ public class KnowledgeOcrController {
     }
 
     @PutMapping("/pages/{pageId}")
+    @OperationLog(module = "智能OCR", title = "更新校对文本", businessType = BusinessType.UPDATE)
     public ApiResult<Void> updatePageText(@PathVariable("pageId") Long pageId, @RequestBody OcrPageUpdateDTO dto) {
         knowledgeOcrService.updatePageText(pageId, dto.getProofreadText());
         return ApiResult.success();
     }
 
     @PostMapping("/{taskId}/confirm")
+    @OperationLog(module = "智能OCR", title = "确认入库并触发切片", businessType = BusinessType.IMPORT)
     public ApiResult<Void> confirmAndIngest(@PathVariable("taskId") Long taskId) {
         knowledgeOcrService.confirmAndIngest(taskId);
         return ApiResult.success();

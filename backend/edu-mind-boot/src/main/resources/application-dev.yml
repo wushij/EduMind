@@ -25,6 +25,9 @@ edumind:
     demo-auto-bind-enabled: true
   security:
     sm-enabled: false
+    master-secret: EduMind_Memory_Key_Seed_2026
+    default-key-alias: edumind-data-key
+    model-key-alias: edumind-model-key
   ai:
     model-key-secret: EduMind_AI_Model_KEK_2026
     gateway:

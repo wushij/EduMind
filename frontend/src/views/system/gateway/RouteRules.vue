@@ -68,12 +68,7 @@
                 :key="opt.value"
                 :label="opt.label"
                 :value="opt.value"
-              >
-                <div class="model-option-item">
-                  <span class="opt-label font-mono">{{ opt.label }}</span>
-                  <span class="opt-tag">{{ opt.provider }}</span>
-                </div>
-              </el-option>
+              />
             </el-select>
           </template>
         </el-table-column>
@@ -90,15 +85,10 @@
             >
               <el-option
                 v-for="opt in modelOptions"
-                :key="opt.value"
+                :key="`${opt.value}-fallback`"
                 :label="opt.label"
                 :value="opt.value"
-              >
-                <div class="model-option-item">
-                  <span class="opt-label font-mono">{{ opt.label }}</span>
-                  <span class="opt-tag">{{ opt.provider }}</span>
-                </div>
-              </el-option>
+              />
             </el-select>
           </template>
         </el-table-column>
@@ -135,10 +125,23 @@ const routes = ref<GatewayRouteVO[]>([]);
 interface ModelOption {
   label: string;
   value: string;
-  provider: string;
 }
 
 const modelOptions = ref<ModelOption[]>([]);
+
+function buildModelOption(model: {
+  name?: string;
+  modelKey?: string;
+  modelName?: string;
+}): ModelOption {
+  const configName = model.name || model.modelKey || model.modelName || '未命名模型';
+  const modelName = model.modelName || configName;
+  const label = modelName !== configName ? `${configName} · ${modelName}` : configName;
+  return {
+    label,
+    value: model.modelKey || model.name || modelName
+  };
+}
 
 function getSceneName(scene: string) {
   if (!scene) return '通用场景';
@@ -162,16 +165,14 @@ async function loadData() {
   try {
     // 1. 加载所有系统中配置的模型，供下拉选择
     const models = await fetchModels();
-    const opts: ModelOption[] = (models || []).map((m) => ({
-      label: m.modelName || m.name || m.modelKey || '未命名模型',
-      value: m.modelKey || m.name || m.modelName || 'default',
-      provider: m.provider || 'default'
-    }));
+    const opts: ModelOption[] = (models || [])
+      .filter((m) => (m.configType === 'chat' || !m.configType) && m.status !== 'disabled')
+      .map((m) => buildModelOption(m));
 
-    // 保障常用预设项存在
+    // 保障 mock 降级项存在
     const knownValues = new Set(opts.map((o) => o.value));
     if (!knownValues.has('mock')) {
-      opts.push({ label: 'mock 本地备用', value: 'mock', provider: 'local' });
+      opts.push({ label: 'mock', value: 'mock' });
     }
     modelOptions.value = opts;
 
@@ -184,12 +185,9 @@ async function loadData() {
       routes.value = MOCK_GATEWAY_ROUTES.map((item) => ({ ...item }));
       if (modelOptions.value.length === 0) {
         modelOptions.value = [
-          { label: 'deepseek-v4-flash', value: 'deepseek-v4-flash', provider: 'DeepSeek' },
-          { label: 'Flash · deepseek-v4-flash', value: 'Flash · deepseek-v4-flash', provider: 'DeepSeek' },
-          { label: 'deepseek-chat', value: 'deepseek-chat', provider: 'DeepSeek' },
-          { label: 'gpt-4o-mini', value: 'gpt-4o-mini', provider: 'OpenAI' },
-          { label: 'qwen-plus', value: 'qwen-plus', provider: 'Qwen' },
-          { label: 'mock', value: 'mock', provider: 'local' }
+          buildModelOption({ name: 'Flash', modelKey: 'Flash', modelName: 'deepseek-v4-flash' }),
+          buildModelOption({ name: 'deepseek-chat', modelKey: 'deepseek-chat', modelName: 'deepseek-chat' }),
+          { label: 'mock', value: 'mock' }
         ];
       }
     } else {
@@ -346,25 +344,6 @@ onMounted(loadData);
       }
     }
 
-    .model-option-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: 100%;
-
-      .opt-label {
-        font-size: 13px;
-        color: #1E293B;
-      }
-
-      .opt-tag {
-        font-size: 11px;
-        color: #94A3B8;
-        background: #F1F5F9;
-        padding: 1px 6px;
-        border-radius: 4px;
-      }
-    }
   }
 }
 </style>

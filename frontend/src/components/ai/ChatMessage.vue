@@ -177,9 +177,11 @@ const activeFollowUps = computed(() => {
 
 function refreshMarkdownUi() {
   nextTick(() => {
-    if (!bubbleRef.value) return;
-    bindMarkdownCodeCopy(bubbleRef.value);
-    renderMermaidInElement(bubbleRef.value);
+    nextTick(() => {
+      if (!bubbleRef.value) return;
+      bindMarkdownCodeCopy(bubbleRef.value);
+      renderMermaidInElement(bubbleRef.value);
+    });
   });
 }
 

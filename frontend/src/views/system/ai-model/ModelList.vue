@@ -217,6 +217,11 @@
               前往获取 {{ currentPreset.label }} API Key ↗
             </el-link>
           </div>
+          <div class="form-item-tip kms-security-tip">
+            <el-icon class="kms-tip-icon"><Lock /></el-icon>
+            <span>已使用国密 SM4-GCM 加密存储，受 KMS 版本控制</span>
+            <span v-if="editing?.keyVersion" class="kms-version-tag">（当前版本: v{{ editing.keyVersion }}）</span>
+          </div>
         </el-form-item>
 
         <el-form-item v-if="form.configType === 'chat'" label="采样温度">
@@ -329,7 +334,8 @@ import {
   ChatDotRound,
   Cpu,
   CircleCheckFilled,
-  CircleCloseFilled
+  CircleCloseFilled,
+  Lock
 } from '@element-plus/icons-vue';
 import {
   fetchModels,
@@ -1038,6 +1044,30 @@ onMounted(async () => {
 
 .portal-link {
   font-size: 12px;
+}
+
+.kms-security-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #10b981;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  padding: 4px 14px;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.kms-tip-icon {
+  font-size: 13px;
+  color: #059669;
+}
+
+.kms-version-tag {
+  color: #047857;
+  font-weight: 600;
 }
 
 .slider-row {

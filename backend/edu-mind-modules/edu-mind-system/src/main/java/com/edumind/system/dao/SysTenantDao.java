@@ -56,4 +56,17 @@ public class SysTenantDao {
     public int updateById(SysTenantEntity entity) {
         return sysTenantMapper.updateById(entity);
     }
+
+    public long countTotal() {
+        return sysTenantMapper.selectCount(null);
+    }
+
+    public long countActive() {
+        return sysTenantMapper.selectCount(new LambdaQueryWrapper<SysTenantEntity>()
+                .eq(SysTenantEntity::getStatus, 1));
+    }
+
+    public int deleteById(Long id) {
+        return sysTenantMapper.deleteById(id);
+    }
 }

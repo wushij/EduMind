@@ -16,6 +16,9 @@ public class NotificationBroadcastConverter {
         }
         NotificationBroadcastVO vo = new NotificationBroadcastVO();
         BeanUtils.copyProperties(entity, vo);
+        if (vo.getSenderName() == null || vo.getSenderName().trim().isEmpty()) {
+            vo.setSenderName("admin");
+        }
         return vo;
     }
 

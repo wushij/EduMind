@@ -42,6 +42,7 @@ public class AuthServiceImpl implements AuthService {
     private final RoleDao roleDao;
     private final UserRoleDao userRoleDao;
     private final CaptchaService captchaService;
+    private final com.edumind.security.captcha.SliderCaptchaService sliderCaptchaService;
     private final UserVoAssembler userVoAssembler;
     private final com.edumind.system.service.email.EmailCodeService emailCodeService;
     private final RedisService redisService;
@@ -53,7 +54,9 @@ public class AuthServiceImpl implements AuthService {
         String username = loginDTO.getUsername().trim();
         String password = loginDTO.getPassword().trim();
 
-        if (StringUtils.hasText(loginDTO.resolveCaptchaId()) || StringUtils.hasText(loginDTO.resolveCaptcha())) {
+        if (StringUtils.hasText(loginDTO.getCaptchaToken())) {
+            sliderCaptchaService.consumeToken(loginDTO.getCaptchaToken(), username, "LOGIN", null);
+        } else if (StringUtils.hasText(loginDTO.resolveCaptchaId()) || StringUtils.hasText(loginDTO.resolveCaptcha())) {
             captchaService.verify(loginDTO.resolveCaptchaId(), loginDTO.resolveCaptcha());
         }
 
@@ -63,6 +66,15 @@ public class AuthServiceImpl implements AuthService {
             if ("admin".equals(username) && "admin123".equals(password)) {
                 permissionCacheService.evictUser(1L);
                 StpUtil.login(1L);
+                try {
+                    cn.dev33.satoken.session.SaSession session = StpUtil.getSession();
+                    if (session != null) {
+                        session.set("username", "admin");
+                        session.set("realName", "系统管理员");
+                        session.set("avatar", "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png");
+                    }
+                } catch (Exception ignored) {
+                }
                 Long tenantId = sysTenantService.initializeLoginTenantSession(1L);
                 UserEntity bootstrapAdmin = userDao.findById(1L);
                 UserVO adminVO = bootstrapAdmin != null
@@ -95,6 +107,15 @@ public class AuthServiceImpl implements AuthService {
 
         permissionCacheService.evictUser(user.getId());
         StpUtil.login(user.getId());
+        try {
+            cn.dev33.satoken.session.SaSession session = StpUtil.getSession();
+            if (session != null) {
+                session.set("username", user.getUsername());
+                session.set("realName", user.getRealName());
+                session.set("avatar", user.getAvatar());
+            }
+        } catch (Exception ignored) {
+        }
         Long tenantId = sysTenantService.initializeLoginTenantSession(user.getId());
         if (tenantId == null) {
             StpUtil.logout(user.getId());
@@ -129,6 +150,15 @@ public class AuthServiceImpl implements AuthService {
         // 3. 执行登录授权
         permissionCacheService.evictUser(user.getId());
         StpUtil.login(user.getId());
+        try {
+            cn.dev33.satoken.session.SaSession session = StpUtil.getSession();
+            if (session != null) {
+                session.set("username", user.getUsername());
+                session.set("realName", user.getRealName());
+                session.set("avatar", user.getAvatar());
+            }
+        } catch (Exception ignored) {
+        }
         Long tenantId = sysTenantService.initializeLoginTenantSession(user.getId());
         if (tenantId == null) {
             StpUtil.logout(user.getId());

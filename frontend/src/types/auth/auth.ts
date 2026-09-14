@@ -22,7 +22,39 @@ export interface LoginParams {
   password: string;
   captcha?: string;
   captchaId?: string;
+  captchaToken?: string;
   role?: RoleEnum;
+}
+
+export interface CaptchaPolicyResult {
+  captchaEnabled: boolean;
+  captchaType: 'image' | 'slider';
+  smsLoginSliderCaptchaEnabled?: boolean;
+  emailLoginSliderCaptchaEnabled?: boolean;
+}
+
+export interface SliderChallengeResult {
+  challengeId: string;
+  background: string;
+  piece: string;
+  width: number;
+  height: number;
+  pieceSize: number;
+  pieceY: number;
+  expireAt: number;
+}
+
+export interface SliderVerifyPayload {
+  challengeId: string;
+  offsetX: number;
+  durationMs: number;
+  events: Array<{ x: number; y: number; t: number }>;
+  username?: string;
+}
+
+export interface SliderVerifyResult {
+  captchaToken: string;
+  expireAt: number;
 }
 
 export type EmailScene = 'login' | 'bind' | 'resetpwd' | 'test';

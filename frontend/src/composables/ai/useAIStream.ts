@@ -22,6 +22,7 @@ import { splitCopilotStream, cleanReasoningText } from '@/utils/ai/copilot-strea
 import { useStreamingMarkdown } from '@/composables/ai/useStreamingMarkdown';
 import { bindMarkdownCodeCopy } from '@/utils/ai/chat-markdown';
 import type { CitationItem } from '@/types/ai/assistant';
+import { usePreferenceStore } from '@/stores/user/preference';
 
 export interface ChatMessage {
   id: string;
@@ -175,11 +176,20 @@ export function useAIStream() {
   const messagesScrollRef = ref<HTMLDivElement | null>(null);
   const streamAnchorRef = ref<HTMLDivElement | null>(null);
 
+  function getInitialReasoningFolded(): boolean {
+    try {
+      const prefStore = usePreferenceStore();
+      return prefStore.preferences.thinkingDisplayMode !== 'EXPANDED';
+    } catch {
+      return true;
+    }
+  }
+
   // 流式过程中的临时状态 (对标全局副驾驶独立顶级 ref)
   const streamingReasoning = ref('');
   const streamingContent = ref('');
   const streamingCitations = ref<CitationItem[]>([]);
-  const isReasoningFolded = ref(true);
+  const isReasoningFolded = ref(getInitialReasoningFolded());
   const isReasoningActive = ref(false);
   const streamPhaseMessage = ref('');
   const answerStreamStarted = ref(false);
@@ -270,7 +280,7 @@ export function useAIStream() {
     streamingReasoning.value = '';
     streamingContent.value = '';
     streamingCitations.value = [];
-    isReasoningFolded.value = true;
+    isReasoningFolded.value = getInitialReasoningFolded();
     isReasoningActive.value = false;
     streamPhaseMessage.value = '';
     answerStreamStarted.value = false;
@@ -496,7 +506,7 @@ export function useAIStream() {
               streamPhaseMessage.value = '';
               if (!answerStreamStarted.value) {
                 answerStreamStarted.value = true;
-                isReasoningFolded.value = true;
+                isReasoningFolded.value = getInitialReasoningFolded();
               }
               const answerDelta = split.answer.slice(lastStreamedIndex);
               lastStreamedIndex = split.answer.length;

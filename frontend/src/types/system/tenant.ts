@@ -1,6 +1,7 @@
 export interface CampusVO {
   id: number;
   tenantId: number;
+  code?: string;
   campusCode: string;
   name: string;
   address?: string;
@@ -9,34 +10,85 @@ export interface CampusVO {
   createTime?: string;
 }
 
+export interface TenantOverviewStatsVO {
+  totalTenants: number;
+  activeTenants: number;
+  totalCampuses: number;
+  totalMembers: number;
+  totalStudents: number;
+  totalTeachers: number;
+  complianceRate: number;
+  totalTokenQuota: number;
+  usedTokenQuota: number;
+}
+
 export interface TenantListVO {
   id: number;
+  code?: string;
   tenantCode: string;
   name: string;
   domain?: string;
+  logo?: string;
   logoUrl?: string;
+  planCode?: string;
+  planName?: string;
   adminName?: string;
   adminPhone?: string;
   status: number;
   expireTime?: string;
   campusCount?: number;
   memberCount?: number;
+  studentCount?: number;
+  teacherCount?: number;
+  tokenUsagePercent?: number;
+  storageUsagePercent?: number;
+  seatsUsagePercent?: number;
   createTime?: string;
 }
 
 export interface TenantDetailVO extends TenantListVO {
   campuses: CampusVO[];
   description?: string;
+  quotas?: TenantQuotaVO[];
 }
 
 export interface TenantCreateRequest {
+  code?: string;
   tenantCode: string;
   name: string;
   domain?: string;
+  logo?: string;
+  planCode?: string;
   adminName: string;
   adminPhone: string;
   adminPassword?: string;
   expireTime?: string;
+}
+
+export interface TenantUpdateRequest {
+  name: string;
+  logo?: string;
+  domain?: string;
+  planCode?: string;
+  expireTime?: string;
+  adminName?: string;
+  adminPhone?: string;
+  status?: number;
+}
+
+export interface CampusCreateRequest {
+  code: string;
+  name: string;
+  address?: string;
+  isMain?: boolean;
+  status?: number;
+}
+
+export interface CampusUpdateRequest {
+  name: string;
+  address?: string;
+  isMain?: boolean;
+  status?: number;
 }
 
 export interface TenantSwitchRequest {
@@ -163,4 +215,28 @@ export interface StudentCognitiveProfileVO {
   }>;
 }
 
+export interface OrgQuotaVO {
+  orgId: number;
+  name: string;
+  orgType: string;
+  orgTypeLabel: string;
+  campusName: string;
+  tokenLimit: number;
+  tokenUsed: number;
+  usagePercent: number;
+  warningThreshold: number;
+  storageLimit: number;
+  storageUsed: number;
+  seatsLimit: number;
+  seatsUsed: number;
+  status: 'NORMAL' | 'WARNING' | 'EXCEEDED';
+}
 
+export interface OrgQuotaUpdateRequest {
+  tenantId?: number;
+  orgId: number;
+  tokenLimit?: number;
+  storageLimit?: number;
+  seatsLimit?: number;
+  warningThreshold?: number;
+}

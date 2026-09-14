@@ -37,6 +37,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
                         "/api/auth/reset-password",
                         "/api/auth/register",
                         "/api/auth/captcha",
+                        "/api/auth/captcha/**",
                         "/api/captcha/**",
                         "/api/storage/files/**",
                         "/doc.html",
@@ -50,6 +51,22 @@ public class SaTokenConfig implements WebMvcConfigurer {
             public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
                 if (StpUtil.isLogin()) {
                     Long userId = StpUtil.getLoginIdAsLong();
+                    String username = null;
+                    String realName = null;
+                    String avatar = null;
+                    try {
+                        cn.dev33.satoken.session.SaSession session = StpUtil.getSession();
+                        if (session != null) {
+                            username = (String) session.get("username");
+                            realName = (String) session.get("realName");
+                            avatar = (String) session.get("avatar");
+                        }
+                    } catch (Exception ignored) {
+                    }
+                    if (username == null && Long.valueOf(1L).equals(userId)) {
+                        username = "admin";
+                        realName = "系统管理员";
+                    }
                     List<String> roles = Collections.emptyList();
                     List<String> permissions = Collections.emptyList();
                     try {
@@ -62,6 +79,9 @@ public class SaTokenConfig implements WebMvcConfigurer {
                     }
                     UserContext.set(LoginUser.builder()
                             .id(userId)
+                            .username(username)
+                            .realName(realName)
+                            .avatar(avatar)
                             .roles(roles != null ? roles : Collections.emptyList())
                             .permissions(permissions != null ? permissions : Collections.emptyList())
                             .build());

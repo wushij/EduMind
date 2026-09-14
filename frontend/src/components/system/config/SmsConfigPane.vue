@@ -88,7 +88,12 @@
               </div>
             </el-form-item>
           </el-form>
-          <el-alert type="info" :closable="false" show-icon title="将发送一条随机 6 位验证码到该手机，用于测试短信配置是否正确。密钥未配置时会在服务端控制台打印。" />
+          <el-alert
+            type="info"
+            :closable="false"
+            show-icon
+            title="将发送一条随机 6 位验证码到该手机。已配置 AccessKey 与签名时走阿里云/腾讯云真实发送；密钥未配置时仅在服务端控制台打印。"
+          />
         </el-card>
         <el-card shadow="never" class="sms-section-card">
           <template #header>
@@ -139,7 +144,7 @@ withDefaults(
 );
 
 const emit = defineEmits<{
-  testSms: [phone: string];
+  testSms: [phone: string, templateCode?: string];
   showAllSmsLogs: [];
 }>();
 
@@ -151,7 +156,7 @@ function handleSendTest() {
     ElMessage.warning('请输入正确的 11 位手机号');
     return;
   }
-  emit('testSms', testSmsPhone.value.trim());
+  emit('testSms', testSmsPhone.value.trim(), testSmsTemplate.value);
 }
 </script>
 

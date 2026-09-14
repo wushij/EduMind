@@ -19,6 +19,10 @@ sql/
 │   ├── V2_0_0__multi_tenant_and_notification.sql # V2.0.0~V2.0.6 多租户/通知/权限（合并）
 │   ├── V2_0_1__ai_memory_and_rag_foundation.sql  # V2.0.7~V2.0.13 记忆/RAG/OCR（合并）
 │   ├── V2_0_2__rag_templates_gates_audit.sql   # V2.0.14~V2.0.19 RAG模板/Gate/操作日志（合并）
+│   ├── V2_0_3__security_key_kms.sql            # V2.0.20 国密 KMS 租户密钥版本管理（Gate I9）
+│   ├── V2_0_4__ai_model_key_version.sql        # V2.0.21 AI 模型 API Key 接入 KMS（Gate I10）
+│   ├── V2_0_5__sys_org_quota.sql               # V2.0.22 组织院系算力配额表（sys_org_quota）
+│   ├── V2_0_6__oper_log_tenant_hardening.sql   # V2.0.23 操作日志多租户加固与审计闭环（Gate I11）
 │   ├── R__seed_data.sql                        # V0 增量路径演示种子（用户/课程/题库/AI 等，幂等）
 │   ├── R__seed_legacy.sql                      # 旧库升级补丁（租户角色/组织成员/权限乱码修复，幂等）
 │   └── R__gate_e2e_seeds.sql                   # Gate F/G/H 集成测试种子（幂等，init 不含 Gate F）
@@ -42,7 +46,7 @@ mysql -u root -p < sql/init.sql
 
 > 已有业务数据的库 **禁止** 执行 `init.sql`；补表、改结构、版本升级请走 `sql/migration/V*.sql`（执行前 `mysqldump` 备份）。
 
-`init.sql` 已包含 **V0.1 ~ V2.0.19** 与 **V1.2.x** 的全部 `V*.sql` 迁移最终状态（含 RAG 提示词工程、教学干预权限、操作日志审计等），**全新空库跑 init 后无需再跑 migration**（Gate E2E 可选种子除外）。
+`init.sql` 已包含 **V0.1 ~ V2.0.23** 与 **V1.2.x** 的全部 `V*.sql` 迁移最终状态（含 RAG 提示词、国密 KMS、组织配额、操作日志审计等），**全新空库跑 init 后无需再跑 migration**（Gate E2E 可选种子除外）。
 
 ### 方式二：按版本增量迁移（已有空库分步升级）
 
@@ -58,9 +62,13 @@ mysql -u root -p < sql/init.sql
 7.  V1_1__ai_model_enhancements.sql          # V1.2（须在步骤 6 之后）
 8.  V2_0_1__ai_memory_and_rag_foundation.sql # V2.0.7 ~ V2.0.13
 9.  V2_0_2__rag_templates_gates_audit.sql     # V2.0.14 ~ V2.0.19
-10. R__seed_data.sql          # 可选，V0 增量路径补充演示数据
-11. R__seed_legacy.sql        # 可选，旧库升级补丁（租户 RBAC / 组织成员）
-12. R__gate_e2e_seeds.sql     # 可选，Gate F/G/H 集成测试专用
+10. V2_0_3__security_key_kms.sql              # V2.0.20 国密 KMS (Gate I9)
+11. V2_0_4__ai_model_key_version.sql          # V2.0.21 AI 模型密钥 KMS (Gate I10)
+12. V2_0_5__sys_org_quota.sql                 # V2.0.22 组织院系算力配额
+13. V2_0_6__oper_log_tenant_hardening.sql     # V2.0.23 操作日志多租户加固 (Gate I11)
+14. R__seed_data.sql          # 可选，V0 增量路径补充演示数据
+15. R__seed_legacy.sql        # 可选，旧库升级补丁（租户 RBAC / 组织成员）
+16. R__gate_e2e_seeds.sql     # 可选，Gate F/G/H 集成测试专用
 ```
 
 > **执行顺序说明：** V1.2 依赖 V2.0 多租户表结构，因此 `V1_1__*` 插在 `V2_0_0__*` 与 `V2_0_1__*` 之间，与历史细粒度脚本顺序一致。
@@ -77,6 +85,10 @@ mysql -u root -p edumind < sql/migration/V2_0_0__multi_tenant_and_notification.s
 mysql -u root -p edumind < sql/migration/V1_1__ai_model_enhancements.sql
 mysql -u root -p edumind < sql/migration/V2_0_1__ai_memory_and_rag_foundation.sql
 mysql -u root -p edumind < sql/migration/V2_0_2__rag_templates_gates_audit.sql
+mysql -u root -p edumind < sql/migration/V2_0_3__security_key_kms.sql
+mysql -u root -p edumind < sql/migration/V2_0_4__ai_model_key_version.sql
+mysql -u root -p edumind < sql/migration/V2_0_5__sys_org_quota.sql
+mysql -u root -p edumind < sql/migration/V2_0_6__oper_log_tenant_hardening.sql
 mysql -u root -p edumind < sql/migration/R__seed_data.sql
 mysql -u root -p edumind < sql/migration/R__seed_legacy.sql
 ```
@@ -108,6 +120,10 @@ mysql -u root -p edumind < sql/migration/R__seed_legacy.sql
 | V1.2 AI 模型增强 | `V1_1__ai_model_enhancements.sql` | `ai_model_config` 运维字段 + `ai_message.reasoning_content`（须在 V2_0_0 后） |
 | V2.0.7~V2.0.13 记忆与 RAG 基础 | `V2_0_1__ai_memory_and_rag_foundation.sql` | 记忆生命周期/课程 RAG Prompt/OCR 权限/通知多租户/conversation_id |
 | V2.0.14~V2.0.19 Gate 与审计 | `V2_0_2__rag_templates_gates_audit.sql` | EXAM/GRADING/LESSON_PREP RAG 模板 + 导出异步 + 干预权限 + `sys_oper_log` |
+| V2.0.20 国密 KMS | `V2_0_3__security_key_kms.sql` | 租户数据密钥版本管理 `security_key_version` + 记忆版本追踪 (Gate I9) |
+| V2.0.21 AI 模型密钥 KMS | `V2_0_4__ai_model_key_version.sql` | `ai_model_config.key_version` + 平台模型密钥种子 `edumind-model-key` (Gate I10) |
+| V2.0.22 组织院系配额 | `V2_0_5__sys_org_quota.sql` | `sys_org_quota` 表 + 组织级 TOKEN/STORAGE/SEATS 演示种子 |
+| V2.0.23 操作日志加固 | `V2_0_6__oper_log_tenant_hardening.sql` | `sys_oper_log` 多租户索引与 operlog 权限闭环 (Gate I11) |
 
 示例（从 V0.2 升级到 V0.5）：
 
@@ -116,7 +132,7 @@ mysql -u root -p edumind < sql/migration/V0_5_0__product_enhancement.sql
 mysql -u root -p edumind < sql/migration/V0_5_1__user_preferences.sql
 ```
 
-示例（从 V0.5 一次性升级到最新 V2.0.19）：
+示例（从 V0.5 一次性升级到最新 V2.0.23）：
 
 ```bash
 mysql -u root -p edumind < sql/migration/V1_0__intelligent_hub_and_analytics.sql
@@ -124,9 +140,13 @@ mysql -u root -p edumind < sql/migration/V2_0_0__multi_tenant_and_notification.s
 mysql -u root -p edumind < sql/migration/V1_1__ai_model_enhancements.sql
 mysql -u root -p edumind < sql/migration/V2_0_1__ai_memory_and_rag_foundation.sql
 mysql -u root -p edumind < sql/migration/V2_0_2__rag_templates_gates_audit.sql
+mysql -u root -p edumind < sql/migration/V2_0_3__security_key_kms.sql
+mysql -u root -p edumind < sql/migration/V2_0_4__ai_model_key_version.sql
+mysql -u root -p edumind < sql/migration/V2_0_5__sys_org_quota.sql
+mysql -u root -p edumind < sql/migration/V2_0_6__oper_log_tenant_hardening.sql
 ```
 
-> 全新建库请直接执行最新版 `sql/init.sql`（已含 V0.1~V2.0.19 与 V1.2.x 完整结构及种子），无需再跑 migration。
+> 全新建库请直接执行最新版 `sql/init.sql`（已含 V0.1~V2.0.23 与 V1.2.x 完整结构及种子），无需再跑 migration。
 
 ### V1.1 回滚（慎用，先备份）
 
@@ -198,7 +218,6 @@ Get-Content sql\migration\R__gate_e2e_seeds.sql -Raw -Encoding UTF8 | mysql -uro
 | | `sys_notification_broadcast` | - | 系统消息广播任务（V2.0.4） |
 | | `sys_sms_log` | - | 短信发送审计日志（V2.0.1） |
 | | `sys_email_log` | - | 邮件发送审计日志（V2.0.1） |
-| | `sys_oper_log` | - | 系统业务操作日志审计（V2.0.19） |
 | | `sys_config` | - | 系统全局参数（邮件 SMTP、平台信息等） |
 | | `sys_ai_quota` | - | AI Token / 调用配额 |
 | | `sys_user_preference` | - | 用户偏好（主题/默认模型/RAG 开关） |
@@ -209,6 +228,7 @@ Get-Content sql\migration\R__gate_e2e_seeds.sql -Raw -Encoding UTF8 | mysql -uro
 | | `sys_tenant_member` | - | 用户与租户成员绑定 |
 | | `sys_member_org` | - | 成员组织分配关系 |
 | | `sys_tenant_quota` | - | 租户资源配额（Token/存储/QPS/席位） |
+| | `sys_org_quota` | `SysOrgQuotaEntity` | 组织院系算力配额分配表（Gate I11/V2.0.5） |
 | **课程教学** | `course` | `CourseEntity` | 课程主信息 |
 | | `course_chapter` | `ChapterEntity` | 课程大纲层级章节树 |
 | | `course_knowledge_point` | `KnowledgePointEntity` | 知识图谱核心知识点 |
@@ -248,7 +268,7 @@ Get-Content sql\migration\R__gate_e2e_seeds.sql -Raw -Encoding UTF8 | mysql -uro
 | | `wrong_question_record` | - | 错题记录与归因（V1.0） |
 | | `course_statistics` | `CourseStatisticsEntity` | 课程日聚合（活跃学生/均分/掌握度/AI 调用/错题，V1.1） |
 | **知识图谱** | `knowledge_point_relation` | - | 知识点关系边（V1.0） |
-| **AI Gateway** | `ai_model_config` | - | 模型配置与降级策略（V1.0） |
+| **AI Gateway** | `ai_model_config` | `AiModelConfigEntity` | 模型配置与降级策略 (Gate I10 SM4-GCM) |
 | | `ai_gateway_route` | - | 场景路由（CHAT/RAG/AGENT/GRADING）（V1.0） |
 | **Agent** | `agent_run` | - | Agent 执行实例（V1.0） |
 | | `agent_step` | - | Agent 步骤时间线（V1.0） |
@@ -256,3 +276,4 @@ Get-Content sql\migration\R__gate_e2e_seeds.sql -Raw -Encoding UTF8 | mysql -uro
 | **导出与安全 (V2.0)** | `export_task` | `ExportTaskEntity` | 异步打印导出任务 |
 | | `security_key_version` | `SecurityKeyVersionEntity` | 国密密钥版本元数据 (Gate I9) |
 | **教学决策 (V2.0)** | `teaching_intervention` | `TeachingInterventionEntity` | 教学干预建议决策 (Gate I8) |
+| **系统与审计 (V2.0)** | `sys_oper_log` | `SysOperLogEntity` | 业务操作日志审计闭环 (Gate I11) |

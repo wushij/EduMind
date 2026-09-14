@@ -3,11 +3,15 @@ package com.edumind.system.service.security.impl;
 import com.edumind.common.api.ResultCode;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
+import com.edumind.security.crypto.Sm4Service;
+import com.edumind.system.api.SecurityKeyQueryApi;
 import com.edumind.system.converter.security.SecurityKeyVersionConverter;
 import com.edumind.system.dao.security.SecurityKeyVersionDao;
+import com.edumind.system.dto.security.SecurityKeyCryptoTestDTO;
 import com.edumind.system.dto.security.SecurityKeyRotateDTO;
 import com.edumind.system.entity.security.SecurityKeyVersionEntity;
 import com.edumind.system.service.security.SecurityKeyVersionService;
+import com.edumind.system.vo.security.SecurityKeyCryptoTestVO;
 import com.edumind.system.vo.security.SecurityKeyVersionVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +32,8 @@ import java.util.List;
 public class SecurityKeyVersionServiceImpl implements SecurityKeyVersionService {
 
     private final SecurityKeyVersionDao securityKeyVersionDao;
+    private final SecurityKeyQueryApi securityKeyQueryApi;
+    private final Sm4Service sm4Service;
 
     @Value("${edumind.security.default-key-alias:edumind-data-key}")
     private String defaultKeyAlias;
@@ -35,22 +41,19 @@ public class SecurityKeyVersionServiceImpl implements SecurityKeyVersionService 
     @Override
     public List<SecurityKeyVersionVO> listKeyVersions(String keyAlias) {
         Long tenantId = TenantContext.requireTenantId();
-        String alias = StringUtils.hasText(keyAlias) ? keyAlias : defaultKeyAlias;
-        List<SecurityKeyVersionEntity> list = securityKeyVersionDao.listByTenantAndAlias(tenantId, alias);
+        // 保证租户数据加密主密钥与AI大模型凭证密钥开箱即用生效
+        ensureLazyInitActiveKey(tenantId, defaultKeyAlias);
+        ensureLazyInitActiveKey(tenantId, "edumind-model-key");
 
-        // 若当前租户下暂无任何版本，懒初始化 v1 ACTIVE（保证开箱即用）
-        if (list.isEmpty()) {
-            ensureLazyInitActiveKey(tenantId, alias);
-            list = securityKeyVersionDao.listByTenantAndAlias(tenantId, alias);
-        }
-
+        String queryAlias = StringUtils.hasText(keyAlias) ? keyAlias.trim() : null;
+        List<SecurityKeyVersionEntity> list = securityKeyVersionDao.listByTenantAndAlias(tenantId, queryAlias);
         return SecurityKeyVersionConverter.toVOList(list);
     }
 
     @Override
     public SecurityKeyVersionVO getActiveKey(String keyAlias) {
         Long tenantId = TenantContext.requireTenantId();
-        String alias = StringUtils.hasText(keyAlias) ? keyAlias : defaultKeyAlias;
+        String alias = StringUtils.hasText(keyAlias) ? keyAlias.trim() : defaultKeyAlias;
         SecurityKeyVersionEntity active = securityKeyVersionDao.findActiveByTenantAndAlias(tenantId, alias);
         if (active == null) {
             active = ensureLazyInitActiveKey(tenantId, alias);
@@ -108,7 +111,51 @@ public class SecurityKeyVersionServiceImpl implements SecurityKeyVersionService 
         return SecurityKeyVersionConverter.toVO(newEntity);
     }
 
+    @Override
+    public SecurityKeyCryptoTestVO testCrypto(SecurityKeyCryptoTestDTO dto) {
+        if (dto == null || !StringUtils.hasText(dto.getText())) {
+            throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "测试输入内容不能为空");
+        }
+        Long tenantId = TenantContext.requireTenantId();
+        String alias = StringUtils.hasText(dto.getKeyAlias()) ? dto.getKeyAlias().trim() : defaultKeyAlias;
+        int version = dto.getKeyVersion() != null && dto.getKeyVersion() > 0
+                ? dto.getKeyVersion()
+                : securityKeyQueryApi.getActiveKeyVersion(tenantId, alias);
+
+        String key16 = securityKeyQueryApi.resolveDataKey16(tenantId, alias, version);
+
+        SecurityKeyCryptoTestVO vo = new SecurityKeyCryptoTestVO();
+        vo.setKeyAlias(alias);
+        vo.setKeyVersion(version);
+        vo.setAlgorithm("SM4-GCM");
+        vo.setOperation(dto.getOperation());
+
+        long start = System.currentTimeMillis();
+        try {
+            if ("DECRYPT".equalsIgnoreCase(dto.getOperation())) {
+                String decrypted = sm4Service.decryptFromBase64(key16, dto.getText().trim());
+                vo.setResultText(decrypted);
+                vo.setSuccess(true);
+                vo.setMessage("解密成功！密文真实由当前 KMS 密钥 (v" + version + ") 认证通过并还原明文");
+            } else {
+                String encrypted = sm4Service.encryptToBase64(key16, dto.getText().trim());
+                vo.setResultText(encrypted);
+                vo.setSuccess(true);
+                vo.setMessage("加密成功！已生成标准国密 SM4-GCM Base64 认证密文");
+            }
+        } catch (Exception e) {
+            log.warn("[国密自检异常] 操作: {}, 租户: {}, 别名: {}, 版本: v{}, 原因: {}",
+                    dto.getOperation(), tenantId, alias, version, e.getMessage());
+            vo.setSuccess(false);
+            vo.setResultText(null);
+            vo.setMessage("执行失败: " + e.getMessage() + " (Fail-Closed 保护已生效，密文认证未通过或格式异常)");
+        }
+        vo.setDurationMs(System.currentTimeMillis() - start);
+        return vo;
+    }
+
     private SecurityKeyVersionEntity requireAccessibleKey(Long id) {
+
         SecurityKeyVersionEntity entity = securityKeyVersionDao.findByIdIgnoreTenant(id);
         if (entity == null) {
             throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "密钥版本记录不存在");

@@ -2,6 +2,7 @@ package com.edumind.system.dao;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.edumind.common.context.TenantContext;
 import com.edumind.system.dto.log.SysOperLogPageQueryDTO;
 import com.edumind.system.entity.SysOperLogEntity;
 import com.edumind.system.mapper.SysOperLogMapper;
@@ -30,6 +31,18 @@ public class SysOperLogDao {
 
     public SysOperLogEntity selectById(Long id) {
         return sysOperLogMapper.selectById(id);
+    }
+
+    /**
+     * 按 ID 查询操作日志（忽略租户行级拦截，专用于 IDOR 越权校验）
+     */
+    public SysOperLogEntity findByIdIgnoreTenant(Long id) {
+        if (id == null) {
+            return null;
+        }
+        final SysOperLogEntity[] holder = new SysOperLogEntity[1];
+        TenantContext.runWithoutTenant(() -> holder[0] = sysOperLogMapper.selectById(id));
+        return holder[0];
     }
 
     public int deleteById(Long id) {

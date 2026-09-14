@@ -79,7 +79,7 @@ const reasoningContentRef = ref<HTMLDivElement | null>(null);
 function refreshReasoningMarkdownUi() {
   nextTick(() => {
     if (reasoningContentRef.value) {
-      bindMarkdownCodeCopy(reasoningContentRef.value);
+      bindMarkdownCodeCopy(reasoningContentRef.value, { renderMermaid: false });
     }
   });
 }
@@ -303,6 +303,10 @@ function toggleFold() {
     font-family: 'Fira Code', Consolas, monospace;
     font-size: 11.5px;
     color: #64748b;
+  }
+
+  :deep(.mermaid-diagram-wrapper) {
+    display: none;
   }
 
   :deep(.code-block-wrapper) {

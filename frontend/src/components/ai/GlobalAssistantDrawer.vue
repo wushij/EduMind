@@ -1564,6 +1564,25 @@ function handleTextareaKeydown(e: KeyboardEvent) {
         color: #8c8c8c;
         font-size: 12px;
       }
+
+      .mermaid-error {
+        color: #cf1322;
+        font-size: 12px;
+      }
+
+      .mermaid-fallback-box {
+        width: 100%;
+
+        pre {
+          margin: 0;
+          padding: 10px 12px;
+          overflow-x: auto;
+          font-size: 12px;
+          line-height: 1.55;
+          background: #fafafa;
+          border-radius: 6px;
+        }
+      }
     }
   }
 

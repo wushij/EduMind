@@ -2,8 +2,11 @@ package com.edumind.notification.controller.broadcast;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.stp.StpUtil;
+import com.edumind.common.annotation.OperationLog;
 import com.edumind.common.api.ApiResult;
 import com.edumind.common.api.PageResult;
+import com.edumind.common.enums.BusinessType;
 import com.edumind.common.model.UserContext;
 import com.edumind.notification.dto.broadcast.BroadcastCreateDTO;
 import com.edumind.notification.service.broadcast.NotificationBroadcastService;
@@ -50,9 +53,26 @@ public class NotificationBroadcastController {
     @SaCheckLogin
     @SaCheckPermission("notice:broadcast:send")
     @PostMapping
+    @OperationLog(module = "通知广播", title = "创建并发送广播", businessType = BusinessType.GRANT)
     public ApiResult<NotificationBroadcastVO> create(@Valid @RequestBody BroadcastCreateDTO dto) {
         Long senderId = UserContext.getUserId();
-        String senderName = UserContext.get() != null ? UserContext.get().getUsername() : "";
+        String senderName = "";
+        if (UserContext.get() != null) {
+            if (org.springframework.util.StringUtils.hasText(UserContext.get().getUsername())) {
+                senderName = UserContext.get().getUsername();
+            } else if (org.springframework.util.StringUtils.hasText(UserContext.get().getRealName())) {
+                senderName = UserContext.get().getRealName();
+            }
+        }
+        if (!org.springframework.util.StringUtils.hasText(senderName) && StpUtil.isLogin()) {
+            try {
+                Object u = StpUtil.getSession().get("username");
+                if (u != null) {
+                    senderName = u.toString();
+                }
+            } catch (Exception ignored) {
+            }
+        }
         return ApiResult.success(broadcastService.createBroadcast(dto, senderId, senderName));
     }
 
@@ -66,6 +86,7 @@ public class NotificationBroadcastController {
     @SaCheckLogin
     @SaCheckPermission("notice:broadcast:send")
     @DeleteMapping("/{id}")
+    @OperationLog(module = "通知广播", title = "删除通知广播", businessType = BusinessType.DELETE)
     public ApiResult<Void> delete(@PathVariable Long id) {
         broadcastService.deleteById(id);
         return ApiResult.success();
@@ -74,6 +95,7 @@ public class NotificationBroadcastController {
     @SaCheckLogin
     @SaCheckPermission("notice:broadcast:send")
     @DeleteMapping("/clear-all")
+    @OperationLog(module = "通知广播", title = "清空通知广播", businessType = BusinessType.CLEAN)
     public ApiResult<Void> clearAll() {
         broadcastService.clearAll();
         return ApiResult.success();

@@ -229,7 +229,7 @@ public class OperationLogAspect {
         if (!StringUtils.hasText(json)) {
             return json;
         }
-        return json.replaceAll("(\"(?:password|oldPassword|newPassword|confirmPassword|secretKey|token)\"\\s*:\\s*)\"[^\"]*\"", "$1\"******\"");
+        return json.replaceAll("(\"(?i:(?:password|oldPassword|old_password|newPassword|new_password|confirmPassword|confirm_password|secretKey|secret_key|token|accessToken|access_token|secret|masterSecret|master_secret|apiKey|api_key|apiKeyCipher|api_key_cipher|cipher))\"\\s*:\\s*)\"[^\"]*\"", "$1\"******\"");
     }
 
     private boolean isFilterObject(Object obj) {

@@ -17,7 +17,7 @@
     <div class="header-right">
       <!-- 多租户与校区一键切换器 (V2.0) -->
       <div class="tenant-switcher">
-        <el-dropdown trigger="click" placement="bottom-end" @command="handleTenantSwitch">
+        <el-dropdown trigger="click" placement="bottom-end" @command="handleTenantSwitch" @visible-change="handleDropdownVisible">
           <el-button size="small" class="tenant-switch-btn" plain>
             <el-icon class="tenant-icon"><School /></el-icon>
             <span class="tenant-text">{{ tenantStore.activeTenantName }}</span>
@@ -27,7 +27,7 @@
           <template #dropdown>
             <el-dropdown-menu class="tenant-dropdown-menu">
               <el-dropdown-item
-                v-for="tenant in tenantStore.availableTenants"
+                v-for="tenant in displayTenants"
                 :key="tenant.id"
                 :command="tenant.id"
                 :disabled="tenantStore.currentTenant?.id === tenant.id"
@@ -38,7 +38,7 @@
                     <el-tag v-if="tenantStore.currentTenant?.id === tenant.id" size="small" type="success" effect="light">当前</el-tag>
                   </div>
                   <div class="tenant-item-meta">
-                    <span>编码: {{ tenant.tenantCode }}</span>
+                    <span>编码: {{ tenant.tenantCode || tenant.code }}</span>
                     <span v-if="tenant.campusCount">校区: {{ tenant.campusCount }}</span>
                   </div>
                 </div>
@@ -134,7 +134,7 @@ import {
 import { useAuthStore } from '@/stores/auth/auth';
 import { useTenantStore } from '@/stores/system/tenant';
 import { DEFAULT_AVATAR } from '@/constants/auth';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { onMounted } from 'vue';
 import NotificationBell from '@/components/notification/NotificationBell.vue';
 
@@ -151,9 +151,49 @@ onMounted(() => {
   tenantStore.fetchAvailable();
 });
 
-const handleTenantSwitch = (tenantId: number) => {
-  tenantStore.switchTenant(tenantId);
+const handleTenantSwitch = async (tenantId: number) => {
+  if (tenantStore.currentTenant?.id === tenantId) return;
+  const target = displayTenants.value.find(t => t.id === tenantId);
+  const targetName = target?.name || '目标学校';
+  try {
+    await ElMessageBox.confirm(
+      `确定切入【${targetName}】学校租户上下文吗？切入后将以管理员视角刷新页面并加载该学校专属教学与治理空间。`,
+      '切入学校租户确认',
+      {
+        confirmButtonText: '确认切入',
+        cancelButtonText: '取消',
+        type: 'info'
+      }
+    );
+    await tenantStore.switchTenant(tenantId);
+  } catch (err) {
+    // 用户取消切入
+  }
 };
+
+const handleDropdownVisible = (visible: boolean) => {
+  if (visible) {
+    tenantStore.fetchAvailable();
+  }
+};
+
+const displayTenants = computed(() => {
+  const list = [...tenantStore.availableTenants];
+  // 如果当前已激活租户不在列表中，置入当前租户作为第一项确保状态自洽
+  if (tenantStore.currentTenant && !list.some(t => t.id === tenantStore.currentTenant?.id)) {
+    list.unshift({
+      id: tenantStore.currentTenant.id,
+      code: tenantStore.currentTenant.code,
+      tenantCode: tenantStore.currentTenant.code,
+      name: tenantStore.currentTenant.name,
+      campusCount: tenantStore.currentTenant.campusCount || 1,
+      status: tenantStore.currentTenant.status || 1,
+      planCode: tenantStore.currentTenant.planCode || 'PRO',
+      planName: tenantStore.currentTenant.planName || '专业版'
+    } as any);
+  }
+  return list;
+});
 
 const currentRoleName = computed(() => {
   const role = authStore.currentRole;

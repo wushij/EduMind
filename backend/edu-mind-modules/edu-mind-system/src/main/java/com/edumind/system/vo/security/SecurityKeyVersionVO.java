@@ -29,5 +29,24 @@ public class SecurityKeyVersionVO implements Serializable {
      */
     private String status;
 
+    /**
+     * 派生密钥安全指纹 (SHA-256 前缀，如 SM4#7F8A-3C2B...)
+     */
+    private String keyFingerprint;
+
+    /**
+     * 关联业务场景描述
+     */
+    private String usageScope;
+
+    /**
+     * 激活生效时间
+     */
     private LocalDateTime activatedTime;
+
+    /**
+     * 创建记录时间
+     */
+    private LocalDateTime createTime;
 }
+

@@ -67,11 +67,13 @@ public class SecurityKeyQueryApiImpl implements SecurityKeyQueryApi {
         Long tid = tenantId != null ? tenantId : 0L;
         try {
             String seed;
+            boolean isCustomAlias = StringUtils.hasText(keyAlias) && !defaultKeyAlias.equals(keyAlias);
+            String aliasPart = isCustomAlias ? "_" + keyAlias : "";
             if (keyVersion <= 1) {
-                // 保持与旧长期记忆数据派生兼容
-                seed = masterSecret + "_" + tid;
+                // 默认别名保持与旧长期记忆数据派生兼容
+                seed = masterSecret + "_" + tid + aliasPart;
             } else {
-                seed = masterSecret + "_" + tid + "_v" + keyVersion;
+                seed = masterSecret + "_" + tid + aliasPart + "_v" + keyVersion;
             }
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(seed.getBytes(StandardCharsets.UTF_8));

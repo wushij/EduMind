@@ -24,6 +24,7 @@ import type {
   GlobalAssistantMessage,
   GlobalAssistantSession
 } from '@/types/ai/assistant';
+import { usePreferenceStore } from '@/stores/user/preference';
 
 
 const INTENT_DESC_MAP: Record<string, string> = {
@@ -212,8 +213,17 @@ export function useGlobalAssistant() {
   const streamingCitations = ref<CitationItem[]>([]);
   const streamingIntent = ref<{ intent?: string; intentDesc?: string; targetCode?: string }>({});
 
-  // 深度思考默认折叠（满足用户“思考默认是折叠的”要求）
-  const isReasoningFolded = ref(true);
+  function getInitialReasoningFolded(): boolean {
+    try {
+      const prefStore = usePreferenceStore();
+      return prefStore.preferences.thinkingDisplayMode !== 'EXPANDED';
+    } catch {
+      return true;
+    }
+  }
+
+  // 深度思考折叠状态（优先遵循用户个人偏好设置）
+  const isReasoningFolded = ref(getInitialReasoningFolded());
   const isReasoningActive = ref(false);
   const streamPhaseMessage = ref('');
   const answerStreamStarted = ref(false);
@@ -232,6 +242,23 @@ export function useGlobalAssistant() {
   const streamingThinkingDisplay = computed(() => {
     const raw = streamingReasoning.value || streamingThinkingBody.value;
     return cleanReasoningText(raw);
+  });
+
+  function refreshMarkdownUi() {
+    nextTick(() => {
+      nextTick(() => bindMarkdownCodeCopy(messagesScrollRef.value));
+    });
+  }
+
+  watch(
+    () => messages.value.map((m) => `${m.id ?? ''}:${m.content?.length ?? 0}`).join('|'),
+    () => refreshMarkdownUi()
+  );
+
+  watch(isStreaming, (streaming, wasStreaming) => {
+    if (wasStreaming && !streaming) {
+      refreshMarkdownUi();
+    }
   });
 
   // 是否手动指定为全域研读模式（彻底杜绝无故写死 #102）
@@ -631,7 +658,7 @@ export function useGlobalAssistant() {
     streamingContent.value = '';
     streamingCitations.value = [];
     streamingIntent.value = {};
-    isReasoningFolded.value = true;
+    isReasoningFolded.value = getInitialReasoningFolded();
     isReasoningActive.value = false;
     streamPhaseMessage.value = '';
     answerStreamStarted.value = false;
@@ -704,7 +731,7 @@ export function useGlobalAssistant() {
               streamPhaseMessage.value = '';
               if (!answerStreamStarted.value) {
                 answerStreamStarted.value = true;
-                isReasoningFolded.value = true;
+                isReasoningFolded.value = getInitialReasoningFolded();
               }
               const answerDelta = split.answer.slice(lastStreamedIndex);
               lastStreamedIndex = split.answer.length;

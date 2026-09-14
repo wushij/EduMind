@@ -16,6 +16,8 @@ public class AiModelConfigVO {
     /** 仅写入，不回传 */
     private String apiKey;
     private Boolean hasApiKey;
+    /** KMS 密钥版本号 */
+    private Integer keyVersion;
     private BigDecimal temperature;
     private String reasoningEffort;
     private Integer dimension;

@@ -29,4 +29,10 @@ public interface SecurityKeyVersionService {
      * 执行密钥版本轮换：将原有 ACTIVE 置为 DEPRECATED，生成版本递增的全新 ACTIVE 密钥
      */
     SecurityKeyVersionVO rotateKey(SecurityKeyRotateDTO dto);
+
+    /**
+     * 在线国密 SM4-GCM 实机加解密测试自检
+     */
+    com.edumind.system.vo.security.SecurityKeyCryptoTestVO testCrypto(com.edumind.system.dto.security.SecurityKeyCryptoTestDTO dto);
 }
+

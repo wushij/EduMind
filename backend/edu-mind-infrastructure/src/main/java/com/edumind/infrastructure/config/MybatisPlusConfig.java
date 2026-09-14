@@ -31,6 +31,7 @@ public class MybatisPlusConfig {
             "sys_tenant_member",
             "sys_member_org",
             "sys_tenant_quota",
+            "sys_org_quota",
             "ai_memory_namespace",
             "knowledge_ocr_task",
             "export_task",
@@ -42,7 +43,8 @@ public class MybatisPlusConfig {
             "edu_question",
             "sys_notification",
             "sys_notification_broadcast",
-            "security_key_version"
+            "security_key_version",
+            "sys_oper_log"
     );
 
     @Bean

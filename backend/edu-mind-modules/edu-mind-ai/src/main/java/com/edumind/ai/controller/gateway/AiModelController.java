@@ -7,7 +7,9 @@ import com.edumind.ai.service.gateway.AiModelManageService;
 import com.edumind.ai.vo.gateway.AiModelConfigVO;
 import com.edumind.ai.vo.gateway.AiModelTestResultVO;
 import com.edumind.ai.vo.gateway.AiProviderPresetsResponseVO;
+import com.edumind.common.annotation.OperationLog;
 import com.edumind.common.api.ApiResult;
+import com.edumind.common.enums.BusinessType;
 import com.edumind.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -54,12 +56,14 @@ public class AiModelController {
 
     @SaCheckRole("ADMIN")
     @PostMapping
+    @OperationLog(module = "模型运维", title = "新增AI模型配置", businessType = BusinessType.INSERT)
     public ApiResult<AiModelConfigVO> createModel(@RequestBody AiModelSaveDTO dto) {
         return ApiResult.success(aiModelManageService.createModel(dto));
     }
 
     @SaCheckRole("ADMIN")
     @PutMapping("/{name}")
+    @OperationLog(module = "模型运维", title = "修改AI模型配置", businessType = BusinessType.UPDATE)
     public ApiResult<Map<String, Object>> updateModel(@PathVariable String name, @RequestBody AiModelSaveDTO dto) {
         aiModelManageService.updateModel(name, dto);
         return ApiResult.success(Map.of("updated", true, "name", name));
@@ -67,6 +71,7 @@ public class AiModelController {
 
     @SaCheckRole("ADMIN")
     @DeleteMapping("/{name}")
+    @OperationLog(module = "模型运维", title = "删除AI模型配置", businessType = BusinessType.DELETE)
     public ApiResult<Map<String, Object>> deleteModel(@PathVariable String name) {
         aiModelManageService.deleteModel(name);
         return ApiResult.success(Map.of("deleted", true, "name", name));
@@ -74,6 +79,7 @@ public class AiModelController {
 
     @SaCheckRole("ADMIN")
     @PostMapping("/{name}/default")
+    @OperationLog(module = "模型运维", title = "设置默认AI模型", businessType = BusinessType.GRANT)
     public ApiResult<Map<String, Object>> setDefaultModel(@PathVariable String name) {
         aiModelManageService.setDefaultModel(name);
         return ApiResult.success(Map.of("is_default", true, "name", name));

@@ -1,6 +1,7 @@
 package com.edumind.system.service.config;
 
 import com.edumind.infrastructure.mail.MailConfig;
+import com.edumind.infrastructure.sms.SmsConfig;
 import com.edumind.system.dto.config.MailConfigDTO;
 import com.edumind.system.dto.config.MailTestDTO;
 import com.edumind.system.vo.config.MailConfigVO;
@@ -14,6 +15,11 @@ public interface SysConfigService {
      * 获取邮件服务原始配置（系统内部调用，包含真实密码）
      */
     MailConfig getMailConfig();
+
+    /**
+     * 获取短信服务原始配置（系统内部调用，包含真实密钥）
+     */
+    SmsConfig getSmsConfig();
 
     /**
      * 获取邮件服务展示配置（管理端调用，密码脱敏）

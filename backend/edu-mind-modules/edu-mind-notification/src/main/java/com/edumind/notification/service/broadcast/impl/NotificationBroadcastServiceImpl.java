@@ -65,6 +65,26 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
             throw new BusinessException("当前受众条件下无目标用户");
         }
 
+        if (!StringUtils.hasText(senderName) && senderId != null) {
+            try {
+                Object u = userQueryApi.getUserById(senderId);
+                if (u != null) {
+                    try {
+                        java.lang.reflect.Method getUsername = u.getClass().getMethod("getUsername");
+                        Object un = getUsername.invoke(u);
+                        if (un != null && StringUtils.hasText(un.toString())) {
+                            senderName = un.toString();
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (!StringUtils.hasText(senderName)) {
+            senderName = "admin";
+        }
+
         NotificationBroadcastEntity broadcast = new NotificationBroadcastEntity();
         broadcast.setTenantId(tenantId);
         broadcast.setTitle(title);
@@ -74,7 +94,7 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
         broadcast.setNotifyType("BROADCAST");
         broadcast.setPriority(priority);
         broadcast.setSenderId(senderId);
-        broadcast.setSenderName(senderName != null ? senderName : "");
+        broadcast.setSenderName(senderName);
         broadcast.setTotalCount(userIds.size());
         broadcast.setReadCount(0);
         broadcastDao.insert(broadcast);
@@ -87,11 +107,15 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
     @Override
     public PageResult<NotificationBroadcastVO> pageList(long page, long pageSize, String targetType) {
         PageResult<NotificationBroadcastEntity> pageResult = broadcastDao.page(page, pageSize, targetType);
+        List<NotificationBroadcastVO> voList = NotificationBroadcastConverter.toVOList(pageResult.getList());
+        for (NotificationBroadcastVO vo : voList) {
+            populateSenderInfo(vo);
+        }
         return PageResult.<NotificationBroadcastVO>builder()
                 .total(pageResult.getTotal())
                 .pageNum(pageResult.getPageNum())
                 .pageSize(pageResult.getPageSize())
-                .list(NotificationBroadcastConverter.toVOList(pageResult.getList()))
+                .list(voList)
                 .build();
     }
 
@@ -105,7 +129,39 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
         if (currentTenantId != null && entity.getTenantId() != null && !currentTenantId.equals(entity.getTenantId())) {
             throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权访问其他租户广播记录");
         }
-        return NotificationBroadcastConverter.toVO(entity);
+        NotificationBroadcastVO vo = NotificationBroadcastConverter.toVO(entity);
+        populateSenderInfo(vo);
+        return vo;
+    }
+
+    private void populateSenderInfo(NotificationBroadcastVO vo) {
+        if (vo == null || vo.getSenderId() == null) {
+            return;
+        }
+        try {
+            Object u = userQueryApi.getUserById(vo.getSenderId());
+            if (u != null) {
+                try {
+                    java.lang.reflect.Method getAvatar = u.getClass().getMethod("getAvatar");
+                    Object av = getAvatar.invoke(u);
+                    if (av != null && StringUtils.hasText(av.toString())) {
+                        vo.setSenderAvatar(av.toString());
+                    }
+                } catch (Exception ignored) {
+                }
+                if (!StringUtils.hasText(vo.getSenderName())) {
+                    try {
+                        java.lang.reflect.Method getUsername = u.getClass().getMethod("getUsername");
+                        Object un = getUsername.invoke(u);
+                        if (un != null && StringUtils.hasText(un.toString())) {
+                            vo.setSenderName(un.toString());
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     @Override

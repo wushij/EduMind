@@ -7,10 +7,25 @@ import {
   RegisterParams,
   PasswordResetVerifyRequest,
   PasswordResetVerifyResult,
-  PasswordResetRequest
+  PasswordResetRequest,
+  CaptchaPolicyResult,
+  SliderChallengeResult,
+  SliderVerifyPayload,
+  SliderVerifyResult
 } from '@/types/auth/auth';
 
 export const getCaptcha = () => get<CaptchaVO>('/auth/captcha');
+
+export const getCaptchaPolicy = () => get<CaptchaPolicyResult>('/auth/captcha/policy');
+
+export const createSliderChallenge = (operation = 'LOGIN', username = '') =>
+  post<SliderChallengeResult>('/auth/captcha/slider/challenge', {
+    operation,
+    username: username.trim()
+  });
+
+export const verifySliderCaptcha = (payload: SliderVerifyPayload) =>
+  post<SliderVerifyResult>('/auth/captcha/slider/verify', payload);
 
 export const login = (params: LoginParams) => post<LoginResult>('/auth/login', params);
 

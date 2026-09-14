@@ -446,10 +446,13 @@ async function fetchRecentSmsLogs() {
   } catch {}
 }
 
-async function handleTriggerSmsTest(phone: string) {
+async function handleTriggerSmsTest(phone: string, templateCode?: string) {
   smsTesting.value = true;
   try {
-    await testSms({ phone, templateCode: draft.sms.templateVerifyCode });
+    await testSms({
+      phone,
+      templateCode: templateCode || draft.sms.templateVerifyCode,
+    });
     ElMessage.success(`测试短信已成功发送至 ${phone}`);
     await fetchRecentSmsLogs();
   } catch (err: any) {

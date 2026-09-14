@@ -7,7 +7,9 @@ import com.edumind.ai.dto.memory.MemoryItemCreateDTO;
 import com.edumind.ai.service.memory.AgentMemoryService;
 import com.edumind.ai.vo.memory.MemoryItemVO;
 import com.edumind.ai.vo.memory.MemoryNamespaceVO;
+import com.edumind.common.annotation.OperationLog;
 import com.edumind.common.api.ApiResult;
+import com.edumind.common.enums.BusinessType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -37,6 +39,7 @@ public class AgentMemoryController {
 
     @PostMapping("/consent")
     @SaCheckPermission("ai:memory:manage")
+    @OperationLog(module = "Agent长期记忆", title = "更新记忆授权", businessType = BusinessType.GRANT)
     public ApiResult<Void> updateConsent(@Valid @RequestBody MemoryConsentDTO dto) {
         agentMemoryService.updateConsent(dto);
         return ApiResult.success();
@@ -44,12 +47,14 @@ public class AgentMemoryController {
 
     @PostMapping
     @SaCheckPermission("ai:memory:manage")
+    @OperationLog(module = "Agent长期记忆", title = "新增记忆条目", businessType = BusinessType.INSERT)
     public ApiResult<Long> createMemory(@Valid @RequestBody MemoryItemCreateDTO dto) {
         return ApiResult.success(agentMemoryService.createMemoryItem(dto));
     }
 
     @DeleteMapping("/{id}")
     @SaCheckPermission("ai:memory:manage")
+    @OperationLog(module = "Agent长期记忆", title = "遗忘删除记忆", businessType = BusinessType.DELETE)
     public ApiResult<Void> forgetMemory(@PathVariable("id") Long id) {
         agentMemoryService.forgetMemory(id);
         return ApiResult.success();
@@ -57,6 +62,7 @@ public class AgentMemoryController {
 
     @DeleteMapping("/all")
     @SaCheckPermission("ai:memory:manage")
+    @OperationLog(module = "Agent长期记忆", title = "清空记忆空间", businessType = BusinessType.CLEAN)
     public ApiResult<Void> forgetAll(@RequestParam(required = false) Long courseId) {
         agentMemoryService.forgetAll(courseId);
         return ApiResult.success();
@@ -64,6 +70,7 @@ public class AgentMemoryController {
 
     @PutMapping("/{id}/feedback")
     @SaCheckPermission("ai:memory:manage")
+    @OperationLog(module = "Agent长期记忆", title = "记忆有效性反馈", businessType = BusinessType.UPDATE)
     public ApiResult<Void> feedbackMemory(@PathVariable("id") Long id, @Valid @RequestBody MemoryFeedbackDTO dto) {
         agentMemoryService.feedbackMemory(id, dto);
         return ApiResult.success();

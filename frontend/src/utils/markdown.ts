@@ -293,6 +293,8 @@ function normalizeLatexDelimiters(text: string): string {
 
 mermaid.initialize({
   startOnLoad: false,
+  // Mermaid 12 默认会把错误 SVG 插入 document.body；开启后失败时清理并抛错，避免污染全站页面
+  suppressErrorRendering: true,
   securityLevel: 'loose',
   theme: 'default',
   themeVariables: {
@@ -367,17 +369,198 @@ const MERMAID_HINT =
 function looksLikeMermaid(code: string): boolean {
   const trimmed = code.trim();
   if (MERMAID_HINT.test(trimmed)) return true;
-  const hasArrow = /(?:-->|==>|-\.->)\s*(?:\[|\(|\{|\w+)/.test(trimmed);
-  const arrowCount = (trimmed.match(/-->|==>|-\.->/g) || []).length;
-  return hasArrow && arrowCount >= 2;
+  if (/^\s*(?:graph|flowchart)\s+(?:TD|TB|BT|RL|LR)\b/im.test(trimmed)) return true;
+  if (/^\s*subgraph\b/im.test(trimmed)) return true;
+  const hasArrow = /(?:-->|==>|-\.->)/.test(trimmed);
+  const nodeDefs = (trimmed.match(/\b[A-Za-z][\w-]*\s*\[[^\]]+\]/g) || []).length;
+  return hasArrow && nodeDefs >= 2;
+}
+
+function isMermaidErrorSvg(svg: string): boolean {
+  if (!svg?.trim()) return true;
+  return /Syntax error in text|aria-roledescription=['"]error['"]|class=['"]error-icon/i.test(svg);
+}
+
+function cleanupMermaidTempDom(id: string) {
+  if (typeof document === 'undefined') return;
+  document.getElementById(`d${id}`)?.remove();
+  document.getElementById(`i${id}`)?.remove();
+}
+
+/** 清理 mermaid.render 遗留在 body 上的临时节点（会导致任意页面出现炸弹图标） */
+export function cleanupOrphanMermaidDom() {
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll<HTMLElement>('body > div[id^="dmermaid-"]').forEach((el) => el.remove());
+  document.querySelectorAll<HTMLElement>('body > iframe[id^="imermaid-"]').forEach((el) => el.remove());
+}
+
+async function renderMermaidSvg(id: string, code: string) {
+  try {
+    const result = await mermaid.render(id, code);
+    if (isMermaidErrorSvg(result.svg)) {
+      throw new Error('Mermaid syntax error');
+    }
+    return result;
+  } finally {
+    cleanupMermaidTempDom(id);
+  }
+}
+
+function quoteMermaidLabel(label: string): string {
+  const trimmed = label.trim();
+  if (!trimmed) return '""';
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) return trimmed;
+  return `"${trimmed.replace(/"/g, '\\"')}"`;
+}
+
+function normalizeMermaidNodeLine(line: string, anonymousSubgraphSeq: { value: number }): string {
+  if (/^\s*(?:%%|classDef|class |style |end\b)/i.test(line)) return line;
+
+  if (/^\s*subgraph\b/i.test(line)) {
+    const withId = line.replace(
+      /subgraph\s+([A-Za-z][\w-]*)\s*\[([^\]]+)\]/i,
+      (_m, id: string, label: string) => `subgraph ${id} [${quoteMermaidLabel(label)}]`
+    );
+    if (withId !== line) return withId;
+    return line.replace(/subgraph\s+\[([^\]]+)\]/i, (_m, label: string) => {
+      anonymousSubgraphSeq.value += 1;
+      return `subgraph sg${anonymousSubgraphSeq.value} [${quoteMermaidLabel(label)}]`;
+    });
+  }
+
+  return line
+    .replace(/\b([A-Za-z][\w-]*)\s+\[([^\]]+)\]/g, (_m, nodeId: string, label: string) => {
+      return `${nodeId}[${quoteMermaidLabel(label)}]`;
+    })
+    .replace(/\b([A-Za-z][\w-]*)\[([^\]]+)\]/g, (_m, nodeId: string, label: string) => {
+      const trimmed = label.trim();
+      if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+        return `${nodeId}[${trimmed}]`;
+      }
+      if (/[\u4e00-\u9fa5\s()（）]/.test(trimmed)) {
+        return `${nodeId}[${quoteMermaidLabel(trimmed)}]`;
+      }
+      return `${nodeId}[${trimmed}]`;
+    });
+}
+
+/** 模型常只列出节点不写连线，Mermaid 12 无法解析；在 subgraph 块内自动串联 */
+function autoLinkMermaidNodes(text: string): string {
+  const lines = text.split('\n');
+  const out: string[] = [];
+  let pending: string[] = [];
+  const nodeLineRe = /^([A-Za-z][\w-]*)(\[.*\])?$/;
+
+  const flush = () => {
+    if (pending.length === 0) return;
+    if (pending.length === 1) {
+      out.push(pending[0]);
+    } else {
+      for (let i = 0; i < pending.length - 1; i++) {
+        out.push(`${pending[i]} --> ${pending[i + 1]}`);
+      }
+    }
+    pending = [];
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flush();
+      out.push(line);
+      continue;
+    }
+    if (
+      /^(flowchart|graph)\s/i.test(trimmed)
+      || /^subgraph\b/i.test(trimmed)
+      || /^end\s*$/i.test(trimmed)
+      || /^%%/.test(trimmed)
+      || /^classDef\b/i.test(trimmed)
+      || /^class\b/i.test(trimmed)
+      || /^style\b/i.test(trimmed)
+    ) {
+      flush();
+      out.push(line);
+      continue;
+    }
+    if (/-->|==>|-\.-?>/.test(trimmed)) {
+      flush();
+      out.push(line);
+      continue;
+    }
+    if (nodeLineRe.test(trimmed)) {
+      pending.push(trimmed);
+      continue;
+    }
+    flush();
+    out.push(line);
+  }
+  flush();
+  return out.join('\n');
 }
 
 function normalizeMermaidCode(raw: string): string {
-  let text = raw.trim();
+  let text = raw.trim().replace(/\r\n/g, '\n');
+  if (!text) return text;
+
+  text = text.replace(
+    /^(graph\s+(?:TD|TB|BT|RL|LR)|flowchart\s+(?:TD|TB|BT|RL|LR))\s+(?=\S)/im,
+    (header) => `${header.trim()}\n`
+  );
+  text = text.replace(/\bend\s+subgraph\b/gi, 'end\nsubgraph');
+  text = text.replace(/([^\n])\s+(subgraph\s+)/gi, '$1\n$2');
+  text = text.replace(/([^\n])\s+end\s*$/gim, '$1\nend');
+
   if (!MERMAID_HINT.test(text)) {
-    text = `graph TD\n${text}`;
+    text = `flowchart TD\n${text}`;
   }
+
+  text = text.replace(/^graph\s+(TD|TB|BT|RL|LR)\b/im, 'flowchart $1');
+
+  const anonymousSubgraphSeq = { value: 0 };
+  text = text
+    .split('\n')
+    .map((line) => normalizeMermaidNodeLine(line, anonymousSubgraphSeq))
+    .join('\n');
+
+  text = autoLinkMermaidNodes(text);
+
+  // 模型常漏写 subgraph 的 end，导致永远无法通过完整性校验
+  const subgraphCount = (text.match(/\bsubgraph\b/gi) || []).length;
+  const endCount = (text.match(/^\s*end\s*$/gim) || []).length;
+  if (subgraphCount > endCount) {
+    text += '\n' + 'end\n'.repeat(subgraphCount - endCount);
+  }
+
   return text;
+}
+
+function readMermaidSource(wrapper: HTMLElement): string {
+  const sourceEl = wrapper.querySelector<HTMLElement>('.mermaid-source');
+  if (sourceEl?.textContent?.trim()) {
+    return sourceEl.textContent.trim();
+  }
+  const diagram = wrapper.querySelector<HTMLElement>('.mermaid-diagram');
+  const legacy = diagram?.dataset.code;
+  if (legacy) {
+    try {
+      return decodeURIComponent(legacy).trim();
+    } catch {
+      return legacy.trim();
+    }
+  }
+  return '';
+}
+
+function buildMermaidWrapper(code: string): string {
+  const escaped = md.utils.escapeHtml(code.trim());
+  return [
+    '<div class="mermaid-diagram-wrapper">',
+    '<div class="mermaid-header"><span>✦ 课程拓扑知识图谱</span></div>',
+    `<pre class="mermaid-source" hidden>${escaped}</pre>`,
+    '<div class="mermaid-diagram"><span class="mermaid-loading">图谱渲染中…</span></div>',
+    '</div>'
+  ].join('');
 }
 
 function inferOrphanCodeLang(code: string): string {
@@ -400,38 +583,56 @@ function inferOrphanCodeLang(code: string): string {
 function inferCodeFenceLanguage(code: string, declared: string): string {
   const decl = normalizeDeclaredLang(declared);
   const text = code.trim();
-  if (decl === 'mermaid' || looksLikeMermaid(text)) return 'mermaid';
+  if (decl === 'mermaid' || decl === 'graph' || decl === 'flowchart') return 'mermaid';
+  if (!decl && looksLikeMermaid(text)) return 'mermaid';
   if (decl === 'json' || (!decl && /^\s*[[{]/.test(text) && /"[\w_]+"\s*:/.test(text))) return 'json';
   if (decl && hljs.getLanguage(decl)) return decl;
   return inferOrphanCodeLang(text);
 }
 
 let mermaidCounter = 0;
+const mermaidFailureLogged = new Set<string>();
 
-function renderCodeBlock(code: string, declaredLang: string): string {
+function getStoredPreference<T>(key: string, defaultValue: T): T {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('edumind_user_preferences') : null;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed[key] !== undefined) return parsed[key];
+    }
+  } catch {}
+  return defaultValue;
+}
+
+function renderCodeBlock(code: string, declaredLang: string, enableMermaid = true): string {
   if (!code?.trim()) return '';
 
-  const lang = inferCodeFenceLanguage(code, declaredLang);
-
-  if (lang === 'mermaid') {
-    const normalized = normalizeMermaidCode(code);
-    const encoded = encodeURIComponent(normalized);
-    return `<div class="mermaid-diagram-wrapper"><div class="mermaid-header"><span>✦ 课程拓扑知识图谱</span></div><div class="mermaid-diagram" data-code="${encoded}"><span class="mermaid-loading">图谱渲染中…</span></div></div>`;
+  const mermaidAllowed = enableMermaid && getStoredPreference('mermaidEnabled', true);
+  let lang = inferCodeFenceLanguage(code, declaredLang);
+  if (!mermaidAllowed && lang === 'mermaid') {
+    lang = 'text';
   }
 
+  if (lang === 'mermaid' && mermaidAllowed) {
+    return buildMermaidWrapper(code);
+  }
+
+  const highlightAllowed = getStoredPreference('codeHighlightEnabled', true);
   let highlighted = '';
-  if (lang && hljs.getLanguage(lang)) {
+  if (highlightAllowed && lang && hljs.getLanguage(lang)) {
     try {
       highlighted = hljs.highlight(code, { language: lang, ignoreIllegals: true }).value;
     } catch {
       highlighted = md.utils.escapeHtml(code);
     }
-  } else {
+  } else if (highlightAllowed) {
     try {
       highlighted = hljs.highlightAuto(code).value;
     } catch {
       highlighted = md.utils.escapeHtml(code);
     }
+  } else {
+    highlighted = md.utils.escapeHtml(code);
   }
 
   const langLabel = `<span class="code-lang">${formatLangLabel(lang)}</span>`;
@@ -440,11 +641,12 @@ function renderCodeBlock(code: string, declaredLang: string): string {
   return `<div class="code-block-wrapper"><div class="code-header">${langLabel}${copyBtn}</div><pre class="hljs"><code class="language-${lang || 'text'}">${highlighted}</code></pre></div>`;
 }
 
-md.renderer.rules.fence = (tokens, idx) => {
+md.renderer.rules.fence = (tokens, idx, _options, env) => {
   const token = tokens[idx];
   const info = token.info ? md.utils.unescapeAll(token.info).trim() : '';
   const lang = info.split(/\s+/g)[0] || '';
-  return renderCodeBlock(token.content, lang);
+  const enableMermaid = env?.enableMermaid !== false;
+  return renderCodeBlock(token.content, lang, enableMermaid);
 };
 
 md.renderer.rules.table_open = () => '<div class="table-wrap"><table>';
@@ -494,15 +696,20 @@ export function unwrapInlineCodeInTables(html: string): string {
  * Copilot 聊天专用 Markdown 渲染（Code Compass renderMarkdownForChat + 文章同款 KaTeX 占位流程）
  */
 export function renderMarkdownForChat(content: string): string {
-  return renderMarkdownPipeline(content, true);
+  return renderMarkdownPipeline(content, true, true);
 }
 
-/** 深度思考区：与正文相同 KaTeX 流程，但不走表格容错（避免 {x | ...} 被误拆） */
+/** 深度思考区：不走表格容错，且不渲染 Mermaid 图谱（仅正文渲染） */
 export function renderMarkdownForReasoning(content: string): string {
-  return renderMarkdownPipeline(content, false);
+  return renderMarkdownPipeline(content, false, false);
 }
 
 function renderKatexHtml(formula: string, displayMode: boolean): string {
+  if (!getStoredPreference('katexEnabled', true)) {
+    return displayMode
+      ? `<pre class="math-raw">${md.utils.escapeHtml(formula)}</pre>`
+      : `<code class="math-raw">${md.utils.escapeHtml(formula)}</code>`;
+  }
   const fixed = repairMalformedLeftRight(formula.trim());
   const html = katex.renderToString(fixed, { displayMode, throwOnError: false, strict: 'ignore' });
   if (!html.includes('katex-error')) return html;
@@ -514,7 +721,7 @@ function renderKatexHtml(formula: string, displayMode: boolean): string {
   return retry.includes('katex-error') ? html : retry;
 }
 
-function renderMarkdownPipeline(content: string, normalizeTables: boolean): string {
+function renderMarkdownPipeline(content: string, normalizeTables: boolean, enableMermaid = true): string {
   if (!content?.trim()) return '';
 
   let processed = normalizeTables
@@ -537,7 +744,7 @@ function renderMarkdownPipeline(content: string, normalizeTables: boolean): stri
     return key;
   });
 
-  let renderedHtml = md.render(processed);
+  let renderedHtml = md.render(processed, { enableMermaid });
 
   blockKatexMap.forEach((htmlVal, key) => {
     renderedHtml = renderedHtml.replace(`<p>${key}</p>`, htmlVal).replaceAll(key, htmlVal);
@@ -550,26 +757,75 @@ function renderMarkdownPipeline(content: string, normalizeTables: boolean): stri
 }
 
 export async function renderMermaidInElement(root: HTMLElement | null) {
-  if (!root) return;
-  const diagrams = root.querySelectorAll<HTMLElement>('.mermaid-diagram:not([data-processed="true"])');
-  for (const el of Array.from(diagrams)) {
-    const rawCode = el.dataset.code ? decodeURIComponent(el.dataset.code) : el.textContent || '';
-    if (!rawCode.trim()) continue;
+  if (!root || typeof document === 'undefined') return;
 
-    const id = `mermaid-graph-${Date.now()}-${mermaidCounter++}`;
+  cleanupOrphanMermaidDom();
+
+  const wrappers = root.querySelectorAll<HTMLElement>(
+    '.mermaid-diagram-wrapper:not([data-mermaid-done="true"])'
+  );
+
+  for (const wrapper of Array.from(wrappers)) {
+    // 深度思考区、流式输出中：不渲染图谱（避免半截语法反复失败并污染 body）
+    if (
+      wrapper.closest('.reasoning-card')
+      || wrapper.closest('.is-streaming-bubble')
+      || wrapper.closest('.is-streaming')
+    ) {
+      continue;
+    }
+
+    const el = wrapper.querySelector<HTMLElement>('.mermaid-diagram');
+    if (!el) {
+      wrapper.setAttribute('data-mermaid-done', 'true');
+      continue;
+    }
+
+    const rawCode = readMermaidSource(wrapper);
+    if (!rawCode) {
+      el.innerHTML = '<span class="mermaid-error">图谱内容为空</span>';
+      wrapper.setAttribute('data-mermaid-done', 'true');
+      continue;
+    }
+
     const codeToRender = normalizeMermaidCode(rawCode);
+    const id = `mermaid-graph-${Date.now()}-${mermaidCounter++}`;
+
     try {
-      const { svg } = await mermaid.render(id, codeToRender);
+      const { svg, bindFunctions } = await renderMermaidSvg(id, codeToRender);
       el.innerHTML = svg;
-      el.setAttribute('data-processed', 'true');
-    } catch {
-      el.innerHTML = `<div class="mermaid-fallback-box"><pre><code>${md.utils.escapeHtml(rawCode)}</code></pre></div>`;
-      el.setAttribute('data-processed', 'true');
+      bindFunctions?.(el);
+      wrapper.setAttribute('data-mermaid-done', 'true');
+    } catch (firstErr) {
+      const simplified = codeToRender
+        .split('\n')
+        .filter((line) => !/^\s*subgraph\b/i.test(line) && !/^\s*end\s*$/i.test(line))
+        .join('\n');
+      try {
+        const retryId = `${id}-retry`;
+        const { svg, bindFunctions } = await renderMermaidSvg(retryId, simplified);
+        el.innerHTML = svg;
+        bindFunctions?.(el);
+        wrapper.setAttribute('data-mermaid-done', 'true');
+      } catch {
+        const logKey = codeToRender.slice(0, 160);
+        if (!mermaidFailureLogged.has(logKey)) {
+          mermaidFailureLogged.add(logKey);
+          console.warn('[Mermaid] render failed:', firstErr);
+        }
+        el.innerHTML = `<div class="mermaid-fallback-box"><pre><code>${md.utils.escapeHtml(rawCode)}</code></pre></div>`;
+        wrapper.setAttribute('data-mermaid-done', 'true');
+      }
     }
   }
+
+  cleanupOrphanMermaidDom();
 }
 
-export function bindMarkdownCodeCopy(root: HTMLElement | null) {
+export function bindMarkdownCodeCopy(
+  root: HTMLElement | null,
+  options?: { renderMermaid?: boolean }
+) {
   if (!root) return;
   root.querySelectorAll<HTMLButtonElement>('.code-copy-btn').forEach((btn) => {
     if (btn.dataset.bound === '1') return;
@@ -594,5 +850,7 @@ export function bindMarkdownCodeCopy(root: HTMLElement | null) {
     });
   });
 
-  void renderMermaidInElement(root);
+  if (options?.renderMermaid !== false) {
+    void renderMermaidInElement(root);
+  }
 }

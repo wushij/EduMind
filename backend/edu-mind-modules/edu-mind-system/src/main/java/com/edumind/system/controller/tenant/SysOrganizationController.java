@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -31,8 +32,7 @@ public class SysOrganizationController {
 
     @GetMapping("/tree")
     @SaCheckPermission(value = {"system:organization:list", "system:organization:view", "system:user:view"}, mode = SaMode.OR)
-    public ApiResult<List<OrganizationNodeVO>> getTree() {
-        Long tenantId = TenantContext.requireTenantId();
+    public ApiResult<List<OrganizationNodeVO>> getTree(@RequestParam(required = false) Long tenantId) {
         return ApiResult.success(sysOrganizationService.getTree(tenantId));
     }
 
@@ -76,8 +76,7 @@ public class SysOrganizationController {
 
     @GetMapping("/stats")
     @SaCheckPermission(value = {"system:organization:list", "system:organization:view", "system:user:view"}, mode = SaMode.OR)
-    public ApiResult<com.edumind.system.vo.tenant.SysOrgStatsVO> getTenantOrgStats() {
-        Long tenantId = TenantContext.requireTenantId();
+    public ApiResult<com.edumind.system.vo.tenant.SysOrgStatsVO> getTenantOrgStats(@RequestParam(required = false) Long tenantId) {
         return ApiResult.success(sysOrganizationService.getTenantOrgStats(tenantId));
     }
 

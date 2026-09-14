@@ -14,6 +14,8 @@ export interface AIModelConfigItem {
   baseUrl?: string;
   apiKey?: string;
   hasApiKey?: boolean;
+  /** KMS 密钥版本号 (>= 1) */
+  keyVersion?: number;
   temperature: number;
   reasoningEffort?: ReasoningEffort;
   dimension?: number;

@@ -17,20 +17,51 @@ import java.util.stream.Collectors;
 public class TenantConverter {
 
     public TenantListVO toListVO(SysTenantEntity entity, int campusCount, long tokenUsagePercent) {
+        return toListVO(entity, campusCount, 0L, 0L, 0L, null, null, tokenUsagePercent, 0L, 0L);
+    }
+
+    public TenantListVO toListVO(SysTenantEntity entity,
+                                int campusCount,
+                                long memberCount,
+                                long studentCount,
+                                long teacherCount,
+                                String adminName,
+                                String adminPhone,
+                                long tokenUsagePercent,
+                                long storageUsagePercent,
+                                long seatsUsagePercent) {
         if (entity == null) return null;
         TenantListVO vo = new TenantListVO();
         vo.setId(entity.getId());
         vo.setCode(entity.getCode());
+        vo.setTenantCode(entity.getCode());
         vo.setName(entity.getName());
         vo.setLogo(entity.getLogo());
         vo.setDomain(entity.getDomain());
         vo.setPlanCode(entity.getPlanCode());
+        vo.setPlanName(resolvePlanName(entity.getPlanCode()));
         vo.setStatus(entity.getStatus());
         vo.setExpireTime(entity.getExpireTime());
         vo.setCreateTime(entity.getCreateTime());
         vo.setCampusCount(campusCount);
+        vo.setMemberCount(memberCount);
+        vo.setStudentCount(studentCount);
+        vo.setTeacherCount(teacherCount);
+        vo.setAdminName(adminName);
+        vo.setAdminPhone(adminPhone);
         vo.setTokenUsagePercent(tokenUsagePercent);
+        vo.setStorageUsagePercent(storageUsagePercent);
+        vo.setSeatsUsagePercent(seatsUsagePercent);
         return vo;
+    }
+
+    private String resolvePlanName(String planCode) {
+        if (planCode == null) return "标准版";
+        return switch (planCode.toUpperCase()) {
+            case "FLAGSHIP" -> "旗舰版";
+            case "PRO" -> "专业版";
+            default -> "标准版";
+        };
     }
 
     public TenantDetailVO toDetailVO(SysTenantEntity entity, List<SysCampusEntity> campuses, List<SysTenantQuotaEntity> quotas) {
@@ -38,16 +69,19 @@ public class TenantConverter {
         TenantDetailVO vo = new TenantDetailVO();
         vo.setId(entity.getId());
         vo.setCode(entity.getCode());
+        vo.setTenantCode(entity.getCode());
         vo.setName(entity.getName());
         vo.setLogo(entity.getLogo());
         vo.setDomain(entity.getDomain());
         vo.setPlanCode(entity.getPlanCode());
+        vo.setPlanName(resolvePlanName(entity.getPlanCode()));
         vo.setStatus(entity.getStatus());
         vo.setExpireTime(entity.getExpireTime());
         vo.setCreateTime(entity.getCreateTime());
 
         if (campuses != null) {
             vo.setCampuses(campuses.stream().map(this::toCampusVO).collect(Collectors.toList()));
+            vo.setCampusCount(campuses.size());
         }
         if (quotas != null) {
             vo.setQuotas(quotas.stream().map(this::toQuotaVO).collect(Collectors.toList()));
@@ -61,9 +95,14 @@ public class TenantConverter {
         vo.setId(entity.getId());
         vo.setTenantId(entity.getTenantId());
         vo.setCode(entity.getCode());
+        vo.setCampusCode(entity.getCode());
         vo.setName(entity.getName());
         vo.setAddress(entity.getAddress());
         vo.setStatus(entity.getStatus());
+        vo.setCreateTime(entity.getCreateTime());
+        boolean isMain = "MAIN".equalsIgnoreCase(entity.getCode())
+                || (entity.getName() != null && (entity.getName().contains("本部") || entity.getName().contains("主校区")));
+        vo.setIsMain(isMain);
         return vo;
     }
 
@@ -87,7 +126,8 @@ public class TenantConverter {
     public SysTenantEntity toEntity(TenantCreateDTO dto) {
         if (dto == null) return null;
         SysTenantEntity entity = new SysTenantEntity();
-        entity.setCode(dto.getCode());
+        String code = dto.getEffectiveCode();
+        entity.setCode(code != null && !code.isBlank() ? code : "TENANT_" + System.currentTimeMillis());
         entity.setName(dto.getName());
         entity.setLogo(dto.getLogo() != null ? dto.getLogo() : "/assets/logo.png");
         entity.setDomain(dto.getDomain());

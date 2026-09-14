@@ -271,6 +271,14 @@ export const SIDEBAR_SUBMENUS: Record<string, SidebarSubMenuMeta> = {
     icon: 'Money',
     sort: 5
   },
+  'ai-audit': {
+    key: 'ai-audit',
+    moduleKey: 'ai-compute',
+    name: 'AI 审计日志',
+    path: '/system/audit',
+    icon: 'Clock',
+    sort: 6
+  },
 
   // 8. 系统管理 (system) - 用户、角色、菜单、权限在前，配置在后
   'system-users': {
@@ -320,14 +328,6 @@ export const SIDEBAR_SUBMENUS: Record<string, SidebarSubMenuMeta> = {
     path: '/system/organizations',
     icon: 'Connection',
     sort: 6
-  },
-  'system-audit': {
-    key: 'system-audit',
-    moduleKey: 'system',
-    name: 'AI 审计日志',
-    path: '/system/audit',
-    icon: 'Clock',
-    sort: 7
   },
   'system-oper-log': {
     key: 'system-oper-log',
@@ -389,7 +389,6 @@ export function mapCodeToSubMenuKey(code: string): string {
   if (lower.startsWith('system:permission')) return 'system-permissions';
   if (lower.startsWith('system:tenant')) return 'system-tenants';
   if (lower.startsWith('system:org') || lower.startsWith('system:organization')) return 'system-organizations';
-  if (lower.startsWith('system:audit')) return 'system-audit';
   if (lower.startsWith('system:operlog') || lower.startsWith('system:oper-log') || lower.startsWith('system:oper')) return 'system-oper-log';
   if (lower.startsWith('system:config')) return 'system-config';
 
@@ -399,6 +398,7 @@ export function mapCodeToSubMenuKey(code: string): string {
   if (lower.startsWith('system:tool')) return 'ai-tools';
   if (lower.startsWith('system:gateway')) return 'ai-gateway';
   if (lower.startsWith('system:quota')) return 'ai-quotas';
+  if (lower.startsWith('system:audit')) return 'ai-audit';
 
   // 课程中心
   if (lower.startsWith('course:create')) return 'course-create';
