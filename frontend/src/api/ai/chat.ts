@@ -28,6 +28,9 @@ export const renameConversation = (id: string, title: string) =>
 
 export const deleteConversation = (id: string) => del<void>(`/ai/conversations/${id}`);
 
+export const deleteMessage = (messageId: string) =>
+  del<{ deletedIds: string[] }>(`/ai/conversations/messages/${messageId}`);
+
 export const generateConversationTitle = (id: string) =>
   post<string>(`/ai/conversations/${id}/generate-title`);
 

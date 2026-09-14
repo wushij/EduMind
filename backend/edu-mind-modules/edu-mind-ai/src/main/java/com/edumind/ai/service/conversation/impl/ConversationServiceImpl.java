@@ -12,13 +12,17 @@ import com.edumind.ai.gateway.ModelRouter;
 import com.edumind.ai.service.conversation.ConversationService;
 import com.edumind.ai.vo.ConversationVO;
 import com.edumind.ai.vo.MessageVO;
+import com.edumind.ai.service.audit.AiCallAuditContext;
+import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.infrastructure.redis.cache.AiSessionCacheService;
 import com.edumind.security.context.LoginUserResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -72,8 +76,60 @@ public class ConversationServiceImpl implements ConversationService {
     @Override
     public void deleteConversation(String conversationId) {
         assertConversationOwner(conversationId);
+        // 仅软删会话与缓存；ai_call_log 为独立审计流水，删除聊天记录不影响 Token 统计
         conversationDao.softDeleteById(conversationId);
         aiSessionCacheService.deleteSession(conversationId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public List<String> deleteMessageWithPair(String messageId) {
+        MessageEntity target = messageDao.findById(messageId);
+        if (target == null) {
+            throw new BusinessException("消息不存在");
+        }
+        ConversationEntity conversation = assertConversationOwner(target.getConversationId());
+
+        List<MessageEntity> messages = messageDao.listByConversationId(target.getConversationId());
+        int targetIndex = -1;
+        for (int i = 0; i < messages.size(); i++) {
+            if (messageId.equals(messages.get(i).getId())) {
+                targetIndex = i;
+                break;
+            }
+        }
+        if (targetIndex < 0) {
+            throw new BusinessException("消息不存在");
+        }
+
+        List<String> idsToDelete = collectPairedMessageIds(messages, targetIndex);
+        for (String id : idsToDelete) {
+            messageDao.deleteById(id);
+        }
+
+        int currentCount = conversation.getMessageCount() != null ? conversation.getMessageCount() : 0;
+        conversation.setMessageCount(Math.max(0, currentCount - idsToDelete.size()));
+        conversationDao.updateById(conversation);
+        aiSessionCacheService.deleteSession(target.getConversationId());
+        return idsToDelete;
+    }
+
+    private List<String> collectPairedMessageIds(List<MessageEntity> messages, int targetIndex) {
+        List<String> ids = new ArrayList<>();
+        MessageEntity current = messages.get(targetIndex);
+        ids.add(current.getId());
+
+        if ("user".equalsIgnoreCase(current.getRole())) {
+            if (targetIndex + 1 < messages.size()
+                    && "assistant".equalsIgnoreCase(messages.get(targetIndex + 1).getRole())) {
+                ids.add(messages.get(targetIndex + 1).getId());
+            }
+        } else if ("assistant".equalsIgnoreCase(current.getRole())) {
+            if (targetIndex > 0 && "user".equalsIgnoreCase(messages.get(targetIndex - 1).getRole())) {
+                ids.add(messages.get(targetIndex - 1).getId());
+            }
+        }
+        return ids;
     }
 
     @Override
@@ -86,11 +142,18 @@ public class ConversationServiceImpl implements ConversationService {
                 .findFirst()
                 .orElse("新会话");
         String modelKey = modelRouter.resolveModelKey("CHAT", null);
+        AiCallAuditContext auditContext = AiCallAuditContext.builder()
+                .userId(LoginUserResolver.resolveUserId())
+                .tenantId(TenantContext.getTenantId())
+                .courseId(entity.getCourseId())
+                .conversationId(conversationId)
+                .build();
         String title = aiGatewayFacade.chat(
-                "CHAT",
+                "CHAT_TITLE",
                 modelKey,
                 "你是会话标题生成器，请用不超过12个字概括用户问题。",
-                firstUser
+                firstUser,
+                auditContext
         );
         if (StringUtils.hasText(title)) {
             entity.setTitle(title.trim().replace("\"", ""));

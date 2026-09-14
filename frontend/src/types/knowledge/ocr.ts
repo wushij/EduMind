@@ -1,3 +1,5 @@
+export type OcrTaskStatus = 'PENDING' | 'PROCESSING' | 'PROOFREADING' | 'COMPLETED' | 'FAILED';
+
 export interface OcrPageVO {
   id: number;
   taskId: number;
@@ -17,12 +19,16 @@ export interface OcrPageVO {
 
 export interface OcrTaskVO {
   id: number;
-  tenantId: number;
+  tenantId?: number;
   documentId: number;
   engine: string;
-  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
-  pageCount: number;
-  completedPageCount: number;
+  status: OcrTaskStatus;
+  totalPages?: number;
+  processedPages?: number;
+  pageCount?: number;
+  completedPageCount?: number;
+  progress?: number;
+  errorMsg?: string;
   errorMessage?: string;
   pages?: OcrPageVO[];
   createTime?: string;
@@ -30,7 +36,7 @@ export interface OcrTaskVO {
 
 export interface OcrTaskCreateRequest {
   documentId: number;
-  engine: 'PADDLE_OCR' | 'MINERU' | 'GPT4O_VISION';
+  engine?: 'PADDLE_OCR' | 'MINERU' | 'GPT4O_VISION' | string;
 }
 
 export interface OcrPageUpdateRequest {

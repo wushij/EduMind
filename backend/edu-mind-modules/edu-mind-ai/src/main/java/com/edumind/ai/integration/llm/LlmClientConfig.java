@@ -1,6 +1,6 @@
 package com.edumind.ai.integration.llm;
 
-import com.edumind.ai.dao.AiCallLogDao;
+import com.edumind.ai.service.audit.AiCallAuditService;
 import com.edumind.infrastructure.redis.cache.AiQuotaService;
 import lombok.extern.slf4j.Slf4j;
 import com.edumind.system.api.TenantQuotaApi;
@@ -18,12 +18,12 @@ public class LlmClientConfig {
 
     @Bean
     public LlmClient llmClient(LlmProperties properties,
-                               AiCallLogDao aiCallLogDao,
+                               AiCallAuditService aiCallAuditService,
                                AiQuotaService aiQuotaService,
                                ObjectProvider<TenantQuotaApi> tenantQuotaApiProvider,
                                @Value("${edumind.ai.daily-quota:500}") long dailyQuota) {
         LlmClient delegate = createDelegate(properties);
-        return new LoggingLlmClient(delegate, aiCallLogDao, properties, aiQuotaService, dailyQuota, tenantQuotaApiProvider.getIfAvailable());
+        return new LoggingLlmClient(delegate, aiCallAuditService, aiQuotaService, dailyQuota, tenantQuotaApiProvider.getIfAvailable());
     }
 
     private LlmClient createDelegate(LlmProperties properties) {

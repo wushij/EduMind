@@ -1,13 +1,30 @@
 <template>
   <div class="route-rules-page" v-loading="loading">
+    <div class="page-top-nav">
+      <el-button link class="back-btn" @click="router.push('/system/gateway')">
+        <el-icon><ArrowLeft /></el-icon>
+        <span>返回 AI 网关监控大盘</span>
+      </el-button>
+    </div>
+
     <div class="page-header">
-      <div>
-        <h2>网关路由规则</h2>
-        <p>按业务场景配置主模型与降级模型</p>
+      <div class="header-info">
+        <div class="header-badges">
+          <span class="badge primary">AI 网关核心调度</span>
+          <span class="badge success">高可用容灾保障</span>
+        </div>
+        <h2>网关路由与模型调度规则</h2>
+        <p>为平台核心教学业务场景配置主选执行模型与故障自动降级模型，当主模型发生限流、异常或超时时无缝熔断切换</p>
       </div>
       <div class="header-actions">
-        <el-button @click="loadRoutes">刷新</el-button>
-        <el-button type="primary" :loading="saving" @click="saveRoutes">保存配置</el-button>
+        <el-button @click="loadData">
+          <el-icon><Refresh /></el-icon>
+          <span>刷新</span>
+        </el-button>
+        <el-button type="primary" class="gradient-btn" :loading="saving" @click="saveRoutes">
+          <el-icon><Check /></el-icon>
+          <span>保存路由策略</span>
+        </el-button>
       </div>
     </div>
 
@@ -16,21 +33,81 @@
       type="info"
       :closable="false"
       show-icon
-      title="当前展示 Mock 数据"
+      title="当前展示 Mock 示例数据，真实环境将直接同步服务端配置"
       class="mock-alert"
     />
 
     <el-card shadow="never" class="table-card">
-      <el-table :data="routes" stripe>
-        <el-table-column prop="scene" label="业务场景" width="160" />
-        <el-table-column label="主模型">
+      <div class="table-tip-row">
+        <el-icon><InfoFilled /></el-icon>
+        <span>建议：主模型选择能力强、推理质量高的大模型（如 deepseek-v4-flash），降级模型选择本地备用或高吞吐低延迟模型（如 mock 或轻量模型）。</span>
+      </div>
+
+      <el-table :data="routes" stripe style="width: 100%;">
+        <el-table-column label="教学业务场景" width="240">
           <template #default="{ row }">
-            <el-input v-model="row.primaryModelKey" placeholder="primaryModelKey" />
+            <div class="scene-cell">
+              <span class="scene-title">{{ getSceneName(row.scene) }}</span>
+              <span class="scene-code font-mono">{{ row.scene }}</span>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="降级模型">
+
+        <el-table-column label="首选主模型 (Primary Model)" min-width="260">
           <template #default="{ row }">
-            <el-input v-model="row.fallbackModelKey" placeholder="fallbackModelKey" />
+            <el-select
+              v-model="row.primaryModelKey"
+              filterable
+              allow-create
+              default-first-option
+              placeholder="请选择或输入模型标识"
+              style="width: 100%;"
+            >
+              <el-option
+                v-for="opt in modelOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              >
+                <div class="model-option-item">
+                  <span class="opt-label font-mono">{{ opt.label }}</span>
+                  <span class="opt-tag">{{ opt.provider }}</span>
+                </div>
+              </el-option>
+            </el-select>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="自动降级模型 (Fallback Model)" min-width="260">
+          <template #default="{ row }">
+            <el-select
+              v-model="row.fallbackModelKey"
+              filterable
+              allow-create
+              default-first-option
+              placeholder="请选择或输入降级模型"
+              style="width: 100%;"
+            >
+              <el-option
+                v-for="opt in modelOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              >
+                <div class="model-option-item">
+                  <span class="opt-label font-mono">{{ opt.label }}</span>
+                  <span class="opt-tag">{{ opt.provider }}</span>
+                </div>
+              </el-option>
+            </el-select>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="调度说明" width="220">
+          <template #default="{ row }">
+            <el-tag size="small" effect="plain" type="info">
+              {{ row.primaryModelKey === row.fallbackModelKey ? '未启用降级隔离' : '故障自动熔断降级' }}
+            </el-tag>
           </template>
         </el-table-column>
       </el-table>
@@ -40,30 +117,84 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { listGatewayRoutes, updateGatewayRoutes } from '@/api/system/gateway';
+import { fetchModels } from '@/api/system/model';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_GATEWAY_ROUTES } from '@/mock/gateway';
 import type { GatewayRouteVO } from '@/types/system/gateway';
 import { ElMessage } from 'element-plus';
+import { ArrowLeft, Refresh, Check, InfoFilled } from '@element-plus/icons-vue';
 
+const router = useRouter();
 const loading = ref(false);
 const saving = ref(false);
 const usedMockFallback = ref(false);
 const routes = ref<GatewayRouteVO[]>([]);
 
-async function loadRoutes() {
+interface ModelOption {
+  label: string;
+  value: string;
+  provider: string;
+}
+
+const modelOptions = ref<ModelOption[]>([]);
+
+function getSceneName(scene: string) {
+  if (!scene) return '通用场景';
+  switch (scene.toLowerCase()) {
+    case 'chat': return '课程智能助教答疑';
+    case 'rag':
+    case 'chat_rag': return '课程知识库问答';
+    case 'question':
+    case 'question_generate': return 'AI 题库出题与变式';
+    case 'grading': return '作业/主观题智能批改';
+    case 'agent': return 'Agent 多步任务规划';
+    case 'embedding': return '向量知识库切片嵌入';
+    case 'stream': return '流式长文本启发对话';
+    default: return scene;
+  }
+}
+
+async function loadData() {
   loading.value = true;
   usedMockFallback.value = false;
   try {
+    // 1. 加载所有系统中配置的模型，供下拉选择
+    const models = await fetchModels();
+    const opts: ModelOption[] = (models || []).map((m) => ({
+      label: m.modelName || m.name || m.modelKey || '未命名模型',
+      value: m.modelKey || m.name || m.modelName || 'default',
+      provider: m.provider || 'default'
+    }));
+
+    // 保障常用预设项存在
+    const knownValues = new Set(opts.map((o) => o.value));
+    if (!knownValues.has('mock')) {
+      opts.push({ label: 'mock 本地备用', value: 'mock', provider: 'local' });
+    }
+    modelOptions.value = opts;
+
+    // 2. 加载路由规则
     const res = await listGatewayRoutes();
     routes.value = res.data ?? [];
   } catch {
     if (USE_MOCK) {
       usedMockFallback.value = true;
       routes.value = MOCK_GATEWAY_ROUTES.map((item) => ({ ...item }));
+      if (modelOptions.value.length === 0) {
+        modelOptions.value = [
+          { label: 'deepseek-v4-flash', value: 'deepseek-v4-flash', provider: 'DeepSeek' },
+          { label: 'Flash · deepseek-v4-flash', value: 'Flash · deepseek-v4-flash', provider: 'DeepSeek' },
+          { label: 'deepseek-chat', value: 'deepseek-chat', provider: 'DeepSeek' },
+          { label: 'gpt-4o-mini', value: 'gpt-4o-mini', provider: 'OpenAI' },
+          { label: 'qwen-plus', value: 'qwen-plus', provider: 'Qwen' },
+          { label: 'mock', value: 'mock', provider: 'local' }
+        ];
+      }
     } else {
       routes.value = [];
-      ElMessage.error('加载路由规则失败');
+      ElMessage.error('加载网关路由规则失败');
     }
   } finally {
     loading.value = false;
@@ -74,11 +205,11 @@ async function saveRoutes() {
   saving.value = true;
   try {
     await updateGatewayRoutes(routes.value);
-    ElMessage.success('路由规则已保存');
+    ElMessage.success('网关路由调度规则已成功保存并立即生效');
     usedMockFallback.value = false;
   } catch {
     if (USE_MOCK) {
-      ElMessage.success('Mock 模式：配置已本地更新');
+      ElMessage.success('Mock 模式：配置已本地保存');
     } else {
       ElMessage.error('保存路由规则失败');
     }
@@ -87,43 +218,153 @@ async function saveRoutes() {
   }
 }
 
-onMounted(loadRoutes);
+onMounted(loadData);
 </script>
 
 <style scoped lang="scss">
 .route-rules-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+  padding-bottom: 40px;
 
-  .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 16px;
-    flex-wrap: wrap;
+  .page-top-nav {
+    .back-btn {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #2563EB;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
 
-    h2 {
-      margin: 0 0 6px;
-      font-size: 22px;
-      font-weight: 700;
-      color: #0F172A;
-    }
-
-    p {
-      margin: 0;
-      color: #64748B;
-      font-size: 14px;
+      &:hover {
+        color: #1D4ED8;
+      }
     }
   }
 
-  .header-actions {
+  .page-header {
+    background: #FFFFFF;
+    border-radius: 16px;
+    padding: 20px 24px;
+    border: 1px solid #E2E8F0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
     display: flex;
-    gap: 12px;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+
+    .header-info {
+      .header-badges {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+
+        .badge {
+          font-size: 11px;
+          font-weight: 600;
+          padding: 2px 8px;
+          border-radius: 6px;
+
+          &.primary {
+            background: #EFF6FF;
+            color: #2563EB;
+          }
+
+          &.success {
+            background: #F0FDF4;
+            color: #16A34A;
+          }
+        }
+      }
+
+      h2 {
+        margin: 0 0 6px;
+        font-size: 20px;
+        font-weight: 800;
+        color: #0F172A;
+      }
+
+      p {
+        margin: 0;
+        color: #64748B;
+        font-size: 13px;
+      }
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+
+      .gradient-btn {
+        background: linear-gradient(135deg, #2563EB 0%, #4F46E5 100%);
+        border: none;
+        border-radius: 8px;
+      }
+    }
   }
 
   .table-card {
-    border-radius: 14px;
+    border-radius: 16px;
+    border: 1px solid #E2E8F0;
+    padding: 10px 16px 20px;
+
+    .table-tip-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #F8FAFC;
+      border: 1px dashed #CBD5E1;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      font-size: 12.5px;
+      color: #475569;
+
+      .el-icon {
+        color: #2563EB;
+        font-size: 16px;
+      }
+    }
+
+    .scene-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+
+      .scene-title {
+        font-weight: 700;
+        color: #1E293B;
+        font-size: 13.5px;
+      }
+
+      .scene-code {
+        font-size: 11px;
+        color: #94A3B8;
+      }
+    }
+
+    .model-option-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+
+      .opt-label {
+        font-size: 13px;
+        color: #1E293B;
+      }
+
+      .opt-tag {
+        font-size: 11px;
+        color: #94A3B8;
+        background: #F1F5F9;
+        padding: 1px 6px;
+        border-radius: 4px;
+      }
+    }
   }
 }
 </style>

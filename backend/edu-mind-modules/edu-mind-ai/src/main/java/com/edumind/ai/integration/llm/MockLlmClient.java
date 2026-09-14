@@ -20,6 +20,9 @@ public class MockLlmClient implements LlmClient {
 
     @Override
     public String chat(String systemPrompt, String userPrompt) {
+        if (isQueryRewriteCall(systemPrompt)) {
+            return mockQueryRewrite(userPrompt);
+        }
         if (isReactAgentCall(systemPrompt)) {
             return buildReactAction(userPrompt);
         }
@@ -27,6 +30,45 @@ public class MockLlmClient implements LlmClient {
             return "基于工具观察结果，已生成教学推进建议。";
         }
         return "[" + modelKey + "] 这是 Mock LLM 的回复。您的问题是：" + userPrompt;
+    }
+
+    @Override
+    public String chat(String systemPrompt, String userPrompt, LlmChatOptions options) {
+        return chat(systemPrompt, userPrompt);
+    }
+
+    private boolean isQueryRewriteCall(String systemPrompt) {
+        return systemPrompt != null
+                && (systemPrompt.contains("检索查询") || systemPrompt.contains("检索 Query"));
+    }
+
+    private String mockQueryRewrite(String userPrompt) {
+        String course = extractLineValue(userPrompt, "当前课程：");
+        String question = extractLineValue(userPrompt, "用户当前问题：");
+        if (!org.springframework.util.StringUtils.hasText(question)) {
+            question = extractLineValue(userPrompt, "用户问题：");
+        }
+        if (!org.springframework.util.StringUtils.hasText(question)) {
+            question = userPrompt != null ? userPrompt.trim() : "";
+        }
+        question = question.replaceAll("\\s+", " ").trim();
+        if (org.springframework.util.StringUtils.hasText(course) && !question.contains(course)) {
+            return course + " " + question;
+        }
+        return question;
+    }
+
+    private String extractLineValue(String text, String label) {
+        if (text == null || label == null) {
+            return "";
+        }
+        int idx = text.indexOf(label);
+        if (idx < 0) {
+            return "";
+        }
+        int start = idx + label.length();
+        int end = text.indexOf('\n', start);
+        return (end >= 0 ? text.substring(start, end) : text.substring(start)).trim();
     }
 
     private boolean isReactAgentCall(String systemPrompt) {
@@ -117,6 +159,11 @@ public class MockLlmClient implements LlmClient {
 
     @Override
     public void streamChat(String systemPrompt, String userPrompt, StreamCallback callback) {
+        streamChatWithHistory(systemPrompt, List.of(LlmChatMessage.user(userPrompt)), callback);
+    }
+
+    @Override
+    public void streamChatWithHistory(String systemPrompt, List<LlmChatMessage> messages, StreamCallback callback) {
         if (!Boolean.TRUE.equals(llmProperties.getMockEnabled())) {
             callback.onError("Mock LLM 未启用");
             return;
@@ -132,7 +179,7 @@ public class MockLlmClient implements LlmClient {
             }
             callback.onStatus("composing", "思考已完成，正在撰写回答正文…");
 
-            String reply = chat(systemPrompt, userPrompt);
+            String reply = chatWithHistory(systemPrompt, messages);
             int chunkSize = 3;
             for (int i = 0; i < reply.length(); i += chunkSize) {
                 int end = Math.min(i + chunkSize, reply.length());

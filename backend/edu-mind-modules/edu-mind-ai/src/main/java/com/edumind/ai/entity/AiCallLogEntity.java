@@ -16,6 +16,7 @@ public class AiCallLogEntity implements Serializable {
     private Long tenantId;
     private Long userId;
     private Long courseId;
+    private String conversationId;
     private String model;
     private Integer promptTokens;
     private Integer completionTokens;

@@ -797,17 +797,27 @@
               <el-tag size="small" type="primary" effect="plain">{{ row.type || 'PDF' }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="status" label="状态" width="120">
+          <el-table-column prop="status" label="状态" width="140">
             <template #default="{ row }">
-              <el-tag :type="row.status === 'SUCCESS' ? 'success' : 'primary'" size="small">
-                {{ row.status === 'SUCCESS' ? '导出成功' : '生成中' }}
-              </el-tag>
+              <el-tag v-if="row.status === 'SUCCESS'" type="success" size="small">导出成功</el-tag>
+              <el-tag v-else-if="row.status === 'PROCESSING'" type="warning" size="small">生成中 ({{ row.progress || 50 }}%)</el-tag>
+              <el-tag v-else-if="row.status === 'PENDING'" type="info" size="small">排队中</el-tag>
+              <el-tooltip v-else-if="row.status === 'FAILED'" :content="row.errorMsg || '生成失败'" placement="top">
+                <el-tag type="danger" size="small">生成失败</el-tag>
+              </el-tooltip>
+              <el-tag v-else size="small">{{ row.status }}</el-tag>
             </template>
           </el-table-column>
           <el-table-column prop="createTime" label="生成时间" width="170" />
           <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="downloadFile(row)">
+              <el-button
+                link
+                type="primary"
+                size="small"
+                :disabled="row.status !== 'SUCCESS' || !row.downloadUrl"
+                @click="downloadFile(row)"
+              >
                 <el-icon><Download /></el-icon> 下载文件
               </el-button>
               <el-button link type="success" size="small" @click="handlePrintDirect">
@@ -822,7 +832,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
   Download,
@@ -838,7 +848,7 @@ import {
   Reading
 } from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
-import { createPaperExportTask } from '@/api/question/export';
+import { createPaperExportTask, getExportTaskStatus, listMyExportTasks } from '@/api/question/export';
 
 const loading = ref(false);
 const exporting = ref(false);
@@ -985,7 +995,19 @@ const configForm = ref({
   showPointBadge: true
 });
 
-const exportHistory = ref([
+interface ExportHistoryItem {
+  taskId: string;
+  title: string;
+  size: string;
+  type: string;
+  status: string;
+  progress?: number;
+  errorMsg?: string;
+  createTime: string;
+  downloadUrl?: string;
+}
+
+const exportHistory = ref<ExportHistoryItem[]>([
   {
     taskId: 'EXP-17262104001',
     title: '2026年普通高等学校招生全国统一考试冲刺预测卷',
@@ -1024,7 +1046,7 @@ const applyPreset = (preset: any) => {
 const handleCreateExportTask = async () => {
   try {
     exporting.value = true;
-    await createPaperExportTask({
+    const res = await createPaperExportTask({
       examId: configForm.value.examId,
       paperTitle: configForm.value.paperTitle,
       paperSubtitle: configForm.value.paperSubtitle,
@@ -1036,21 +1058,48 @@ const handleCreateExportTask = async () => {
       showStudentInfo: configForm.value.showStudentInfo,
       showScoreGrid: configForm.value.showScoreGrid
     });
-    ElMessage.success('高保真 300DPI PDF 任务生成完成，已就绪！');
-    exportHistory.value.unshift({
-      taskId: 'EXP-' + Date.now(),
-      title: configForm.value.paperTitle,
-      size: configForm.value.paperSize,
-      type: 'PDF',
-      status: 'SUCCESS',
-      createTime: '刚刚',
-      downloadUrl: '#'
-    });
+
+    const task = res.data;
+    if (!task || !task.taskId) {
+      throw new Error('创建导出任务返回异常');
+    }
+
+    ElMessage.info('试卷导出任务已提交排队，后台正在高保真排版中...');
+    await refreshHistory();
+
+    // 启动状态轮询
+    await pollExportTask(task.taskId);
   } catch (e: any) {
-    ElMessage.error(e.message || '导出失败');
+    ElMessage.error(e.message || '导出任务提交失败');
   } finally {
     exporting.value = false;
   }
+};
+
+const pollExportTask = async (taskId: string) => {
+  let attempts = 0;
+  const maxAttempts = 30;
+  while (attempts < maxAttempts) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    attempts++;
+    try {
+      const statusRes = await getExportTaskStatus(taskId);
+      const current = statusRes.data;
+      if (current.status === 'SUCCESS') {
+        ElMessage.success('试卷导出完成，已生成下载链接！');
+        await refreshHistory();
+        return;
+      } else if (current.status === 'FAILED') {
+        ElMessage.error(`试卷导出失败: ${current.errorMsg || '未知异常'}`);
+        await refreshHistory();
+        return;
+      }
+    } catch (err) {
+      console.warn('轮询导出任务状态重试中...', err);
+    }
+  }
+  ElMessage.warning('试卷导出排版耗时较长，请稍后刷新任务列表查看结果');
+  await refreshHistory();
 };
 
 const handleExportWord = () => {
@@ -1080,13 +1129,51 @@ const handlePrintDirect = () => {
   }, 100);
 };
 
-const refreshHistory = () => {
-  ElMessage.success('近期导出任务列表已刷新');
+const refreshHistory = async () => {
+  try {
+    const res = await listMyExportTasks();
+    if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      exportHistory.value = res.data.map(item => ({
+        taskId: item.taskId,
+        title: configForm.value.paperTitle || `试卷 #${item.bizId} 考务排版`,
+        size: configForm.value.paperSize || 'A4',
+        type: 'PDF',
+        status: item.status,
+        progress: item.progress,
+        errorMsg: item.errorMsg,
+        createTime: item.createTime || '刚刚',
+        downloadUrl: item.downloadUrl
+      }));
+    }
+  } catch (err) {
+    console.warn('获取近期导出任务历史失败', err);
+  }
 };
 
 const downloadFile = (row: any) => {
-  ElMessage.success(`已开始下载文件: ${row.title}`);
+  if (row.status === 'FAILED') {
+    ElMessage.error(row.errorMsg || '该导出任务生成失败，无法下载');
+    return;
+  }
+  if (row.status !== 'SUCCESS') {
+    ElMessage.warning('导出任务正在后台排版中，请稍候...');
+    return;
+  }
+  if (!row.downloadUrl || row.downloadUrl === '#') {
+    ElMessage.warning('暂无可用下载地址');
+    return;
+  }
+
+  ElMessage.success(`开始下载文件: ${row.title || '试卷排版'}`);
+  const fullUrl = row.downloadUrl.startsWith('http')
+    ? row.downloadUrl
+    : `${window.location.origin}${row.downloadUrl}`;
+  window.open(fullUrl, '_blank');
 };
+
+onMounted(() => {
+  refreshHistory();
+});
 </script>
 
 <!-- 全局纯净打印关键样式 (未 scoped，确保穿透重置 layout 并隔离试卷) -->

@@ -2,8 +2,8 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import type { HttpRequestConfig } from './types';
 import { ElMessage } from 'element-plus';
 import { TOKEN_KEY } from '@/constants/auth';
-import { API_BASE_URL, API_TIMEOUT, SM_ENABLED, SM_HMAC_SECRET } from '@/config';
-import { getTimestamp, generateNonce, generateRequestSignature } from '@/utils/crypto';
+import { API_BASE_URL, API_TIMEOUT } from '@/config';
+import { buildRequestSecurityHeaders } from './request-signature';
 import { storage } from '../storage/local';
 import { logAppError } from './error-handler';
 
@@ -30,27 +30,19 @@ axiosInstance.interceptors.request.use(
       config.headers['X-Tenant-Id'] = String(tenantId);
     }
 
-    const timestamp = getTimestamp();
-    const nonce = generateNonce();
-    config.headers['X-Timestamp'] = String(timestamp);
-    config.headers['X-Nonce'] = nonce;
-
     const urlPath = config.url || '/';
-    const path = urlPath.startsWith('http') ? new URL(urlPath).pathname : urlPath;
-    const sensitive = SM_ENABLED && (path.startsWith('/analytics') || path.startsWith('/ai/agent'));
-    if (sensitive) {
-      const body = typeof config.data === 'string'
-        ? config.data
-        : config.data ? JSON.stringify(config.data) : '';
-      const signature = generateRequestSignature(
-        (config.method || 'get').toUpperCase(),
-        path.startsWith('/api') ? path : `/api${path}`,
-        timestamp,
-        nonce,
-        body,
-        SM_HMAC_SECRET
-      );
-      config.headers['X-Signature'] = signature;
+    const body = typeof config.data === 'string'
+      ? config.data
+      : config.data ? JSON.stringify(config.data) : '';
+    const securityHeaders = buildRequestSecurityHeaders(
+      (config.method || 'get').toUpperCase(),
+      urlPath,
+      body
+    );
+    config.headers['X-Timestamp'] = securityHeaders['X-Timestamp'];
+    config.headers['X-Nonce'] = securityHeaders['X-Nonce'];
+    if (securityHeaders['X-Signature']) {
+      config.headers['X-Signature'] = securityHeaders['X-Signature'];
     }
 
     return config;

@@ -35,8 +35,8 @@ public class ReplayAttackFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        String timestampHeader = request.getHeader("X-Timestamp");
-        String nonceHeader = request.getHeader("X-Nonce");
+        String timestampHeader = SecurityRequestSupport.resolveValue(request, "X-Timestamp");
+        String nonceHeader = SecurityRequestSupport.resolveValue(request, "X-Nonce");
         boolean checkRequired = (securityProperties.isSmEnabled()
                 || dynamicSecurityConfigService.isSm3SignEnabled()
                 || dynamicSecurityConfigService.isTimestampEnabled()

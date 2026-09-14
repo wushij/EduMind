@@ -24,4 +24,17 @@ public interface UserQueryApi {
     long countActiveUsers();
 
     long countUsersByRoleCode(String roleCode);
+
+    /** 按租户查询全部活跃成员用户 ID */
+    List<Long> listActiveUserIdsByTenantId(Long tenantId);
+
+    /** 按租户统计活跃成员总数 */
+    long countActiveUsersByTenantId(Long tenantId);
+
+    /** 按租户及角色编码查询成员用户 ID（ADMIN/TEACHER/STUDENT） */
+    List<Long> listUserIdsByTenantAndRole(Long tenantId, String roleCode);
+
+    /** 按租户及角色编码统计成员人数 */
+    long countUsersByTenantAndRole(Long tenantId, String roleCode);
 }
+

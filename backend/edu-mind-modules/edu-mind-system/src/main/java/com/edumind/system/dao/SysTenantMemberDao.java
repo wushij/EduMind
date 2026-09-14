@@ -50,4 +50,26 @@ public class SysTenantMemberDao {
         return sysTenantMemberMapper.delete(new LambdaQueryWrapper<SysTenantMemberEntity>()
                 .eq(SysTenantMemberEntity::getTenantId, tenantId));
     }
+
+    public List<Long> listUserIdsByTenantId(Long tenantId) {
+        if (tenantId == null) {
+            return java.util.Collections.emptyList();
+        }
+        return sysTenantMemberMapper.selectList(new LambdaQueryWrapper<SysTenantMemberEntity>()
+                .eq(SysTenantMemberEntity::getTenantId, tenantId)
+                .eq(SysTenantMemberEntity::getStatus, 1))
+                .stream()
+                .map(SysTenantMemberEntity::getUserId)
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    public long countActiveUsersByTenantId(Long tenantId) {
+        if (tenantId == null) {
+            return 0L;
+        }
+        return sysTenantMemberMapper.selectCount(new LambdaQueryWrapper<SysTenantMemberEntity>()
+                .eq(SysTenantMemberEntity::getTenantId, tenantId)
+                .eq(SysTenantMemberEntity::getStatus, 1));
+    }
 }

@@ -31,6 +31,14 @@ public class NotificationBroadcastDao {
         return broadcastMapper.delete(new LambdaQueryWrapper<>());
     }
 
+    public int deleteAllByTenantId(Long tenantId) {
+        if (tenantId == null) {
+            return 0;
+        }
+        return broadcastMapper.delete(new LambdaQueryWrapper<NotificationBroadcastEntity>()
+                .eq(NotificationBroadcastEntity::getTenantId, tenantId));
+    }
+
     public int incrementReadCount(Long id) {
         NotificationBroadcastEntity entity = findById(id);
         if (entity == null) {

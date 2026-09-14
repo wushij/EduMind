@@ -9,3 +9,7 @@ export function createPaperExportTask(data: PaperExportRequest): Promise<ApiResp
 export function getExportTaskStatus(taskId: string): Promise<ApiResponse<ExportTaskVO>> {
   return get<ExportTaskVO>(`/question/exports/${taskId}`);
 }
+
+export function listMyExportTasks(): Promise<ApiResponse<ExportTaskVO[]>> {
+  return get<ExportTaskVO[]>('/question/exports/my');
+}

@@ -20,5 +20,6 @@ export interface ExportTaskVO {
   status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED';
   progress: number;
   downloadUrl?: string;
+  errorMsg?: string;
   createTime?: string;
 }

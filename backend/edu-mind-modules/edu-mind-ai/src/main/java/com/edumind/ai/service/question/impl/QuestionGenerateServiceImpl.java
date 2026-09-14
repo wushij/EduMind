@@ -3,13 +3,12 @@ package com.edumind.ai.service.question.impl;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.edumind.ai.dao.AiCallLogDao;
 import com.edumind.ai.dto.QuestionGenerateDTO;
-import com.edumind.ai.entity.AiCallLogEntity;
 import com.edumind.ai.gateway.AiGatewayFacade;
-import com.edumind.ai.integration.llm.LlmProperties;
+import com.edumind.ai.service.audit.AiCallAuditContext;
 import com.edumind.ai.service.prompt.PromptService;
 import com.edumind.ai.service.question.QuestionGenerateService;
+import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.common.model.UserContext;
 import com.edumind.infrastructure.redis.cache.AiSessionCacheService;
@@ -29,8 +28,6 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
     private static final long GENERATING_TTL_SECONDS = 120L;
 
     private final AiGatewayFacade aiGatewayFacade;
-    private final LlmProperties llmProperties;
-    private final AiCallLogDao aiCallLogDao;
     private final PromptService promptService;
     private final AiSessionCacheService aiSessionCacheService;
 
@@ -44,7 +41,6 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
             throw new BusinessException("题目正在生成中，请稍候");
         }
         try {
-            long start = System.currentTimeMillis();
             Map<String, Object> params = new HashMap<>();
             params.put("courseId", dto.getCourseId());
             params.put("count", dto.getCount());
@@ -57,12 +53,16 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
                     + ", 题型=" + dto.getQuestionTypes()
                     + ", 数量=" + dto.getCount();
 
-            String json = aiGatewayFacade.generateQuestions("AGENT", null,
-                    promptService.getSystemPrompt("question_generate") + "\n" + userPrompt, params);
+            AiCallAuditContext auditContext = AiCallAuditContext.builder()
+                    .userId(UserContext.getUserId())
+                    .tenantId(TenantContext.getTenantId())
+                    .courseId(dto.getCourseId())
+                    .build();
 
-            List<QuestionVO> result = parseQuestions(json, dto);
-            logCall("question_generate", start, dto.getCourseId());
-            return result;
+            String json = aiGatewayFacade.generateQuestions("question_generate", null,
+                    promptService.getSystemPrompt("question_generate") + "\n" + userPrompt, params, auditContext);
+
+            return parseQuestions(json, dto);
         } finally {
             aiSessionCacheService.finishGenerating("question", userId);
         }
@@ -90,15 +90,5 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
             list.add(vo);
         }
         return list;
-    }
-
-    private void logCall(String scene, long start, Long courseId) {
-        AiCallLogEntity log = new AiCallLogEntity();
-        log.setUserId(UserContext.getUserId());
-        log.setCourseId(courseId);
-        log.setModel(llmProperties.getModel());
-        log.setScene(scene);
-        log.setLatencyMs((int) (System.currentTimeMillis() - start));
-        aiCallLogDao.insert(log);
     }
 }

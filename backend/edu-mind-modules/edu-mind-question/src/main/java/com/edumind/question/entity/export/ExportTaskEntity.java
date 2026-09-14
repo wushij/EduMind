@@ -33,14 +33,34 @@ public class ExportTaskEntity implements Serializable {
     private Long bizId;
 
     /**
-     * 任务执行状态 (PROCESSING / SUCCESS / FAILED)
+     * 任务执行状态 (PENDING / PROCESSING / SUCCESS / FAILED)
      */
     private String status;
+
+    /**
+     * 任务失败原因
+     */
+    private String errorMsg;
 
     /**
      * 导出生成的文件下载地址
      */
     private String fileUrl;
+
+    /**
+     * 下载鉴权令牌 (UUID 去横线)
+     */
+    private String downloadToken;
+
+    /**
+     * 对象存储 ObjectKey
+     */
+    private String objectKey;
+
+    /**
+     * 导出排版参数快照 (JSON)
+     */
+    private String exportParams;
 
     /**
      * 下载链接有效截止时间

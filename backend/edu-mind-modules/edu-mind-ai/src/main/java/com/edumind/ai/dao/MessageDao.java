@@ -26,6 +26,33 @@ public class MessageDao {
         );
     }
 
+    /**
+     * 获取会话最近 N 条消息（按时间正序），用于多轮上下文组装。
+     */
+    public List<MessageEntity> listRecentByConversationId(String conversationId, int limit) {
+        if (conversationId == null || limit <= 0) {
+            return Collections.emptyList();
+        }
+        List<MessageEntity> recentDesc = messageMapper.selectList(
+                new LambdaQueryWrapper<MessageEntity>()
+                        .eq(MessageEntity::getConversationId, conversationId)
+                        .orderByDesc(MessageEntity::getCreateTime)
+                        .last("LIMIT " + limit)
+        );
+        if (recentDesc.isEmpty()) {
+            return recentDesc;
+        }
+        Collections.reverse(recentDesc);
+        return recentDesc;
+    }
+
+    public MessageEntity findById(String id) {
+        if (id == null) {
+            return null;
+        }
+        return messageMapper.selectById(id);
+    }
+
     public int insert(MessageEntity entity) {
         return messageMapper.insert(entity);
     }

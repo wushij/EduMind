@@ -39,7 +39,8 @@ WHERE permission_code IN (
     'exam:view', 'exam:edit',
     'knowledge:view', 'knowledge:edit',
     'analytics:view', 'resource:view', 'resource:upload', 'notice:view', 'ai:chat',
-    'ai:memory:view', 'ai:memory:manage'
+    'ai:memory:view', 'ai:memory:manage',
+    'notice:broadcast:view', 'notice:broadcast:send'
 );
 
 -- 5. 院系管理员 (ORG_ADMIN) 绑定辖下组织与成员管理权限

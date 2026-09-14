@@ -10,8 +10,14 @@ import {
   createConversation,
   renameConversation,
   deleteConversation,
+  deleteMessage,
   generateConversationTitle
 } from '@/api/ai/chat';
+import {
+  collectPairedMessageIds,
+  isPersistedMessageId,
+  removeMessagesByIds
+} from '@/utils/ai/chat-message-pair';
 import { splitCopilotStream, cleanReasoningText } from '@/utils/ai/copilot-stream-split';
 import { useStreamingMarkdown } from '@/composables/ai/useStreamingMarkdown';
 import { bindMarkdownCodeCopy } from '@/utils/ai/chat-markdown';
@@ -195,17 +201,30 @@ export function useAIStream() {
     return cleanReasoningText(raw);
   });
 
+  const showScrollToBottom = ref(false);
   let followAnimationFrameId: number | null = null;
 
-  /** 流式输出时自动平滑向上滚动贴底 (基于 requestAnimationFrame) */
+  /** 流式输出时自动平滑向上滚动贴底；用户手动上滑后暂停贴底（与侧边栏 AI 一致） */
   function scheduleFollowStreamOutput() {
+    if (!streaming.value || showScrollToBottom.value) return;
     if (followAnimationFrameId) return;
     followAnimationFrameId = requestAnimationFrame(() => {
       followAnimationFrameId = null;
-      if (messagesScrollRef.value) {
-        messagesScrollRef.value.scrollTop = messagesScrollRef.value.scrollHeight;
-      }
+      nextTick(() => {
+        if (!streaming.value || showScrollToBottom.value) return;
+        if (messagesScrollRef.value) {
+          messagesScrollRef.value.scrollTop = messagesScrollRef.value.scrollHeight;
+          bindMarkdownCodeCopy(messagesScrollRef.value);
+        }
+      });
     });
+  }
+
+  function handleViewportScroll(e: Event) {
+    const el = e.target as HTMLElement;
+    if (!el) return;
+    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    showScrollToBottom.value = distanceToBottom > 160;
   }
 
   function scrollToBottomInstant() {
@@ -231,6 +250,15 @@ export function useAIStream() {
 
   watch(
     () => streamingRenderedHtml.value,
+    () => {
+      if (streaming.value) {
+        scheduleFollowStreamOutput();
+      }
+    }
+  );
+
+  watch(
+    () => streamingReasoning.value,
     () => {
       if (streaming.value) {
         scheduleFollowStreamOutput();
@@ -287,15 +315,27 @@ export function useAIStream() {
       .catch(() => {});
   }
 
-  function finalizeAssistantMessage(promptText: string) {
+  function finalizeAssistantMessage(
+    promptText: string,
+    serverIds?: { userMessageId?: string; messageId?: string }
+  ) {
     finishStreamingMarkdown();
     const finalReasoning = cleanReasoningText(
       streamingReasoning.value || streamingThinkingBody.value
     );
     const finalAnswer = streamingAnswerBody.value || streamingContent.value;
 
+    if (serverIds?.userMessageId) {
+      for (let i = messages.value.length - 1; i >= 0; i--) {
+        if (messages.value[i]?.role === 'user') {
+          messages.value[i].id = serverIds.userMessageId;
+          break;
+        }
+      }
+    }
+
     messages.value.push({
-      id: `ai_${Date.now()}`,
+      id: serverIds?.messageId || `ai_${Date.now()}`,
       role: 'assistant',
       content: finalAnswer.trim() || '已处理你的课程学习咨询。',
       reasoningContent: finalReasoning,
@@ -307,6 +347,7 @@ export function useAIStream() {
 
     followUpPrompts.value = generateSmartFollowUps(promptText);
     resetStreamingState();
+    window.dispatchEvent(new CustomEvent('edumind:ai-usage-changed'));
     scrollToBottomInstant();
     nextTick(() => {
       if (messagesScrollRef.value) {
@@ -470,7 +511,13 @@ export function useAIStream() {
             streamingCitations.value = cits as CitationItem[];
           }
         } else if (event === 'done') {
-          const d = data as { conversationId?: string; citations?: CitationItem[]; reasoningContent?: string };
+          const d = data as {
+            conversationId?: string;
+            messageId?: string;
+            userMessageId?: string;
+            citations?: CitationItem[];
+            reasoningContent?: string;
+          };
           if (d.conversationId) {
             const convId = String(d.conversationId);
             if (convId !== currentSessionId.value) {
@@ -491,7 +538,10 @@ export function useAIStream() {
           if (d.reasoningContent && !streamingReasoning.value) {
             streamingReasoning.value = String(d.reasoningContent);
           }
-          finalizeAssistantMessage(query);
+          finalizeAssistantMessage(query, {
+            userMessageId: d.userMessageId,
+            messageId: d.messageId
+          });
         } else if (event === 'error') {
           throw new Error(String((data as { message?: string })?.message || '流式输出服务异常'));
         }
@@ -707,18 +757,46 @@ export function useAIStream() {
     sendMessage(userPrompt, courseId, { ...options, isRegenerate: true });
   }
 
-  function confirmDeleteMessage(targetIdx: number) {
-    ElMessageBox.confirm('确定要删除本轮问答记录吗？删除后将无法找回。', '删除对话记录', {
-      confirmButtonText: '确定删除',
-      cancelButtonText: '取消',
-      type: 'warning',
-      lockScroll: false
-    })
-      .then(() => {
-        messages.value.splice(targetIdx, 1);
-        ElMessage.success('已删除该条记录');
-      })
-      .catch(() => {});
+  async function confirmDeleteMessage(targetIdx: number) {
+    try {
+      await ElMessageBox.confirm(
+        '将删除本条及其对应的一问一答，删除后无法恢复。确定继续吗？',
+        '删除对话记录',
+        {
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          type: 'warning',
+          lockScroll: false
+        }
+      );
+    } catch {
+      return;
+    }
+
+    const idsToDelete = collectPairedMessageIds(messages.value, targetIdx);
+    if (!idsToDelete.length) return;
+
+    const persistedId = idsToDelete.find((id) => isPersistedMessageId(id));
+    try {
+      let deletedIds = idsToDelete;
+      if (persistedId) {
+        const res = await deleteMessage(persistedId);
+        if (res?.data?.deletedIds?.length) {
+          deletedIds = res.data.deletedIds;
+        }
+      }
+      messages.value = removeMessagesByIds(messages.value, deletedIds);
+      followUpPrompts.value = [];
+      ElMessage.success('已删除本轮对话记录');
+    } catch {
+      if (!persistedId) {
+        messages.value = removeMessagesByIds(messages.value, idsToDelete);
+        followUpPrompts.value = [];
+        ElMessage.success('已删除本轮对话记录');
+        return;
+      }
+      ElMessage.error('删除失败，请稍后重试');
+    }
   }
 
   return {
@@ -753,6 +831,8 @@ export function useAIStream() {
     confirmDeleteMessage,
     scrollToBottomSmooth,
     scrollToBottomInstant,
-    scheduleFollowStreamOutput
+    scheduleFollowStreamOutput,
+    showScrollToBottom,
+    handleViewportScroll
   };
 }

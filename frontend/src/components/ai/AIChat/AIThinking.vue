@@ -26,7 +26,12 @@
 
     <!-- 思考详情展开区 -->
     <div v-show="!folded" class="reasoning-body">
-      <div v-if="displayText" class="reasoning-content reasoning-md chat-md-content" v-html="renderedHtml" />
+      <div
+        v-if="displayText"
+        ref="reasoningContentRef"
+        class="reasoning-content reasoning-md chat-md-content"
+        v-html="renderedHtml"
+      />
       <div v-else-if="active && !hasAnswerBody" class="thinking-inline-status">
         <span class="thinking-spinner" />
         <span>{{ phaseMessage || '正在推理思考与检索切片中…' }}</span>
@@ -36,9 +41,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { cleanReasoningText } from '@/utils/ai/copilot-stream-split';
-import { renderReasoningMarkdown } from '@/utils/ai/chat-markdown';
+import { bindMarkdownCodeCopy, renderReasoningMarkdown } from '@/utils/ai/chat-markdown';
 
 const props = withDefaults(
   defineProps<{
@@ -69,6 +74,24 @@ const title = computed(() => {
 });
 
 const renderedHtml = computed(() => renderReasoningMarkdown(displayText.value));
+const reasoningContentRef = ref<HTMLDivElement | null>(null);
+
+function refreshReasoningMarkdownUi() {
+  nextTick(() => {
+    if (reasoningContentRef.value) {
+      bindMarkdownCodeCopy(reasoningContentRef.value);
+    }
+  });
+}
+
+watch(renderedHtml, () => refreshReasoningMarkdownUi());
+watch(
+  () => props.folded,
+  (folded) => {
+    if (!folded) refreshReasoningMarkdownUi();
+  }
+);
+onMounted(() => refreshReasoningMarkdownUi());
 
 function toggleFold() {
   emit('update:folded', !props.folded);
@@ -280,6 +303,60 @@ function toggleFold() {
     font-family: 'Fira Code', Consolas, monospace;
     font-size: 11.5px;
     color: #64748b;
+  }
+
+  :deep(.code-block-wrapper) {
+    margin: 10px 0;
+    border-radius: 8px;
+    background: #1e1e1e;
+    overflow: hidden;
+    border: 1px solid #333333;
+
+    .code-header {
+      background: #252526;
+      padding: 6px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+
+      .code-lang {
+        font-size: 11px;
+        color: #9cdcfe;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .code-copy-btn {
+        flex-shrink: 0;
+        background: #3c3c3c;
+        color: #cccccc;
+        border: none;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 10.5px;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+          background: #505050;
+          color: #ffffff;
+        }
+
+        &.is-copied {
+          background: #52c41a;
+          color: #ffffff;
+        }
+      }
+    }
+
+    pre {
+      margin: 0;
+      padding: 10px 12px;
+      overflow-x: auto;
+      font-size: 12px;
+      line-height: 1.55;
+    }
   }
 }
 

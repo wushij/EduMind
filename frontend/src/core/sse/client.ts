@@ -1,5 +1,5 @@
 import { storage } from '@/core/storage/local';
-import { getTimestamp, generateNonce } from '@/utils/crypto';
+import { buildRequestSecurityHeaders } from '@/core/http/request-signature';
 import { TOKEN_KEY } from '@/constants/auth';
 
 export type SseEventHandler = (event: string, data: Record<string, unknown>) => void;
@@ -19,10 +19,11 @@ export class SSEClient {
   ) {
     this.controller = new AbortController();
     try {
+      const body = JSON.stringify(payload);
+      const securityHeaders = buildRequestSecurityHeaders('POST', url, body);
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'X-Timestamp': String(getTimestamp()),
-        'X-Nonce': generateNonce()
+        ...securityHeaders
       };
 
       const token = storage.get(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
@@ -33,7 +34,7 @@ export class SSEClient {
       const response = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(payload),
+        body,
         signal: this.controller.signal
       });
 

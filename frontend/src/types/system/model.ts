@@ -6,6 +6,8 @@ export type ModelStatus = 'enabled' | 'disabled';
 export interface AIModelConfigItem {
   id?: number;
   name: string;
+  /** Gateway 路由键，Prompt 测试与 boundModel 应使用此字段 */
+  modelKey?: string;
   provider: string;
   configType: ModelConfigType;
   modelName: string;

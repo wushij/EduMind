@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 @Data
 public class NotificationBroadcastVO implements Serializable {
     private Long id;
+    private Long tenantId;
     private String title;
     private String content;
     private String targetType;

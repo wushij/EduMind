@@ -168,4 +168,29 @@ public class FilterSecurityTest {
         Assertions.assertEquals(403, response.getStatus());
         Assertions.assertTrue(response.getContentAsString().contains("请求签名验证未通过"));
     }
+
+    @Test
+    public void testSignatureFilter_QueryParamSignatureAcceptedOnSensitiveGet() throws Exception {
+        SecurityProperties props = new SecurityProperties();
+        props.setSmEnabled(true);
+        props.setSensitivePaths(List.of("/api/ai/agent"));
+        props.setHmacSecret("EduMind_Platform_SecretKey_2026");
+        SignatureFilter smFilter = new SignatureFilter(signatureService, props, dynamicSecurityConfigService);
+
+        long now = System.currentTimeMillis();
+        String nonce = "query_sign_nonce";
+        String path = "/api/ai/agent/runs/run-001/stream";
+        String signature = signatureService.generateSignature("GET", path, now, nonce, "", props.getHmacSecret());
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+        request.setQueryString("satoken=token&X-Timestamp=" + now + "&X-Nonce=" + nonce + "&X-Signature=" + signature);
+        request.addParameter("satoken", "token");
+        request.addParameter("X-Timestamp", String.valueOf(now));
+        request.addParameter("X-Nonce", nonce);
+        request.addParameter("X-Signature", signature);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        smFilter.doFilter(request, response, new MockFilterChain());
+        Assertions.assertEquals(200, response.getStatus());
+    }
 }

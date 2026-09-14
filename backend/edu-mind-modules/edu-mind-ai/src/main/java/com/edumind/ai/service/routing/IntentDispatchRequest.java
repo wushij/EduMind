@@ -12,4 +12,6 @@ public class IntentDispatchRequest {
     private Long knowledgeBaseId;
     private Long documentId;
     private IntentRouter.IntentResult intent;
+    private String courseName;
+    private String conversationHistory;
 }

@@ -59,6 +59,8 @@ target/
 *.zip
 *.tar.gz
 *.rar
+backend/META-INF/
+**/META-INF/
 
 # Maven 依赖与版本备份
 pom.xml.tag

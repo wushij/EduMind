@@ -23,6 +23,10 @@ public class ModelRouterImpl implements ModelRouter {
             return normalizeModelKey(explicitModelKey);
         }
 
+        if (Boolean.TRUE.equals(llmProperties.getMockEnabled()) && "mock".equalsIgnoreCase(llmProperties.getProvider())) {
+            return "mock";
+        }
+
         AiModelConfigEntity defaultChat = aiModelConfigDao.findDefaultByType("chat");
         if (defaultChat != null && isInvokable(defaultChat)) {
             return configLookupKey(defaultChat);
@@ -49,13 +53,16 @@ public class ModelRouterImpl implements ModelRouter {
     public String resolveFallback(String modelKey) {
         AiModelConfigEntity config = findConfig(modelKey);
         if (config != null && StringUtils.hasText(config.getFallbackModelKey())
-                && !isMockKey(config.getFallbackModelKey())) {
+                && (!isMockKey(config.getFallbackModelKey()) || Boolean.TRUE.equals(llmProperties.getMockEnabled()))) {
             return config.getFallbackModelKey();
         }
         AiGatewayRouteEntity route = aiGatewayRouteDao.findByScene("CHAT");
         String routeFallback = route != null ? route.getFallbackModelKey() : null;
-        if (StringUtils.hasText(routeFallback) && !isMockKey(routeFallback)) {
+        if (StringUtils.hasText(routeFallback) && (!isMockKey(routeFallback) || Boolean.TRUE.equals(llmProperties.getMockEnabled()))) {
             return routeFallback;
+        }
+        if (Boolean.TRUE.equals(llmProperties.getMockEnabled())) {
+            return "mock";
         }
         return null;
     }

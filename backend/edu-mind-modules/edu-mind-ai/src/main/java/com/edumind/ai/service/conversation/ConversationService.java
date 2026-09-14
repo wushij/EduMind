@@ -20,4 +20,9 @@ public interface ConversationService {
     void deleteConversation(String conversationId);
 
     String generateTitle(String conversationId);
+
+    /**
+     * 删除单条消息及其配对的一问一答（删提问连带回复，删回复连带提问）。
+     */
+    List<String> deleteMessageWithPair(String messageId);
 }

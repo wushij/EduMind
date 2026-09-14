@@ -1,23 +1,21 @@
 package com.edumind.ai.integration.llm;
 
 import cn.dev33.satoken.stp.StpUtil;
-import com.edumind.ai.dao.AiCallLogDao;
-import com.edumind.ai.entity.AiCallLogEntity;
+import com.edumind.ai.service.audit.AiCallAuditService;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.infrastructure.redis.cache.AiQuotaService;
 import com.edumind.system.api.TenantQuotaApi;
 import lombok.RequiredArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @RequiredArgsConstructor
 public class LoggingLlmClient implements LlmClient {
 
     private final LlmClient delegate;
-    private final AiCallLogDao aiCallLogDao;
-    private final LlmProperties properties;
+    private final AiCallAuditService aiCallAuditService;
     private final AiQuotaService aiQuotaService;
     private final long dailyQuota;
     private final TenantQuotaApi tenantQuotaApi;
@@ -28,10 +26,28 @@ public class LoggingLlmClient implements LlmClient {
         long start = System.currentTimeMillis();
         try {
             String result = delegate.chat(systemPrompt, userPrompt);
-            logCall("chat", start, estimateTokens(systemPrompt, userPrompt), estimateTokens(result));
+            aiCallAuditService.recordEstimated("CHAT", null, null, start,
+                    joinPrompt(systemPrompt, userPrompt), result);
             return result;
         } catch (RuntimeException ex) {
-            logCall("chat", start, estimateTokens(systemPrompt, userPrompt), 0);
+            aiCallAuditService.recordEstimated("CHAT", null, null, start,
+                    joinPrompt(systemPrompt, userPrompt), "");
+            throw ex;
+        }
+    }
+
+    @Override
+    public String chat(String systemPrompt, String userPrompt, LlmChatOptions options) {
+        assertQuota();
+        long start = System.currentTimeMillis();
+        try {
+            String result = delegate.chat(systemPrompt, userPrompt, options);
+            aiCallAuditService.recordEstimated("CHAT", null, null, start,
+                    joinPrompt(systemPrompt, userPrompt), result);
+            return result;
+        } catch (RuntimeException ex) {
+            aiCallAuditService.recordEstimated("CHAT", null, null, start,
+                    joinPrompt(systemPrompt, userPrompt), "");
             throw ex;
         }
     }
@@ -42,19 +58,24 @@ public class LoggingLlmClient implements LlmClient {
         long start = System.currentTimeMillis();
         try {
             String result = delegate.generateQuestions(prompt, params);
-            logCall("question_generate", start, estimateTokens(prompt, ""), estimateTokens(result));
+            aiCallAuditService.recordEstimated("question_generate", null, null, start, prompt, result);
             return result;
         } catch (RuntimeException ex) {
-            logCall("question_generate", start, estimateTokens(prompt, ""), 0);
+            aiCallAuditService.recordEstimated("question_generate", null, null, start, prompt, "");
             throw ex;
         }
     }
 
     @Override
     public void streamChat(String systemPrompt, String userPrompt, StreamCallback callback) {
+        streamChatWithHistory(systemPrompt, List.of(LlmChatMessage.user(userPrompt)), callback);
+    }
+
+    @Override
+    public void streamChatWithHistory(String systemPrompt, List<LlmChatMessage> messages, StreamCallback callback) {
         assertQuota();
         long start = System.currentTimeMillis();
-        delegate.streamChat(systemPrompt, userPrompt, new StreamCallback() {
+        delegate.streamChatWithHistory(systemPrompt, messages, new StreamCallback() {
             private final StringBuilder buffer = new StringBuilder();
 
             @Override
@@ -75,16 +96,34 @@ public class LoggingLlmClient implements LlmClient {
 
             @Override
             public void onComplete() {
-                logCall("chat_stream", start, estimateTokens(systemPrompt, userPrompt), estimateTokens(buffer.toString()));
+                aiCallAuditService.recordEstimated("CHAT", null, null, start,
+                        joinHistoryPrompt(systemPrompt, messages), buffer.toString());
                 callback.onComplete();
             }
 
             @Override
             public void onError(String message) {
-                logCall("chat_stream", start, estimateTokens(systemPrompt, userPrompt), 0);
+                aiCallAuditService.recordEstimated("CHAT", null, null, start,
+                        joinHistoryPrompt(systemPrompt, messages), buffer.toString());
                 callback.onError(message);
             }
         });
+    }
+
+    @Override
+    public String chatWithHistory(String systemPrompt, List<LlmChatMessage> messages) {
+        assertQuota();
+        long start = System.currentTimeMillis();
+        try {
+            String result = delegate.chatWithHistory(systemPrompt, messages);
+            aiCallAuditService.recordEstimated("CHAT", null, null, start,
+                    joinHistoryPrompt(systemPrompt, messages), result);
+            return result;
+        } catch (RuntimeException ex) {
+            aiCallAuditService.recordEstimated("CHAT", null, null, start,
+                    joinHistoryPrompt(systemPrompt, messages), "");
+            throw ex;
+        }
     }
 
     private void assertQuota() {
@@ -99,36 +138,19 @@ public class LoggingLlmClient implements LlmClient {
         }
     }
 
-    private void logCall(String scene, long startMs, int promptTokens, int completionTokens) {
-        AiCallLogEntity entity = new AiCallLogEntity();
-        if (StpUtil.isLogin()) {
-            entity.setUserId(StpUtil.getLoginIdAsLong());
-        }
-        entity.setModel(properties.getModel());
-        entity.setScene(scene);
-        entity.setPromptTokens(promptTokens);
-        entity.setCompletionTokens(completionTokens);
-        entity.setLatencyMs((int) (System.currentTimeMillis() - startMs));
-        entity.setCreateTime(LocalDateTime.now());
-        aiCallLogDao.insert(entity);
-
-        // 原子扣减租户 Token 配额
-        Long tenantId = entity.getTenantId() != null ? entity.getTenantId() : TenantContext.getTenantId();
-        if (tenantId != null && tenantId > 0 && tenantQuotaApi != null) {
-            long totalTokens = (long) promptTokens + completionTokens;
-            if (totalTokens > 0) {
-                tenantQuotaApi.consumeTokenQuota(tenantId, totalTokens);
-            }
-        }
+    private String joinPrompt(String systemPrompt, String userPrompt) {
+        return (systemPrompt != null ? systemPrompt : "") + "\n" + (userPrompt != null ? userPrompt : "");
     }
 
-    private int estimateTokens(String... texts) {
-        int length = 0;
-        for (String text : texts) {
-            if (text != null) {
-                length += text.length();
+    private String joinHistoryPrompt(String systemPrompt, List<LlmChatMessage> messages) {
+        StringBuilder builder = new StringBuilder(systemPrompt != null ? systemPrompt : "");
+        if (messages != null) {
+            for (LlmChatMessage message : messages) {
+                if (message != null && message.getContent() != null) {
+                    builder.append('\n').append(message.getContent());
+                }
             }
         }
-        return Math.max(1, length / 4);
+        return builder.toString();
     }
 }

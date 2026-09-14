@@ -123,7 +123,7 @@ public class GatewayResilienceStore {
         recordCircuitOpen();
     }
 
-    private CircuitBreakerState getCircuitState(String modelKey) {
+    public CircuitBreakerState getCircuitState(String modelKey) {
         CircuitBreakerState state = redisService.getObject(CIRCUIT_PREFIX + modelKey, CircuitBreakerState.class);
         return state != null ? state : new CircuitBreakerState();
     }

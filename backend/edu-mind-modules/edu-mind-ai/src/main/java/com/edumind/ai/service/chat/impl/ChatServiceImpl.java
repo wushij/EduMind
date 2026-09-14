@@ -1,20 +1,24 @@
 package com.edumind.ai.service.chat.impl;
 
 import com.alibaba.fastjson2.JSON;
-import com.edumind.ai.dao.AiCallLogDao;
 import com.edumind.ai.dao.ConversationDao;
 import com.edumind.ai.dao.MessageDao;
 import com.edumind.ai.dto.ChatStreamDTO;
-import com.edumind.ai.entity.AiCallLogEntity;
 import com.edumind.ai.entity.ConversationEntity;
 import com.edumind.ai.entity.MessageEntity;
 import com.edumind.ai.gateway.AiGatewayFacade;
+import com.edumind.ai.integration.llm.LlmChatMessage;
 import com.edumind.ai.integration.llm.LlmClient;
 import com.edumind.ai.integration.llm.LlmProperties;
 import com.edumind.ai.integration.llm.LlmStreamRelay;
+import com.edumind.ai.service.audit.AiCallAuditContext;
+import com.edumind.ai.service.chat.ChatHistoryBuilder;
 import com.edumind.ai.router.IntentRouter;
 import com.edumind.ai.service.chat.ChatService;
 import com.edumind.ai.service.chat.ChatStreamRegistry;
+import com.edumind.ai.service.memory.MemoryPromptBuilder;
+import com.edumind.ai.service.memory.retrieval.MemoryContextBlock;
+import com.edumind.ai.service.memory.retrieval.MemoryRetrievalService;
 import com.edumind.ai.service.routing.IntentDispatchPlan;
 import com.edumind.ai.service.routing.IntentDispatchRequest;
 import com.edumind.ai.service.routing.IntentDispatchService;
@@ -22,6 +26,8 @@ import com.edumind.ai.vo.rag.CitationVO;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.event.LearningActivityEvent;
 import com.edumind.common.exception.BusinessException;
+import com.edumind.common.model.LoginUser;
+import com.edumind.common.model.UserContext;
 import com.edumind.infrastructure.redis.cache.AiSessionCacheService;
 import com.edumind.knowledge.api.KnowledgeQueryApi;
 import com.edumind.knowledge.vo.knowledge.KnowledgeBaseVO;
@@ -47,12 +53,14 @@ public class ChatServiceImpl implements ChatService {
     private final MessageDao messageDao;
     private final AiGatewayFacade aiGatewayFacade;
     private final LlmProperties llmProperties;
-    private final AiCallLogDao aiCallLogDao;
     private final AiSessionCacheService aiSessionCacheService;
     private final ChatStreamRegistry chatStreamRegistry;
     private final KnowledgeQueryApi knowledgeQueryApi;
     private final ApplicationEventPublisher eventPublisher;
     private final IntentDispatchService intentDispatchService;
+    private final MemoryRetrievalService memoryRetrievalService;
+    private final MemoryPromptBuilder memoryPromptBuilder;
+    private final ChatHistoryBuilder chatHistoryBuilder;
 
     @Override
     public SseEmitter streamChat(ChatStreamDTO dto) {
@@ -61,13 +69,15 @@ public class ChatServiceImpl implements ChatService {
 
         ConversationEntity conversation = resolveConversation(dto, userId);
         boolean regenerate = Boolean.TRUE.equals(dto.getRegenerate());
+        String savedUserMessageId = null;
         if (regenerate) {
             if (!StringUtils.hasText(dto.getConversationId())) {
                 throw new BusinessException("重新生成需要指定会话");
             }
             removeLastAssistantMessage(conversation);
         } else {
-            saveMessage(conversation.getId(), "user", dto.getMessage(), null, null);
+            MessageEntity userMessage = saveMessage(conversation.getId(), "user", dto.getMessage(), null, null);
+            savedUserMessageId = userMessage.getId();
             aiSessionCacheService.trackUserMessage(conversation.getId(), dto.getMessage());
         }
 
@@ -75,11 +85,20 @@ public class ChatServiceImpl implements ChatService {
         SseEmitter emitter = new SseEmitter(llmProperties.getTimeoutMs().longValue());
         sendEvent(emitter, "stream", Map.of("streamId", streamId));
         final boolean regenerateTurn = regenerate;
+        final String userMessageIdForDone = savedUserMessageId;
+        final LoginUser currentUser = UserContext.get();
+        final Long currentUserId = userId;
         CompletableFuture.runAsync(() -> {
             TenantContext.setTenantId(currentTenantId);
+            if (currentUser != null) {
+                UserContext.set(currentUser);
+            } else {
+                UserContext.set(LoginUser.builder().id(currentUserId).build());
+            }
             try {
-                doStream(conversation, dto, emitter, streamId, regenerateTurn);
+                doStream(conversation, dto, emitter, streamId, regenerateTurn, userMessageIdForDone);
             } finally {
+                UserContext.clear();
                 TenantContext.clear();
             }
         });
@@ -89,6 +108,12 @@ public class ChatServiceImpl implements ChatService {
     @Override
     public void cancelStream(String streamId) {
         chatStreamRegistry.cancel(streamId);
+    }
+
+    @Override
+    public String buildSystemPromptWithMemory(String baseSystemPrompt, Long courseId, String queryMessage) {
+        List<MemoryContextBlock> blocks = memoryRetrievalService.retrieve(courseId, queryMessage, 5);
+        return memoryPromptBuilder.buildSystemPromptWithMemory(baseSystemPrompt, blocks);
     }
 
     private ConversationEntity resolveConversation(ChatStreamDTO dto, Long userId) {
@@ -118,8 +143,7 @@ public class ChatServiceImpl implements ChatService {
     }
 
     private void doStream(ConversationEntity conversation, ChatStreamDTO dto, SseEmitter emitter, String streamId,
-                          boolean regenerateTurn) {
-        long start = System.currentTimeMillis();
+                          boolean regenerateTurn, String userMessageId) {
         StringBuilder assistantContent = new StringBuilder();
         final Long knowledgeBaseId = resolveKnowledgeBaseId(dto);
         try {
@@ -131,12 +155,17 @@ public class ChatServiceImpl implements ChatService {
             ));
 
             boolean useRag = shouldUseRag(dto, knowledgeBaseId, intent);
+            List<MessageEntity> recentMessages = messageDao.listRecentByConversationId(
+                    conversation.getId(), ChatHistoryBuilder.MAX_HISTORY_MESSAGES);
+            String conversationHistory = chatHistoryBuilder.formatConversationHistory(recentMessages);
+
             IntentDispatchRequest dispatchRequest = IntentDispatchRequest.builder()
                     .message(dto.getMessage())
                     .courseId(dto.getCourseId())
                     .knowledgeBaseId(useRag ? knowledgeBaseId : null)
                     .documentId(dto.getDocumentId())
                     .intent(intent)
+                    .conversationHistory(conversationHistory)
                     .build();
             IntentDispatchPlan plan = intentDispatchService.prepare(dispatchRequest);
 
@@ -151,7 +180,19 @@ public class ChatServiceImpl implements ChatService {
                 sendEvent(emitter, "citation", Map.of("citations", citations));
             }
 
-            final String promptForLog = userPrompt;
+            // 长期记忆检索与个性化上下文注入 (Gate I4 P0-1)
+            Long targetCourseId = conversation.getCourseId() != null ? conversation.getCourseId() : dto.getCourseId();
+            List<MemoryContextBlock> memoryBlocks = memoryRetrievalService.retrieve(
+                    targetCourseId, dto.getMessage(), 5);
+            if (memoryBlocks != null && !memoryBlocks.isEmpty()) {
+                systemPrompt = memoryPromptBuilder.buildSystemPromptWithMemory(systemPrompt, memoryBlocks);
+                sendEvent(emitter, "memory", Map.of("memories", memoryPromptBuilder.toSsePayload(memoryBlocks)));
+            }
+            systemPrompt = chatHistoryBuilder.appendFollowUpDiscipline(systemPrompt, dto.getMessage());
+
+            List<LlmChatMessage> chatHistory = chatHistoryBuilder.withCurrentUserPrompt(
+                    chatHistoryBuilder.build(recentMessages), userPrompt);
+
             final List<CitationVO> citationsForSave = citations;
             final boolean ragUsed = useRag && knowledgeBaseId != null;
             StringBuilder reasoningContent = new StringBuilder();
@@ -165,7 +206,18 @@ public class ChatServiceImpl implements ChatService {
                     assistantContent,
                     reasoningContent
             );
-            aiGatewayFacade.streamChat("CHAT", dto.getModelKey(), systemPrompt, userPrompt, new LlmClient.StreamCallback() {
+            final String auditScene = ragUsed ? "CHAT_RAG" : "CHAT";
+            AiCallAuditContext auditContext = AiCallAuditContext.builder()
+                    .userId(LoginUserResolver.resolveUserId())
+                    .tenantId(TenantContext.getTenantId())
+                    .courseId(conversation.getCourseId())
+                    .conversationId(conversation.getId())
+                    .knowledgeBaseId(knowledgeBaseId)
+                    .retrievalHitCount(citationsForSave != null && !citationsForSave.isEmpty()
+                            ? citationsForSave.size() : null)
+                    .build();
+            aiGatewayFacade.streamChat(auditScene, dto.getModelKey(), systemPrompt, chatHistory, auditContext,
+                    new LlmClient.StreamCallback() {
                 @Override
                 public void onReasoning(String content) {
                     relay.onReasoning(content);
@@ -207,6 +259,9 @@ public class ChatServiceImpl implements ChatService {
                     Map<String, String> done = new HashMap<>();
                     done.put("conversationId", conversation.getId());
                     done.put("messageId", assistantMsg.getId());
+                    if (StringUtils.hasText(userMessageId)) {
+                        done.put("userMessageId", userMessageId);
+                    }
                     if (plan.getAgentCode() != null) {
                         done.put("agentCode", plan.getAgentCode());
                     }
@@ -215,7 +270,6 @@ public class ChatServiceImpl implements ChatService {
                     }
                     sendEvent(emitter, "done", done);
                     emitter.complete();
-                    logCall(start, ragUsed, knowledgeBaseId, conversation.getCourseId(), promptForLog, assistantContent.toString(), citationsForSave);
                     publishChatActivity(conversation);
                     chatStreamRegistry.remove(streamId);
                 }
@@ -297,32 +351,6 @@ public class ChatServiceImpl implements ChatService {
             return true;
         }
         return knowledgeBaseId != null && "chat".equalsIgnoreCase(intent.type());
-    }
-
-    private void logCall(long start, boolean useRag, Long knowledgeBaseId, Long courseId, String prompt, String completion,
-                         List<CitationVO> citations) {
-        AiCallLogEntity log = new AiCallLogEntity();
-        Long currentTenantId = TenantContext.requireTenantId();
-        log.setTenantId(currentTenantId);
-        log.setUserId(LoginUserResolver.resolveUserId());
-        log.setCourseId(courseId);
-        log.setModel(llmProperties.getModel());
-        log.setScene(useRag ? "CHAT_RAG" : "chat_stream");
-        log.setLatencyMs((int) (System.currentTimeMillis() - start));
-        log.setKnowledgeBaseId(knowledgeBaseId);
-        log.setPromptTokens(estimateTokens(prompt));
-        log.setCompletionTokens(estimateTokens(completion));
-        if (citations != null && !citations.isEmpty()) {
-            log.setRetrievalHitCount(citations.size());
-        }
-        aiCallLogDao.insert(log);
-    }
-
-    private int estimateTokens(String text) {
-        if (!StringUtils.hasText(text)) {
-            return 0;
-        }
-        return Math.max(1, text.length() / 4);
     }
 
     private String truncate(String text, int maxLen) {

@@ -3,6 +3,8 @@ package com.edumind.question.service.export;
 import com.edumind.question.dto.export.PaperExportRequestDTO;
 import com.edumind.question.vo.export.ExportTaskVO;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 import java.util.List;
 
 /**
@@ -24,4 +26,9 @@ public interface ExportTaskService {
      * 查询当前用户的近期导出任务列表
      */
     List<ExportTaskVO> listMyExportTasks();
+
+    /**
+     * 安全鉴权下载试卷导出文件
+     */
+    void download(Long taskId, String token, HttpServletResponse response);
 }

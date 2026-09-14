@@ -1,10 +1,14 @@
 package com.edumind.knowledge.controller.ocr;
 
+import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.edumind.common.api.ApiResult;
+import com.edumind.knowledge.dto.ocr.OcrPageUpdateDTO;
+import com.edumind.knowledge.dto.ocr.OcrTaskCreateDTO;
 import com.edumind.knowledge.service.ocr.KnowledgeOcrService;
 import com.edumind.knowledge.vo.ocr.KnowledgeOcrPageVO;
 import com.edumind.knowledge.vo.ocr.KnowledgeOcrTaskVO;
-import lombok.Data;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,15 +20,20 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * 知识库 OCR 识别与校对任务控制器
+ */
 @RestController
 @RequestMapping("/api/knowledge/ocr-tasks")
 @RequiredArgsConstructor
+@SaCheckLogin
+@SaCheckPermission("knowledge:ocr:use")
 public class KnowledgeOcrController {
 
     private final KnowledgeOcrService knowledgeOcrService;
 
     @PostMapping
-    public ApiResult<KnowledgeOcrTaskVO> createOcrTask(@RequestBody OcrTaskCreateDTO dto) {
+    public ApiResult<KnowledgeOcrTaskVO> createOcrTask(@Valid @RequestBody OcrTaskCreateDTO dto) {
         return ApiResult.success(knowledgeOcrService.createOcrTask(dto.getDocumentId(), dto.getEngine()));
     }
 
@@ -39,7 +48,7 @@ public class KnowledgeOcrController {
     }
 
     @PutMapping("/pages/{pageId}")
-    public ApiResult<Void> updatePageText(@PathVariable("pageId") Long pageId, @RequestBody PageUpdateDTO dto) {
+    public ApiResult<Void> updatePageText(@PathVariable("pageId") Long pageId, @RequestBody OcrPageUpdateDTO dto) {
         knowledgeOcrService.updatePageText(pageId, dto.getProofreadText());
         return ApiResult.success();
     }
@@ -48,16 +57,5 @@ public class KnowledgeOcrController {
     public ApiResult<Void> confirmAndIngest(@PathVariable("taskId") Long taskId) {
         knowledgeOcrService.confirmAndIngest(taskId);
         return ApiResult.success();
-    }
-
-    @Data
-    public static class OcrTaskCreateDTO {
-        private Long documentId;
-        private String engine;
-    }
-
-    @Data
-    public static class PageUpdateDTO {
-        private String proofreadText;
     }
 }

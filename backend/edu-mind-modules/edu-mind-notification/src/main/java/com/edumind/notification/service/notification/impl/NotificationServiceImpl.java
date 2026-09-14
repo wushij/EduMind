@@ -81,7 +81,13 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void markAllAsRead(Long userId) {
+        List<Long> unreadBroadcastRefIds = notificationDao.findUnreadBroadcastRefIdsByUserId(userId);
         notificationDao.markAllAsReadByUserId(userId);
+        if (unreadBroadcastRefIds != null && !unreadBroadcastRefIds.isEmpty()) {
+            for (Long refId : unreadBroadcastRefIds) {
+                broadcastDao.incrementReadCount(refId);
+            }
+        }
     }
 
     @Override

@@ -1,13 +1,12 @@
 package com.edumind.ai.service.grading.impl;
 
-import com.edumind.ai.dao.AiCallLogDao;
 import com.edumind.ai.dto.SubjectiveGradingDTO;
-import com.edumind.ai.entity.AiCallLogEntity;
 import com.edumind.ai.gateway.AiGatewayFacade;
-import com.edumind.ai.integration.llm.LlmProperties;
+import com.edumind.ai.service.audit.AiCallAuditContext;
 import com.edumind.ai.service.grading.AiGradingService;
 import com.edumind.ai.service.prompt.PromptService;
 import com.edumind.ai.vo.SubjectiveGradingVO;
+import com.edumind.common.context.TenantContext;
 import com.edumind.common.model.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,13 +17,10 @@ import org.springframework.util.StringUtils;
 public class AiGradingServiceImpl implements AiGradingService {
 
     private final AiGatewayFacade aiGatewayFacade;
-    private final LlmProperties llmProperties;
-    private final AiCallLogDao aiCallLogDao;
     private final PromptService promptService;
 
     @Override
     public SubjectiveGradingVO gradeSubjective(SubjectiveGradingDTO dto) {
-        long start = System.currentTimeMillis();
         int maxScore = dto.getMaxScore() != null ? dto.getMaxScore() : 10;
         String userPrompt = """
                 题目：%s
@@ -38,11 +34,16 @@ public class AiGradingServiceImpl implements AiGradingService {
                 dto.getStudentAnswer(),
                 maxScore);
 
-        String reply = aiGatewayFacade.chat("GRADING", promptService.getSystemPrompt("subjective_grading"), userPrompt);
+        AiCallAuditContext auditContext = AiCallAuditContext.builder()
+                .userId(UserContext.getUserId())
+                .tenantId(TenantContext.getTenantId())
+                .courseId(dto.getCourseId())
+                .build();
+
+        String reply = aiGatewayFacade.chat("subjective_grading", null,
+                promptService.getSystemPrompt("subjective_grading"), userPrompt, auditContext);
         int score = estimateScore(reply, maxScore, dto.getStudentAnswer(), dto.getReferenceAnswer());
         String status = score >= maxScore * 0.6 ? "AUTO_GRADED" : "PENDING_REVIEW";
-
-        logCall(start, dto.getCourseId());
 
         return SubjectiveGradingVO.builder()
                 .score(score)
@@ -60,15 +61,5 @@ public class AiGradingServiceImpl implements AiGradingService {
             return maxScore;
         }
         return Math.max(1, (int) (maxScore * 0.7));
-    }
-
-    private void logCall(long start, Long courseId) {
-        AiCallLogEntity log = new AiCallLogEntity();
-        log.setUserId(UserContext.getUserId());
-        log.setCourseId(courseId);
-        log.setModel(llmProperties.getModel());
-        log.setScene("subjective_grading");
-        log.setLatencyMs((int) (System.currentTimeMillis() - start));
-        aiCallLogDao.insert(log);
     }
 }

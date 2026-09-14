@@ -27,5 +27,7 @@ public class ExportTaskVO implements Serializable {
 
     private String downloadUrl;
 
+    private String errorMsg;
+
     private LocalDateTime createTime;
 }

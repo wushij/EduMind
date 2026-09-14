@@ -14,6 +14,7 @@ import com.edumind.ai.mapper.memory.AiMemoryItemMapper;
 import com.edumind.ai.mapper.memory.AiMemoryNamespaceMapper;
 import com.edumind.ai.service.chat.ChatService;
 import com.edumind.ai.service.memory.AgentMemoryService;
+import com.edumind.ai.service.memory.MemoryPromptBuilder;
 import com.edumind.ai.service.memory.retrieval.MemoryContextBlock;
 import com.edumind.ai.service.memory.retrieval.MemoryRetrievalService;
 import com.edumind.ai.vo.memory.MemoryItemVO;
@@ -37,6 +38,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 智教云 V2.0 · Agent 长期记忆 Beta 全链路闭环集成测试 (Gate I4 专项工程验收)
@@ -50,6 +52,9 @@ public class AgentMemoryIntegrationTest {
 
     @Autowired
     private MemoryRetrievalService memoryRetrievalService;
+
+    @Autowired
+    private MemoryPromptBuilder memoryPromptBuilder;
 
     @Autowired
     private ChatService chatService;
@@ -306,7 +311,7 @@ public class AgentMemoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("用例 6: Chat 主链路集成长期记忆 (授权状态下注入上下文并触发 memory SSE 事件)")
+    @DisplayName("用例 6: Chat 主链路集成长期记忆 (授权状态下注入记忆上下文与摘要，撤回授权后严格零注入 Fail-Closed)")
     void test6_chatIntegrationWithMemory() {
         mockLogin(TENANT_A, USER_A1);
 
@@ -322,7 +327,7 @@ public class AgentMemoryIntegrationTest {
         createDTO.setMemoryType("PREFERENCE");
         agentMemoryService.createMemoryItem(createDTO);
 
-        // 2. 模拟 Chat 发起对话
+        // 2. 模拟 Chat 发起对话 (Smoke 验证 streamChat 流式创建正常)
         ChatStreamDTO chatDTO = new ChatStreamDTO();
         chatDTO.setCourseId(COURSE_ID);
         chatDTO.setMessage("请帮我推导这道函数的单调区间");
@@ -331,19 +336,38 @@ public class AgentMemoryIntegrationTest {
         SseEmitter emitter = chatService.streamChat(chatDTO);
         Assertions.assertNotNull(emitter, "对话流应成功创建 SseEmitter");
 
-        // 3. 验证长期记忆检索管线在此对话场景下能够精准匹配并生成上下文块
+        // 3. 同步验证 ChatService.buildSystemPromptWithMemory 成功将长期记忆注入 systemPrompt
+        String baseSystemPrompt = "你是智教云 EduMind 课程 AI 助手，请用简洁专业的语言回答学生关于课程内容的问题。";
+        String systemPromptWithMemory = chatService.buildSystemPromptWithMemory(
+                baseSystemPrompt, COURSE_ID, chatDTO.getMessage());
+
+        Assertions.assertNotNull(systemPromptWithMemory, "注入记忆后的 System Prompt 不可为空");
+        Assertions.assertTrue(systemPromptWithMemory.startsWith(baseSystemPrompt), "System Prompt 基础前缀必须保留");
+        Assertions.assertTrue(systemPromptWithMemory.contains("偏好详细推导步骤"), "授权状态下 Chat systemPrompt 必须注入记忆摘要关键词");
+        Assertions.assertTrue(systemPromptWithMemory.contains("PREFERENCE"), "注入文本中应清晰标明记忆分类类型 PREFERENCE");
+
+        // 3.1 验证 SSE Payload 构建规范 (严格剔除 fullContent 明文以防泄露)
         List<MemoryContextBlock> blocks = memoryRetrievalService.retrieve(
                 TENANT_A, USER_A1, COURSE_ID, chatDTO.getMessage(), 5);
-        Assertions.assertFalse(blocks.isEmpty(), "对话前检索管线应命中该用户的长期偏好记忆");
-        Assertions.assertEquals("PREFERENCE", blocks.get(0).getMemoryType());
-        Assertions.assertTrue(blocks.get(0).getSummary().contains("偏好详细推导步骤"));
+        Assertions.assertFalse(blocks.isEmpty(), "授权状态下检索管线应命中该用户的长期偏好记忆");
+        List<Map<String, Object>> sseMemories = memoryPromptBuilder.toSsePayload(blocks);
+        Assertions.assertFalse(sseMemories.isEmpty(), "SSE payload memories 列表非空");
+        Assertions.assertTrue(sseMemories.get(0).containsKey("summary"), "SSE payload 应包含 summary");
+        Assertions.assertFalse(sseMemories.get(0).containsKey("fullContent"), "SSE payload 严禁包含 fullContent 明文以防泄露");
 
-        // 4. 验证撤回授权后，同样的对话消息无法召回任何记忆 (Fail-Closed)
+        // 4. 撤回授权后验证: 相同路径下 System Prompt 不含任何记忆内容，且无 memory blocks (Fail-Closed)
         consentDTO.setConsentGranted(false);
         agentMemoryService.updateConsent(consentDTO);
 
+        String systemPromptAfterRevoke = chatService.buildSystemPromptWithMemory(
+                baseSystemPrompt, COURSE_ID, chatDTO.getMessage());
+        Assertions.assertEquals(baseSystemPrompt, systemPromptAfterRevoke,
+                "撤回知情授权后，Chat systemPrompt 必须保持原始基础 Prompt，严格零注入 (Fail-Closed)");
+        Assertions.assertFalse(systemPromptAfterRevoke.contains("偏好详细推导步骤"),
+                "撤回知情授权后，System Prompt 绝对不可含有任何已撤销记忆关键词");
+
         List<MemoryContextBlock> blocksAfterRevoke = memoryRetrievalService.retrieve(
                 TENANT_A, USER_A1, COURSE_ID, chatDTO.getMessage(), 5);
-        Assertions.assertTrue(blocksAfterRevoke.isEmpty(), "撤回授权后，相同场景下的记忆检索必须为空 (Fail-Closed)");
+        Assertions.assertTrue(blocksAfterRevoke.isEmpty(), "撤回授权后记忆检索管线必须返回空 (Fail-Closed)");
     }
 }

@@ -3,12 +3,15 @@ package com.edumind.ai.service.routing.impl;
 import com.edumind.ai.rag.model.RagResult;
 import com.edumind.ai.rag.model.RetrievalHit;
 import com.edumind.ai.rag.pipeline.RagPipelineImpl;
+import com.edumind.ai.rag.query.QueryRewriteContext;
 import com.edumind.ai.router.IntentRouter;
 import com.edumind.ai.service.prompt.PromptService;
 import com.edumind.ai.service.routing.IntentDispatchPlan;
 import com.edumind.ai.service.routing.IntentDispatchRequest;
 import com.edumind.ai.service.routing.IntentDispatchService;
 import com.edumind.ai.vo.rag.CitationVO;
+import com.edumind.course.api.CourseQueryApi;
+import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.knowledge.service.knowledge.KnowledgeAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,6 +30,7 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
     private final PromptService promptService;
     private final RagPipelineImpl ragPipeline;
     private final KnowledgeAccessService knowledgeAccessService;
+    private final CourseQueryApi courseQueryApi;
 
     @Override
     public IntentRouter.IntentResult route(String message, Long courseId) {
@@ -67,13 +71,19 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
 
         if (useRag) {
             knowledgeAccessService.assertAccessible(request.getKnowledgeBaseId());
+            QueryRewriteContext rewriteContext = QueryRewriteContext.builder()
+                    .question(request.getMessage())
+                    .courseName(resolveCourseName(request))
+                    .conversationHistory(request.getConversationHistory())
+                    .build();
             RagResult ragResult = ragPipeline.executeDetailed(
                     request.getMessage(),
                     request.getKnowledgeBaseId(),
                     5,
                     0.65,
                     request.getDocumentId(),
-                    false
+                    false,
+                    rewriteContext
             );
             userPrompt = ragResult.getPromptPreview();
             citations = toCitations(ragResult);
@@ -155,5 +165,20 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
         citation.setExcerpt(hit.getExcerpt());
         citation.setChunkIndex(hit.getChunkIndex());
         return citation;
+    }
+
+    private String resolveCourseName(IntentDispatchRequest request) {
+        if (StringUtils.hasText(request.getCourseName())) {
+            return request.getCourseName();
+        }
+        if (request.getCourseId() == null) {
+            return "";
+        }
+        try {
+            CourseDetailVO course = courseQueryApi.getCourseById(request.getCourseId());
+            return course != null && StringUtils.hasText(course.getName()) ? course.getName() : "";
+        } catch (Exception ex) {
+            return "";
+        }
     }
 }

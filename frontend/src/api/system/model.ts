@@ -26,6 +26,7 @@ function mapVoToItem(vo: Record<string, unknown>): AIModelConfigItem {
   return {
     id: vo.id as number | undefined,
     name: (vo.name || vo.configName || vo.modelKey || '') as string,
+    modelKey: (vo.modelKey || vo.name || vo.configName || vo.modelName || '') as string,
     provider: (vo.provider || 'mock') as string,
     configType: ((vo.configType as string) || 'chat') as AIModelConfigItem['configType'],
     modelName: (vo.modelName || vo.modelKey || '') as string,

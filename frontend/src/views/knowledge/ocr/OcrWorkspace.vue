@@ -12,15 +12,15 @@
             <span class="stat-label">公式 LaTeX 识别率</span>
           </div>
           <div class="hero-stat-card">
-            <span class="stat-num text-success">4 页</span>
+            <span class="stat-num text-success">{{ currentTask?.totalPages ? currentTask.totalPages + ' 页' : pages.length + ' 页' }}</span>
             <span class="stat-label">当前试卷总页数</span>
           </div>
           <div class="hero-stat-card">
-            <span class="stat-num text-warning">12 道</span>
-            <span class="stat-label">切片试题提取</span>
+            <span class="stat-num text-warning">{{ taskStatusLabel }}</span>
+            <span class="stat-label">任务运行状态</span>
           </div>
           <div class="hero-stat-card">
-            <span class="stat-num text-info">MinerU</span>
+            <span class="stat-num text-info">{{ selectedEngine }}</span>
             <span class="stat-label">多模态高精引擎</span>
           </div>
         </div>
@@ -28,6 +28,47 @@
     </PageHeroBanner>
 
     <div class="main-content-layout">
+      <!-- 异步任务识别状态横幅 -->
+      <transition name="el-fade-in">
+        <div v-if="currentTask && isProcessing" class="ocr-status-card processing-card">
+          <div class="status-meta">
+            <div class="status-left">
+              <el-icon class="is-loading status-icon"><Loading /></el-icon>
+              <span class="status-title">
+                {{ currentTask.status === 'PENDING' ? 'OCR 识别任务已排队，正在调度分配异步算力...' : '多模态版面切片与 LaTeX 公式深度识别处理中...' }}
+              </span>
+              <el-tag size="small" type="warning" effect="dark">{{ currentTask.status }}</el-tag>
+            </div>
+            <div class="status-right">
+              <span class="page-count-text">已完成 {{ currentTask.processedPages || 0 }} / {{ currentTask.totalPages || 3 }} 页 ({{ currentTask.progress || 0 }}%)</span>
+            </div>
+          </div>
+          <el-progress
+            :percentage="currentTask.progress || 0"
+            :stroke-width="8"
+            :indeterminate="currentTask.status === 'PENDING'"
+            color="#2563EB"
+          />
+        </div>
+        <div v-else-if="currentTask && currentTask.status === 'FAILED'" class="ocr-status-card failed-card">
+          <el-alert
+            type="error"
+            :title="'OCR 识别异常中断: ' + (currentTask.errorMsg || '底层引擎故障或超时')"
+            description="系统已捕获异常并安全记录，请检查网络或切换识别引擎后重新发起"
+            show-icon
+            :closable="false"
+          >
+            <template #default>
+              <div class="failed-action-box">
+                <el-button size="small" type="danger" @click="reRunOcr">
+                  <el-icon><Refresh /></el-icon> 重新识别
+                </el-button>
+              </div>
+            </template>
+          </el-alert>
+        </div>
+      </transition>
+
       <!-- 顶部控制条 -->
       <div class="ocr-toolbar-card">
         <div class="toolbar-left">
@@ -35,7 +76,7 @@
             <el-icon><Document /></el-icon>
             <span class="title">2026年秋季高三开学调研测试·数学试卷.pdf</span>
           </div>
-          <el-select v-model="selectedEngine" size="small" style="width: 150px;">
+          <el-select v-model="selectedEngine" size="small" style="width: 150px;" :disabled="isProcessing">
             <el-option label="MinerU (高精公式)" value="MINERU" />
             <el-option label="PaddleOCR-v4" value="PADDLE_OCR" />
             <el-option label="GPT-4o Vision" value="GPT4O_VISION" />
@@ -44,23 +85,29 @@
 
         <div class="toolbar-center">
           <el-button-group>
-            <el-button size="small" :disabled="currentPageIdx <= 0" @click="prevPage">
+            <el-button size="small" :disabled="currentPageIdx <= 0 || isProcessing" @click="prevPage">
               <el-icon><ArrowLeft /></el-icon> 上一页
             </el-button>
             <el-button size="small" disabled style="color: #0F172A; font-weight: 600;">
-              第 {{ currentPageIdx + 1 }} / {{ pages.length }} 页
+              第 {{ pages.length > 0 ? currentPageIdx + 1 : 0 }} / {{ pages.length }} 页
             </el-button>
-            <el-button size="small" :disabled="currentPageIdx >= pages.length - 1" @click="nextPage">
+            <el-button size="small" :disabled="currentPageIdx >= pages.length - 1 || isProcessing" @click="nextPage">
               下一页 <el-icon><ArrowRight /></el-icon>
             </el-button>
           </el-button-group>
         </div>
 
         <div class="toolbar-right">
-          <el-button size="small" @click="reRunOcr">
+          <el-button size="small" :disabled="isProcessing" @click="reRunOcr">
             <el-icon><Refresh /></el-icon> 重新识别本页
           </el-button>
-          <el-button size="small" type="success" class="gradient-btn" @click="confirmAndIngest">
+          <el-button
+            size="small"
+            type="success"
+            class="gradient-btn"
+            :disabled="isProcessing || currentTask?.status !== 'PROOFREADING'"
+            @click="confirmAndIngest"
+          >
             <el-icon><Check /></el-icon> 确认校对并入库
           </el-button>
         </div>
@@ -81,7 +128,11 @@
           </div>
 
           <div class="scan-image-container">
-            <div class="image-stage" :style="{ transform: `scale(${zoomScale})` }">
+            <div v-if="isProcessing" class="scan-processing-placeholder">
+              <el-icon class="is-loading" style="font-size: 36px; color: #2563EB;"><Loading /></el-icon>
+              <p class="placeholder-text">正在通过 {{ selectedEngine }} 引擎切片与提取版面坐标...</p>
+            </div>
+            <div v-else class="image-stage" :style="{ transform: `scale(${zoomScale})` }">
               <div class="mock-exam-paper">
                 <div class="paper-header-text">绝密 ★ 启用前</div>
                 <div class="paper-title-text">2026年普通高等学校招生全国统一考试冲刺卷</div>
@@ -126,14 +177,14 @@
           <div class="pane-header">
             <span class="pane-title">LaTeX 公式与 Markdown 智能结构化校对</span>
             <div class="editor-tabs">
-              <el-radio-group v-model="editorMode" size="small">
+              <el-radio-group v-model="editorMode" size="small" :disabled="isProcessing">
                 <el-radio-button label="edit">源码编辑</el-radio-button>
                 <el-radio-button label="preview">渲染预览</el-radio-button>
               </el-radio-group>
             </div>
           </div>
 
-          <div class="quick-symbols-bar" v-if="editorMode === 'edit'">
+          <div class="quick-symbols-bar" v-if="editorMode === 'edit' && !isProcessing">
             <el-button size="small" text @click="insertFormula('$\\int_{a}^{b} f(x)dx$')">积分公式</el-button>
             <el-button size="small" text @click="insertFormula('$\\lim_{x \\to 0} \\frac{\\sin x}{x}$')">极限公式</el-button>
             <el-button size="small" text @click="insertFormula('$\\sqrt{x^2 + y^2}$')">根号</el-button>
@@ -142,8 +193,12 @@
           </div>
 
           <div class="editor-body">
+            <div v-if="isProcessing" class="editor-processing-placeholder">
+              <el-skeleton :rows="10" animated />
+              <p class="placeholder-text">后台异步识别中，完成后将在此处呈现结构化公式与题解文本...</p>
+            </div>
             <el-input
-              v-if="editorMode === 'edit'"
+              v-else-if="editorMode === 'edit'"
               v-model="currentProofreadText"
               type="textarea"
               :rows="22"
@@ -165,7 +220,15 @@
               <span>LaTeX 公式数：8 处</span>
             </div>
             <div class="footer-actions">
-              <el-button size="small" type="primary" plain @click="saveProofreadDraft">保存当前页草稿</el-button>
+              <el-button
+                size="small"
+                type="primary"
+                plain
+                :disabled="isProcessing || currentTask?.status !== 'PROOFREADING'"
+                @click="saveProofreadDraft"
+              >
+                保存当前页草稿
+              </el-button>
             </div>
           </div>
         </div>
@@ -175,18 +238,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { Document, ArrowLeft, ArrowRight, Refresh, Check } from '@element-plus/icons-vue';
+import { Document, ArrowLeft, ArrowRight, Refresh, Check, Loading } from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
 import MathText from '@/components/common/MathText.vue';
 import {
   createOcrTask,
+  getOcrTaskStatus,
   getOcrTaskPages,
   updateOcrPageText,
   confirmOcrTask
 } from '@/api/knowledge/ocr';
+import type { OcrTaskVO } from '@/types/knowledge/ocr';
 
 interface WorkspacePage {
   id?: number;
@@ -199,11 +264,13 @@ interface WorkspacePage {
 
 const route = useRoute();
 const loading = ref(false);
+const polling = ref(false);
 const selectedEngine = ref<'MINERU' | 'PADDLE_OCR' | 'GPT4O_VISION'>('MINERU');
 const currentPageIdx = ref(0);
 const zoomScale = ref(1.0);
 const editorMode = ref<'edit' | 'preview'>('edit');
 const currentTaskId = ref<number | null>(null);
+const currentTask = ref<OcrTaskVO | null>(null);
 
 const pages = ref<WorkspacePage[]>([
   {
@@ -240,6 +307,28 @@ D. $\\frac{\\sqrt{2}}{2}$`
 
 const currentProofreadText = ref(pages.value[0].rawText);
 
+const isProcessing = computed(() => {
+  return polling.value || currentTask.value?.status === 'PENDING' || currentTask.value?.status === 'PROCESSING';
+});
+
+const taskStatusLabel = computed(() => {
+  if (!currentTask.value) return '就绪';
+  switch (currentTask.value.status) {
+    case 'PENDING':
+      return '队列排队中';
+    case 'PROCESSING':
+      return '识别分析中';
+    case 'PROOFREADING':
+      return '待人工校对';
+    case 'COMPLETED':
+      return '已确认入库';
+    case 'FAILED':
+      return '识别失败';
+    default:
+      return currentTask.value.status;
+  }
+});
+
 const prevPage = () => {
   if (currentPageIdx.value > 0) {
     currentPageIdx.value--;
@@ -251,6 +340,36 @@ const nextPage = () => {
   if (currentPageIdx.value < pages.value.length - 1) {
     currentPageIdx.value++;
     currentProofreadText.value = pages.value[currentPageIdx.value].proofreadText || pages.value[currentPageIdx.value].rawText;
+  }
+};
+
+const pollTaskUntilProofreading = async (taskId: number): Promise<boolean> => {
+  const maxAttempts = 30;
+  let attempts = 0;
+  polling.value = true;
+  try {
+    while (attempts < maxAttempts) {
+      attempts++;
+      const res = await getOcrTaskStatus(taskId);
+      if (res?.data) {
+        currentTask.value = res.data;
+        if (res.data.status === 'PROOFREADING' || res.data.status === 'COMPLETED') {
+          return true;
+        }
+        if (res.data.status === 'FAILED') {
+          ElMessage.error(res.data.errorMsg || 'OCR 任务识别失败');
+          return false;
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    ElMessage.warning('OCR 任务识别耗时较长，请稍后刷新查看');
+    return false;
+  } catch (err: any) {
+    ElMessage.error(err?.message || '轮询任务状态失败');
+    return false;
+  } finally {
+    polling.value = false;
   }
 };
 
@@ -281,7 +400,26 @@ const loadTaskPages = async (taskId: number) => {
 const initializeWorkspace = async () => {
   const queryTaskId = Number(route.query.taskId);
   if (queryTaskId) {
-    await loadTaskPages(queryTaskId);
+    try {
+      loading.value = true;
+      const statusRes = await getOcrTaskStatus(queryTaskId);
+      if (statusRes?.data) {
+        currentTask.value = statusRes.data;
+        currentTaskId.value = queryTaskId;
+        if (statusRes.data.status === 'PROOFREADING' || statusRes.data.status === 'COMPLETED') {
+          await loadTaskPages(queryTaskId);
+        } else if (statusRes.data.status === 'PENDING' || statusRes.data.status === 'PROCESSING') {
+          const success = await pollTaskUntilProofreading(queryTaskId);
+          if (success) {
+            await loadTaskPages(queryTaskId);
+          }
+        }
+      }
+    } catch (e: any) {
+      ElMessage.error(e?.message || '加载任务状态失败');
+    } finally {
+      loading.value = false;
+    }
     return;
   }
 
@@ -294,7 +432,14 @@ const initializeWorkspace = async () => {
       engine: selectedEngine.value
     });
     if (createRes?.data?.id) {
-      await loadTaskPages(createRes.data.id);
+      const taskId = createRes.data.id;
+      currentTaskId.value = taskId;
+      currentTask.value = createRes.data;
+      const success = await pollTaskUntilProofreading(taskId);
+      if (success) {
+        await loadTaskPages(taskId);
+        ElMessage.success('OCR 识别完成，已就绪可开始人工校对');
+      }
     }
   } catch (err: any) {
     // 若暂无可用文档，保留默认展示模板
@@ -313,8 +458,15 @@ const reRunOcr = async () => {
       engine: selectedEngine.value
     });
     if (createRes?.data?.id) {
-      await loadTaskPages(createRes.data.id);
-      ElMessage.success(`已切换 [${selectedEngine.value}] 引擎并重新生成版面切片与公式识别数据`);
+      const taskId = createRes.data.id;
+      currentTaskId.value = taskId;
+      currentTask.value = createRes.data;
+      ElMessage.info(`已派发 [${selectedEngine.value}] 引擎识别任务，进入队列处理...`);
+      const success = await pollTaskUntilProofreading(taskId);
+      if (success) {
+        await loadTaskPages(taskId);
+        ElMessage.success(`[${selectedEngine.value}] 引擎识别完成，已更新切片版面与公式数据`);
+      }
     }
   } catch (err: any) {
     ElMessage.error(err?.message || '重新识别调度失败');
@@ -351,6 +503,9 @@ const confirmAndIngest = async () => {
   try {
     loading.value = true;
     await confirmOcrTask(currentTaskId.value);
+    if (currentTask.value) {
+      currentTask.value.status = 'COMPLETED';
+    }
     ElMessage.success('已确认整份试卷校对，成功写入知识库文档并触发切片索引！');
   } catch (e: any) {
     ElMessage.error(e?.message || '确认校对入库失败');
@@ -408,6 +563,60 @@ onMounted(() => {
     gap: 20px;
   }
 
+  .ocr-status-card {
+    background: #FFFFFF;
+    border-radius: 14px;
+    padding: 16px 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+
+    &.processing-card {
+      border: 1px solid #BFDBFE;
+      background: linear-gradient(180deg, #EFF6FF 0%, #FFFFFF 100%);
+
+      .status-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+
+        .status-left {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+
+          .status-icon {
+            font-size: 18px;
+            color: #2563EB;
+          }
+
+          .status-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1E293B;
+          }
+        }
+
+        .status-right {
+          .page-count-text {
+            font-size: 13px;
+            font-weight: 600;
+            color: #2563EB;
+          }
+        }
+      }
+    }
+
+    &.failed-card {
+      border: 1px solid #FECACA;
+      padding: 0;
+      background: transparent;
+
+      .failed-action-box {
+        margin-top: 8px;
+      }
+    }
+  }
+
   .ocr-toolbar-card {
     background: #FFFFFF;
     border-radius: 14px;
@@ -416,7 +625,6 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
-    margin-bottom: 20px;
 
     .toolbar-left {
       display: flex;
@@ -505,6 +713,21 @@ onMounted(() => {
         padding: 24px;
         display: flex;
         justify-content: center;
+        align-items: center;
+
+        .scan-processing-placeholder {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 16px;
+          color: #64748B;
+
+          .placeholder-text {
+            font-size: 14px;
+            color: #475569;
+          }
+        }
 
         .image-stage {
           transform-origin: top center;
@@ -595,6 +818,19 @@ onMounted(() => {
       .editor-body {
         flex: 1;
         overflow-y: auto;
+
+        .editor-processing-placeholder {
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+
+          .placeholder-text {
+            font-size: 13px;
+            color: #94A3B8;
+            text-align: center;
+          }
+        }
 
         .proofread-textarea {
           :deep(.el-textarea__inner) {

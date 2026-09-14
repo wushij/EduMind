@@ -15,6 +15,7 @@ public class PromptTemplateVersionEntity {
     private Long templateId;
     private Integer version;
     private String content;
+    private String systemPrompt;
     private String variables;
     private Long publishedBy;
     private LocalDateTime createTime;

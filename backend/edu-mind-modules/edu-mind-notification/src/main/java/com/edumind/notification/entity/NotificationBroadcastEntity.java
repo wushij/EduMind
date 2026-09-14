@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 public class NotificationBroadcastEntity implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private String title;
     private String content;
     private String targetType;

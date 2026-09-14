@@ -91,6 +91,22 @@ public class NotificationDao {
         );
     }
 
+    public List<Long> findUnreadBroadcastRefIdsByUserId(Long userId) {
+        if (userId == null) {
+            return java.util.Collections.emptyList();
+        }
+        return notificationMapper.selectList(
+                new LambdaQueryWrapper<NotificationEntity>()
+                        .eq(NotificationEntity::getUserId, userId)
+                        .eq(NotificationEntity::getType, "BROADCAST")
+                        .eq(NotificationEntity::getIsRead, 0)
+                        .isNotNull(NotificationEntity::getRefId)
+                        .select(NotificationEntity::getRefId)
+        ).stream()
+                .map(NotificationEntity::getRefId)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     public int deleteById(Long id, Long userId) {
         return notificationMapper.delete(
                 new LambdaQueryWrapper<NotificationEntity>()
@@ -121,6 +137,17 @@ public class NotificationDao {
         return notificationMapper.delete(
                 new LambdaQueryWrapper<NotificationEntity>()
                         .eq(NotificationEntity::getType, type)
+        );
+    }
+
+    public int deleteAllByTypeAndTenantId(String type, Long tenantId) {
+        if (!StringUtils.hasText(type) || tenantId == null) {
+            return 0;
+        }
+        return notificationMapper.delete(
+                new LambdaQueryWrapper<NotificationEntity>()
+                        .eq(NotificationEntity::getType, type)
+                        .eq(NotificationEntity::getTenantId, tenantId)
         );
     }
 

@@ -5,6 +5,7 @@ import com.edumind.ai.dto.ConversationCreateDTO;
 import com.edumind.ai.dto.ConversationRenameDTO;
 import com.edumind.ai.service.conversation.ConversationService;
 import com.edumind.ai.vo.ConversationVO;
+import com.edumind.ai.vo.MessageDeleteResultVO;
 import com.edumind.ai.vo.MessageVO;
 import com.edumind.common.api.ApiResult;
 import jakarta.validation.Valid;
@@ -59,5 +60,13 @@ public class ConversationController {
     @PostMapping("/{id}/generate-title")
     public ApiResult<String> generateTitle(@PathVariable("id") String id) {
         return ApiResult.success(conversationService.generateTitle(id));
+    }
+
+    @SaCheckPermission("ai:chat")
+    @DeleteMapping("/messages/{messageId}")
+    public ApiResult<MessageDeleteResultVO> deleteMessage(@PathVariable("messageId") String messageId) {
+        MessageDeleteResultVO result = new MessageDeleteResultVO();
+        result.setDeletedIds(conversationService.deleteMessageWithPair(messageId));
+        return ApiResult.success(result);
     }
 }

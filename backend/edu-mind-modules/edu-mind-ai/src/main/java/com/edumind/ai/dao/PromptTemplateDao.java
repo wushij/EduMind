@@ -27,8 +27,8 @@ public class PromptTemplateDao {
 
     public List<PromptTemplateEntity> list(String category, String status, String keyword) {
         LambdaQueryWrapper<PromptTemplateEntity> wrapper = new LambdaQueryWrapper<>();
-        if (StringUtils.hasText(category)) {
-            wrapper.eq(PromptTemplateEntity::getCategory, category);
+        if (StringUtils.hasText(category) && !"ALL".equalsIgnoreCase(category.trim())) {
+            wrapper.eq(PromptTemplateEntity::getCategory, category.trim());
         }
         if (StringUtils.hasText(status)) {
             wrapper.eq(PromptTemplateEntity::getStatus, status);

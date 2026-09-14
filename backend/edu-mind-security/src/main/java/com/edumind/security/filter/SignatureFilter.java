@@ -34,7 +34,7 @@ public class SignatureFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String uri = request.getRequestURI();
         boolean smRequired = (securityProperties.isSmEnabled() || dynamicSecurityConfigService.isSm3SignEnabled()) && isSensitivePath(uri);
-        String signatureHeader = request.getHeader("X-Signature");
+        String signatureHeader = SecurityRequestSupport.resolveValue(request, "X-Signature");
 
         if (!smRequired && signatureHeader == null) {
             filterChain.doFilter(request, response);
@@ -55,8 +55,8 @@ public class SignatureFilter extends OncePerRequestFilter {
             return;
         }
 
-        String timestampHeader = request.getHeader("X-Timestamp");
-        String nonceHeader = request.getHeader("X-Nonce");
+        String timestampHeader = SecurityRequestSupport.resolveValue(request, "X-Timestamp");
+        String nonceHeader = SecurityRequestSupport.resolveValue(request, "X-Nonce");
         if (timestampHeader == null || nonceHeader == null) {
             ApiResponseWriter.write(response, ResultCode.VALIDATE_FAILED, "签名校验失败：缺少 X-Timestamp 或 X-Nonce");
             return;

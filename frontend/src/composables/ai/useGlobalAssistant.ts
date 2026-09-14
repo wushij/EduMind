@@ -6,8 +6,14 @@ import { API_BASE_URL } from '@/config';
 import { askGlobalAssistant } from '@/api/ai/assistant';
 import {
   getMessages,
-  deleteConversation
+  deleteConversation,
+  deleteMessage
 } from '@/api/ai/chat';
+import {
+  collectPairedMessageIds,
+  isPersistedMessageId,
+  removeMessagesByIds
+} from '@/utils/ai/chat-message-pair';
 import { storage } from '@/core/storage/local';
 import { splitCopilotStream, cleanReasoningText } from '@/utils/ai/copilot-stream-split';
 import { useStreamingMarkdown } from '@/composables/ai/useStreamingMarkdown';
@@ -655,6 +661,7 @@ export function useGlobalAssistant() {
 
     resetStreamingState();
     saveCurrentSessionToHistory();
+    window.dispatchEvent(new CustomEvent('edumind:ai-usage-changed'));
     nextTick(() => bindMarkdownCodeCopy(messagesScrollRef.value));
   }
 
@@ -843,19 +850,46 @@ export function useGlobalAssistant() {
     handleSubmit({ isRegenerate: true });
   }
 
-  function confirmDeleteMessage(targetIdx: number) {
-    ElMessageBox.confirm('确定要删除本轮问答记录吗？删除后将不可恢复。', '删除对话确认', {
-      confirmButtonText: '确定删除',
-      cancelButtonText: '取消',
-      type: 'warning',
-      lockScroll: false
-    })
-      .then(() => {
-        messages.value.splice(targetIdx, 1);
+  async function confirmDeleteMessage(targetIdx: number) {
+    try {
+      await ElMessageBox.confirm(
+        '将删除本条及其对应的一问一答，删除后无法恢复。确定继续吗？',
+        '删除对话确认',
+        {
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          type: 'warning',
+          lockScroll: false
+        }
+      );
+    } catch {
+      return;
+    }
+
+    const idsToDelete = collectPairedMessageIds(messages.value, targetIdx);
+    if (!idsToDelete.length) return;
+
+    const persistedId = idsToDelete.find((id) => isPersistedMessageId(id));
+    try {
+      let deletedIds = idsToDelete;
+      if (persistedId) {
+        const res = await deleteMessage(persistedId);
+        if (res?.data?.deletedIds?.length) {
+          deletedIds = res.data.deletedIds;
+        }
+      }
+      messages.value = removeMessagesByIds(messages.value, deletedIds);
+      saveCurrentSessionToHistory();
+      ElMessage.success('已删除本轮对话记录');
+    } catch {
+      if (!persistedId) {
+        messages.value = removeMessagesByIds(messages.value, idsToDelete);
         saveCurrentSessionToHistory();
         ElMessage.success('已删除本轮对话记录');
-      })
-      .catch(() => {});
+        return;
+      }
+      ElMessage.error('删除失败，请稍后重试');
+    }
   }
 
   async function copyMessage(content: string) {

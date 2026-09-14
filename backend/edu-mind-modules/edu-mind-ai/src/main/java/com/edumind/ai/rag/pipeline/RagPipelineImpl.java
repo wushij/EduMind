@@ -5,6 +5,7 @@ import com.edumind.ai.rag.context.ContextBuilder;
 import com.edumind.ai.rag.model.RagResult;
 import com.edumind.ai.rag.model.RetrievalHit;
 import com.edumind.ai.rag.query.QueryRewriter;
+import com.edumind.ai.rag.query.QueryRewriteContext;
 import com.edumind.ai.rag.rerank.ScoreReranker;
 import com.edumind.ai.rag.retrieval.RagRetrieverImpl;
 import com.edumind.ai.service.prompt.PromptService;
@@ -33,7 +34,13 @@ public class RagPipelineImpl implements RagPipeline {
 
     public RagResult executeDetailed(String query, Long knowledgeBaseId, int topK, double minScore,
                                      Long documentId, boolean skipLlm) {
-        String rewritten = queryRewriter.rewrite(query);
+        return executeDetailed(query, knowledgeBaseId, topK, minScore, documentId, skipLlm,
+                QueryRewriteContext.ofQuestion(query));
+    }
+
+    public RagResult executeDetailed(String query, Long knowledgeBaseId, int topK, double minScore,
+                                     Long documentId, boolean skipLlm, QueryRewriteContext rewriteContext) {
+        String rewritten = queryRewriter.rewrite(rewriteContext);
         List<RetrievalHit> hits = ragRetriever.retrieveWithRewrittenQuery(
                 rewritten, knowledgeBaseId, topK, minScore, documentId);
         List<RetrievalHit> ranked = scoreReranker.rerank(hits, topK, minScore);

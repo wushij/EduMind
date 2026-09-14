@@ -165,7 +165,11 @@
           </div>
 
           <!-- 消息流展示滚动区 -->
-          <div ref="messagesScrollRef" class="messages-flow-scroll">
+          <div
+            ref="messagesScrollRef"
+            class="messages-flow-scroll"
+            @scroll="handleViewportScroll"
+          >
             <!-- 章节锚定上下文小浮条 -->
             <div v-if="activeSectionTitle" class="context-anchor-chip">
               <el-icon class="pin-icon"><Connection /></el-icon>
@@ -220,6 +224,23 @@
             <!-- 不可见物理锚点，用于 requestAnimationFrame 顺畅跟随贴底向上滚动 -->
             <div ref="streamAnchorRef" class="stream-bottom-anchor" />
           </div>
+
+          <transition name="fade">
+            <button
+              v-if="showScrollToBottom"
+              class="scroll-bottom-btn"
+              type="button"
+              aria-label="回到底部"
+              title="查看最新回复"
+              @click="scrollToBottomSmooth"
+            >
+              <svg class="scroll-bottom-svg" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" class="scroll-bottom-svg__bg" />
+                <path d="M12 7.5v6.5" class="scroll-bottom-svg__shaft" />
+                <path d="M8.8 11.8 12 15 15.2 11.8" class="scroll-bottom-svg__head" />
+              </svg>
+            </button>
+          </transition>
 
           <!-- 底部多功能自适应输入框组件 -->
           <ChatInput
@@ -548,7 +569,9 @@ const {
   handleRegenerate: regenerateStreamMessage,
   confirmDeleteMessage,
   scrollToBottomSmooth,
-  scrollToBottomInstant
+  scrollToBottomInstant,
+  showScrollToBottom,
+  handleViewportScroll
 } = useAIStream();
 
 const welcomeMessage = computed(() => ({
@@ -1031,6 +1054,7 @@ watch(
       min-height: 0;
 
       .chat-workbench-card {
+        position: relative;
         display: flex;
         flex-direction: column;
         flex: 1;
@@ -1265,6 +1289,55 @@ watch(
 
         :deep(.chat-input-dock) {
           flex-shrink: 0;
+        }
+
+        .scroll-bottom-btn {
+          position: absolute;
+          bottom: 88px;
+          right: 20px;
+          z-index: 20;
+          width: 34px;
+          height: 34px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(255, 255, 255, 0.96);
+          border: 1px solid rgba(22, 119, 255, 0.35);
+          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+          &:hover {
+            transform: translateY(-2px);
+            background: #1677ff;
+            box-shadow: 0 6px 18px rgba(22, 119, 255, 0.35);
+
+            .scroll-bottom-svg__bg {
+              fill: #1677ff;
+            }
+
+            .scroll-bottom-svg__shaft,
+            .scroll-bottom-svg__head {
+              stroke: #ffffff;
+            }
+          }
+
+          .scroll-bottom-svg {
+            width: 20px;
+            height: 20px;
+
+            &__bg {
+              fill: #ffffff;
+            }
+
+            &__shaft,
+            &__head {
+              stroke: #1677ff;
+              stroke-width: 2.2;
+              fill: none;
+            }
+          }
         }
       }
     }

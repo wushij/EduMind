@@ -33,6 +33,7 @@ export interface PromptTestRequest {
   variables: Record<string, string>;
   model: string;
   temperature: number;
+  maxTokens?: number;
 }
 
 export interface PromptTestResponse {

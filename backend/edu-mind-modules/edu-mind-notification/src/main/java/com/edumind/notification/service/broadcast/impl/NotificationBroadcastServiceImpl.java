@@ -1,6 +1,8 @@
 package com.edumind.notification.service.broadcast.impl;
 
 import com.edumind.common.api.PageResult;
+import com.edumind.common.api.ResultCode;
+import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.notification.converter.broadcast.NotificationBroadcastConverter;
 import com.edumind.notification.dao.NotificationBroadcastDao;
@@ -36,7 +38,8 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
 
     @Override
     public BroadcastEstimateVO estimateAudience(String targetType, String targetPayload) {
-        long count = resolveAudienceCount(targetType, targetPayload);
+        Long tenantId = TenantContext.requireTenantId();
+        long count = resolveAudienceCount(tenantId, targetType, targetPayload);
         BroadcastEstimateVO vo = new BroadcastEstimateVO();
         vo.setEstimatedCount(count);
         vo.setTargetType(targetType);
@@ -47,6 +50,7 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
     @Override
     @Transactional(rollbackFor = Exception.class)
     public NotificationBroadcastVO createBroadcast(BroadcastCreateDTO dto, Long senderId, String senderName) {
+        Long tenantId = TenantContext.requireTenantId();
         String title = dto.getTitle() != null ? dto.getTitle().trim() : "";
         String content = dto.getContent() != null ? dto.getContent().trim() : "";
         if (!StringUtils.hasText(title) || !StringUtils.hasText(content)) {
@@ -56,12 +60,13 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
         String targetPayload = normalizeTargetPayload(targetType, dto.getTargetPayload());
         int priority = dto.getPriority() != null ? dto.getPriority() : 0;
 
-        List<Long> userIds = resolveAudienceUserIds(targetType, targetPayload);
+        List<Long> userIds = resolveAudienceUserIds(tenantId, targetType, targetPayload);
         if (userIds.isEmpty()) {
             throw new BusinessException("当前受众条件下无目标用户");
         }
 
         NotificationBroadcastEntity broadcast = new NotificationBroadcastEntity();
+        broadcast.setTenantId(tenantId);
         broadcast.setTitle(title);
         broadcast.setContent(content);
         broadcast.setTargetType(targetType);
@@ -74,7 +79,7 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
         broadcast.setReadCount(0);
         broadcastDao.insert(broadcast);
 
-        broadcastDispatcher.dispatch(broadcast.getId(), userIds, title, content, priority);
+        broadcastDispatcher.dispatch(tenantId, broadcast.getId(), userIds, title, content, priority);
 
         return NotificationBroadcastConverter.toVO(broadcast);
     }
@@ -96,6 +101,10 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
         if (entity == null) {
             throw new BusinessException("广播记录不存在");
         }
+        Long currentTenantId = TenantContext.getTenantId();
+        if (currentTenantId != null && entity.getTenantId() != null && !currentTenantId.equals(entity.getTenantId())) {
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权访问其他租户广播记录");
+        }
         return NotificationBroadcastConverter.toVO(entity);
     }
 
@@ -114,17 +123,24 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteById(Long id) {
-        if (broadcastDao.deleteById(id) == 0) {
+        NotificationBroadcastEntity entity = broadcastDao.findById(id);
+        if (entity == null) {
             throw new BusinessException("广播记录不存在");
         }
+        Long currentTenantId = TenantContext.getTenantId();
+        if (currentTenantId != null && entity.getTenantId() != null && !currentTenantId.equals(entity.getTenantId())) {
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权删除其他租户广播记录");
+        }
+        broadcastDao.deleteById(id);
         notificationDao.deleteByRefId(id);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void clearAll() {
-        broadcastDao.deleteAll();
-        notificationDao.deleteAllByType("BROADCAST");
+        Long currentTenantId = TenantContext.requireTenantId();
+        broadcastDao.deleteAllByTenantId(currentTenantId);
+        notificationDao.deleteAllByTypeAndTenantId("BROADCAST", currentTenantId);
     }
 
     private String normalizeTargetType(String targetType) {
@@ -148,24 +164,24 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
         return role;
     }
 
-    private List<Long> resolveAudienceUserIds(String targetType, String targetPayload) {
+    private List<Long> resolveAudienceUserIds(Long tenantId, String targetType, String targetPayload) {
         if ("all".equals(targetType)) {
-            return new ArrayList<>(userQueryApi.listAllActiveUserIds());
+            return new ArrayList<>(userQueryApi.listActiveUserIdsByTenantId(tenantId));
         }
         if ("role".equals(targetType)) {
-            return new ArrayList<>(userQueryApi.listUserIdsByRoleCode(targetPayload));
+            return new ArrayList<>(userQueryApi.listUserIdsByTenantAndRole(tenantId, targetPayload));
         }
         throw new BusinessException("不支持的推送对象类型");
     }
 
-    private long resolveAudienceCount(String targetType, String targetPayload) {
+    private long resolveAudienceCount(Long tenantId, String targetType, String targetPayload) {
         String normalized = normalizeTargetType(targetType);
         if ("all".equals(normalized)) {
-            return userQueryApi.countActiveUsers();
+            return userQueryApi.countActiveUsersByTenantId(tenantId);
         }
         if ("role".equals(normalized)) {
             String role = normalizeTargetPayload("role", targetPayload);
-            return userQueryApi.countUsersByRoleCode(role);
+            return userQueryApi.countUsersByTenantAndRole(tenantId, role);
         }
         return 0;
     }
@@ -173,7 +189,7 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
     private String buildAudienceDesc(String targetType, String targetPayload, long count) {
         String normalized = normalizeTargetType(targetType);
         if ("all".equals(normalized)) {
-            return String.format("预计触达全体用户 %d 人", count);
+            return String.format("本校预计触达全体成员 %d 人", count);
         }
         if ("role".equals(normalized)) {
             String role = targetPayload != null ? targetPayload.toUpperCase(Locale.ROOT) : "";
@@ -183,8 +199,9 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
                 case "STUDENT" -> "学生";
                 default -> role;
             };
-            return String.format("预计触达【%s】 %d 人", roleName, count);
+            return String.format("本校预计触达【%s】 %d 人", roleName, count);
         }
-        return "预计触达 0 人";
+        return "本校预计触达 0 人";
     }
 }
+

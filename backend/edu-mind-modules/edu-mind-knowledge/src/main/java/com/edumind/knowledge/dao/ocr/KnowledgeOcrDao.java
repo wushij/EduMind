@@ -21,6 +21,19 @@ public class KnowledgeOcrDao {
         return taskMapper.selectById(id);
     }
 
+    /**
+     * 按 ID 加载任务（忽略租户 SQL 拦截），仅用于 IDOR 归属校验。
+     * 禁止在普通列表/分页查询中使用。
+     */
+    public KnowledgeOcrTaskEntity findTaskByIdIgnoreTenant(Long id) {
+        if (id == null) {
+            return null;
+        }
+        final KnowledgeOcrTaskEntity[] holder = new KnowledgeOcrTaskEntity[1];
+        com.edumind.common.context.TenantContext.runWithoutTenant(() -> holder[0] = taskMapper.selectById(id));
+        return holder[0];
+    }
+
     public List<KnowledgeOcrTaskEntity> listTasksByDocument(Long tenantId, Long documentId) {
         return taskMapper.selectList(new LambdaQueryWrapper<KnowledgeOcrTaskEntity>()
                 .eq(KnowledgeOcrTaskEntity::getTenantId, tenantId)

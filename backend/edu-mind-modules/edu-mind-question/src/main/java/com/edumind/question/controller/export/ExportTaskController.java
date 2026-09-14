@@ -1,10 +1,12 @@
 package com.edumind.question.controller.export;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.edumind.common.api.ApiResult;
 import com.edumind.question.dto.export.PaperExportRequestDTO;
 import com.edumind.question.service.export.ExportTaskService;
 import com.edumind.question.vo.export.ExportTaskVO;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -23,6 +26,7 @@ import java.util.List;
 @RequestMapping("/api/question/exports")
 @RequiredArgsConstructor
 @SaCheckLogin
+@SaCheckPermission("exam:export")
 public class ExportTaskController {
 
     private final ExportTaskService exportTaskService;
@@ -40,5 +44,12 @@ public class ExportTaskController {
     @GetMapping("/my")
     public ApiResult<List<ExportTaskVO>> listMyExportTasks() {
         return ApiResult.success(exportTaskService.listMyExportTasks());
+    }
+
+    @GetMapping("/{taskId}/download")
+    public void download(@PathVariable("taskId") Long taskId,
+                         @RequestParam("token") String token,
+                         HttpServletResponse response) {
+        exportTaskService.download(taskId, token, response);
     }
 }

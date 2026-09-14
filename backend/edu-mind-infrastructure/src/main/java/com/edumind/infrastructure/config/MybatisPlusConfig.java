@@ -39,7 +39,9 @@ public class MybatisPlusConfig {
             "knowledge_base",
             "ai_conversation",
             "ai_call_log",
-            "edu_question"
+            "edu_question",
+            "sys_notification",
+            "sys_notification_broadcast"
     );
 
     @Bean

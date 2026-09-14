@@ -1,5 +1,6 @@
 package com.edumind.notification.service.broadcast;
 
+import com.edumind.common.context.TenantContext;
 import com.edumind.notification.converter.notification.NotificationConverter;
 import com.edumind.notification.dao.NotificationDao;
 import com.edumind.notification.entity.NotificationEntity;
@@ -23,28 +24,38 @@ public class NotificationBroadcastDispatcher {
     private final UserPreferenceQueryApi userPreferenceQueryApi;
 
     @Async
-    public void dispatch(Long broadcastId, List<Long> userIds, String title, String content, int priority) {
-        final int batchSize = 200;
-        for (int i = 0; i < userIds.size(); i += batchSize) {
-            int end = Math.min(i + batchSize, userIds.size());
-            List<Long> chunk = userIds.subList(i, end);
-            for (Long userId : chunk) {
-                if (!userPreferenceQueryApi.isNotificationEnabled(userId)) {
-                    continue;
+    public void dispatch(Long tenantId, Long broadcastId, List<Long> userIds, String title, String content, int priority) {
+        if (tenantId != null) {
+            TenantContext.setTenantId(tenantId);
+        }
+        try {
+            final int batchSize = 200;
+            for (int i = 0; i < userIds.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, userIds.size());
+                List<Long> chunk = userIds.subList(i, end);
+                for (Long userId : chunk) {
+                    if (!userPreferenceQueryApi.isNotificationEnabled(userId)) {
+                        continue;
+                    }
+                    NotificationEntity entity = new NotificationEntity();
+                    entity.setTenantId(tenantId);
+                    entity.setUserId(userId);
+                    entity.setTitle(title);
+                    entity.setContent(content);
+                    entity.setType("BROADCAST");
+                    entity.setRefId(broadcastId);
+                    entity.setPriority(priority);
+                    entity.setIsRead(0);
+                    notificationDao.insert(entity);
+                    NotificationVO vo = NotificationConverter.toVO(entity);
+                    notificationPushService.pushToUser(userId, vo);
                 }
-                NotificationEntity entity = new NotificationEntity();
-                entity.setUserId(userId);
-                entity.setTitle(title);
-                entity.setContent(content);
-                entity.setType("BROADCAST");
-                entity.setRefId(broadcastId);
-                entity.setPriority(priority);
-                entity.setIsRead(0);
-                notificationDao.insert(entity);
-                NotificationVO vo = NotificationConverter.toVO(entity);
-                notificationPushService.pushToUser(userId, vo);
+            }
+            log.info("Broadcast dispatched: tenantId={}, broadcastId={}, recipients={}", tenantId, broadcastId, userIds.size());
+        } finally {
+            if (tenantId != null) {
+                TenantContext.clear();
             }
         }
-        log.info("Broadcast dispatched: broadcastId={}, recipients={}", broadcastId, userIds.size());
     }
 }

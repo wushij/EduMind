@@ -8,4 +8,8 @@ import java.util.Map;
 public class PromptTestDTO {
     private Map<String, String> variables;
     private String modelKey;
+    private String systemPrompt;
+    private String userPromptTemplate;
+    private Double temperature;
+    private Integer maxTokens;
 }

@@ -28,6 +28,16 @@ sql/
 │   ├── V2_0_5__notification_broadcast_permissions.sql # V2.0.5 广播推送权限种子
 │   ├── V2_0_6__system_and_ai_compute_permissions.sql  # V2.0.6 系统管理/AI智算权限种子
 │   ├── V2_0_7__memory_retention.sql            # V2.0.7 长期记忆留存周期 + 记忆权限
+│   ├── V2_0_8__ai_model_max_tokens_8192.sql   # V2.0.8 Chat 模型默认 max_tokens 提升至 8192
+│   ├── V2_0_9__course_rag_prompt_templates.sql # V2.0.9 Prompt 表扩展 + 课程 RAG 提示词资产
+│   ├── V2_0_10__notification_tenant.sql        # V2.0.10 通知广播多租户隔离与权限增强 (Gate I5)
+│   ├── V2_0_11__ai_call_log_conversation_id.sql # V2.0.11 ai_call_log 增加 conversation_id
+│   ├── V2_0_12__knowledge_ocr_permissions.sql  # V2.0.12 知识库 OCR 识别与校对使用权限 (Gate I6)
+│   ├── V2_0_13__chat_rag_prompt_and_tokens.sql # V2.0.13 课程轻量版 RAG Prompt 与 8000 Token 上限
+│   ├── V2_0_14__exam_rag_prompt_template.sql   # V2.0.14 智能命题（RAG）通用核心提示词模板 (EXAM_RAG_GENERAL)
+│   ├── V2_0_15__grading_rag_prompt_template.sql # V2.0.15 智能批改（RAG）通用核心提示词模板 (GRADING_RAG_GENERAL)
+│   ├── V2_0_16__lesson_prep_rag_prompt_template.sql # V2.0.16 教案备课（RAG）通用核心提示词模板 (LESSON_PREP_RAG_GENERAL)
+│   ├── V2_0_17__export_task_async.sql          # V2.0.17 试卷排版导出异步化与下载鉴权 (Gate I7)
 │   ├── R__gate_f_e2e_seed.sql                  # Gate F 隔离测试种子（teacher2 + course104）
 │   ├── R__gate_g_e2e_seed.sql                  # Gate G E2E 种子（掌握度/图谱/错题，幂等）
 │   ├── R__gate_h_e2e_seed.sql                  # Gate H E2E 种子（course_statistics/ai_call_log，幂等）
@@ -57,7 +67,7 @@ mysql -u root -p < sql/init.sql
 
 > 已有业务数据的库 **禁止** 执行 `init.sql`；补表、改结构、版本升级请走 `sql/migration/V*.sql`（执行前 `mysqldump` 备份）。
 
-`init.sql` 已包含 **V0.1 ~ V2.0.7** 与 **V1.2.x** 的最终表结构与演示种子（含 `chat_rag` 思考链 Prompt v2），**全新空库跑 init 后无需再跑 migration**（Gate E2E 可选种子除外）。
+`init.sql` 已包含 **V0.1 ~ V2.0.12** 与 **V1.2.x** 的全部 `V*.sql` 迁移最终状态（含课程 RAG 提示词、通知多租户、OCR 权限等），**全新空库跑 init 后无需再跑 migration**（Gate E2E 可选种子除外）。
 
 ### 方式二：按版本增量迁移（已有空库分步升级）
 
@@ -82,8 +92,17 @@ mysql -u root -p < sql/init.sql
 16. V2_0_5__notification_broadcast_permissions.sql
 17. V2_0_6__system_and_ai_compute_permissions.sql
 18. V2_0_7__memory_retention.sql
-19. R__seed_data.sql          # 可选，补充演示种子数据
-20. R__seed_tenant_roles.sql  # 旧库升级：租户/院系管理员角色与组织权限
+19. V2_0_8__ai_model_max_tokens_8192.sql
+20. V2_0_9__course_rag_prompt_templates.sql
+21. V2_0_10__notification_tenant.sql
+22. V2_0_11__ai_call_log_conversation_id.sql
+23. V2_0_12__knowledge_ocr_permissions.sql
+24. V2_0_13__chat_rag_prompt_and_tokens.sql
+25. V2_0_14__exam_rag_prompt_template.sql
+26. V2_0_15__grading_rag_prompt_template.sql
+27. V2_0_16__lesson_prep_rag_prompt_template.sql
+28. R__seed_data.sql          # 可选，补充演示种子数据
+29. R__seed_tenant_roles.sql  # 旧库升级：租户/院系管理员角色与组织权限
 ```
 
 示例：
@@ -107,6 +126,14 @@ mysql -u root -p edumind < sql/migration/V2_0_4__notification_broadcast.sql
 mysql -u root -p edumind < sql/migration/V2_0_5__notification_broadcast_permissions.sql
 mysql -u root -p edumind < sql/migration/V2_0_6__system_and_ai_compute_permissions.sql
 mysql -u root -p edumind < sql/migration/V2_0_7__memory_retention.sql
+mysql -u root -p edumind < sql/migration/V2_0_8__ai_model_max_tokens_8192.sql
+mysql -u root -p edumind < sql/migration/V2_0_9__course_rag_prompt_templates.sql
+mysql -u root -p edumind < sql/migration/V2_0_10__notification_tenant.sql
+mysql -u root -p edumind < sql/migration/V2_0_11__ai_call_log_conversation_id.sql
+mysql -u root -p edumind < sql/migration/V2_0_12__knowledge_ocr_permissions.sql
+mysql -u root -p edumind < sql/migration/V2_0_13__chat_rag_prompt_and_tokens.sql
+mysql -u root -p edumind < sql/migration/V2_0_14__exam_rag_prompt_template.sql
+mysql -u root -p edumind < sql/migration/V2_0_15__grading_rag_prompt_template.sql
 mysql -u root -p edumind < sql/migration/R__seed_data.sql
 mysql -u root -p edumind < sql/migration/R__seed_tenant_roles.sql
 ```
@@ -146,6 +173,14 @@ mysql -u root -p edumind < sql/migration/R__seed_tenant_roles.sql
 | V2.0.5 广播权限 | `V2_0_5__notification_broadcast_permissions.sql` | `notice:broadcast:view/send` |
 | V2.0.6 系统/智算权限 | `V2_0_6__system_and_ai_compute_permissions.sql` | 菜单/租户/配置/模型/网关等权限 |
 | V2.0.7 记忆生命周期 | `V2_0_7__memory_retention.sql` | `retention_days`/`memory_type` + `ai:memory:*` 权限 |
+| V2.0.8 模型Token上限 | `V2_0_8__ai_model_max_tokens_8192.sql` | Chat 模型默认 max_tokens 提升至 8192 |
+| V2.0.9 课程 RAG Prompt | `V2_0_9__course_rag_prompt_templates.sql` | `prompt_template` 扩展字段 + 5 套教学提示词模板 |
+| V2.0.10 通知多租户 | `V2_0_10__notification_tenant.sql` | 通知与广播表增加 `tenant_id` 隔离 + 权限赋权 (Gate I5) |
+| V2.0.11 审计会话追溯 | `V2_0_11__ai_call_log_conversation_id.sql` | `ai_call_log.conversation_id`（无外键，可选追溯） |
+| V2.0.12 OCR任务权限 | `V2_0_12__knowledge_ocr_permissions.sql` | 知识库 OCR 识别任务与校对使用权限 (Gate I6) |
+| V2.0.13 轻量版提示词与Token | `V2_0_13__chat_rag_prompt_and_tokens.sql` | chat_rag 独立 System Prompt 与 max_tokens 提升至 8000 |
+| V2.0.14 智能命题RAG模板 | `V2_0_14__exam_rag_prompt_template.sql` | 注入 EXAM_RAG_GENERAL 通用智能命题与溯源约束模板 |
+| V2.0.15 智能批改RAG模板 | `V2_0_15__grading_rag_prompt_template.sql` | 注入 GRADING_RAG_GENERAL 评分点模型与证据溯源模板 |
 
 示例（从 V0.2 升级到 V0.5）：
 
@@ -162,7 +197,7 @@ mysql -u root -p edumind < sql/migration/V1_1_0__ai_call_log_course_id.sql
 mysql -u root -p edumind < sql/migration/V1_1_1__course_statistics_job.sql
 ```
 
-示例（从 V1.1 升级到 V2.0.7）：
+示例（从 V1.1 升级到 V2.0.12）：
 
 ```bash
 mysql -u root -p edumind < sql/migration/V2_0_0__multi_tenant_core.sql
@@ -175,9 +210,14 @@ mysql -u root -p edumind < sql/migration/V2_0_4__notification_broadcast.sql
 mysql -u root -p edumind < sql/migration/V2_0_5__notification_broadcast_permissions.sql
 mysql -u root -p edumind < sql/migration/V2_0_6__system_and_ai_compute_permissions.sql
 mysql -u root -p edumind < sql/migration/V2_0_7__memory_retention.sql
+mysql -u root -p edumind < sql/migration/V2_0_8__ai_model_max_tokens_8192.sql
+mysql -u root -p edumind < sql/migration/V2_0_9__course_rag_prompt_templates.sql
+mysql -u root -p edumind < sql/migration/V2_0_10__notification_tenant.sql
+mysql -u root -p edumind < sql/migration/V2_0_11__ai_call_log_conversation_id.sql
+mysql -u root -p edumind < sql/migration/V2_0_12__knowledge_ocr_permissions.sql
 ```
 
-> 全新建库请直接执行最新版 `sql/init.sql`（已含 V0.1~V2.0.7 与 V1.2.x 完整结构及种子），无需再跑 migration。
+> 全新建库请直接执行最新版 `sql/init.sql`（已含 V0.1~V2.0.12 与 V1.2.x 完整结构及种子），无需再跑 migration。
 
 ### V1.1 回滚（慎用，先备份）
 

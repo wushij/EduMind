@@ -1,6 +1,7 @@
 import { onUnmounted, ref } from 'vue';
 import { getAgentRun, listAgents, startAgentRun } from '@/api/ai/agent';
 import { API_BASE_URL } from '@/config';
+import { appendSecurityQuery } from '@/core/http/request-signature';
 import { IS_DEV } from '@/config/env';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_AGENT_RUN, MOCK_AGENTS } from '@/mock/agent';
@@ -89,7 +90,11 @@ export function useAgentRun() {
     stopPolling();
     polling.value = true;
     const token = storage.get(TOKEN_KEY);
-    const url = `${API_BASE_URL}/ai/agent/runs/${runId}/stream${token ? `?satoken=${token}` : ''}`;
+    let url = `${API_BASE_URL}/ai/agent/runs/${runId}/stream`;
+    if (token) {
+      url += `${url.includes('?') ? '&' : '?'}satoken=${encodeURIComponent(token)}`;
+    }
+    url = appendSecurityQuery(url, 'GET');
     eventSource = new EventSource(url);
     eventSource.addEventListener('step', () => pollRun(runId));
     eventSource.addEventListener('done', () => {

@@ -1,6 +1,7 @@
 package com.edumind.question.dao.export;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.edumind.common.context.TenantContext;
 import com.edumind.question.entity.export.ExportTaskEntity;
 import com.edumind.question.mapper.export.ExportTaskMapper;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,12 @@ public class ExportTaskDao {
 
     public ExportTaskEntity findById(Long id) {
         return exportTaskMapper.selectById(id);
+    }
+
+    public ExportTaskEntity findByIdIgnoreTenant(Long id) {
+        final ExportTaskEntity[] holder = new ExportTaskEntity[1];
+        TenantContext.runWithoutTenant(() -> holder[0] = exportTaskMapper.selectById(id));
+        return holder[0];
     }
 
     public ExportTaskEntity findByIdAndTenantId(Long id, Long tenantId) {
