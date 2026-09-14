@@ -102,7 +102,65 @@ export interface OrganizationMemberVO {
   name: string;
   role: string;
   avatar?: string;
-  masteryRate?: number;
-  lastActive?: string;
+  masteryRate?: number | null;
+  lastActive?: string | null;
 }
+
+export interface OrgStatsVO {
+  campusCount: number;
+  facultyCount: number;
+  classCount: number;
+  studentCount: number;
+  teacherCount: number;
+}
+
+export interface OrgNodeStatsVO {
+  orgId: number;
+  orgName: string;
+  orgType: string;
+  studentCount: number;
+  teacherCount: number;
+  avgMasteryRate: number;
+  homeworkSubmissionRate: number;
+  pendingInterventions: number;
+}
+
+export interface TenantMemberCandidateVO {
+  memberId: number;
+  userId: number;
+  memberNo: string;
+  realName: string;
+  username: string;
+  avatar?: string;
+  phone?: string;
+  isAssigned: boolean;
+  currentRole?: string;
+}
+
+export interface OrgMemberBatchAssignRequest {
+  memberIds: number[];
+  roleType: string;
+}
+
+export interface StudentCognitiveProfileVO {
+  userId: number;
+  realName: string;
+  studentNo: string;
+  avatar?: string;
+  phone?: string;
+  className: string;
+  lastActive?: string;
+  overallMastery: number;
+  assessedCount: number;
+  weakKnowledgePoints: string[];
+  masteredKnowledgePoints: string[];
+  details?: Array<{
+    knowledgePointId: number;
+    name: string;
+    score: number;
+    sampleCount: number;
+    lastAssessedAt?: string;
+  }>;
+}
+
 

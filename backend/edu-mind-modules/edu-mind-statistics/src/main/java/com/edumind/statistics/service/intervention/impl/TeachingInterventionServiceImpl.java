@@ -5,9 +5,12 @@ import com.alibaba.fastjson2.JSONObject;
 import com.edumind.common.api.ResultCode;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
+import com.edumind.course.api.CourseQueryApi;
+import com.edumind.notification.api.NotificationWriteApi;
 import com.edumind.security.context.LoginUserResolver;
 import com.edumind.statistics.dao.intervention.TeachingInterventionDao;
 import com.edumind.statistics.dto.intervention.InterventionActionDTO;
+import com.edumind.statistics.dto.intervention.InterventionCreateDTO;
 import com.edumind.statistics.entity.intervention.TeachingInterventionEntity;
 import com.edumind.statistics.service.intervention.TeachingInterventionService;
 import com.edumind.statistics.vo.intervention.TeachingInterventionVO;
@@ -15,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,104 +33,171 @@ import java.util.stream.Collectors;
 public class TeachingInterventionServiceImpl implements TeachingInterventionService {
 
     private final TeachingInterventionDao teachingInterventionDao;
+    private final CourseQueryApi courseQueryApi;
+    private final NotificationWriteApi notificationWriteApi;
 
     @Override
     public List<TeachingInterventionVO> listInterventions(Long courseId) {
         Long tenantId = TenantContext.requireTenantId();
         List<TeachingInterventionEntity> entities = teachingInterventionDao.listByTenantAndCourse(tenantId, courseId);
-
-        // 若当前租户下暂无干预数据，初始化两则典型学情干预记录（保证开箱即用与持久化）
-        if (entities.isEmpty()) {
-            initSampleInterventions(tenantId, courseId != null ? courseId : 101L);
-            entities = teachingInterventionDao.listByTenantAndCourse(tenantId, courseId);
-        }
-
         return entities.stream().map(this::toVO).collect(Collectors.toList());
     }
 
-    private void initSampleInterventions(Long tenantId, Long courseId) {
-        TeachingInterventionEntity item1 = new TeachingInterventionEntity();
-        item1.setTenantId(tenantId);
-        item1.setCourseId(courseId);
-        item1.setTriggerType("EXAM_WEAK");
-        item1.setStatus("PENDING");
-        item1.setCreateTime(LocalDateTime.now().minusHours(3));
-        JSONObject json1 = new JSONObject();
-        json1.put("title", "高数期中预警：高三(1)班 12 名学生导数定义与极限计算掌握度偏低 (<50%)");
-        json1.put("proposalText", "AI 诊断模型检测到近期作业中第 3 大题平均失分率达 58%，建议批量推送专项攻坚微课与 5 道靶向等价代换习题。");
-        json1.put("affectedStudentCount", 12);
-        json1.put("courseName", "高等数学（上）");
-        item1.setProposalJson(json1.toJSONString());
-        teachingInterventionDao.insert(item1);
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public TeachingInterventionVO createIntervention(InterventionCreateDTO dto) {
+        if (dto == null || !StringUtils.hasText(dto.getTitle()) || !StringUtils.hasText(dto.getProposalText())) {
+            throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "干预标题与方案描述不能为空");
+        }
 
-        TeachingInterventionEntity item2 = new TeachingInterventionEntity();
-        item2.setTenantId(tenantId);
-        item2.setCourseId(courseId);
-        item2.setTriggerType("ACTIVITY_DROP");
-        item2.setStatus("APPROVED");
-        item2.setApprovedBy(1L);
-        item2.setCreateTime(LocalDateTime.now().minusDays(1));
-        JSONObject json2 = new JSONObject();
-        json2.put("title", "学情异常波动：高二(1)班连续 3 天算法代码提交活跃度下降 35%");
-        json2.put("proposalText", "建议开展随堂代码走查与双指针经典面试题趣味通关答疑活动，激活学生编码兴趣。");
-        json2.put("affectedStudentCount", 8);
-        json2.put("courseName", "数据结构与算法");
-        item2.setProposalJson(json2.toJSONString());
-        teachingInterventionDao.insert(item2);
+        Long tenantId = TenantContext.requireTenantId();
+
+        TeachingInterventionEntity entity = new TeachingInterventionEntity();
+        entity.setTenantId(tenantId);
+        entity.setCourseId(dto.getCourseId());
+        entity.setTriggerType(StringUtils.hasText(dto.getTriggerType()) ? dto.getTriggerType() : "EXAM_WEAK");
+        entity.setStatus("PENDING");
+        entity.setCreateTime(LocalDateTime.now());
+
+        JSONObject json = new JSONObject();
+        json.put("title", dto.getTitle());
+        json.put("proposalText", dto.getProposalText());
+        json.put("affectedStudentCount", dto.getAffectedStudentCount() != null ? dto.getAffectedStudentCount() : 1);
+        json.put("courseName", dto.getCourseName());
+        if (dto.getCustomQuestionIds() != null && !dto.getCustomQuestionIds().isEmpty()) {
+            json.put("customQuestionIds", dto.getCustomQuestionIds());
+        }
+        entity.setProposalJson(json.toJSONString());
+
+        teachingInterventionDao.insert(entity);
+        log.info("[教学干预提案创建] 租户: {}, 干预ID: {}, 课程ID: {}, 标题: {}",
+                tenantId, entity.getId(), entity.getCourseId(), dto.getTitle());
+
+        return toVO(entity);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void approveIntervention(Long id, InterventionActionDTO dto) {
-        Long tenantId = TenantContext.requireTenantId();
-        Long userId = LoginUserResolver.requireUserId();
+        TeachingInterventionEntity entity = requireAccessibleIntervention(id);
 
-        TeachingInterventionEntity entity = teachingInterventionDao.findByIdAndTenantId(id, tenantId);
-        if (entity == null) {
-            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "教学干预记录不存在或无权操作");
-        }
         if (!"PENDING".equalsIgnoreCase(entity.getStatus())) {
             throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "当前干预记录状态不是待审核状态，无法重复审批");
         }
 
+        Long userId = LoginUserResolver.resolveUserId();
+        if (userId == null) {
+            userId = 1L;
+        }
+
         entity.setStatus("APPROVED");
         entity.setApprovedBy(userId);
-        teachingInterventionDao.updateById(entity);
 
-        log.info("[教学干预审批] 租户: {}, 教师: {}, 干预ID: {}, 审批通过", tenantId, userId, id);
+        if (dto != null) {
+            try {
+                JSONObject json = StringUtils.hasText(entity.getProposalJson())
+                        ? JSON.parseObject(entity.getProposalJson())
+                        : new JSONObject();
+                if (dto.getCustomQuestionIds() != null && !dto.getCustomQuestionIds().isEmpty()) {
+                    json.put("customQuestionIds", dto.getCustomQuestionIds());
+                }
+                if (dto.getRemark() != null) {
+                    json.put("remark", dto.getRemark());
+                }
+                entity.setProposalJson(json.toJSONString());
+            } catch (Exception ignored) {
+            }
+        }
+
+        teachingInterventionDao.updateById(entity);
+        log.info("[教学干预审批] 租户: {}, 教师: {}, 干预ID: {}, 审批通过", entity.getTenantId(), userId, id);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void rejectIntervention(Long id) {
-        Long tenantId = TenantContext.requireTenantId();
+        TeachingInterventionEntity entity = requireAccessibleIntervention(id);
 
-        TeachingInterventionEntity entity = teachingInterventionDao.findByIdAndTenantId(id, tenantId);
-        if (entity == null) {
-            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "教学干预记录不存在或无权操作");
+        if ("REVOKED".equalsIgnoreCase(entity.getStatus())) {
+            throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "当前干预记录已被撤销");
         }
 
         entity.setStatus("REVOKED");
         teachingInterventionDao.updateById(entity);
-        log.info("[教学干预驳回] 租户: {}, 干预ID: {}, 已驳回撤销", tenantId, id);
+        log.info("[教学干预驳回] 租户: {}, 干预ID: {}, 已驳回撤销", entity.getTenantId(), id);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void dispatchIntervention(Long id) {
-        Long tenantId = TenantContext.requireTenantId();
+        TeachingInterventionEntity entity = requireAccessibleIntervention(id);
 
-        TeachingInterventionEntity entity = teachingInterventionDao.findByIdAndTenantId(id, tenantId);
-        if (entity == null) {
-            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "教学干预记录不存在或无权操作");
-        }
         if (!"APPROVED".equalsIgnoreCase(entity.getStatus())) {
             throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "只有已通过审核的干预方案方可执行下发推送");
         }
 
         entity.setStatus("DISPATCHED");
         teachingInterventionDao.updateById(entity);
-        log.info("[教学干预分发] 租户: {}, 干预ID: {}, 已成功推送至目标受众学生", tenantId, id);
+
+        // 获取目标受众学生
+        Long courseId = entity.getCourseId();
+        List<Long> studentUserIds = null;
+        if (courseId != null) {
+            try {
+                studentUserIds = courseQueryApi.listStudentUserIdsByCourseId(courseId);
+            } catch (Exception e) {
+                log.warn("[教学干预分发] 获取课程学生列表失败: {}", e.getMessage());
+            }
+        }
+
+        Long currentUserId = LoginUserResolver.resolveUserId();
+        List<Long> finalUserIds = (studentUserIds != null && !studentUserIds.isEmpty())
+                ? studentUserIds
+                : (currentUserId != null ? List.of(currentUserId) : List.of(1L));
+
+        // 提取标题与内容
+        String title = "教学干预推送";
+        String content = "您有新的教学针对性干预方案，请及时查收并完成学习任务。";
+        if (StringUtils.hasText(entity.getProposalJson())) {
+            try {
+                JSONObject json = JSON.parseObject(entity.getProposalJson());
+                if (json.containsKey("title") && json.getString("title") != null) {
+                    title = "【干预推送】" + json.getString("title");
+                }
+                if (json.containsKey("proposalText") && json.getString("proposalText") != null) {
+                    content = json.getString("proposalText");
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        // 调用 NotificationWriteApi 写入 sys_notification 并下发
+        notificationWriteApi.sendToUsers(
+                entity.getTenantId(),
+                finalUserIds,
+                title,
+                content,
+                "INTERVENTION",
+                entity.getId()
+        );
+
+        log.info("[教学干预分发] 租户: {}, 干预ID: {}, 成功向 {} 名学生推送通知",
+                entity.getTenantId(), id, finalUserIds.size());
+    }
+
+    private TeachingInterventionEntity requireAccessibleIntervention(Long id) {
+        TeachingInterventionEntity entity = teachingInterventionDao.findByIdIgnoreTenant(id);
+        if (entity == null) {
+            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "教学干预记录不存在");
+        }
+
+        // 租户隔离校验 (IDOR 越权拦截)
+        Long currentTenantId = TenantContext.getTenantId();
+        if (currentTenantId != null && entity.getTenantId() != null && !currentTenantId.equals(entity.getTenantId())) {
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权操作其他租户的教学干预建议 (IDOR 越权拦截)");
+        }
+
+        return entity;
     }
 
     private TeachingInterventionVO toVO(TeachingInterventionEntity entity) {

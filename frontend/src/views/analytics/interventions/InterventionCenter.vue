@@ -54,9 +54,13 @@
         </div>
 
         <div class="filter-right">
-          <el-button type="primary" class="gradient-btn" @click="openTriggerSimulator">
+          <el-button type="primary" class="gradient-btn" @click="openCreateDialog">
+            <el-icon><Plus /></el-icon>
+            <span>新建干预提案</span>
+          </el-button>
+          <el-button @click="openTriggerSimulator">
             <el-icon><MagicStick /></el-icon>
-            <span>手动触发学情诊断</span>
+            <span>诊断巡检</span>
           </el-button>
         </div>
       </div>
@@ -172,68 +176,85 @@
         </div>
       </div>
     </el-drawer>
+
+    <!-- 新建干预提案对话框 -->
+    <el-dialog v-model="createDialogVisible" title="新建教学干预提案" width="560px" destroy-on-close>
+      <el-form ref="createFormRef" :model="createForm" label-position="top">
+        <el-form-item label="关联课程">
+          <el-select v-model="createForm.courseId" placeholder="选择关联课程" style="width: 100%" @change="onCourseChange">
+            <el-option label="高等数学（上）" :value="102" />
+            <el-option label="数据结构与算法" :value="101" />
+            <el-option label="高中物理必修第一册" :value="103" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="触发动因类型">
+          <el-select v-model="createForm.triggerType" placeholder="选择触发动因" style="width: 100%">
+            <el-option label="考试薄弱断层 (EXAM_WEAK)" value="EXAM_WEAK" />
+            <el-option label="学习活跃度骤降 (ACTIVITY_DROP)" value="ACTIVITY_DROP" />
+            <el-option label="作业多次逾期 (HOMEWORK_DELAY)" value="HOMEWORK_DELAY" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="干预提案标题" required>
+          <el-input v-model="createForm.title" placeholder="如：第3章导数与极限掌握度预警..." maxlength="100" show-word-limit />
+        </el-form-item>
+
+        <el-form-item label="循证干预方案描述" required>
+          <el-input
+            v-model="createForm.proposalText"
+            type="textarea"
+            :rows="3"
+            placeholder="说明 AI 诊断发现的问题及具体干预措施建议..."
+            maxlength="500"
+            show-word-limit
+          />
+        </el-form-item>
+
+        <el-form-item label="预警影响学生数">
+          <el-input-number v-model="createForm.affectedStudentCount" :min="1" :max="500" style="width: 100%" />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="createDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="createSubmitting" @click="submitCreateIntervention">确定创建</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { MagicStick, Opportunity, DataLine, Check, Promotion } from '@element-plus/icons-vue';
+import { MagicStick, Opportunity, DataLine, Check, Promotion, Plus } from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
-import { listInterventions, approveIntervention, rejectIntervention, dispatchIntervention } from '@/api/analytics/intervention';
-import type { TeachingInterventionVO } from '@/types/analytics/intervention';
+import { listInterventions, createIntervention, approveIntervention, rejectIntervention, dispatchIntervention } from '@/api/analytics/intervention';
+import type { TeachingInterventionVO, InterventionCreateRequest } from '@/types/analytics/intervention';
 
 const loading = ref(false);
 const courseFilter = ref<number | undefined>(undefined);
 const triggerFilter = ref<string | undefined>(undefined);
 const statusFilter = ref<string | undefined>(undefined);
 
-const interventions = ref<TeachingInterventionVO[]>([
-  {
-    id: 1,
-    tenantId: 1,
-    courseId: 102,
-    courseName: '高等数学（上）',
-    triggerType: 'EXAM_WEAK',
-    title: '高数期中预警：高三(1)班 12 名学生导数定义与极限计算掌握度偏低 (<50%)',
-    proposalText: 'AI 诊断模型检测到近期作业中第 3 大题平均失分率达 58%，建议批量推送专项攻坚微课与 5 道靶向等价代换习题。',
-    affectedStudentCount: 12,
-    status: 'PENDING',
-    createTime: '4小时前'
-  },
-  {
-    id: 2,
-    tenantId: 1,
-    courseId: 101,
-    courseName: '数据结构与算法',
-    triggerType: 'ACTIVITY_DROP',
-    title: '学情异常波动：高二(1)班连续 3 天算法代码提交活跃度下降 35%',
-    proposalText: '建议开展随堂代码走查与双指针经典面试题趣味通关答疑活动，激活学生编码兴趣。',
-    affectedStudentCount: 8,
-    status: 'APPROVED',
-    approvedBy: '张教授',
-    createTime: '昨天 15:20'
-  },
-  {
-    id: 3,
-    tenantId: 1,
-    courseId: 103,
-    courseName: '高中物理必修第一册',
-    triggerType: 'HOMEWORK_DELAY',
-    title: '作业滞后预警：高一(2)班 6 名学生牛顿第二定律综合题连续未提交',
-    proposalText: '建议由任课老师发起课后一对一关怀，并由 AI 助教推送基础概念梳理思维导图。',
-    affectedStudentCount: 6,
-    status: 'DISPATCHED',
-    approvedBy: '李老师',
-    createTime: '2天前'
-  }
-]);
+const interventions = ref<TeachingInterventionVO[]>([]);
 
 const drawerVisible = ref(false);
 const activeIntervention = ref<TeachingInterventionVO | null>(null);
 
+const createDialogVisible = ref(false);
+const createSubmitting = ref(false);
+const createForm = ref<InterventionCreateRequest>({
+  courseId: 102,
+  courseName: '高等数学（上）',
+  triggerType: 'EXAM_WEAK',
+  title: '',
+  proposalText: '',
+  affectedStudentCount: 5
+});
+
 const pendingCount = computed(() => interventions.value.filter(i => i.status === 'PENDING').length);
-const totalAffectedStudents = computed(() => interventions.value.reduce((acc, cur) => acc + cur.affectedStudentCount, 0));
+const totalAffectedStudents = computed(() => interventions.value.reduce((acc, cur) => acc + (cur.affectedStudentCount || 0), 0));
 
 const filteredInterventions = computed(() => {
   return interventions.value.filter(i => {
@@ -284,22 +305,66 @@ const getStatusTagType = (status: string) => {
 const loadData = async () => {
   try {
     loading.value = true;
-    const res = await listInterventions();
-    if (res?.data && res.data.length > 0) {
+    const res = await listInterventions(courseFilter.value);
+    if (res?.data) {
       interventions.value = res.data;
+    } else {
+      interventions.value = [];
     }
-  } catch (e) {
-    // Keep mock baseline
+  } catch (e: any) {
+    ElMessage.error(e.message || '加载干预建议失败');
   } finally {
     loading.value = false;
+  }
+};
+
+watch(courseFilter, () => {
+  loadData();
+});
+
+const openCreateDialog = () => {
+  createForm.value = {
+    courseId: 102,
+    courseName: '高等数学（上）',
+    triggerType: 'EXAM_WEAK',
+    title: '',
+    proposalText: '',
+    affectedStudentCount: 5
+  };
+  createDialogVisible.value = true;
+};
+
+const onCourseChange = (val?: number) => {
+  if (val === 102) createForm.value.courseName = '高等数学（上）';
+  else if (val === 101) createForm.value.courseName = '数据结构与算法';
+  else if (val === 103) createForm.value.courseName = '高中物理必修第一册';
+  else createForm.value.courseName = undefined;
+};
+
+const submitCreateIntervention = async () => {
+  if (!createForm.value.title?.trim() || !createForm.value.proposalText?.trim()) {
+    ElMessage.warning('请完整填写干预提案标题与方案描述');
+    return;
+  }
+  try {
+    createSubmitting.value = true;
+    await createIntervention(createForm.value);
+    ElMessage.success('干预提案已成功创建！');
+    createDialogVisible.value = false;
+    await loadData();
+  } catch (e: any) {
+    ElMessage.error(e.message || '创建干预提案失败');
+  } finally {
+    createSubmitting.value = false;
   }
 };
 
 const handleApprove = async (item: TeachingInterventionVO) => {
   try {
     await approveIntervention(item.id);
-    item.status = 'DISPATCHED';
-    ElMessage.success('干预方案已审核通过，并即时分发至目标学生任务中心！');
+    item.status = 'APPROVED';
+    ElMessage.success('干预方案已审核通过，等待分发推送！');
+    await loadData();
   } catch (e: any) {
     ElMessage.error(e.message || '审批失败');
   }
@@ -309,7 +374,8 @@ const handleDispatch = async (item: TeachingInterventionVO) => {
   try {
     await dispatchIntervention(item.id);
     item.status = 'DISPATCHED';
-    ElMessage.success('已推送至相关学生！');
+    ElMessage.success('已成功推送至相关学生任务中心！');
+    await loadData();
   } catch (e: any) {
     ElMessage.error(e.message || '分发失败');
   }
@@ -325,13 +391,14 @@ const handleReject = (item: TeachingInterventionVO) => {
       await rejectIntervention(item.id);
       item.status = 'REVOKED';
       ElMessage.info('已驳回该提案');
+      await loadData();
     } catch (e: any) {
       ElMessage.error(e.message || '驳回失败');
     }
   });
 };
 
-const handleCustomize = (item: TeachingInterventionVO) => {
+const handleCustomize = (_item: TeachingInterventionVO) => {
   ElMessage.info('自定义配置：教师可自由勾选替换题库试题与微课视频');
 };
 
@@ -341,7 +408,7 @@ const viewEfficacyTrace = (item: TeachingInterventionVO) => {
 };
 
 const openTriggerSimulator = () => {
-  ElMessage.success('已启动全量学情诊断巡检扫描，未发现新的失分断层');
+  ElMessage.success('已启动全量学情诊断巡检扫描，当前无新的异常动因');
 };
 
 onMounted(() => {

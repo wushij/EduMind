@@ -123,20 +123,34 @@
       </el-card>
     </div>
 
-    <!-- 近期操作与登录审计记录 -->
+    <!-- 近期操作与登录审计记录（对接真实操作日志接口） -->
     <el-card shadow="never" class="audit-table-card mt-4">
-      <h3 class="card-title">
-        <el-icon class="mr-1"><Clock /></el-icon>
-        <span>账号近期安全与操作审计日志</span>
-      </h3>
-      <el-table :data="auditLogs" stripe class="audit-table">
+      <div class="card-header-flex">
+        <h3 class="card-title">
+          <el-icon class="mr-1"><Clock /></el-icon>
+          <span>账号近期安全与操作审计日志</span>
+        </h3>
+        <button
+          type="button"
+          class="jump-log-center-btn"
+          @click="router.push('/system/oper-log')"
+        >
+          查看全平台操作日志大盘 →
+        </button>
+      </div>
+      <el-table v-loading="auditLogsLoading" :data="auditLogs" stripe class="audit-table">
         <el-table-column label="操作时间" prop="time" width="180" />
         <el-table-column label="操作模块" prop="module" width="140" />
         <el-table-column label="操作行为说明" prop="action" min-width="220" />
         <el-table-column label="客户端 IP" prop="ip" width="140" />
+        <el-table-column label="耗时" width="100">
+          <template #default="{ row }">
+            <span>{{ row.costTime ?? 0 }}ms</span>
+          </template>
+        </el-table-column>
         <el-table-column label="结果状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'SUCCESS' ? 'success' : 'danger'" size="small">
+            <el-tag :type="row.status === 'SUCCESS' ? 'success' : 'danger'" size="small" round>
               {{ row.status === 'SUCCESS' ? '操作成功' : '拦截失败' }}
             </el-tag>
           </template>
@@ -353,6 +367,7 @@ import {
   CircleCloseFilled
 } from '@element-plus/icons-vue';
 import { getUserDetail, updateUserStatus, resetUserPassword } from '@/api/system/user';
+import { getUserOperLogs } from '@/api/system/oper-log';
 import { useAuthStore } from '@/stores/auth/auth';
 import { normalizeAvatarUrl } from '@/utils/format/file';
 import type { UserInfo } from '@/types/auth/auth';
@@ -376,18 +391,65 @@ const displayAvatar = computed(() => {
   return normalizeAvatarUrl(userInfo.value.avatar);
 });
 
-const auditLogs = ref([
-  { time: '2026-09-11 15:30:12', module: '试题中心', action: '录入新单选试题 #1005', ip: '127.0.0.1', status: 'SUCCESS' },
-  { time: '2026-09-11 14:15:40', module: '作业管理', action: '发布作业《二叉树递归遍历测验》', ip: '127.0.0.1', status: 'SUCCESS' },
-  { time: '2026-09-11 09:00:21', module: '用户认证', action: '账号常规登录鉴权成功', ip: '192.168.1.108', status: 'SUCCESS' }
-]);
+const auditLogs = ref<any[]>([]);
+const auditLogsLoading = ref(false);
+
+function parseOperSummary(row: any): string {
+  if (!row.operParam) {
+    return row.title || '常规系统操作';
+  }
+  try {
+    const obj = JSON.parse(row.operParam);
+    if (obj.action) return String(obj.action);
+    const p = obj.params || obj;
+    if (p && typeof p === 'object') {
+      const name = p.username || p.realName || p.title || p.name || '';
+      if (name) return `${row.title || '操作'}「${name}」`;
+    }
+  } catch {}
+  return row.title || '常规系统操作';
+}
+
+async function loadUserAuditLogs() {
+  auditLogsLoading.value = true;
+  try {
+    const res = await getUserOperLogs(userId.value, 8);
+    if (res.data && res.data.length > 0) {
+      auditLogs.value = res.data.map((item) => ({
+        time: item.operTime,
+        module: item.title || '系统管理',
+        action: parseOperSummary(item),
+        ip: item.operIp || '127.0.0.1',
+        costTime: item.costTime || 0,
+        status: item.status === 0 ? 'SUCCESS' : 'FAILED'
+      }));
+    } else {
+      auditLogs.value = [
+        {
+          time: '近期暂无',
+          module: '系统日志',
+          action: '该账号近期尚无敏感写操作或管理记录',
+          ip: '127.0.0.1',
+          costTime: 0,
+          status: 'SUCCESS'
+        }
+      ];
+    }
+  } catch {
+    auditLogs.value = [];
+  } finally {
+    auditLogsLoading.value = false;
+  }
+}
 
 onMounted(() => {
   loadUser();
+  loadUserAuditLogs();
 });
 
 onActivated(() => {
   loadUser();
+  loadUserAuditLogs();
 });
 
 function isUserEnabled(user: { status?: string | number } | null) {
@@ -1182,6 +1244,44 @@ function saveRoleAssignment() {
         cursor: not-allowed;
         box-shadow: none;
         transform: none;
+      }
+    }
+  }
+}
+
+.audit-table-card {
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+
+  .card-header-flex {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      margin: 0;
+    }
+
+    .jump-log-center-btn {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #2563eb;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: #2563eb;
+        color: #ffffff;
       }
     }
   }

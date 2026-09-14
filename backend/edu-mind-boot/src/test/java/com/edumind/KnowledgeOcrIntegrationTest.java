@@ -10,7 +10,6 @@ import com.edumind.common.model.UserContext;
 import com.edumind.knowledge.dao.KnowledgeBaseDao;
 import com.edumind.knowledge.dao.KnowledgeDocumentDao;
 import com.edumind.knowledge.dao.KnowledgeDocumentTextDao;
-import com.edumind.knowledge.dao.ocr.KnowledgeOcrDao;
 import com.edumind.knowledge.entity.KnowledgeBaseEntity;
 import com.edumind.knowledge.entity.KnowledgeDocumentEntity;
 import com.edumind.knowledge.entity.KnowledgeDocumentTextEntity;
@@ -32,7 +31,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 
@@ -49,9 +47,6 @@ public class KnowledgeOcrIntegrationTest {
 
     @Autowired
     private KnowledgeOcrService ocrService;
-
-    @Autowired
-    private KnowledgeOcrDao ocrDao;
 
     @Autowired
     private KnowledgeOcrTaskMapper taskMapper;

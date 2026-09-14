@@ -30,12 +30,13 @@ public class TokenStatisticsController {
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String scene,
             @RequestParam(required = false) String model,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(defaultValue = "1") long page,
-            @RequestParam(defaultValue = "20") long pageSize) {
+            @RequestParam(defaultValue = "10") long pageSize) {
         return ApiResult.success(tokenStatisticsService.listLogs(
-                userId, scene, model, startDate, endDate, page, pageSize));
+                userId, scene, model, keyword, startDate, endDate, page, pageSize));
     }
 
     @SaCheckPermission("system:audit:view")

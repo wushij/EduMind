@@ -36,4 +36,9 @@ public interface CourseQueryApi {
      * 用户可访问的课程 ID 列表（选课成员）
      */
     List<Long> listCourseIdsByUserId(Long userId);
+
+    /**
+     * 课程下学生成员 userId 列表（Beta 干预触达受众）
+     */
+    List<Long> listStudentUserIdsByCourseId(Long courseId);
 }

@@ -36,5 +36,8 @@ public interface UserQueryApi {
 
     /** 按租户及角色编码统计成员人数 */
     long countUsersByTenantAndRole(Long tenantId, String roleCode);
+
+    /** 按用户名或真实姓名模糊搜索用户 ID 列表 */
+    List<Long> findUserIdsByKeyword(String keyword);
 }
 

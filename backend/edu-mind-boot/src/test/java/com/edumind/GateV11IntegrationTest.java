@@ -82,7 +82,7 @@ public class GateV11IntegrationTest {
         LoginUser user = LoginUser.builder().id(2L).username("teacher").build();
         UserContext.set(user);
         TenantContext.setTenantId(1L);
-        // 依赖 migration + R__gate_h_e2e_seed.sql 初始化，禁止 DROP 生产/共享表
+        // 依赖 migration + R__gate_e2e_seeds.sql 初始化，禁止 DROP 生产/共享表
     }
 
     @AfterEach

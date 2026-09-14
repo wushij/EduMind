@@ -1,6 +1,5 @@
 package com.edumind.ai.dto.memory;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data

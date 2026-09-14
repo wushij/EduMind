@@ -88,7 +88,7 @@ public class MemoryRetrievalService {
             AiMemoryItemEntity entity = scored.item();
             String decryptedContent = null;
             if (StringUtils.hasText(entity.getContentCiphertext())) {
-                decryptedContent = memoryCryptoService.decrypt(tenantId, entity.getContentCiphertext());
+                decryptedContent = memoryCryptoService.decrypt(tenantId, entity.getContentCiphertext(), entity.getKeyVersion());
             }
 
             return MemoryContextBlock.builder()

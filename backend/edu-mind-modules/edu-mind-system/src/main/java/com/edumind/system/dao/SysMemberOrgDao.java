@@ -70,8 +70,23 @@ public class SysMemberOrgDao {
                 .eq(SysMemberOrgEntity::getOrganizationId, organizationId));
     }
 
+    public List<SysMemberOrgEntity> listByTenantId(Long tenantId) {
+        return sysMemberOrgMapper.selectList(new LambdaQueryWrapper<SysMemberOrgEntity>()
+                .eq(SysMemberOrgEntity::getTenantId, tenantId));
+    }
+
+    public List<SysMemberOrgEntity> listByOrgIds(Long tenantId, List<Long> orgIds) {
+        if (orgIds == null || orgIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return sysMemberOrgMapper.selectList(new LambdaQueryWrapper<SysMemberOrgEntity>()
+                .eq(SysMemberOrgEntity::getTenantId, tenantId)
+                .in(SysMemberOrgEntity::getOrganizationId, orgIds));
+    }
+
     public int deleteByTenantId(Long tenantId) {
         return sysMemberOrgMapper.delete(new LambdaQueryWrapper<SysMemberOrgEntity>()
                 .eq(SysMemberOrgEntity::getTenantId, tenantId));
     }
 }
+

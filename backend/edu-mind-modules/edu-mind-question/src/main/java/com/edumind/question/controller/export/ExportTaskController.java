@@ -36,14 +36,14 @@ public class ExportTaskController {
         return ApiResult.success(exportTaskService.createPaperExportTask(dto));
     }
 
-    @GetMapping("/{taskId}")
-    public ApiResult<ExportTaskVO> getTaskStatus(@PathVariable("taskId") Long taskId) {
-        return ApiResult.success(exportTaskService.getTaskStatus(taskId));
-    }
-
     @GetMapping("/my")
     public ApiResult<List<ExportTaskVO>> listMyExportTasks() {
         return ApiResult.success(exportTaskService.listMyExportTasks());
+    }
+
+    @GetMapping("/{taskId}")
+    public ApiResult<ExportTaskVO> getTaskStatus(@PathVariable("taskId") Long taskId) {
+        return ApiResult.success(exportTaskService.getTaskStatus(taskId));
     }
 
     @GetMapping("/{taskId}/download")

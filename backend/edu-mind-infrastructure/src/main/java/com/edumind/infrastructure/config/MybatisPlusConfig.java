@@ -41,7 +41,8 @@ public class MybatisPlusConfig {
             "ai_call_log",
             "edu_question",
             "sys_notification",
-            "sys_notification_broadcast"
+            "sys_notification_broadcast",
+            "security_key_version"
     );
 
     @Bean

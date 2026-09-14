@@ -12,7 +12,6 @@ import com.edumind.knowledge.entity.KnowledgeDocumentEntity;
 import com.edumind.knowledge.entity.KnowledgeDocumentTextEntity;
 import com.edumind.knowledge.entity.ocr.KnowledgeOcrPageEntity;
 import com.edumind.knowledge.entity.ocr.KnowledgeOcrTaskEntity;
-import com.edumind.knowledge.service.chunk.ChunkService;
 import com.edumind.knowledge.service.ocr.KnowledgeOcrService;
 import com.edumind.knowledge.service.ocr.KnowledgeOcrTaskDispatcher;
 import com.edumind.knowledge.vo.ocr.KnowledgeOcrPageVO;
@@ -34,7 +33,6 @@ public class KnowledgeOcrServiceImpl implements KnowledgeOcrService {
     private final KnowledgeDocumentDao knowledgeDocumentDao;
     private final KnowledgeBaseDao knowledgeBaseDao;
     private final KnowledgeDocumentTextDao knowledgeDocumentTextDao;
-    private final ChunkService chunkService;
     private final com.edumind.knowledge.service.chunk.ChunkTriggerExecutor chunkTriggerExecutor;
     private final KnowledgeOcrTaskDispatcher knowledgeOcrTaskDispatcher;
 

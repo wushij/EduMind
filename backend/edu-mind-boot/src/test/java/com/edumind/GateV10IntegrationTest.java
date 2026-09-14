@@ -167,7 +167,7 @@ class GateV10IntegrationTest {
         Long recordId = jdbcTemplate.query(
                 "SELECT id FROM wrong_question_record WHERE student_id = 3 AND question_id = 1007 LIMIT 1",
                 rs -> rs.next() ? rs.getLong(1) : null);
-        assumeTrue(recordId != null, "需执行 sql/migration/R__gate_g_e2e_seed.sql");
+        assumeTrue(recordId != null, "需执行 sql/migration/R__gate_e2e_seeds.sql");
         WrongQuestionRecordEntity entity = wrongQuestionDiagnosisService.diagnoseRecord(recordId);
         assertNotNull(entity.getDiagnosis());
         assertNotNull(entity.getVariantQuestionIds());

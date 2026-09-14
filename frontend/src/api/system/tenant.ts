@@ -50,6 +50,26 @@ export function getOrgTree(tenantId?: number): Promise<ApiResponse<OrganizationN
   return get<OrganizationNodeVO[]>('/system/organizations/tree', { tenantId });
 }
 
+export function getTenantOrgStats(): Promise<ApiResponse<import('@/types/system/tenant').OrgStatsVO>> {
+  return get<import('@/types/system/tenant').OrgStatsVO>('/system/organizations/stats');
+}
+
+export function getOrgNodeStats(id: number): Promise<ApiResponse<import('@/types/system/tenant').OrgNodeStatsVO>> {
+  return get<import('@/types/system/tenant').OrgNodeStatsVO>(`/system/organizations/${id}/stats`);
+}
+
+export function getOrgCandidates(id: number, keyword?: string): Promise<ApiResponse<import('@/types/system/tenant').TenantMemberCandidateVO[]>> {
+  return get<import('@/types/system/tenant').TenantMemberCandidateVO[]>(`/system/organizations/${id}/candidates`, { keyword });
+}
+
+export function batchAssignOrgMembers(id: number, data: import('@/types/system/tenant').OrgMemberBatchAssignRequest): Promise<ApiResponse<void>> {
+  return post<void>(`/system/organizations/${id}/members/batch`, data);
+}
+
+export function getStudentCognitiveProfile(userId: number): Promise<ApiResponse<import('@/types/system/tenant').StudentCognitiveProfileVO>> {
+  return get<import('@/types/system/tenant').StudentCognitiveProfileVO>(`/system/organizations/students/${userId}/profile`);
+}
+
 export function createOrgNode(data: OrgCreateRequest): Promise<ApiResponse<number>> {
   return post<number>('/system/organizations', data);
 }
@@ -83,3 +103,4 @@ export function listTenantQuotas(tenantId?: number): Promise<ApiResponse<TenantQ
 export function updateTenantQuota(data: QuotaUpdateRequest): Promise<ApiResponse<void>> {
   return put<void>('/system/tenant-quotas', data);
 }
+

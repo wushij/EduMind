@@ -21,5 +21,7 @@ export interface ExportTaskVO {
   progress: number;
   downloadUrl?: string;
   errorMsg?: string;
+  exportParams?: string;
+  paperTitle?: string;
   createTime?: string;
 }

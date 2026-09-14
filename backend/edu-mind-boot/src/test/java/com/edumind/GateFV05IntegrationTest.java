@@ -99,7 +99,7 @@ class GateFV05IntegrationTest {
         assumeTrue(canConnectDatabase(), "MySQL edumind 不可用，跳过 Gate F 集成测试");
         TenantContext.setTenantId(1L);
         KnowledgeBaseEntity gateKb = knowledgeBaseDao.findById(GATE_F_KB_ID);
-        assumeTrue(gateKb != null, "请先执行 sql/migration/R__gate_f_e2e_seed.sql");
+        assumeTrue(gateKb != null, "请先执行 sql/migration/R__gate_e2e_seeds.sql");
         loginAsTeacher();
     }
 

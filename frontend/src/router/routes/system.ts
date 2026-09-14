@@ -99,12 +99,20 @@ export const systemRoutes: RouteRecordRaw[] = [
     meta: { title: '租户用量与配额大盘', requiresAuth: true, roles: ['ADMIN'] }
   },
 
-  // 审计日志
+  // 审计日志 (AI 算力与网关调用)
   {
     path: '/system/audit',
     name: 'SystemAuditLog',
     component: () => import('@/views/system/audit/AuditLog.vue'),
     meta: { title: '系统安全与调用审计', requiresAuth: true, roles: ['ADMIN'] }
+  },
+
+  // 业务操作日志 (对齐 wu-admin)
+  {
+    path: '/system/oper-log',
+    name: 'SystemOperLog',
+    component: () => import('@/views/system/oper-log/index.vue'),
+    meta: { title: '业务操作日志', requiresAuth: true, roles: ['ADMIN'] }
   },
 
   // AI 网关
@@ -134,6 +142,19 @@ export const systemRoutes: RouteRecordRaw[] = [
       title: '消息广播推送',
       requiresAuth: true,
       permissions: ['notice:broadcast:view']
+    }
+  },
+
+  // 国密 KMS 密钥版本管理 (Gate I9)
+  {
+    path: '/system/security/keys',
+    name: 'SystemSecurityKeys',
+    component: () => import('@/views/system/security/KeyVersionList.vue'),
+    meta: {
+      title: '国密 KMS 密钥管理',
+      requiresAuth: true,
+      roles: ['ADMIN'],
+      permissions: ['security:key:view']
     }
   },
 

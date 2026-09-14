@@ -30,6 +30,12 @@ public class TeachingInterventionDao {
                 .eq(TeachingInterventionEntity::getTenantId, tenantId));
     }
 
+    public TeachingInterventionEntity findByIdIgnoreTenant(Long id) {
+        final TeachingInterventionEntity[] holder = new TeachingInterventionEntity[1];
+        com.edumind.common.context.TenantContext.runWithoutTenant(() -> holder[0] = teachingInterventionMapper.selectById(id));
+        return holder[0];
+    }
+
     public int insert(TeachingInterventionEntity entity) {
         return teachingInterventionMapper.insert(entity);
     }

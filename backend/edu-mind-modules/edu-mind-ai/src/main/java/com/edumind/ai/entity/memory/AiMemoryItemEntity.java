@@ -17,6 +17,7 @@ public class AiMemoryItemEntity implements Serializable {
     private String memoryType;
     private String summary;
     private String contentCiphertext;
+    private Integer keyVersion;
     private String sensitivityLevel;
     private String vectorRef;
     private LocalDateTime expireTime;

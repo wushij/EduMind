@@ -10,7 +10,7 @@
           :before-upload="beforeAvatarUpload"
           :http-request="handleAvatarUpload"
         >
-          <img :src="displayAvatar" alt="Avatar" class="avatar-img" />
+          <img :src="displayAvatar" alt="Avatar" class="avatar-img" @error="handleAvatarError" />
           <div class="avatar-upload-mask">
             <el-icon><Camera /></el-icon>
             <span>更换头像</span>
@@ -349,12 +349,20 @@ import type { UploadRequestOptions } from 'element-plus';
 const authStore = useAuthStore();
 const isDev = import.meta.env.DEV;
 const avatarUploading = ref(false);
+const avatarLoadFailed = ref(false);
 
 const currentUser = computed(() => authStore.currentUser);
 const currentRole = computed(() => authStore.currentRole || 'ADMIN');
-const displayAvatar = computed(
-  () => currentUser.value?.avatar || DEFAULT_AVATAR
-);
+const displayAvatar = computed(() => {
+  if (avatarLoadFailed.value) {
+    return DEFAULT_AVATAR;
+  }
+  return currentUser.value?.avatar || DEFAULT_AVATAR;
+});
+
+function handleAvatarError() {
+  avatarLoadFailed.value = true;
+}
 
 const roleLabel = computed(() => {
   switch (currentRole.value) {
@@ -475,6 +483,7 @@ async function handleAvatarUpload(options: UploadRequestOptions) {
   try {
     const res = await uploadAvatar(file);
     if (res?.data) {
+      avatarLoadFailed.value = false;
       authStore.setUser(res.data);
       ElMessage.success('头像已更新');
     }

@@ -52,6 +52,20 @@ public class CourseMemberDao {
                 .eq(CourseMemberEntity::getUserId, userId));
     }
 
+    public List<Long> findStudentUserIdsByCourseId(Long courseId) {
+        if (courseId == null) {
+            return Collections.emptyList();
+        }
+        return courseMemberMapper.selectList(new LambdaQueryWrapper<CourseMemberEntity>()
+                .eq(CourseMemberEntity::getCourseId, courseId)
+                .eq(CourseMemberEntity::getMemberRole, "STUDENT"))
+                .stream()
+                .map(CourseMemberEntity::getUserId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
     public int insert(CourseMemberEntity entity) {
         return courseMemberMapper.insert(entity);
     }

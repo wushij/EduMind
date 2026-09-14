@@ -132,4 +132,9 @@ public class UserQueryApiImpl implements UserQueryApi {
     public long countUsersByTenantAndRole(Long tenantId, String roleCode) {
         return listUserIdsByTenantAndRole(tenantId, roleCode).size();
     }
+
+    @Override
+    public List<Long> findUserIdsByKeyword(String keyword) {
+        return userDao.findUserIdsByKeyword(keyword);
+    }
 }

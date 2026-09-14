@@ -87,4 +87,18 @@ public class UserDao {
         return userMapper.selectCount(new LambdaQueryWrapper<UserEntity>()
                 .eq(UserEntity::getStatus, "1"));
     }
+
+    public java.util.List<Long> findUserIdsByKeyword(String keyword) {
+        if (!org.springframework.util.StringUtils.hasText(keyword)) {
+            return java.util.Collections.emptyList();
+        }
+        return userMapper.selectList(new LambdaQueryWrapper<UserEntity>()
+                .select(UserEntity::getId)
+                .like(UserEntity::getUsername, keyword.trim())
+                .or()
+                .like(UserEntity::getRealName, keyword.trim()))
+                .stream()
+                .map(UserEntity::getId)
+                .collect(java.util.stream.Collectors.toList());
+    }
 }

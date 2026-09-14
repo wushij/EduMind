@@ -849,6 +849,7 @@ import {
 } from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
 import { createPaperExportTask, getExportTaskStatus, listMyExportTasks } from '@/api/question/export';
+import { downloadByApiPath } from '@/utils/download/blob-download';
 
 const loading = ref(false);
 const exporting = ref(false);
@@ -1132,25 +1133,40 @@ const handlePrintDirect = () => {
 const refreshHistory = async () => {
   try {
     const res = await listMyExportTasks();
-    if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
-      exportHistory.value = res.data.map(item => ({
-        taskId: item.taskId,
-        title: configForm.value.paperTitle || `试卷 #${item.bizId} 考务排版`,
-        size: configForm.value.paperSize || 'A4',
-        type: 'PDF',
-        status: item.status,
-        progress: item.progress,
-        errorMsg: item.errorMsg,
-        createTime: item.createTime || '刚刚',
-        downloadUrl: item.downloadUrl
-      }));
+    if (res?.data && Array.isArray(res.data)) {
+      if (res.data.length === 0) {
+        exportHistory.value = [];
+        return;
+      }
+      exportHistory.value = res.data.map(item => {
+        let title = item.paperTitle;
+        if (!title && item.exportParams) {
+          try {
+            const parsed = JSON.parse(item.exportParams);
+            title = parsed.paperTitle;
+          } catch (e) {
+            // ignore
+          }
+        }
+        return {
+          taskId: item.taskId,
+          title: title || `试卷 #${item.bizId} 考务排版`,
+          size: configForm.value.paperSize || 'A4',
+          type: 'PDF',
+          status: item.status,
+          progress: item.progress,
+          errorMsg: item.errorMsg,
+          createTime: item.createTime || '刚刚',
+          downloadUrl: item.downloadUrl
+        };
+      });
     }
   } catch (err) {
     console.warn('获取近期导出任务历史失败', err);
   }
 };
 
-const downloadFile = (row: any) => {
+const downloadFile = async (row: any) => {
   if (row.status === 'FAILED') {
     ElMessage.error(row.errorMsg || '该导出任务生成失败，无法下载');
     return;
@@ -1165,10 +1181,11 @@ const downloadFile = (row: any) => {
   }
 
   ElMessage.success(`开始下载文件: ${row.title || '试卷排版'}`);
-  const fullUrl = row.downloadUrl.startsWith('http')
-    ? row.downloadUrl
-    : `${window.location.origin}${row.downloadUrl}`;
-  window.open(fullUrl, '_blank');
+  try {
+    await downloadByApiPath(row.downloadUrl, (row.title || 'export') + '.pdf');
+  } catch (err: any) {
+    ElMessage.error(err.message || '文件下载失败，请稍后重试');
+  }
 };
 
 onMounted(() => {

@@ -6,3 +6,5 @@ export function downloadBlob(blob: Blob, filename: string) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+export * from './blob-download';

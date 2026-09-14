@@ -1,6 +1,7 @@
 package com.edumind.statistics.service.intervention;
 
 import com.edumind.statistics.dto.intervention.InterventionActionDTO;
+import com.edumind.statistics.dto.intervention.InterventionCreateDTO;
 import com.edumind.statistics.vo.intervention.TeachingInterventionVO;
 
 import java.util.List;
@@ -9,6 +10,11 @@ import java.util.List;
  * 教学干预建议与决策业务服务接口
  */
 public interface TeachingInterventionService {
+
+    /**
+     * 创建教学干预建议提案
+     */
+    TeachingInterventionVO createIntervention(InterventionCreateDTO dto);
 
     /**
      * 获取指定课程或当前租户的教学干预建议列表

@@ -10,7 +10,7 @@ import java.util.Map;
 
 public interface TokenStatisticsService {
 
-    PageResult<AiCallLogVO> listLogs(Long userId, String scene, String model,
+    PageResult<AiCallLogVO> listLogs(Long userId, String scene, String model, String keyword,
                                      LocalDate startDate, LocalDate endDate,
                                      long page, long pageSize);
 

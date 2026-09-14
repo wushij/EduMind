@@ -29,5 +29,9 @@ public class ExportTaskVO implements Serializable {
 
     private String errorMsg;
 
+    private String exportParams;
+
+    private String paperTitle;
+
     private LocalDateTime createTime;
 }

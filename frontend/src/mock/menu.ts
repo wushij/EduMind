@@ -5,7 +5,7 @@
 
 import type { SysMenu } from '@/types/system/menu';
 
-export const MENU_STORAGE_KEY = 'edumind_sys_menu_v2_3';
+export const MENU_STORAGE_KEY = 'edumind_sys_menu_v2_5';
 
 /**
  * 默认预设的 EduMind 8 大核心业务模块菜单树
@@ -668,7 +668,7 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
         path: '/analytics/interventions',
         component: 'views/analytics/Interventions.vue',
         icon: 'Warning',
-        permission: 'analytics:intervention',
+        permission: 'analytics:intervention:view',
         sort: 5,
         status: 1,
         visible: true
@@ -957,7 +957,7 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
       {
         id: 807,
         parentId: 800,
-        name: '系统审计日志',
+        name: 'AI 审计日志',
         type: 2,
         path: '/system/audit',
         component: 'views/system/audit/AuditLog.vue',
@@ -966,6 +966,59 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
         sort: 7,
         status: 1,
         visible: true
+      },
+
+      // 7.1 业务操作日志
+      {
+        id: 8071,
+        parentId: 800,
+        name: '操作日志',
+        type: 2,
+        path: '/system/oper-log',
+        component: 'views/system/oper-log/index.vue',
+        icon: 'Memo',
+        permission: 'system:operlog:query',
+        sort: 8,
+        status: 1,
+        visible: true,
+        children: [
+          {
+            id: 80711,
+            parentId: 8071,
+            name: '操作日志查询',
+            type: 3,
+            permission: 'system:operlog:query',
+            sort: 1,
+            status: 1
+          },
+          {
+            id: 80712,
+            parentId: 8071,
+            name: '操作日志删除',
+            type: 3,
+            permission: 'system:operlog:delete',
+            sort: 2,
+            status: 1
+          },
+          {
+            id: 80713,
+            parentId: 8071,
+            name: '操作日志清空',
+            type: 3,
+            permission: 'system:operlog:clear',
+            sort: 3,
+            status: 1
+          },
+          {
+            id: 80714,
+            parentId: 8071,
+            name: '操作日志导出',
+            type: 3,
+            permission: 'system:operlog:export',
+            sort: 4,
+            status: 1
+          }
+        ]
       },
 
       // 8. 系统全局配置 (放最后)
@@ -981,6 +1034,41 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
         sort: 8,
         status: 1,
         visible: true
+      },
+
+      // 8.2 国密 KMS 密钥管理 (Gate I9)
+      {
+        id: 8085,
+        parentId: 800,
+        name: '国密密钥',
+        type: 2,
+        path: '/system/security/keys',
+        component: 'views/system/security/KeyVersionList.vue',
+        icon: 'Key',
+        permission: 'security:key:view',
+        sort: 8.5,
+        status: 1,
+        visible: true,
+        children: [
+          {
+            id: 80851,
+            parentId: 8085,
+            name: '密钥版本查看',
+            type: 3,
+            permission: 'security:key:view',
+            sort: 1,
+            status: 1
+          },
+          {
+            id: 80852,
+            parentId: 8085,
+            name: '密钥版本轮换',
+            type: 3,
+            permission: 'security:key:rotate',
+            sort: 2,
+            status: 1
+          }
+        ]
       },
       {
         id: 809,
@@ -1075,6 +1163,36 @@ export function getStoredMenuTree(): SysMenu[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        // 自动校验并注入「操作日志」菜单节点，防止历史 localStorage 遗漏
+        const hasOperLog = (nodes: SysMenu[]): boolean => {
+          return nodes.some(n => n.path === '/system/oper-log' || (n.children && hasOperLog(n.children)));
+        };
+        if (!hasOperLog(parsed)) {
+          const sysMod = parsed.find(m => m.id === 800);
+          if (sysMod && sysMod.children) {
+            const defaultSysMod = DEFAULT_MENU_TREE.find(m => m.id === 800);
+            const operLogNode = defaultSysMod?.children?.find(c => c.id === 8071);
+            if (operLogNode) {
+              sysMod.children.splice(sysMod.children.length - 1, 0, JSON.parse(JSON.stringify(operLogNode)));
+              saveStoredMenuTree(parsed);
+            }
+          }
+        }
+        // 自动校验并注入「国密密钥」菜单节点，防止历史 localStorage 遗漏
+        const hasSecurityKeys = (nodes: SysMenu[]): boolean => {
+          return nodes.some(n => n.path === '/system/security/keys' || (n.children && hasSecurityKeys(n.children)));
+        };
+        if (!hasSecurityKeys(parsed)) {
+          const sysMod = parsed.find(m => m.id === 800);
+          if (sysMod && sysMod.children) {
+            const defaultSysMod = DEFAULT_MENU_TREE.find(m => m.id === 800);
+            const secKeysNode = defaultSysMod?.children?.find(c => c.id === 8085);
+            if (secKeysNode) {
+              sysMod.children.splice(sysMod.children.length - 1, 0, JSON.parse(JSON.stringify(secKeysNode)));
+              saveStoredMenuTree(parsed);
+            }
+          }
+        }
         return parsed;
       }
     }

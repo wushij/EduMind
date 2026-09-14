@@ -74,10 +74,44 @@ public class SysOrganizationController {
         return ApiResult.success();
     }
 
-    @DeleteMapping("/{id}")
-    @SaCheckPermission(value = {"system:organization:delete", "system:organization:edit", "system:user:edit"}, mode = SaMode.OR)
-    public ApiResult<Void> deleteNode(@PathVariable("id") Long id) {
-        sysOrganizationService.deleteNode(id);
+    @GetMapping("/stats")
+    @SaCheckPermission(value = {"system:organization:list", "system:organization:view", "system:user:view"}, mode = SaMode.OR)
+    public ApiResult<com.edumind.system.vo.tenant.SysOrgStatsVO> getTenantOrgStats() {
+        Long tenantId = TenantContext.requireTenantId();
+        return ApiResult.success(sysOrganizationService.getTenantOrgStats(tenantId));
+    }
+
+    @GetMapping("/{id}/stats")
+    @SaCheckPermission(value = {"system:organization:list", "system:organization:view", "system:user:view"}, mode = SaMode.OR)
+    public ApiResult<com.edumind.system.vo.tenant.SysOrgNodeStatsVO> getNodeStats(@PathVariable("id") Long id) {
+        Long tenantId = TenantContext.requireTenantId();
+        return ApiResult.success(sysOrganizationService.getNodeStats(tenantId, id));
+    }
+
+    @GetMapping("/{id}/candidates")
+    @SaCheckPermission(value = {"system:organization:assign", "system:organization:edit", "system:user:edit"}, mode = SaMode.OR)
+    public ApiResult<List<com.edumind.system.vo.tenant.SysTenantMemberCandidateVO>> getCandidates(
+            @PathVariable("id") Long id,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String keyword) {
+        Long tenantId = TenantContext.requireTenantId();
+        return ApiResult.success(sysOrganizationService.getCandidateMembers(tenantId, id, keyword));
+    }
+
+    @PostMapping("/{id}/members/batch")
+    @SaCheckPermission(value = {"system:organization:assign", "system:organization:edit", "system:user:edit"}, mode = SaMode.OR)
+    public ApiResult<Void> batchAssignMembers(
+            @PathVariable("id") Long id,
+            @Valid @RequestBody com.edumind.system.dto.tenant.OrgMemberBatchAssignDTO dto) {
+        Long tenantId = TenantContext.requireTenantId();
+        sysOrganizationService.batchAssignMembers(tenantId, id, dto);
         return ApiResult.success();
     }
+
+    @GetMapping("/students/{userId}/profile")
+    @SaCheckPermission(value = {"system:organization:list", "system:organization:view", "system:user:view"}, mode = SaMode.OR)
+    public ApiResult<java.util.Map<String, Object>> getStudentProfile(@PathVariable("userId") Long userId) {
+        Long tenantId = TenantContext.requireTenantId();
+        return ApiResult.success(sysOrganizationService.getStudentCognitiveProfile(tenantId, userId));
+    }
 }
+

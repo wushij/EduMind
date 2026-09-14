@@ -108,6 +108,11 @@ public class CourseQueryApiImpl implements CourseQueryApi {
         return courseMemberDao.findCourseIdsByUserId(userId);
     }
 
+    @Override
+    public List<Long> listStudentUserIdsByCourseId(Long courseId) {
+        return courseMemberDao.findStudentUserIdsByCourseId(courseId);
+    }
+
     private String resolveTeacherName(Long teacherId) {
         if (teacherId == null) {
             return "";

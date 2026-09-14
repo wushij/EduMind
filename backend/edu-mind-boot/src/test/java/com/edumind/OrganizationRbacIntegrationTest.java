@@ -1,6 +1,5 @@
 package com.edumind;
 
-import cn.dev33.satoken.stp.StpUtil;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.system.api.TenantDataScope;
@@ -9,11 +8,9 @@ import com.edumind.system.dao.SysMemberOrgDao;
 import com.edumind.system.dao.SysOrganizationDao;
 import com.edumind.system.dao.SysTenantMemberDao;
 import com.edumind.system.dto.tenant.OrgMemberAssignDTO;
-import com.edumind.system.entity.SysOrganizationEntity;
 import com.edumind.system.entity.SysTenantMemberEntity;
 import com.edumind.system.service.SysOrganizationService;
 import com.edumind.system.vo.tenant.OrganizationMemberVO;
-import com.edumind.system.vo.tenant.OrganizationNodeVO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;

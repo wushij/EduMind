@@ -51,6 +51,12 @@ public class SysOrganizationDao {
                 .eq(SysOrganizationEntity::getTenantId, tenantId));
     }
 
+    public long countByType(Long tenantId, String orgType) {
+        return sysOrganizationMapper.selectCount(new LambdaQueryWrapper<SysOrganizationEntity>()
+                .eq(SysOrganizationEntity::getTenantId, tenantId)
+                .eq(SysOrganizationEntity::getOrgType, orgType));
+    }
+
     public int deleteById(Long id) {
         return sysOrganizationMapper.deleteById(id);
     }
@@ -60,3 +66,4 @@ public class SysOrganizationDao {
                 .eq(SysOrganizationEntity::getTenantId, tenantId));
     }
 }
+

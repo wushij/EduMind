@@ -324,10 +324,18 @@ export const SIDEBAR_SUBMENUS: Record<string, SidebarSubMenuMeta> = {
   'system-audit': {
     key: 'system-audit',
     moduleKey: 'system',
-    name: '审计日志',
+    name: 'AI 审计日志',
     path: '/system/audit',
     icon: 'Clock',
     sort: 7
+  },
+  'system-oper-log': {
+    key: 'system-oper-log',
+    moduleKey: 'system',
+    name: '操作日志',
+    path: '/system/oper-log',
+    icon: 'Memo',
+    sort: 8
   },
   'system-config': {
     key: 'system-config',
@@ -335,7 +343,7 @@ export const SIDEBAR_SUBMENUS: Record<string, SidebarSubMenuMeta> = {
     name: '系统配置',
     path: '/system/config',
     icon: 'Monitor',
-    sort: 8
+    sort: 9
   },
 
   // 9. 消息通知 (notice)
@@ -382,6 +390,7 @@ export function mapCodeToSubMenuKey(code: string): string {
   if (lower.startsWith('system:tenant')) return 'system-tenants';
   if (lower.startsWith('system:org') || lower.startsWith('system:organization')) return 'system-organizations';
   if (lower.startsWith('system:audit')) return 'system-audit';
+  if (lower.startsWith('system:operlog') || lower.startsWith('system:oper-log') || lower.startsWith('system:oper')) return 'system-oper-log';
   if (lower.startsWith('system:config')) return 'system-config';
 
   // AI 智算中心
@@ -440,7 +449,7 @@ export function getPermissionActionMeta(code: string): {
 } {
   const lower = code.toLowerCase();
 
-  if (lower.endsWith(':view') || lower.endsWith(':list')) {
+  if (lower.endsWith(':view') || lower.endsWith(':list') || lower.endsWith(':query')) {
     return { icon: 'Pointer', sort: 1 };
   }
   if (lower.endsWith(':add') || lower.endsWith(':create') || lower.endsWith(':upload')) {
@@ -449,20 +458,23 @@ export function getPermissionActionMeta(code: string): {
   if (lower.endsWith(':edit') || lower.endsWith(':update') || lower.endsWith(':grade')) {
     return { icon: 'EditPen', sort: 3 };
   }
-  if (lower.endsWith(':delete')) {
+  if (lower.endsWith(':delete') || lower.endsWith(':remove') || lower.endsWith(':clear')) {
     return { icon: 'Delete', sort: 4 };
   }
+  if (lower.endsWith(':export')) {
+    return { icon: 'Download', sort: 5 };
+  }
   if (lower.endsWith(':assign')) {
-    return { icon: 'User', sort: 5 };
+    return { icon: 'User', sort: 6 };
   }
   if (lower.endsWith(':use') || lower.endsWith(':chat')) {
-    return { icon: 'Cpu', sort: 6 };
+    return { icon: 'Cpu', sort: 7 };
   }
   if (lower.endsWith(':send')) {
-    return { icon: 'Promotion', sort: 7 };
+    return { icon: 'Promotion', sort: 8 };
   }
 
-  return { icon: 'Key', sort: 8 };
+  return { icon: 'Key', sort: 9 };
 }
 
 /** 兼容旧接口的元数据推断函数 */

@@ -12,12 +12,12 @@ minio:
 
 ai:
   llm:
-    provider: mock
+    provider: openai-compatible
     api-key: ${AI_API_KEY:${DEEPSEEK_API_KEY:}}
     base-url: https://api.deepseek.com
     model: deepseek-chat
     timeout-ms: 60000
-    mock-enabled: true
+    mock-enabled: false   # 真实模型走后台「模型配置」；仅 Gateway 降级链保留 mock
     stream-enabled: true
 
 edumind:

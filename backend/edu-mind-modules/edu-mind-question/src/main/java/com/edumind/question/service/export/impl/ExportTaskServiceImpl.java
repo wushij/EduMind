@@ -16,6 +16,7 @@ import com.edumind.question.service.export.ExportTaskDispatcher;
 import com.edumind.question.service.export.ExportTaskService;
 import com.edumind.question.vo.export.ExportTaskVO;
 import com.edumind.security.context.LoginUserResolver;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StreamUtils;
+import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -204,6 +206,16 @@ public class ExportTaskServiceImpl implements ExportTaskService {
         vo.setProgress(progress);
 
         vo.setDownloadUrl(entity.getFileUrl());
+        vo.setExportParams(entity.getExportParams());
+        if (StringUtils.hasText(entity.getExportParams())) {
+            try {
+                JsonNode node = objectMapper.readTree(entity.getExportParams());
+                if (node.hasNonNull("paperTitle")) {
+                    vo.setPaperTitle(node.get("paperTitle").asText());
+                }
+            } catch (Exception ignored) {
+            }
+        }
         vo.setCreateTime(entity.getCreateTime());
         return vo;
     }

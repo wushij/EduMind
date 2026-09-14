@@ -27,16 +27,21 @@ public class TokenStatisticsServiceImpl implements TokenStatisticsService {
 
     private final AiCallLogDao aiCallLogDao;
     private final AiConverter aiConverter;
+    private final com.edumind.system.api.UserQueryApi userQueryApi;
 
     @Override
-    public PageResult<AiCallLogVO> listLogs(Long userId, String scene, String model,
+    public PageResult<AiCallLogVO> listLogs(Long userId, String scene, String model, String keyword,
                                             LocalDate startDate, LocalDate endDate,
                                             long page, long pageSize) {
-        LambdaQueryWrapper<AiCallLogEntity> wrapper = buildLogWrapper(userId, scene, model, startDate, endDate);
+        LambdaQueryWrapper<AiCallLogEntity> wrapper = buildLogWrapper(userId, scene, model, keyword, startDate, endDate);
         wrapper.orderByDesc(AiCallLogEntity::getCreateTime);
         Page<AiCallLogEntity> result = aiCallLogDao.page(new Page<>(page, pageSize), wrapper);
         List<AiCallLogVO> list = result.getRecords().stream()
-                .map(aiConverter::toCallLogVO)
+                .map(entity -> {
+                    AiCallLogVO vo = aiConverter.toCallLogVO(entity);
+                    enrichUserInfo(vo);
+                    return vo;
+                })
                 .collect(Collectors.toList());
         return PageResult.<AiCallLogVO>builder()
                 .total(result.getTotal())
@@ -46,11 +51,37 @@ public class TokenStatisticsServiceImpl implements TokenStatisticsService {
                 .build();
     }
 
+    private void enrichUserInfo(AiCallLogVO vo) {
+        if (vo.getUserId() == null || userQueryApi == null) {
+            return;
+        }
+        try {
+            Object userObj = userQueryApi.getUserById(vo.getUserId());
+            if (userObj != null) {
+                org.springframework.beans.BeanWrapper bw = new org.springframework.beans.BeanWrapperImpl(userObj);
+                if (bw.isReadableProperty("username")) {
+                    vo.setUsername((String) bw.getPropertyValue("username"));
+                }
+                if (bw.isReadableProperty("realName")) {
+                    vo.setRealName((String) bw.getPropertyValue("realName"));
+                }
+                if (bw.isReadableProperty("avatar")) {
+                    vo.setAvatar((String) bw.getPropertyValue("avatar"));
+                }
+            }
+            List<String> roles = userQueryApi.getRolesByUserId(vo.getUserId());
+            if (roles != null && !roles.isEmpty()) {
+                vo.setUserRole(roles.get(0));
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
     @Override
     public TokenAuditSummaryVO summary(String groupBy, LocalDate startDate, LocalDate endDate) {
         LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now();
         LocalDate effectiveStart = startDate != null ? startDate : effectiveEnd.minusDays(6);
-        List<AiCallLogEntity> logs = aiCallLogDao.list(buildLogWrapper(null, null, null, effectiveStart, effectiveEnd));
+        List<AiCallLogEntity> logs = aiCallLogDao.list(buildLogWrapper(null, null, null, null, effectiveStart, effectiveEnd));
         int promptTokens = logs.stream().mapToInt(log -> log.getPromptTokens() != null ? log.getPromptTokens() : 0).sum();
         int completionTokens = logs.stream().mapToInt(log -> log.getCompletionTokens() != null ? log.getCompletionTokens() : 0).sum();
         int avgLatency = logs.isEmpty() ? 0 : (int) logs.stream()
@@ -70,21 +101,52 @@ public class TokenStatisticsServiceImpl implements TokenStatisticsService {
     public List<Map<String, Object>> dailyTrend(int days, LocalDate endDate) {
         LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now();
         LocalDate effectiveStart = effectiveEnd.minusDays(Math.max(days, 1) - 1);
-        List<AiCallLogEntity> logs = aiCallLogDao.list(buildLogWrapper(null, null, null, effectiveStart, effectiveEnd));
+        List<AiCallLogEntity> logs = aiCallLogDao.list(buildLogWrapper(null, null, null, null, effectiveStart, effectiveEnd));
         return buildDailyTrend(logs, effectiveStart, effectiveEnd);
     }
 
-    private LambdaQueryWrapper<AiCallLogEntity> buildLogWrapper(Long userId, String scene, String model,
+    private LambdaQueryWrapper<AiCallLogEntity> buildLogWrapper(Long userId, String scene, String model, String keyword,
                                                                 LocalDate startDate, LocalDate endDate) {
         LambdaQueryWrapper<AiCallLogEntity> wrapper = new LambdaQueryWrapper<>();
         if (userId != null) {
             wrapper.eq(AiCallLogEntity::getUserId, userId);
         }
-        if (scene != null) {
-            wrapper.eq(AiCallLogEntity::getScene, scene);
+        if (org.springframework.util.StringUtils.hasText(scene)) {
+            wrapper.eq(AiCallLogEntity::getScene, scene.trim());
         }
-        if (model != null) {
-            wrapper.eq(AiCallLogEntity::getModel, model);
+        if (org.springframework.util.StringUtils.hasText(model)) {
+            wrapper.eq(AiCallLogEntity::getModel, model.trim());
+        }
+        if (org.springframework.util.StringUtils.hasText(keyword)) {
+            String kw = keyword.trim();
+            Long idMatch = null;
+            if (kw.toLowerCase().startsWith("tr_")) {
+                try {
+                    idMatch = Long.parseLong(kw.substring(3));
+                } catch (Exception ignored) {}
+            } else if (kw.matches("^\\d+$")) {
+                try {
+                    idMatch = Long.parseLong(kw);
+                } catch (Exception ignored) {}
+            }
+            final Long finalId = idMatch;
+            List<Long> matchedUserIds = java.util.Collections.emptyList();
+            try {
+                matchedUserIds = userQueryApi.findUserIdsByKeyword(kw);
+            } catch (Exception ignored) {}
+            final List<Long> userIds = matchedUserIds;
+
+            wrapper.and(q -> {
+                if (finalId != null) {
+                    q.eq(AiCallLogEntity::getId, finalId).or().eq(AiCallLogEntity::getUserId, finalId).or();
+                }
+                if (!userIds.isEmpty()) {
+                    q.in(AiCallLogEntity::getUserId, userIds).or();
+                }
+                q.like(AiCallLogEntity::getScene, kw)
+                 .or().like(AiCallLogEntity::getModel, kw)
+                 .or().like(AiCallLogEntity::getConversationId, kw);
+            });
         }
         if (startDate != null) {
             wrapper.ge(AiCallLogEntity::getCreateTime, LocalDateTime.of(startDate, LocalTime.MIN));

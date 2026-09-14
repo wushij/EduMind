@@ -59,6 +59,21 @@ public class LocalFileStorageService implements FileStorageService {
                 return null;
             }
         }
+        // 回退兼容多目录搜索 (backend/data 与 根目录 data)
+        Path backendTarget = Path.of("backend", "data").resolve(bucket).resolve(objectName).toAbsolutePath();
+        if (Files.exists(backendTarget)) {
+            try {
+                return Files.newInputStream(backendTarget);
+            } catch (IOException ignored) {
+            }
+        }
+        Path rootDataTarget = Path.of("data").resolve(bucket).resolve(objectName).toAbsolutePath();
+        if (Files.exists(rootDataTarget)) {
+            try {
+                return Files.newInputStream(rootDataTarget);
+            } catch (IOException ignored) {
+            }
+        }
         // 回退兼容旧临时路径
         Path legacyTarget = Path.of(System.getProperty("java.io.tmpdir"), "edumind-storage")
                 .resolve(bucket).resolve(objectName);
@@ -115,6 +130,12 @@ public class LocalFileStorageService implements FileStorageService {
 
     private Path resolveStorageDir(String customPath) {
         Path userDir = Path.of(System.getProperty("user.dir")).toAbsolutePath();
+        if (userDir.getFileName() != null && userDir.getFileName().toString().equalsIgnoreCase("edu-mind-boot")) {
+            Path parent = userDir.getParent();
+            if (parent != null && parent.getFileName() != null && parent.getFileName().toString().equalsIgnoreCase("backend")) {
+                userDir = parent;
+            }
+        }
         if (StringUtils.hasText(customPath)) {
             Path p = Path.of(customPath);
             if (p.isAbsolute()) {

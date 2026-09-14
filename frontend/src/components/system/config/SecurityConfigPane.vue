@@ -25,7 +25,7 @@
           v-model="draft.sm4EncryptEnabled"
           :disabled="!canEdit"
         />
-        <span class="unit">是否启用接口请求/响应数据加密（国密 SM4-CBC 模式 + 16 字节随机 IV 向量）</span>
+        <span class="unit">是否启用接口请求/响应数据加密（国密 SM4-GCM 认证加密 + 12 字节随机 IV）</span>
       </el-form-item>
 
       <el-form-item label="数字签名验签">

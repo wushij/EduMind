@@ -9,6 +9,12 @@ public class AiCallLogVO {
 
     private Long id;
     private Long userId;
+    private String username;
+    private String realName;
+    private String avatar;
+    private String userRole;
+    private Long courseId;
+    private String conversationId;
     private String model;
     private Integer promptTokens;
     private Integer completionTokens;

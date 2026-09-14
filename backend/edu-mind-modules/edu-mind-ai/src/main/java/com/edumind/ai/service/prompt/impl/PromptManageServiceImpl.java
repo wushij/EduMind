@@ -138,9 +138,9 @@ public class PromptManageServiceImpl implements PromptManageService {
             nextVersion = (entity.getVersion() != null && entity.getVersion() > 0) ? entity.getVersion() : 1;
         } else {
             PromptTemplateVersionEntity latest = history.get(0);
-            boolean sysSame = Objects.equals(StringUtils.trimWhitespace(entity.getSystemPrompt()), StringUtils.trimWhitespace(latest.getSystemPrompt()));
-            boolean contentSame = Objects.equals(StringUtils.trimWhitespace(entity.getContent()), StringUtils.trimWhitespace(latest.getContent()));
-            boolean varsSame = Objects.equals(StringUtils.trimWhitespace(entity.getVariables()), StringUtils.trimWhitespace(latest.getVariables()));
+            boolean sysSame = Objects.equals(normalizeText(entity.getSystemPrompt()), normalizeText(latest.getSystemPrompt()));
+            boolean contentSame = Objects.equals(normalizeText(entity.getContent()), normalizeText(latest.getContent()));
+            boolean varsSame = Objects.equals(normalizeText(entity.getVariables()), normalizeText(latest.getVariables()));
 
             if (sysSame && contentSame && varsSame && "PUBLISHED".equalsIgnoreCase(entity.getStatus())) {
                 // 内容与当前最新发布快照完全一致，直接更新缓存，杜绝生成冗余无意义重复版本
@@ -276,6 +276,10 @@ public class PromptManageServiceImpl implements PromptManageService {
         vo.setMaxTokens(entity.getMaxTokens());
         vo.setUpdateTime(entity.getUpdateTime());
         return vo;
+    }
+
+    private static String normalizeText(String text) {
+        return text == null ? null : text.trim();
     }
 
     private PromptTemplateVersionVO toVersionVO(PromptTemplateVersionEntity entity) {

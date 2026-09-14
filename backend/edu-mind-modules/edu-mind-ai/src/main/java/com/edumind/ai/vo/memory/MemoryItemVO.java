@@ -15,6 +15,7 @@ public class MemoryItemVO {
     private String vectorRef;
     private Double confidenceScore;
     private Boolean encrypted;
+    private Integer keyVersion;
     private Integer accessCount;
     private LocalDateTime createTime;
 }

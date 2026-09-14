@@ -1,5 +1,6 @@
 package com.edumind.notification.api.impl;
 
+import com.edumind.common.context.TenantContext;
 import com.edumind.notification.api.NotificationWriteApi;
 import com.edumind.notification.converter.notification.NotificationConverter;
 import com.edumind.notification.dao.NotificationDao;
@@ -9,6 +10,8 @@ import com.edumind.notification.vo.notification.NotificationVO;
 import com.edumind.system.api.UserPreferenceQueryApi;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +35,7 @@ public class NotificationWriteApiImpl implements NotificationWriteApi {
             return;
         }
         NotificationEntity entity = new NotificationEntity();
+        entity.setTenantId(TenantContext.getTenantId());
         entity.setUserId(userId);
         entity.setTitle(title);
         entity.setContent(content);
@@ -42,5 +46,33 @@ public class NotificationWriteApiImpl implements NotificationWriteApi {
 
         NotificationVO vo = NotificationConverter.toVO(entity);
         notificationPushService.pushToUser(userId, vo);
+    }
+
+    @Override
+    public void sendToUsers(Long tenantId, List<Long> userIds, String title, String content, String type, Long refId) {
+        if (userIds == null || userIds.isEmpty()) {
+            return;
+        }
+        Long finalTenantId = tenantId != null ? tenantId : TenantContext.getTenantId();
+        for (Long userId : userIds) {
+            if (userId == null) {
+                continue;
+            }
+            if (!userPreferenceQueryApi.isNotificationEnabled(userId)) {
+                continue;
+            }
+            NotificationEntity entity = new NotificationEntity();
+            entity.setTenantId(finalTenantId);
+            entity.setUserId(userId);
+            entity.setTitle(title);
+            entity.setContent(content);
+            entity.setType(type != null ? type : "SYSTEM");
+            entity.setRefId(refId);
+            entity.setIsRead(0);
+            notificationDao.insert(entity);
+
+            NotificationVO vo = NotificationConverter.toVO(entity);
+            notificationPushService.pushToUser(userId, vo);
+        }
     }
 }

@@ -29,6 +29,23 @@ public class KnowledgeMasteryDao {
         );
     }
 
+    public List<KnowledgeMasteryEntity> listByStudent(Long studentId) {
+        return knowledgeMasteryMapper.selectList(
+                new LambdaQueryWrapper<KnowledgeMasteryEntity>()
+                        .eq(KnowledgeMasteryEntity::getStudentId, studentId)
+        );
+    }
+
+    public List<KnowledgeMasteryEntity> listByStudents(List<Long> studentIds) {
+        if (studentIds == null || studentIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return knowledgeMasteryMapper.selectList(
+                new LambdaQueryWrapper<KnowledgeMasteryEntity>()
+                        .in(KnowledgeMasteryEntity::getStudentId, studentIds)
+        );
+    }
+
     public KnowledgeMasteryEntity findByStudentAndKp(Long studentId, Long knowledgePointId) {
         return knowledgeMasteryMapper.selectOne(
                 new LambdaQueryWrapper<KnowledgeMasteryEntity>()
@@ -45,3 +62,4 @@ public class KnowledgeMasteryDao {
         return knowledgeMasteryMapper.updateById(entity);
     }
 }
+

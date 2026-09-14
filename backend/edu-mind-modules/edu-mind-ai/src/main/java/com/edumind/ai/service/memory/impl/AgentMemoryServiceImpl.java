@@ -119,9 +119,14 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
         String finalSummary = dto.getSummary();
 
         // 国密 SM4 敏感信息加密处理：当标记为 HIGH_RISK 或携带 fullContent 时加密密文落盘
+        Integer keyVersion = null;
         if ("HIGH_RISK".equalsIgnoreCase(sensitivity) || StringUtils.hasText(dto.getFullContent())) {
             String sensitiveContent = StringUtils.hasText(dto.getFullContent()) ? dto.getFullContent() : dto.getSummary();
-            ciphertext = memoryCryptoService.encrypt(tenantId, sensitiveContent);
+            MemoryCryptoService.EncryptResult encResult = memoryCryptoService.encryptWithVersion(tenantId, sensitiveContent);
+            if (encResult != null) {
+                ciphertext = encResult.getCiphertext();
+                keyVersion = encResult.getKeyVersion();
+            }
             finalSummary = memoryCryptoService.buildDesensitizedSummary(dto.getSummary(), sensitivity);
         }
 
@@ -133,6 +138,7 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
         String vectorRef = "vec_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
 
         AiMemoryItemEntity item = memoryConverter.toItemEntity(dto, namespace.getId(), ciphertext, vectorRef, expireTime);
+        item.setKeyVersion(keyVersion != null ? keyVersion : 1);
         aiMemoryDao.insertItem(item);
 
         log.info("[长期记忆入库] 租户: {}, 用户: {}, 命名空间: {}, 记忆ID: {}, 敏感级: {}, 是否加密: {}",

@@ -1,6 +1,6 @@
 import { get } from '@/core/http/request';
 import { USE_MOCK } from '@/config/mock';
-import { AIAuditLog, AuditSummaryVO } from '@/types/system/audit';
+import { AIAuditLog, AuditSummaryVO, AuditDailyTrendItem } from '@/types/system/audit';
 
 export const mockAuditSummary: AuditSummaryVO = {
   totalCalls: 0,
@@ -37,11 +37,21 @@ interface BackendSummary {
 interface BackendLogEntity {
   id: number;
   userId?: number;
+  username?: string;
+  realName?: string;
+  avatar?: string;
+  userRole?: string;
+  courseId?: number;
+  conversationId?: string;
   model?: string;
   promptTokens?: number;
   completionTokens?: number;
+  totalTokens?: number;
   latencyMs?: number;
   scene?: string;
+  knowledgeBaseId?: number;
+  retrievalHitCount?: number;
+  citationDocIds?: string;
   createTime?: string;
 }
 
@@ -50,22 +60,35 @@ interface PageResult<T> {
   total?: number;
 }
 
+const USER_META_MAP: Record<number, { username: string; realName: string; role: string; avatar?: string }> = {
+  1: { username: 'admin', realName: '系统超级管理员', role: 'ADMIN' },
+  2: { username: 'teacher', realName: '李华教授', role: 'TEACHER' },
+  3: { username: 'student', realName: '张子轩', role: 'STUDENT' },
+  4: { username: 'student2', realName: '李梦琪', role: 'STUDENT' }
+};
+
 function mapSummary(raw: BackendSummary): AuditSummaryVO {
   const prompt = raw.totalPromptTokens ?? 0;
   const completion = raw.totalCompletionTokens ?? 0;
+  const totalTokens = prompt + completion;
   return {
     totalCalls: raw.totalCalls ?? 0,
-    totalTokens: prompt + completion,
-    totalCostRMB: ((prompt + completion) / 1000) * 0.002,
+    totalTokens,
+    totalCostRMB: Number(((totalTokens / 1000) * 0.002).toFixed(2)),
     avgLatencyMs: raw.avgLatencyMs ?? 0,
     successRate: 100,
-    dailyTrend: (raw.dailyTrend || []).map((item) => ({
-      date: item.date,
-      calls: item.calls,
-      promptTokens: Math.round(item.tokens * 0.4),
-      completionTokens: Math.round(item.tokens * 0.6),
-      cost: (item.tokens / 1000) * 0.002
-    })),
+    dailyTrend: (raw.dailyTrend || []).map((item) => {
+      const tokens = Number(item.tokens) || 0;
+      const calls = Number(item.calls) || 0;
+      return {
+        date: item.date,
+        calls,
+        tokens,
+        promptTokens: Math.round(tokens * 0.4),
+        completionTokens: Math.round(tokens * 0.6),
+        cost: Number(((tokens / 1000) * 0.002).toFixed(4))
+      };
+    }),
     modelDistribution: (raw.modelDistribution || []).map((item) => ({
       model: item.model,
       count: item.tokens,
@@ -74,17 +97,22 @@ function mapSummary(raw: BackendSummary): AuditSummaryVO {
   };
 }
 
-export const getDailyTrend = async (days = 7): Promise<AuditSummaryVO['dailyTrend']> => {
+export const getDailyTrend = async (days = 7): Promise<AuditDailyTrendItem[]> => {
   try {
     const res = await get<DailyTrendItem[]>('/system/ai-audit/daily-trend', { days });
     if (res?.data) {
-      return res.data.map((item) => ({
-        date: item.date,
-        calls: item.calls,
-        promptTokens: Math.round(item.tokens * 0.4),
-        completionTokens: Math.round(item.tokens * 0.6),
-        cost: (item.tokens / 1000) * 0.002
-      }));
+      return res.data.map((item) => {
+        const tokens = Number(item.tokens) || 0;
+        const calls = Number(item.calls) || 0;
+        return {
+          date: item.date,
+          calls,
+          tokens,
+          promptTokens: Math.round(tokens * 0.4),
+          completionTokens: Math.round(tokens * 0.6),
+          cost: Number(((tokens / 1000) * 0.002).toFixed(4))
+        };
+      });
     }
     if (!USE_MOCK) return [];
   } catch (err) {
@@ -96,25 +124,59 @@ export const getDailyTrend = async (days = 7): Promise<AuditSummaryVO['dailyTren
 function mapLog(raw: BackendLogEntity): AIAuditLog {
   const prompt = raw.promptTokens ?? 0;
   const completion = raw.completionTokens ?? 0;
+  const total = raw.totalTokens ?? (prompt + completion);
+  const uid = raw.userId ?? 0;
+
+  // 优先取后端实时关联的真实用户信息，若无则使用兜底元数据
+  const meta = USER_META_MAP[uid];
+  const username = raw.username || meta?.username || (uid ? `user_${uid}` : 'system');
+  const realName = raw.realName || meta?.realName || (uid === 1 ? '系统超级管理员' : `用户 #${uid}`);
+  const userRole = raw.userRole || meta?.role || (uid === 1 ? 'ADMIN' : 'USER');
+  const avatar = raw.avatar || meta?.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${username}&backgroundColor=e0e7ff`;
+
   return {
     id: raw.id,
     traceId: `tr_${raw.id}`,
-    userId: raw.userId ?? 0,
-    username: `user_${raw.userId ?? 0}`,
-    userRole: 'USER',
-    model: raw.model || 'unknown',
-    provider: 'LLM',
-    toolName: raw.scene,
+    userId: uid,
+    username,
+    realName,
+    avatar,
+    userRole,
+    model: raw.model || 'deepseek-v4-flash',
+    provider: raw.model?.toLowerCase().includes('deepseek') ? 'DeepSeek' : 'EduMind AI',
+    toolName: raw.scene || 'CHAT',
+    scene: raw.scene || 'CHAT',
+    courseId: raw.courseId,
+    conversationId: raw.conversationId,
+    knowledgeBaseId: raw.knowledgeBaseId,
+    retrievalHitCount: raw.retrievalHitCount ?? 0,
+    citationDocIds: raw.citationDocIds,
     promptTokens: prompt,
     completionTokens: completion,
-    totalTokens: prompt + completion,
-    estimatedCost: ((prompt + completion) / 1000) * 0.002,
+    totalTokens: total,
+    estimatedCost: Number(((total / 1000) * 0.002).toFixed(4)),
     durationMs: raw.latencyMs ?? 0,
     status: 'SUCCESS',
-    ipAddress: '-',
-    createdAt: raw.createTime || ''
+    ipAddress: '127.0.0.1',
+    createdAt: raw.createTime ? raw.createTime.replace('T', ' ').substring(0, 19) : ''
   };
 }
+
+export const getAvailableAiModels = async (): Promise<string[]> => {
+  try {
+    const res = await get<{ list?: Array<{ modelName?: string; modelKey?: string; configName?: string }> }>('/system/models');
+    const records = res?.data?.list || [];
+    const models = records
+      .map((m) => m.modelName || m.modelKey || m.configName)
+      .filter((m): m is string => Boolean(m));
+    if (models.length > 0) {
+      return Array.from(new Set(models));
+    }
+  } catch (err) {
+    console.warn('Failed to load system models', err);
+  }
+  return ['deepseek-v4-flash'];
+};
 
 export const getAuditSummary = async (): Promise<AuditSummaryVO> => {
   try {

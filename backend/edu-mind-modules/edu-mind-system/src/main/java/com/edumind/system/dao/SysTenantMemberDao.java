@@ -72,4 +72,14 @@ public class SysTenantMemberDao {
                 .eq(SysTenantMemberEntity::getTenantId, tenantId)
                 .eq(SysTenantMemberEntity::getStatus, 1));
     }
+
+    public List<SysTenantMemberEntity> listByTenantId(Long tenantId) {
+        if (tenantId == null) {
+            return java.util.Collections.emptyList();
+        }
+        return sysTenantMemberMapper.selectList(new LambdaQueryWrapper<SysTenantMemberEntity>()
+                .eq(SysTenantMemberEntity::getTenantId, tenantId)
+                .eq(SysTenantMemberEntity::getStatus, 1));
+    }
 }
+

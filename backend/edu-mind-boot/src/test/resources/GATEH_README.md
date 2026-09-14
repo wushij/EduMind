@@ -18,9 +18,8 @@ mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS edumind_gateh CHARACTER SE
 cd E:\EduMind
 (Get-Content sql\init.sql -Raw -Encoding UTF8) -replace 'edumind','edumind_gateh' | mysql -uroot -proot --default-character-set=utf8mb4
 
-# 3. Gate G/H E2E 种子（幂等）
-Get-Content sql\migration\R__gate_g_e2e_seed.sql -Raw -Encoding UTF8 | mysql -uroot -proot edumind_gateh --default-character-set=utf8mb4
-Get-Content sql\migration\R__gate_h_e2e_seed.sql -Raw -Encoding UTF8 | mysql -uroot -proot edumind_gateh --default-character-set=utf8mb4
+# 3. Gate F/G/H E2E 种子（幂等）
+Get-Content sql\migration\R__gate_e2e_seeds.sql -Raw -Encoding UTF8 | mysql -uroot -proot edumind_gateh --default-character-set=utf8mb4
 ```
 
 ## 运行测试
@@ -51,5 +50,5 @@ mysql -uroot -proot edumind_restore < backup_gateh_YYYYMMDD.sql
 ## 注意事项
 
 - `GateV11IntegrationTest` **不再**在 `@BeforeEach` 中执行 `DROP TABLE` 等 DDL。
-- 数据依赖 Flyway 等价的手动 migration + `R__gate_h_e2e_seed.sql`。
+- 数据依赖 `init.sql`（或等价 migration）+ `R__gate_e2e_seeds.sql`。
 - 若测试报 `Unknown database 'edumind_gateh'`，请按上文初始化。

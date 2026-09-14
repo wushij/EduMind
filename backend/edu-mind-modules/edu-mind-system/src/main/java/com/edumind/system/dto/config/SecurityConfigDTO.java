@@ -28,7 +28,7 @@ public class SecurityConfigDTO implements Serializable {
     /** 国密 HMAC-SM3 数字签名开关 */
     private Boolean sm3SignEnabled;
 
-    /** 国密 SM4-CBC 接口加解密开关 */
+    /** 国密 SM4-GCM 接口加解密开关（与 Sm4GcmService 实现一致） */
     private Boolean sm4EncryptEnabled;
 
     /** 登录失败触发图形验证码阈值 (-1:从不, 0:始终, 1:输错1次, 3:输错3次) */

@@ -312,6 +312,10 @@ function getDefaultPermissionMock(): PermissionVO[] {
     { id: 35, permissionCode: 'system:tenant:edit', permissionName: '租户校区编辑' },
     { id: 26, permissionCode: 'system:org:view', permissionName: '组织架构管理' },
     { id: 36, permissionCode: 'system:audit:view', permissionName: '系统调用审计日志' },
+    { id: 46, permissionCode: 'system:operlog:query', permissionName: '操作日志查询浏览' },
+    { id: 47, permissionCode: 'system:operlog:delete', permissionName: '操作日志删除记录' },
+    { id: 48, permissionCode: 'system:operlog:clear', permissionName: '操作日志一键清空' },
+    { id: 49, permissionCode: 'system:operlog:export', permissionName: '操作日志导出报表' },
     { id: 37, permissionCode: 'system:config:view', permissionName: '系统全局配置查看' },
     { id: 38, permissionCode: 'system:config:edit', permissionName: '系统全局配置编辑' },
 

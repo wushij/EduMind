@@ -7,7 +7,6 @@ import com.edumind.common.exception.BusinessException;
 import com.edumind.common.model.LoginUser;
 import com.edumind.common.model.UserContext;
 import com.edumind.notification.dao.NotificationBroadcastDao;
-import com.edumind.notification.dao.NotificationDao;
 import com.edumind.notification.dto.broadcast.BroadcastCreateDTO;
 import com.edumind.notification.entity.NotificationBroadcastEntity;
 import com.edumind.notification.entity.NotificationEntity;
@@ -58,9 +57,6 @@ public class NotificationBroadcastIntegrationTest {
 
     @Autowired
     private NotificationBroadcastDao broadcastDao;
-
-    @Autowired
-    private NotificationDao notificationDao;
 
     @Autowired
     private SysTenantDao sysTenantDao;
@@ -367,6 +363,7 @@ public class NotificationBroadcastIntegrationTest {
         NotificationVO notif2 = studentNotifs.stream()
                 .filter(n -> "广播消息二".equals(n.getTitle()))
                 .findFirst().orElseThrow();
+        Assertions.assertEquals("广播消息二", notif2.getTitle());
 
         // 1. 单条已读测试: markAsRead
         notificationService.markAsRead(notif1.getId(), STUDENT_A);

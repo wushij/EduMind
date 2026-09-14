@@ -23,10 +23,7 @@ public class ModelRouterImpl implements ModelRouter {
             return normalizeModelKey(explicitModelKey);
         }
 
-        if (Boolean.TRUE.equals(llmProperties.getMockEnabled()) && "mock".equalsIgnoreCase(llmProperties.getProvider())) {
-            return "mock";
-        }
-
+        // 优先使用后台「模型配置」中的默认模型，避免 application-*.yml 的 provider=mock 覆盖已接入的真实模型
         AiModelConfigEntity defaultChat = aiModelConfigDao.findDefaultByType("chat");
         if (defaultChat != null && isInvokable(defaultChat)) {
             return configLookupKey(defaultChat);

@@ -16,3 +16,14 @@ export interface InterventionActionRequest {
   remark?: string;
   customQuestionIds?: number[];
 }
+
+export interface InterventionCreateRequest {
+  courseId?: number;
+  courseName?: string;
+  triggerType?: string;
+  title: string;
+  proposalText: string;
+  affectedStudentCount?: number;
+  customQuestionIds?: number[];
+}
+

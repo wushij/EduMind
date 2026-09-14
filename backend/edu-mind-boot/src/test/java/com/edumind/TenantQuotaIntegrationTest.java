@@ -5,7 +5,6 @@ import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.system.api.TenantQuotaApi;
 import com.edumind.system.dao.SysTenantQuotaDao;
-import com.edumind.system.dto.tenant.QuotaUpdateDTO;
 import com.edumind.system.entity.SysTenantQuotaEntity;
 import com.edumind.system.service.quota.TenantQuotaService;
 import com.edumind.system.vo.tenant.TenantQuotaVO;
