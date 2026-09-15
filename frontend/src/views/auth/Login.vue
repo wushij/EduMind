@@ -4,13 +4,67 @@
     <!-- 右侧高保真登录卡片 (严格 1:1 对齐 docs/登录1.png) -->
     <div class="login-card-wrapper">
       <div class="login-card">
-        <!-- 顶部 Tabs 导航：账号登录 / 扫码登录 -->
-        <div class="card-tabs-header">
+        <!-- 右上角经典切角扫码/电脑登录切换器 (Corner Switcher) -->
+        <div
+          class="corner-switch-box"
+          :class="{ 'is-qrcode': isQrCodeMode }"
+          :title="isQrCodeMode ? '点击切换为账号密码登录' : '点击切换为扫码登录'"
+          @click="toggleLoginMode"
+        >
+          <!-- 折角徽标 (带斜切几何质感背景与 SVG 矢量图标) -->
+          <div class="corner-badge">
+            <div class="corner-triangle"></div>
+            <div class="corner-icon-wrap">
+              <!-- 处于扫码模式时展示：电脑显示器图标 (切回密码) -->
+              <svg
+                v-if="isQrCodeMode"
+                viewBox="0 0 24 24"
+                class="corner-svg"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+              <!-- 处于表单模式时展示：二维码图标 (切换扫码) -->
+              <svg
+                v-else
+                viewBox="0 0 24 24"
+                class="corner-svg"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <line x1="6.5" y1="6.5" x2="6.5" y2="6.5" stroke-width="2.5" stroke-linecap="round" />
+                <line x1="17.5" y1="6.5" x2="17.5" y2="6.5" stroke-width="2.5" stroke-linecap="round" />
+                <line x1="6.5" y1="17.5" x2="6.5" y2="17.5" stroke-width="2.5" stroke-linecap="round" />
+                <line x1="17.5" y1="17.5" x2="17.5" y2="17.5" stroke-width="2.5" stroke-linecap="round" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- 顶部 Tabs 导航：保留账号登录 / 邮箱登录 双模式 (带图标) -->
+        <div v-show="!isQrCodeMode" class="card-tabs-header">
           <div
             class="tab-btn"
             :class="{ active: activeTab === 'account' }"
             @click="activeTab = 'account'"
           >
+            <svg viewBox="0 0 24 24" class="tab-icon" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
             <span>账号登录</span>
             <div v-if="activeTab === 'account'" class="tab-indicator"></div>
           </div>
@@ -19,22 +73,18 @@
             :class="{ active: activeTab === 'email' }"
             @click="activeTab = 'email'"
           >
+            <svg viewBox="0 0 24 24" class="tab-icon" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+              <polyline points="22,6 12,13 2,6" />
+            </svg>
             <span>邮箱登录</span>
             <div v-if="activeTab === 'email'" class="tab-indicator"></div>
-          </div>
-          <div
-            class="tab-btn"
-            :class="{ active: activeTab === 'qrcode' }"
-            @click="activeTab = 'qrcode'"
-          >
-            <span>扫码登录</span>
-            <div v-if="activeTab === 'qrcode'" class="tab-indicator"></div>
           </div>
           <div class="tabs-base-line"></div>
         </div>
 
         <!-- 模式 A：账号密码登录 -->
-        <div v-show="activeTab === 'account'" class="tab-body">
+        <div v-show="!isQrCodeMode && activeTab === 'account'" class="tab-body">
           <div class="card-title-section">
             <p class="card-welcome-title">欢迎使用 EduMind AI 智能教学赋能平台</p>
           </div>
@@ -179,9 +229,9 @@
         </div>
 
         <!-- 模式 C：邮箱验证码快捷登录 -->
-        <div v-show="activeTab === 'email'" class="tab-body">
+        <div v-show="!isQrCodeMode && activeTab === 'email'" class="tab-body">
           <div class="card-title-section">
-            <p class="card-welcome-title">欢迎使用邮箱验证码安全快捷登录</p>
+            <p class="card-welcome-title">EduMind AI 教学平台 · 邮箱免密安全登录</p>
           </div>
 
           <!-- 邮箱登录表单 -->
@@ -279,9 +329,12 @@
           </div>
         </div>
 
-        <!-- 模式 B：扫码登录 -->
-        <div v-show="activeTab === 'qrcode'" class="tab-body qrcode-body">
-          <p class="card-sub-title qrcode-sub-title">使用手机微信或企业微信扫一扫快速登录</p>
+        <!-- 模式 B：扫码登录 (右上角切角触发) -->
+        <div v-show="isQrCodeMode" class="tab-body qrcode-body">
+          <div class="card-title-section qrcode-header">
+            <p class="card-welcome-title">扫码安全登录</p>
+            <p class="card-sub-title qrcode-sub-title">请使用微信或企业微信扫一扫快捷登录</p>
+          </div>
 
           <div class="scan-box-panel">
             <div class="qr-frame">
@@ -302,7 +355,7 @@
             </button>
           </div>
 
-          <div class="back-account-btn" @click="activeTab = 'account'">
+          <div class="back-account-btn" @click="isQrCodeMode = false">
             返回账号密码登录
           </div>
         </div>
@@ -340,13 +393,18 @@ const route = useRoute();
 const authStore = useAuthStore();
 
 // 状态管理
-const activeTab = ref<'account' | 'email' | 'qrcode'>('account');
+const isQrCodeMode = ref(false);
+const activeTab = ref<'account' | 'email'>('account');
 const rememberMe = ref(false);
 const showPassword = ref(false);
 const loading = ref(false);
 
+const toggleLoginMode = () => {
+  isQrCodeMode.value = !isQrCodeMode.value;
+};
+
 // 验证码策略与状态 (支持字符图形验证码与 Code Compass 滑块验证码)
-const captchaType = ref<'image' | 'slider'>('slider');
+const captchaType = ref<'image' | 'slider'>('image');
 const sliderModalVisible = ref(false);
 const captchaToken = ref('');
 const captchaId = ref('');
@@ -600,7 +658,7 @@ onMounted(async () => {
       captchaType.value = policyRes.data.captchaType;
     }
   } catch {
-    // 获取失败默认采用滑块模式
+    // 获取失败默认采用图片验证码
   }
   if (captchaType.value === 'image') {
     refreshCaptcha();
@@ -633,6 +691,8 @@ onMounted(async () => {
   }
 
   .login-card {
+    position: relative;
+    overflow: hidden; /* 保证右上角折角完美契合卡片 16px 圆角 */
     width: 416px;
     background: #FFFFFF;
     border-radius: 16px;
@@ -640,11 +700,86 @@ onMounted(async () => {
     padding: 34px 34px 28px;
     box-sizing: border-box;
 
-    /* 顶部两列 Tabs 切换 */
+    /* 右上角经典切角扫码/密码登录切换器 (Corner Switcher) */
+    .corner-switch-box {
+      position: absolute;
+      top: 0;
+      right: 0;
+      z-index: 20;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      user-select: none;
+
+      /* 折角三角形徽标 */
+      .corner-badge {
+        position: relative;
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-end;
+
+        .corner-triangle {
+          position: absolute;
+          top: 0;
+          right: 0;
+          width: 100%;
+          height: 100%;
+          clip-path: polygon(0 0, 100% 0, 100% 100%);
+          background: linear-gradient(135deg, #F0F7FF 0%, #E1EFFE 100%);
+          box-shadow: -2px 2px 6px rgba(16, 68, 148, 0.06);
+          transition: all 0.25s ease;
+        }
+
+        .corner-icon-wrap {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          z-index: 2;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #1677FF;
+          transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+          .corner-svg {
+            width: 21px;
+            height: 21px;
+            display: block;
+          }
+        }
+      }
+
+      &:hover {
+        .corner-badge {
+          .corner-triangle {
+            background: linear-gradient(135deg, #E0EEFD 0%, #C7E2FE 100%);
+          }
+
+          .corner-icon-wrap {
+            transform: scale(1.15);
+            color: #0958D9;
+          }
+        }
+      }
+
+      /* 扫码模式激活状态下的细微调优 */
+      &.is-qrcode {
+        .corner-icon-wrap {
+          color: #2563EB;
+        }
+      }
+    }
+
+    /* 顶部两列 Tabs 切换 (账号登录 / 邮箱登录) */
     .card-tabs-header {
       position: relative;
       display: flex;
-      justify-content: space-around;
+      justify-content: center;
+      gap: 40px;
       margin-bottom: 24px;
 
       .tab-btn {
@@ -654,10 +789,25 @@ onMounted(async () => {
         font-weight: 500;
         padding-bottom: 12px;
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
         transition: color 0.2s;
+
+        .tab-icon {
+          width: 17px;
+          height: 17px;
+          stroke-width: 1.8;
+          color: currentColor;
+          transition: transform 0.2s ease;
+        }
 
         &:hover {
           color: #1677FF;
+
+          .tab-icon {
+            transform: scale(1.08);
+          }
         }
 
         &.active {
@@ -670,7 +820,7 @@ onMounted(async () => {
           bottom: 0px;
           left: 50%;
           transform: translateX(-50%);
-          width: 68px;
+          width: 82px;
           height: 3px;
           background: #1677FF;
           border-radius: 2px;
@@ -935,24 +1085,40 @@ onMounted(async () => {
       }
     }
 
+    /* 视图淡入微动效 */
+    .tab-body {
+      animation: authFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
     /* 扫码模式 */
     .qrcode-body {
       display: flex;
       flex-direction: column;
       align-items: center;
 
-      .qrcode-sub-title {
-        font-size: 13px;
-        color: #6e7a8a;
-        margin: 0 0 16px;
+      .qrcode-header {
+        margin-bottom: 8px;
         text-align: center;
+
+        .card-welcome-title {
+          font-size: 16px;
+          font-weight: 600;
+          color: #0A1B39;
+          margin: 0 0 6px 0;
+        }
+
+        .qrcode-sub-title {
+          font-size: 13px;
+          color: #6E7A8A;
+          margin: 0;
+        }
       }
 
       .scan-box-panel {
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 10px 0;
+        padding: 6px 0;
 
         .qr-frame {
           position: relative;
@@ -1026,6 +1192,17 @@ onMounted(async () => {
         }
       }
     }
+  }
+}
+
+@keyframes authFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

@@ -18,6 +18,8 @@ public interface NotificationBroadcastService {
 
     BroadcastStatsVO getStats();
 
+    com.edumind.notification.vo.broadcast.BroadcastRecipientSummaryVO getRecipientSummary(Long broadcastId, Integer isRead, String keyword, long page, long pageSize);
+
     void deleteById(Long id);
 
     void clearAll();

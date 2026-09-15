@@ -27,6 +27,7 @@ export function usePrompt() {
     try {
       promptList.value = await getPromptTemplates(category);
     } catch (err: any) {
+      promptList.value = [];
       ElMessage.error(err.message || '获取提示词模板失败');
     } finally {
       loading.value = false;
@@ -36,9 +37,16 @@ export function usePrompt() {
   const loadPrompt = async (id: number) => {
     loading.value = true;
     try {
-      currentPrompt.value = await getPromptById(id);
+      const res = await getPromptById(id);
+      if (!res) {
+        ElMessage.warning('提示词不存在');
+        currentPrompt.value = null;
+      } else {
+        currentPrompt.value = res;
+      }
     } catch (err: any) {
       ElMessage.error(err.message || '获取提示词详情失败');
+      currentPrompt.value = null;
     } finally {
       loading.value = false;
     }

@@ -24,4 +24,19 @@ public class CourseResourceController {
     public ApiResult<List<CourseResourceVO>> listCourseResources(@PathVariable("id") Long courseId) {
         return ApiResult.success(courseResourceService.listByCourseId(courseId));
     }
+
+    @SaCheckPermission("course:edit")
+    @org.springframework.web.bind.annotation.PostMapping("/{id}/resources")
+    public ApiResult<Long> addCourseResource(@PathVariable("id") Long courseId,
+                                             @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody com.edumind.resource.dto.course.CourseResourceCreateDTO dto) {
+        return ApiResult.success(courseResourceService.addResource(courseId, dto));
+    }
+
+    @SaCheckPermission("course:edit")
+    @org.springframework.web.bind.annotation.DeleteMapping("/{id}/resources/{resourceId}")
+    public ApiResult<Void> deleteCourseResource(@PathVariable("id") Long courseId,
+                                                @PathVariable("resourceId") Long resourceId) {
+        courseResourceService.deleteResource(resourceId);
+        return ApiResult.success();
+    }
 }

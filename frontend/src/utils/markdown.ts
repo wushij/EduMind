@@ -291,6 +291,50 @@ function normalizeLatexDelimiters(text: string): string {
     .join('');
 }
 
+const KNOWN_CODE_LANGS = [
+  'c\\+\\+', 'cpp', 'csharp', 'c#', 'python', 'py', 'javascript', 'js',
+  'typescript', 'ts', 'java', 'golang', 'go', 'rust', 'rs', 'kotlin', 'kt',
+  'swift', 'scala', 'sql', 'html', 'css', 'scss', 'less', 'bash', 'shell', 'sh', 'zsh',
+  'json', 'xml', 'yaml', 'yml', 'markdown', 'md', 'mermaid', 'r', 'matlab',
+  'php', 'ruby', 'rb', 'perl', 'lua', 'dart', 'c'
+];
+
+/**
+ * 修复大模型输出代码块时缺失换行导致 Markdown 语法颠倒的问题：
+ * 1. ``` 前缺失换行（如「### 例题3：混合嵌套循环```c」或「嵌套混合```」）
+ *    -> 若前面紧贴非换行内容，CommonMark 无法识别开头的代码围栏，会导致后方的闭合 ``` 被误判为开头，
+ *       把正文讲解/公式全部吞进代码框，代码反而裸露在外。
+ * 2. ```lang 与首行代码粘连（如 ```cfor 或 ```pythondef）
+ *    -> 拆开语言声明与代码文本，确保语法高亮与代码独立换行。
+ * 3. 未声明语言但紧贴代码（如 ```for 或 ```i=1）
+ *    -> 拆开围栏与首行代码。
+ * 4. 闭合 ``` 后面粘连中文小标题/正文（如 ```思路：或 ```解析：）
+ *    -> 确保代码块闭合后换行。
+ */
+export function normalizeCodeFences(raw: string): string {
+  if (!raw) return '';
+  let s = raw;
+
+  // 1. 如果 ``` 或 ~~~ 紧随表格行（以 | 结尾），必须用空行分隔，避免被表格误吞为最后一列单元格
+  s = s.replace(/(\|[ \t]*)\n*(```+|~~~+)/g, '$1\n\n$2');
+
+  // 2. ``` 或 ~~~ 前面紧贴非换行字符，强制换行（仅行内空白，不吞多行换行）
+  s = s.replace(/([^\n\r])[ \t]*(```+|~~~+)/g, '$1\n$2');
+
+  // 3. ```lang 后面在同一行直接粘连代码文本（如 ```cfor 或 ```pythondef）
+  const knownLangsPattern = KNOWN_CODE_LANGS.join('|');
+  const langGluedRegex = new RegExp(`(^|\\n)([\`~]{3,})(${knownLangsPattern})([^\\s\\n])`, 'gi');
+  s = s.replace(langGluedRegex, '$1$2$3\n$4');
+
+  // 4. ``` 后面没有任何已知语言声明直接紧贴代码（如 ```for 或 ```i=1）
+  s = s.replace(/(^|\n)([\`~]{3,})(?![a-zA-Z0-9_#+-]+(\s|\n|$))([^\s\n]+)/g, '$1$2\n$3');
+
+  // 5. 闭合代码块 ``` 后面直接紧贴中文或小标题（如 ```思路：外层 或 ```解析：）
+  s = s.replace(/(^|\n)([\`~]{3,})([ \t]*)([\u4e00-\u9fa5【「『（\(（])/g, '$1$2\n$4');
+
+  return s;
+}
+
 mermaid.initialize({
   startOnLoad: false,
   // Mermaid 12 默认会把错误 SVG 插入 document.body；开启后失败时清理并抛错，避免污染全站页面
@@ -724,9 +768,10 @@ function renderKatexHtml(formula: string, displayMode: boolean): string {
 function renderMarkdownPipeline(content: string, normalizeTables: boolean, enableMermaid = true): string {
   if (!content?.trim()) return '';
 
+  const fenced = normalizeCodeFences(content);
   let processed = normalizeTables
-    ? normalizeLatexDelimiters(normalizeChatTables(content))
-    : normalizeLatexDelimiters(content);
+    ? normalizeLatexDelimiters(normalizeChatTables(fenced))
+    : normalizeLatexDelimiters(fenced);
 
   const blockKatexMap = new Map<string, string>();
   let blockIdx = 0;
@@ -853,4 +898,28 @@ export function bindMarkdownCodeCopy(
   if (options?.renderMermaid !== false) {
     void renderMermaidInElement(root);
   }
+}
+
+// 全局委托监听：无论组件是否处于流式高频重绘，点击复制按钮均能可靠触发
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', async (e) => {
+    const btn = (e.target as HTMLElement)?.closest<HTMLButtonElement>('.code-copy-btn');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const code = btn.closest('.code-block-wrapper')?.querySelector('code')?.textContent || '';
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      const prevText = btn.textContent || '复制';
+      btn.textContent = '已复制';
+      btn.classList.add('is-copied');
+      setTimeout(() => {
+        btn.textContent = prevText;
+        btn.classList.remove('is-copied');
+      }, 1500);
+    } catch {
+      /* clipboard blocked */
+    }
+  });
 }

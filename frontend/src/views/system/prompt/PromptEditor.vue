@@ -1530,6 +1530,27 @@ onMounted(async () => {
           provider: 'SAVED'
         });
       }
+    } else {
+      // 不存在 id 或拉取失败：重置为空表单，不展示内置示例或假数据正文
+      form.value = {
+        id: 0,
+        code: '',
+        name: '',
+        category: 'rag',
+        description: '',
+        systemPrompt: '',
+        userPromptTemplate: '',
+        variables: [],
+        version: 'v1.0.0',
+        status: 'DRAFT',
+        boundModel: '',
+        temperature: 0.3,
+        maxTokens: 8000,
+        callCount: 0,
+        createdAt: '',
+        updatedAt: ''
+      };
+      testVariables.value = {};
     }
   }
 });

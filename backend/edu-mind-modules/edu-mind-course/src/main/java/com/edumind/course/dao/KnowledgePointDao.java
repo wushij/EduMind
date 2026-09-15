@@ -42,4 +42,26 @@ public class KnowledgePointDao {
         }
         return knowledgePointMapper.insert(entity);
     }
+
+    public Long countByCourseId(Long courseId) {
+        if (courseId == null) {
+            return 0L;
+        }
+        return knowledgePointMapper.selectCount(new LambdaQueryWrapper<KnowledgePointEntity>()
+                .eq(KnowledgePointEntity::getCourseId, courseId));
+    }
+
+    public int updateById(KnowledgePointEntity entity) {
+        if (entity == null) {
+            return 0;
+        }
+        return knowledgePointMapper.updateById(entity);
+    }
+
+    public int deleteById(Long id) {
+        if (id == null) {
+            return 0;
+        }
+        return knowledgePointMapper.deleteById(id);
+    }
 }

@@ -10,4 +10,8 @@ public interface CourseMemberService {
     List<CourseMemberVO> listMembers(Long courseId);
 
     Long addMember(Long courseId, CourseMemberAddDTO dto);
+
+    void removeMember(Long courseId, Long userId);
+
+    Long joinCourse(Long courseId, Long userId);
 }

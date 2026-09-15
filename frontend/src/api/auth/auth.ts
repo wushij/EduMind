@@ -25,7 +25,7 @@ export const createSliderChallenge = (operation = 'LOGIN', username = '') =>
   });
 
 export const verifySliderCaptcha = (payload: SliderVerifyPayload) =>
-  post<SliderVerifyResult>('/auth/captcha/slider/verify', payload);
+  post<SliderVerifyResult>('/auth/captcha/slider/verify', payload, { silent: true });
 
 export const login = (params: LoginParams) => post<LoginResult>('/auth/login', params);
 

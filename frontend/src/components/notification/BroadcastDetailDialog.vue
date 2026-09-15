@@ -55,8 +55,11 @@
           </div>
         </div>
 
-        <div class="overview-box">
-          <span class="overview-label">已读确认人数</span>
+        <div class="overview-box overview-box-interactive" @click="emit('open-recipients')">
+          <div class="overview-header-row">
+            <span class="overview-label">已读确认人数</span>
+            <span class="detail-badge-pill">明细 &gt;</span>
+          </div>
           <div class="overview-val-row">
             <span class="overview-num highlight-emerald">{{ broadcast.readCount || 0 }}</span>
             <span class="overview-unit">人</span>
@@ -127,6 +130,14 @@
 
     <template #footer>
       <div class="dialog-footer-wrap">
+        <el-button
+          round
+          class="btn-recipients-pill"
+          :icon="UserFilled"
+          @click="emit('open-recipients')"
+        >
+          查看已读名单明细
+        </el-button>
         <el-button round class="btn-close-pill" @click="emit('update:visible', false)">
           关闭
         </el-button>
@@ -151,6 +162,7 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void;
+  (e: 'open-recipients'): void;
 }>();
 
 function resolveSenderAvatar(b: NotificationBroadcastVO | null): string {
@@ -310,6 +322,40 @@ function handleCopy(text?: string) {
   flex-direction: column;
   gap: 4px;
 
+  &.overview-box-interactive {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-color: #a7f3d0;
+    background: #f0fdf4;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+      border-color: #10b981;
+
+      .detail-badge-pill {
+        color: #047857;
+        text-decoration: underline;
+      }
+    }
+  }
+
+  .overview-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .detail-badge-pill {
+    font-size: 10px;
+    font-weight: 500;
+    color: #059669;
+    background: transparent;
+    border: none;
+    padding: 0;
+    transition: all 0.2s ease;
+  }
+
   .overview-label {
     font-size: 11px;
     color: #64748b;
@@ -434,7 +480,27 @@ function handleCopy(text?: string) {
 .dialog-footer-wrap {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
   padding-top: 8px;
+}
+
+.btn-recipients-pill {
+  border-radius: 9999px !important;
+  padding: 8px 18px !important;
+  background: #ecfdf5 !important;
+  border: 1px solid #a7f3d0 !important;
+  color: #047857 !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  transition: all 0.2s ease !important;
+
+  &:hover {
+    background: #10b981 !important;
+    border-color: #10b981 !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25) !important;
+    transform: translateY(-1px);
+  }
 }
 
 .btn-close-pill {

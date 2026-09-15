@@ -54,9 +54,14 @@ public class KnowledgeOcrServiceImpl implements KnowledgeOcrService {
             throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "关联文档ID不能为空");
         }
 
-        // 校验文档存在性
+        // 校验文档存在性（跨租户时 Fail-Closed 返回 403 而非 404，避免 ID 枚举）
         KnowledgeDocumentEntity doc = knowledgeDocumentDao.findById(documentId);
         if (doc == null) {
+            final KnowledgeDocumentEntity[] crossTenantProbe = new KnowledgeDocumentEntity[1];
+            TenantContext.runWithoutTenant(() -> crossTenantProbe[0] = knowledgeDocumentDao.findById(documentId));
+            if (crossTenantProbe[0] != null) {
+                throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权访问其他租户的文档 (IDOR 越权拦截)");
+            }
             throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "关联文档不存在");
         }
 

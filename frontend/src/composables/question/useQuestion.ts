@@ -7,8 +7,6 @@ import {
   deleteQuestion
 } from '@/api/question/question';
 import { QuestionItem } from '@/types/question/question';
-import { USE_MOCK } from '@/config/mock';
-import { MOCK_QUESTIONS } from '@/mock/questions';
 import { normalizeQuestion, normalizeQuestionList } from '@/utils/question/normalize-question';
 
 export function useQuestion() {
@@ -23,9 +21,10 @@ export function useQuestion() {
       const res = await getQuestions(params);
       questions.value = normalizeQuestionList(res.data?.list || []);
       total.value = res.data?.total ?? questions.value.length;
-    } catch {
-      questions.value = USE_MOCK ? normalizeQuestionList(MOCK_QUESTIONS) : [];
-      total.value = questions.value.length;
+    } catch (err) {
+      questions.value = [];
+      total.value = 0;
+      throw err;
     } finally {
       loading.value = false;
     }
@@ -36,11 +35,9 @@ export function useQuestion() {
     try {
       const res = await getQuestionDetail(id);
       currentQuestion.value = normalizeQuestion(res.data || {});
-    } catch {
-      const fallback = USE_MOCK ? MOCK_QUESTIONS.find(q => q.id === id) || null : null;
-      currentQuestion.value = fallback
-        ? normalizeQuestion(fallback)
-        : null;
+    } catch (err) {
+      currentQuestion.value = null;
+      throw err;
     } finally {
       loading.value = false;
     }

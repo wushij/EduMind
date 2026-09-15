@@ -2,6 +2,7 @@ package com.edumind.common.api;
 
 import com.edumind.common.utils.JsonUtil;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.ResponseEntity;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -44,5 +45,21 @@ public final class ApiResponseWriter {
             case 500 -> HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
             default -> HttpServletResponse.SC_OK;
         };
+    }
+
+    /**
+     * Controller 层统一构造带 HTTP 状态码的 {@link ApiResult} 响应。
+     */
+    public static ResponseEntity<ApiResult<Void>> toResponseEntity(int businessCode, String message) {
+        return ResponseEntity.status(resolveHttpStatus(businessCode))
+                .body(ApiResult.failed(businessCode, message));
+    }
+
+    public static ResponseEntity<ApiResult<Void>> toResponseEntity(ResultCode resultCode) {
+        return toResponseEntity(resultCode.getCode(), resultCode.getMessage());
+    }
+
+    public static ResponseEntity<ApiResult<Void>> toResponseEntity(ResultCode resultCode, String message) {
+        return toResponseEntity(resultCode.getCode(), message);
     }
 }

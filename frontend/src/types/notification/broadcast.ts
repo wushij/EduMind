@@ -42,3 +42,25 @@ export interface BroadcastStatsVO {
 }
 
 export type BroadcastListResult = PageResult<NotificationBroadcastVO>;
+
+export interface BroadcastRecipientVO {
+  id: number;
+  userId: number;
+  username: string;
+  realName?: string;
+  avatar?: string;
+  roleCode?: string;
+  roleName?: string;
+  isRead: number;
+  createTime?: string;
+}
+
+export interface BroadcastRecipientSummaryVO {
+  broadcastId: number;
+  broadcastTitle: string;
+  totalCount: number;
+  readCount: number;
+  unreadCount: number;
+  readRate: number;
+  recipients: PageResult<BroadcastRecipientVO>;
+}

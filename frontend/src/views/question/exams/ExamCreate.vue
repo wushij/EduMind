@@ -533,8 +533,6 @@ import { createExam } from '@/api/question/exam';
 import { getQuestions } from '@/api/question/question';
 import type { Course } from '@/types/course/course';
 import type { QuestionItem, QuestionType, Difficulty } from '@/types/question/question';
-import { USE_MOCK } from '@/config/mock';
-import { MOCK_QUESTIONS } from '@/mock/questions';
 import { normalizeQuestionList } from '@/utils/question/normalize-question';
 
 const router = useRouter();
@@ -625,41 +623,20 @@ onMounted(async () => {
 async function loadCourses() {
   try {
     const res = await getCourseList({ page: 1, pageSize: 50 });
-    courses.value = res.data?.list?.length
-      ? res.data.list
-      : (USE_MOCK ? [
-          { id: 101, title: '数据结构与算法' } as any,
-          { id: 102, title: 'Java程序设计' } as any,
-          { id: 103, title: '高等数学（上）' } as any
-        ] : []);
+    courses.value = res.data?.list || [];
   } catch (err: any) {
-    if (USE_MOCK) {
-      courses.value = [
-        { id: 101, title: '数据结构与算法' } as any,
-        { id: 102, title: 'Java程序设计' } as any,
-        { id: 103, title: '高等数学（上）' } as any
-      ];
-    } else {
-      courses.value = [];
-      ElMessage.error(err?.message || '获取课程列表失败');
-    }
+    courses.value = [];
+    ElMessage.error(err?.message || '获取课程列表失败');
   }
 }
 
 async function loadPoolQuestions() {
   try {
     const res = await getQuestions({ pageSize: 50 });
-    const normalized = normalizeQuestionList(res.data?.list || []);
-    poolQuestions.value = normalized.length > 0
-      ? normalized
-      : (USE_MOCK ? normalizeQuestionList(MOCK_QUESTIONS) : []);
+    poolQuestions.value = normalizeQuestionList(res.data?.list || []);
   } catch (err: any) {
-    if (USE_MOCK) {
-      poolQuestions.value = normalizeQuestionList(MOCK_QUESTIONS);
-    } else {
-      poolQuestions.value = [];
-      ElMessage.error(err?.message || '获取试题池失败');
-    }
+    poolQuestions.value = [];
+    ElMessage.error(err?.message || '获取试题池失败');
   }
 }
 

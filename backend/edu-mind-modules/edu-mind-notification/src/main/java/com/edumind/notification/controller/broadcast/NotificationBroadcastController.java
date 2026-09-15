@@ -84,6 +84,18 @@ public class NotificationBroadcastController {
     }
 
     @SaCheckLogin
+    @SaCheckPermission("notice:broadcast:view")
+    @GetMapping("/{id}/recipients")
+    public ApiResult<com.edumind.notification.vo.broadcast.BroadcastRecipientSummaryVO> getRecipients(
+            @PathVariable Long id,
+            @RequestParam(required = false) Integer isRead,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "10") long pageSize) {
+        return ApiResult.success(broadcastService.getRecipientSummary(id, isRead, keyword, page, pageSize));
+    }
+
+    @SaCheckLogin
     @SaCheckPermission("notice:broadcast:send")
     @DeleteMapping("/{id}")
     @OperationLog(module = "通知广播", title = "删除通知广播", businessType = BusinessType.DELETE)

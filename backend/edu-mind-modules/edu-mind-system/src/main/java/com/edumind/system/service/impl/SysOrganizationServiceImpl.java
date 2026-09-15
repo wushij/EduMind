@@ -74,7 +74,10 @@ public class SysOrganizationServiceImpl implements SysOrganizationService, Organ
             }
             throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权访问其他学校组织架构");
         }
-        return currentTenantId != null ? currentTenantId : 1L;
+        if (currentTenantId == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "缺少租户上下文，拒绝访问组织架构");
+        }
+        return currentTenantId;
     }
 
     @Override

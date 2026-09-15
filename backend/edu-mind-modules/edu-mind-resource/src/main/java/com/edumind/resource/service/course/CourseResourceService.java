@@ -7,4 +7,8 @@ import java.util.List;
 public interface CourseResourceService {
 
     List<CourseResourceVO> listByCourseId(Long courseId);
+
+    Long addResource(Long courseId, com.edumind.resource.dto.course.CourseResourceCreateDTO dto);
+
+    void deleteResource(Long resourceId);
 }

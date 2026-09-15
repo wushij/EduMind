@@ -14,9 +14,15 @@ export const courseRoutes: RouteRecordRaw[] = [
     meta: { title: '新建课程', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
   },
   {
+    path: '/course/ai',
+    name: 'CourseAIAssistant',
+    component: () => import('@/views/course/CourseAIPage.vue'),
+    meta: { title: '课程 AI 助手', requiresAuth: true }
+  },
+  {
     path: '/course/ai-assistant',
     name: 'CourseAIAssistantRedirect',
-    redirect: '/course/101/ai',
+    redirect: '/course/ai',
     meta: { title: '课程 AI 助手', requiresAuth: true }
   },
   {

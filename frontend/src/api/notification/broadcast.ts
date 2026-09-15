@@ -41,3 +41,18 @@ export function deleteBroadcast(id: number) {
 export function clearAllBroadcasts() {
   return del<void>('/notifications/broadcast/clear-all');
 }
+
+export function getBroadcastRecipients(
+  id: number,
+  params?: {
+    isRead?: number;
+    keyword?: string;
+    page?: number;
+    pageSize?: number;
+  }
+) {
+  return get<import('@/types/notification/broadcast').BroadcastRecipientSummaryVO>(
+    `/notifications/broadcast/${id}/recipients`,
+    params
+  );
+}

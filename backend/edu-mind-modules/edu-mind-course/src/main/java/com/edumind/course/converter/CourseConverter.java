@@ -60,23 +60,32 @@ public class CourseConverter {
         return entity;
     }
 
-    public CourseVO toVO(CourseEntity entity, String teacherName, Long studentCount) {
+    public CourseVO toVO(CourseEntity entity, String teacherName, Long studentCount, Long chapterCount, Long knowledgePointCount, Long resourceCount) {
         if (entity == null) {
             return null;
         }
         return CourseVO.builder()
                 .id(entity.getId())
                 .name(entity.getTitle())
+                .code(entity.getCode())
+                .description(entity.getDescription())
                 .coverUrl(entity.getCoverImage())
                 .teacherId(entity.getTeacherId())
                 .teacherName(teacherName)
-                .studentCount(studentCount)
+                .studentCount(studentCount != null ? studentCount : 0L)
+                .chapterCount(chapterCount != null ? chapterCount : 0L)
+                .knowledgePointCount(knowledgePointCount != null ? knowledgePointCount : 0L)
+                .resourceCount(resourceCount != null ? resourceCount : 0L)
                 .status(mapStatus(entity.getStatus()))
                 .semester(entity.getSemester())
                 .build();
     }
 
-    public CourseDetailVO toDetailVO(CourseEntity entity, String teacherName, Long studentCount) {
+    public CourseVO toVO(CourseEntity entity, String teacherName, Long studentCount) {
+        return toVO(entity, teacherName, studentCount, 0L, 0L, 0L);
+    }
+
+    public CourseDetailVO toDetailVO(CourseEntity entity, String teacherName, Long studentCount, Long chapterCount, Long knowledgePointCount, Long resourceCount) {
         if (entity == null) {
             return null;
         }
@@ -90,10 +99,17 @@ public class CourseConverter {
                 .status(mapStatus(entity.getStatus()))
                 .teacherId(entity.getTeacherId())
                 .teacherName(teacherName)
-                .studentCount(studentCount)
+                .studentCount(studentCount != null ? studentCount : 0L)
+                .chapterCount(chapterCount != null ? chapterCount : 0L)
+                .knowledgePointCount(knowledgePointCount != null ? knowledgePointCount : 0L)
+                .resourceCount(resourceCount != null ? resourceCount : 0L)
                 .createdAt(entity.getCreateTime())
                 .updatedAt(entity.getUpdateTime())
                 .build();
+    }
+
+    public CourseDetailVO toDetailVO(CourseEntity entity, String teacherName, Long studentCount) {
+        return toDetailVO(entity, teacherName, studentCount, 0L, 0L, 0L);
     }
 
     public List<ChapterTreeVO> toChapterTree(List<ChapterEntity> chapters) {

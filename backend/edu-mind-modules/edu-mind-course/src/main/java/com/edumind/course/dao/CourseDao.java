@@ -24,6 +24,15 @@ public class CourseDao {
         return courseMapper.selectById(id);
     }
 
+    public CourseEntity findByCode(String code) {
+        if (!StringUtils.hasText(code)) {
+            return null;
+        }
+        return courseMapper.selectOne(new LambdaQueryWrapper<CourseEntity>()
+                .eq(CourseEntity::getCode, code.trim())
+                .last("LIMIT 1"));
+    }
+
     public List<CourseEntity> findByIds(List<Long> ids) {
         if (CollectionUtils.isEmpty(ids)) {
             return Collections.emptyList();

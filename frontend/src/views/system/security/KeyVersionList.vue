@@ -1,5 +1,5 @@
 <template>
-  <div class="key-version-page" v-loading="loading">
+  <div class="key-version-page">
     <!-- 顶部高端 Hero Banner -->
     <PageHeroBanner
       title="国密 KMS 密钥管理 · 数据安全与合规中枢"
@@ -49,9 +49,14 @@
             <el-icon><RefreshRight /></el-icon>
             <span>轮换密钥版本</span>
           </el-button>
-          <el-button plain :loading="refreshing" class="action-pill-btn" @click="handleRefreshAll">
-            <el-icon><Refresh /></el-icon>
-            <span>刷新大盘</span>
+          <el-button
+            round
+            :icon="Refresh"
+            class="btn-refresh"
+            :loading="refreshing"
+            @click="handleRefreshAll"
+          >
+            刷新大盘
           </el-button>
         </div>
       </div>
@@ -94,9 +99,7 @@
             <div class="spec-grid">
               <div class="spec-item">
                 <span class="k">加密算法标准</span>
-                <span class="v">
-                  <span class="algorithm-pill-clean">国密 SM4-GCM</span>
-                </span>
+                <span class="v font-semibold text-amber">国密 SM4-GCM</span>
               </div>
               <div class="spec-item">
                 <span class="k">当前生效版本</span>
@@ -153,9 +156,7 @@
             <div class="spec-grid">
               <div class="spec-item">
                 <span class="k">加密算法标准</span>
-                <span class="v">
-                  <span class="algorithm-pill-clean">国密 SM4-GCM</span>
-                </span>
+                <span class="v font-semibold text-amber">国密 SM4-GCM</span>
               </div>
               <div class="spec-item">
                 <span class="k">当前生效版本</span>
@@ -221,12 +222,24 @@
 
             <!-- 查询与重置按钮并排锁定在一组 -->
             <div class="filter-actions-group">
-              <el-button type="primary" size="small" class="action-pill-btn primary" @click="handleSearch">
+              <el-button
+                type="primary"
+                size="small"
+                class="action-pill-btn primary"
+                :disabled="loading"
+                @click="handleSearch"
+              >
                 <el-icon><Search /></el-icon>
                 <span>查询</span>
               </el-button>
-              <el-button size="small" class="action-pill-btn" @click="handleReset">
-                <el-icon><RefreshRight /></el-icon>
+              <el-button
+                round
+                size="small"
+                class="btn-refresh"
+                :disabled="loading"
+                @click="handleReset"
+              >
+                <el-icon class="mr-1" :class="{ 'is-loading': loading }"><Refresh /></el-icon>
                 <span>重置</span>
               </el-button>
             </div>
@@ -239,7 +252,11 @@
         </div>
 
         <!-- 密钥版本台账数据表格 -->
-        <div class="table-wrap">
+        <div
+          class="table-wrap"
+          v-loading="loading"
+          element-loading-text="正在检索国密密钥资产流水..."
+        >
           <el-table
             :data="paginatedKeyList"
             row-key="id"
@@ -775,24 +792,31 @@ const paginatedKeyList = computed(() => {
 });
 
 // 加载全量密钥
-async function fetchList() {
-  loading.value = true;
+async function fetchList(silent = false) {
+  if (!silent) {
+    loading.value = true;
+  }
   try {
-    const res = await listSecurityKeys(aliasFilter.value || undefined);
+    const [res] = await Promise.all([
+      listSecurityKeys(aliasFilter.value || undefined),
+      !silent ? new Promise((resolve) => setTimeout(resolve, 220)) : Promise.resolve()
+    ]);
     if (res?.data && Array.isArray(res.data)) {
       keyList.value = res.data;
     }
   } catch (err: any) {
     ElMessage.error(err?.message || '获取国密密钥资产列表失败');
   } finally {
-    loading.value = false;
+    if (!silent) {
+      loading.value = false;
+    }
   }
 }
 
 async function handleRefreshAll() {
   refreshing.value = true;
   try {
-    await fetchList();
+    await fetchList(true);
     ElMessage.success('国密 KMS 密钥与安全状态已同步更新');
   } finally {
     refreshing.value = false;
@@ -941,6 +965,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .key-version-page {
+  position: relative;
   padding-bottom: 40px;
 
   .hero-stats-row {
@@ -959,12 +984,11 @@ onMounted(() => {
       display: flex;
       align-items: center;
       gap: 10px;
-      transition: all 0.25s ease;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
 
       &:hover {
         background: #FFFFFF;
         border-color: #1677FF;
-        transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(22, 119, 255, 0.1);
       }
 
@@ -1062,12 +1086,11 @@ onMounted(() => {
       border: 1px solid #E2E8F0;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
       overflow: hidden;
-      transition: all 0.25s ease;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
 
       &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(22, 119, 255, 0.08);
-        border-color: rgba(22, 119, 255, 0.3);
+        box-shadow: 0 6px 20px rgba(22, 119, 255, 0.08);
+        border-color: rgba(22, 119, 255, 0.35);
       }
 
       .card-glow-bg {
@@ -1173,12 +1196,12 @@ onMounted(() => {
             .algorithm-pill-clean {
               display: inline-flex;
               align-items: center;
-              font-weight: 700;
-              font-size: 12px;
+              font-weight: 600;
+              font-size: 13px;
               color: #D97706;
-              background: #FEF3C7;
-              padding: 2px 10px;
-              border-radius: 9999px;
+              background: transparent;
+              padding: 0;
+              border-radius: 0;
               border: none !important;
               box-shadow: none !important;
               width: fit-content;
@@ -1192,22 +1215,27 @@ onMounted(() => {
                 display: inline-flex;
                 align-items: center;
                 gap: 6px;
-                background: #F1F5F9;
-                padding: 3px 10px;
-                border-radius: 9999px;
+                background: transparent;
+                padding: 0;
+                border-radius: 0;
                 border: none !important;
                 box-shadow: none !important;
                 cursor: pointer;
-                transition: all 0.2s ease;
+                transition: color 0.2s ease;
 
                 &:hover {
-                  background: #E2E8F0;
                   color: #1677FF;
+
+                  span,
+                  .copy-icon {
+                    color: #1677FF;
+                  }
                 }
 
                 .copy-icon {
                   font-size: 12px;
-                  color: #64748B;
+                  color: #94A3B8;
+                  transition: color 0.2s ease;
                 }
               }
             }
@@ -2135,7 +2163,13 @@ onMounted(() => {
     height: 32px;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
+    box-sizing: border-box;
+
+    &.refresh-btn {
+      min-width: 104px;
+    }
   }
 
   .font-mono { font-family: Consolas, Monaco, monospace; }

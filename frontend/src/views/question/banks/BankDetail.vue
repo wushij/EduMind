@@ -343,8 +343,6 @@ import { ArrowLeft, Search, Plus, DocumentCopy, FolderOpened, Files, Check } fro
 import { getQuestionBankDetail, addQuestionsToBank, removeQuestionFromBank } from '@/api/question/question-bank';
 import { getQuestions } from '@/api/question/question';
 import type { QuestionItem, QuestionType, Difficulty } from '@/types/question/question';
-import { USE_MOCK } from '@/config/mock';
-import { MOCK_QUESTIONS } from '@/mock/questions';
 import { normalizeQuestionList } from '@/utils/question/normalize-question';
 import MathText from '@/components/common/MathText.vue';
 
@@ -424,20 +422,13 @@ async function loadBankDetail() {
     bankInfo.value = res.data;
     if (bankInfo.value?.questions && Array.isArray(bankInfo.value.questions)) {
       bankQuestions.value = normalizeQuestionList(bankInfo.value.questions as Record<string, unknown>[]);
-    } else if (USE_MOCK) {
-      bankQuestions.value = normalizeQuestionList(MOCK_QUESTIONS.slice(0, 3) as unknown as Record<string, unknown>[]);
     } else {
       bankQuestions.value = [];
     }
   } catch (err: any) {
-    if (USE_MOCK) {
-      bankInfo.value = getDefaultBankMock(bankId.value);
-      bankQuestions.value = normalizeQuestionList(MOCK_QUESTIONS.slice(0, 3) as unknown as Record<string, unknown>[]);
-    } else {
-      bankInfo.value = null;
-      bankQuestions.value = [];
-      ElMessage.error(err?.message || '加载题库详情失败，请检查网络或后端状态');
-    }
+    bankInfo.value = null;
+    bankQuestions.value = [];
+    ElMessage.error(err?.message || '加载题库详情失败，请检查网络或后端状态');
   } finally {
     loading.value = false;
   }
@@ -449,54 +440,9 @@ async function loadCandidatePool() {
     const res = await getQuestions({ pageSize: 50 });
     candidatePool.value = normalizeQuestionList(res.data?.list || []);
   } catch (err: any) {
-    if (USE_MOCK) {
-      candidatePool.value = normalizeQuestionList(MOCK_QUESTIONS);
-    } else {
-      candidatePool.value = [];
-      ElMessage.error(err?.message || '获取试题池失败');
-    }
+    candidatePool.value = [];
+    ElMessage.error(err?.message || '获取试题池失败');
   }
-}
-
-function getDefaultBankMock(id: number) {
-  const mockBanks: Record<number, any> = {
-    1: {
-      id: 1,
-      name: '数据结构核心真题库',
-      courseId: 101,
-      courseName: '数据结构与算法',
-      questionCount: 5,
-      description: '涵盖全国统考408与期末高频真题，包括线性表、二叉树与图算法典型考察点。',
-      updateTime: '2026-09-10'
-    },
-    2: {
-      id: 2,
-      name: 'Java面向对象精选题集',
-      courseId: 102,
-      courseName: 'Java程序设计',
-      questionCount: 3,
-      description: '针对类与对象、多态特性、集合框架体系与异常处理机制的精编测试题集。',
-      updateTime: '2026-09-09'
-    },
-    3: {
-      id: 3,
-      name: '高等数学期末测试真题库',
-      courseId: 103,
-      courseName: '大学数学：高等数学（上）',
-      questionCount: 3,
-      description: '重点考察极限计算、洛必达法则、泰勒公式与不定积分经典真题。',
-      updateTime: '2026-09-08'
-    }
-  };
-  return mockBanks[id] || {
-    id,
-    name: '课程通用试题库',
-    courseId: 101,
-    courseName: '通用课程',
-    questionCount: 3,
-    description: '收录日常教学练习题与期中期末典型题目。',
-    updateTime: '2026-09-11'
-  };
 }
 
 // 勾选单行
@@ -528,12 +474,8 @@ function viewDetailDialog(q: QuestionItem) {
 // 移出单个试题
 async function handleRemoveQuestion(id: number) {
   try {
-    if (USE_MOCK) {
-      bankQuestions.value = bankQuestions.value.filter(q => q.id !== id);
-    } else {
-      await removeQuestionFromBank(bankId.value, id);
-      await loadBankDetail();
-    }
+    await removeQuestionFromBank(bankId.value, id);
+    await loadBankDetail();
     selectedRowKeys.value = selectedRowKeys.value.filter(k => k !== id);
     ElMessage.success('已成功从题库中移出该试题');
   } catch (err: any) {
@@ -546,15 +488,10 @@ async function handleBatchRemove() {
   const count = selectedRowKeys.value.length;
   if (count === 0) return;
   try {
-    if (USE_MOCK) {
-      const set = new Set(selectedRowKeys.value);
-      bankQuestions.value = bankQuestions.value.filter(q => !set.has(q.id));
-    } else {
-      for (const qId of selectedRowKeys.value) {
-        await removeQuestionFromBank(bankId.value, qId);
-      }
-      await loadBankDetail();
+    for (const qId of selectedRowKeys.value) {
+      await removeQuestionFromBank(bankId.value, qId);
     }
+    await loadBankDetail();
     selectedRowKeys.value = [];
     ElMessage.success(`已批量移出 ${count} 道试题`);
   } catch (err: any) {
@@ -585,13 +522,8 @@ async function confirmAddQuestions() {
   if (selectedCandidateIds.value.length === 0) return;
   addingLoading.value = true;
   try {
-    if (USE_MOCK) {
-      const selectedList = candidatePool.value.filter(q => selectedCandidateIds.value.includes(q.id));
-      bankQuestions.value.push(...selectedList);
-    } else {
-      await addQuestionsToBank(bankId.value, selectedCandidateIds.value);
-      await loadBankDetail();
-    }
+    await addQuestionsToBank(bankId.value, selectedCandidateIds.value);
+    await loadBankDetail();
     ElMessage.success(`成功添加 ${selectedCandidateIds.value.length} 道题目到当前题库！`);
     drawerVisible.value = false;
   } catch (err: any) {

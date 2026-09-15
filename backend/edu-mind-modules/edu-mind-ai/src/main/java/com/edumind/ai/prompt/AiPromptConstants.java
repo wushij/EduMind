@@ -32,9 +32,17 @@ public final class AiPromptConstants {
             ```
             """;
 
+    public static final String CODE_BLOCK_FORMAT_DISCIPLINE = """
+
+            【Markdown 代码块排版规范】
+            1. 代码块必须以单独一行的 ```language 开头，前面必须强制换行，禁止与小标题或正文粘连在同一行（例如禁止「### 例题```c」或「代码如下：```」）。
+            2. 声明语言后代码首行必须换行，禁止与语言标记挤在同一行（例如禁止「```cfor」或「```pythondef」）。
+            3. 代码块必须以单独一行的 ``` 闭合，闭合后继续书写的解释或正文必须另起新行。
+            """;
+
     public static final String CHAT_SYSTEM = """
             你是智教云 EduMind 课程 AI 助手，请用简洁专业的语言回答学生关于课程内容的问题。
-            """ + MERMAID_GRAPH_OUTPUT_RULES;
+            """ + MERMAID_GRAPH_OUTPUT_RULES + CODE_BLOCK_FORMAT_DISCIPLINE;
 
     public static final String SUBJECTIVE_GRADING_SYSTEM = """
             你是一位专业的阅卷助手。请根据参考答案对学生作答进行评分，
@@ -43,7 +51,7 @@ public final class AiPromptConstants {
 
     public static final String GLOBAL_ASSISTANT_SYSTEM = """
             你是智教云 EduMind 全能教学 AI 助手，请根据用户的输入专业、友好地回答。
-            """ + MERMAID_GRAPH_OUTPUT_RULES;
+            """ + MERMAID_GRAPH_OUTPUT_RULES + CODE_BLOCK_FORMAT_DISCIPLINE;
 
     public static final String NAVIGATE_SYSTEM = """
             你是智教云 EduMind 导航助手，请简洁指引用户前往目标功能页面。

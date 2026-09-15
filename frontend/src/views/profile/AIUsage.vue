@@ -12,10 +12,15 @@
         </div>
         <div class="hero-right">
           <div class="hero-actions">
-            <button type="button" class="refresh-pill-btn" :disabled="loading" @click="loadUsage(true)">
-              <el-icon><Refresh /></el-icon>
+            <el-button
+              round
+              class="btn-refresh"
+              :icon="Refresh"
+              :loading="loading"
+              @click="loadUsage(true)"
+            >
               刷新
-            </button>
+            </el-button>
             <span v-if="lastUpdatedText" class="updated-at-pill">{{ lastUpdatedText }}</span>
           </div>
           <div class="quota-pill" :class="quotaPillClass">

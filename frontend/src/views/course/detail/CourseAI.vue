@@ -10,11 +10,36 @@
               <img class="hero-brand-logo" src="@/assets/images/logo.png" alt="EduMind" />
             </div>
             <div class="hero-titles">
-              <h2 class="hero-course-title">
-                {{ course?.title || 'Java程序设计' }} · AI 助手
-              </h2>
+              <div class="hero-title-row">
+                <h2 class="hero-course-title">
+                  {{ displayCourseTitle }} · AI 助手
+                </h2>
+                <!-- 切换当前学校租户名下其他课程 -->
+                <el-dropdown
+                  v-if="tenantCourseOptions.length > 1"
+                  trigger="click"
+                  @command="handleSwitchCourse"
+                >
+                  <button type="button" class="course-switch-pill" title="切换当前所选课程">
+                    <span>切换课程</span>
+                    <el-icon class="arrow"><ArrowDown /></el-icon>
+                  </button>
+                  <template #dropdown>
+                    <el-dropdown-menu class="course-dropdown-menu">
+                      <el-dropdown-item
+                        v-for="c in tenantCourseOptions"
+                        :key="c.id"
+                        :command="c.id"
+                        :class="{ 'is-selected': Number(c.id) === currentCourseIdNum }"
+                      >
+                        {{ c.title || c.name }}
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </div>
               <p class="hero-course-desc">
-                基于课程知识库，为你提供专业、准确、个性化的学习支持
+                基于学科知识库与教学大纲，为你提供专业、准确、个性化的学习支持
               </p>
             </div>
           </div>
@@ -168,6 +193,7 @@
           <div
             ref="messagesScrollRef"
             class="messages-flow-scroll"
+            data-chat-scroll="true"
             @scroll="handleViewportScroll"
           >
             <!-- 章节锚定上下文小浮条 -->
@@ -189,6 +215,7 @@
               @send-prompt="handleSendPrompt"
               @regenerate="handleRegenerate(idx)"
               @delete="confirmDeleteMessage(idx)"
+              @reasoning-collapse="pauseAutoScrollFollow"
             />
 
             <!-- 正在流式生成的进行时消息卡片 (对标侧边栏真流式) -->
@@ -204,13 +231,14 @@
 
                 <!-- 深度思考状态卡片 (动态脉冲，正文输出时自动折叠) -->
                 <AIThinking
-                  v-if="!streamingAnswerBody || streamingThinkingDisplay"
+                  v-if="showThinkingPanel && (!streamingAnswerBody || streamingThinkingDisplay)"
                   :content="streamingThinkingDisplay"
                   :folded="isReasoningFolded"
                   :active="!streamingAnswerBody && (isReasoningActive || !streamingThinkingDisplay)"
                   :has-answer-body="!!streamingAnswerBody"
                   :phase-message="streamPhaseMessage || '正在深度研读本门课程知识大纲与切片...'"
                   @update:folded="isReasoningFolded = $event"
+                  @user-collapse="pauseAutoScrollFollow"
                 />
 
                 <!-- 正文流式渲染 (useStreamingMarkdown 增量输出) -->
@@ -280,7 +308,7 @@
           </div>
 
           <!-- 资源文件列表 -->
-          <div class="resource-items-list">
+          <div class="resource-items-list" v-loading="resourcesLoading">
             <div
               v-for="res in filteredResources"
               :key="res.title"
@@ -294,6 +322,10 @@
               <button type="button" class="file-download-btn" title="下载资料">
                 <el-icon><Download /></el-icon>
               </button>
+            </div>
+            <div v-if="filteredResources.length === 0 && !resourcesLoading" class="resource-empty-box">
+              <el-icon><Document /></el-icon>
+              <span>当前分类暂无教学资料</span>
             </div>
           </div>
         </div>
@@ -360,9 +392,11 @@ import {
   Opportunity,
   Close
 } from '@element-plus/icons-vue';
-import type { CourseVO } from '@/types/course/course';
+import type { CourseVO, Course } from '@/types/course/course';
 import type { Chapter } from '@/types/course/chapter';
+import { getCourseList } from '@/api/course/course';
 import { getChapters } from '@/api/course/chapter';
+import { getCourseResources } from '@/api/course/resource';
 import { getChatModels } from '@/api/ai/chat';
 import { useAIStream } from '@/composables/ai/useAIStream';
 import { usePreferenceStore } from '@/stores/user/preference';
@@ -372,20 +406,48 @@ import ChatSessionList from '@/components/ai/ChatSessionList.vue';
 import AIThinking from '@/components/ai/AIChat/AIThinking.vue';
 
 const props = defineProps<{
-
   course?: CourseVO | null;
+}>();
+
+const emit = defineEmits<{
+  (e: 'switch-course', courseId: number): void;
 }>();
 
 const router = useRouter();
 const route = useRoute();
 
-/** 优先用路由 :id，避免刷新时 course prop 尚未加载导致 courseId 错乱 */
+/** 优先用路由 :id，若无路由参数则使用传入的 course.id */
 function resolveCourseId(): number | undefined {
-  const routeId = Number(route.params.id);
-  if (!Number.isNaN(routeId) && routeId > 0) return routeId;
   const propId = props.course?.id ? Number(props.course.id) : NaN;
   if (!Number.isNaN(propId) && propId > 0) return propId;
+  const routeId = Number(route.params.id);
+  if (!Number.isNaN(routeId) && routeId > 0) return routeId;
   return undefined;
+}
+
+const currentCourseIdNum = computed(() => resolveCourseId() ?? 0);
+const displayCourseTitle = computed(() => {
+  return props.course?.title || props.course?.name || '学科专属';
+});
+
+// 多租户课程切换支持
+const tenantCourseOptions = ref<Course[]>([]);
+async function loadTenantCourses() {
+  try {
+    const res = await getCourseList({ page: 1, pageSize: 50 });
+    tenantCourseOptions.value = res?.data?.list || [];
+  } catch {
+    tenantCourseOptions.value = [];
+  }
+}
+
+function handleSwitchCourse(targetId: number | string) {
+  const numId = Number(targetId);
+  localStorage.setItem('edumind_last_course_id', String(numId));
+  emit('switch-course', numId);
+  if (route.params.id) {
+    router.push(`/course/${numId}/ai`);
+  }
 }
 
 // ======================= 1. 顶部 Banner 与 5 大胶囊 (组件库矢量图标) =======================
@@ -455,7 +517,7 @@ async function loadChapters() {
     }
   } catch {
     chaptersData.value = [];
-    ElMessage.error('加载课程章节失败');
+    // 静默降级为无章节状态，避免跨租户/未配置章节时弹报错 Toast
   } finally {
     chaptersLoading.value = false;
   }
@@ -497,12 +559,14 @@ const currentModeTab = ref('ai');
 
 function switchModeTab(key: string) {
   currentModeTab.value = key;
+  const cid = resolveCourseId();
+  if (!cid) return;
   if (key === 'graph') {
-    router.push(`/course/${props.course?.id || '101'}/knowledge-points`);
+    router.push(`/course/${cid}/knowledge-points`);
   } else if (key === 'resource') {
-    router.push(`/course/${props.course?.id || '101'}/resources`);
+    router.push(`/course/${cid}/resources`);
   } else if (key === 'task') {
-    router.push(`/course/${props.course?.id || '101'}/overview`);
+    router.push(`/course/${cid}/overview`);
   }
 }
 
@@ -563,6 +627,7 @@ const {
   isReasoningActive,
   streamPhaseMessage,
   followUpPrompts,
+  showThinkingPanel,
   loadSessions,
   switchSession,
   sendMessage,
@@ -575,6 +640,7 @@ const {
   scrollToBottomSmooth,
   scrollToBottomInstant,
   showScrollToBottom,
+  pauseAutoScrollFollow,
   handleViewportScroll
 } = useAIStream();
 
@@ -651,48 +717,79 @@ interface ResourceItem {
   type: string;
   ext: string;
   cat: string;
+  downloadUrl?: string;
 }
 
-const allResources: ResourceItem[] = [
-  { title: 'Java5.0课件.pdf', type: 'pdf', ext: 'PDF', cat: '课件' },
-  { title: '第5章课堂笔记.zip', type: 'zip', ext: 'ZIP', cat: '课件' },
-  { title: '课程PPT.pptx', type: 'ppt', ext: 'PPT', cat: '课件' },
-  { title: 'Java示例代码.zip', type: 'code', ext: 'ZIP', cat: '课件' },
-  { title: '1.1 语言概述精讲.mp4', type: 'video', ext: 'MP4', cat: '视频' },
-  { title: '6.1 面向对象深度精析.mp4', type: 'video', ext: 'MP4', cat: '视频' },
-  { title: 'Java并发编程参考手册.pdf', type: 'pdf', ext: 'PDF', cat: '文档' },
-  { title: 'JDK 17 新特性速查指南.pdf', type: 'pdf', ext: 'PDF', cat: '文档' },
-  { title: '基础语法自测习题集.pdf', type: 'pdf', ext: 'PDF', cat: '习题' },
-  { title: '面向对象典型真题及解析.docx', type: 'doc', ext: 'DOC', cat: '习题' },
-  { title: '在线图书商城项目源码.zip', type: 'code', ext: 'ZIP', cat: '项目' }
-];
+const realResources = ref<ResourceItem[]>([]);
+const resourcesLoading = ref(false);
+
+async function loadCourseResources() {
+  const cid = resolveCourseId();
+  if (!cid) {
+    realResources.value = [];
+    return;
+  }
+  resourcesLoading.value = true;
+  try {
+    const res = await getCourseResources(cid);
+    const list = Array.isArray(res?.data) ? res.data : [];
+    realResources.value = list.map((item) => {
+      const ext = (item.title?.split('.').pop() || item.resourceType || 'DOC').toUpperCase();
+      let cat = '课件';
+      if (['MP4', 'AVI', 'MKV', 'WEBM', 'VIDEO'].includes(ext)) cat = '视频';
+      else if (['ZIP', 'RAR', '7Z', 'CODE', 'TAR'].includes(ext)) cat = '项目';
+      else if (['EXAM', 'QUIZ'].includes(item.resourceType || '') || ext === 'DOCX') cat = '习题';
+      else if (['PDF', 'DOC', 'TXT', 'MD'].includes(ext)) cat = '文档';
+
+      return {
+        title: item.title,
+        type: ext.toLowerCase(),
+        ext,
+        cat,
+        downloadUrl: item.downloadUrl
+      };
+    });
+  } catch {
+    realResources.value = [];
+  } finally {
+    resourcesLoading.value = false;
+  }
+}
 
 const filteredResources = computed(() => {
-  return allResources.filter(r => r.cat === activeResourceCat.value);
+  return realResources.value.filter(r => r.cat === activeResourceCat.value);
 });
 
 function downloadResource(res: ResourceItem) {
-  ElMessage.success(`开始下载课程资料：${res.title}`);
+  if (res.downloadUrl) {
+    window.open(res.downloadUrl, '_blank');
+  } else {
+    ElMessage.info(`资料「${res.title}」已进入下载队列`);
+  }
 }
 
 function navigateToResources() {
-  router.push(`/course/${props.course?.id || '101'}/resources`);
+  const cid = resolveCourseId();
+  if (cid) {
+    router.push(`/course/${cid}/resources`);
+  }
 }
 
-// 精选 5 大推荐高频提问
-const recommendedQuestions = [
-  '什么是Java虚拟机（JVM）？',
-  'JDK、JRE、JVM 三者有什么区别？',
-  '如何理解面向对象的三大特性？',
-  'Java中的异常处理机制是怎样的？',
-  'ArrayList 和 LinkedList 有什么区别？'
-];
+// 结合当前学科知识体系动态生成 5 大高频学习指导推荐提问
+const recommendedQuestions = computed(() => {
+  const name = displayCourseTitle.value;
+  return [
+    `请结合大纲为我梳理【${name}】的核心知识图谱架构`,
+    `当前阶段如何高效复习【${name}】？请给出科学备考指引`,
+    `在【${name}】中，有哪些最易混淆的重点概念？请对比解析`,
+    `请针对当前章节出一道典型综合解析题并附解题思路`,
+    `【${name}】在实际工程研发与学科前沿中有哪些典型应用？`
+  ];
+});
 
 function handleSendRecommended(question: string) {
   handleSend(question);
 }
-
-
 
 function exportChatMarkdown() {
   const content = allDisplayMessages.value
@@ -702,15 +799,15 @@ function exportChatMarkdown() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${props.course?.title || 'Java程序设计'}_AI问答记录.md`;
+  a.download = `${displayCourseTitle.value}_AI问答记录.md`;
   a.click();
   URL.revokeObjectURL(url);
   ElMessage.success('已导出当前问答记录为 Markdown 文件');
 }
 
 onMounted(() => {
-  loadChapters();
   loadModels();
+  loadTenantCourses();
   scrollToBottomInstant();
   nextTick(() => {
     const appContent = document.querySelector('.app-content');
@@ -724,10 +821,25 @@ watch(
   () => resolveCourseId(),
   (courseId) => {
     if (courseId) {
-      void loadSessions(courseId);
+      // 进入课程 AI 页默认展示新对话欢迎页，历史会话通过「历史记录」查看
+      void loadSessions(courseId, { restoreLastSession: false });
+      void loadChapters();
+      void loadCourseResources();
     }
   },
   { immediate: true }
+);
+
+watch(
+  () => props.course,
+  (c) => {
+    if (c && c.id) {
+      const cid = Number(c.id);
+      void loadSessions(cid, { restoreLastSession: false });
+      void loadChapters();
+      void loadCourseResources();
+    }
+  }
 );
 </script>
 
@@ -803,6 +915,34 @@ watch(
             display: flex;
             flex-direction: column;
             gap: 4px;
+
+            .hero-title-row {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              flex-wrap: wrap;
+
+              .course-switch-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                height: 24px;
+                padding: 0 10px;
+                border-radius: 9999px;
+                background: #EFF6FF;
+                border: 1px solid #BFDBFE;
+                color: #1677FF;
+                font-size: 11.5px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+
+                &:hover {
+                  background: #DBEAFE;
+                  border-color: #93C5FD;
+                }
+              }
+            }
 
             .hero-course-title {
               margin: 0;
@@ -1159,6 +1299,7 @@ watch(
           min-height: 0;
           overflow-x: hidden;
           overflow-y: auto;
+          overflow-anchor: none;
           -webkit-overflow-scrolling: touch;
           padding: 16px 20px;
           display: flex;
@@ -1288,6 +1429,7 @@ watch(
             width: 100%;
             pointer-events: none;
             visibility: hidden;
+            overflow-anchor: none;
           }
         }
 
@@ -1470,6 +1612,22 @@ watch(
               .file-name {
                 color: #1677FF;
               }
+            }
+          }
+
+          .resource-empty-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 32px 10px;
+            color: #94A3B8;
+            font-size: 12px;
+
+            .el-icon {
+              font-size: 24px;
+              color: #CBD5E1;
             }
           }
         }

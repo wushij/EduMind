@@ -25,6 +25,7 @@ public class MybatisPlusConfig {
      * 已纳入多租户物理隔离的业务表清单 (严格在 SQL 解析层追加 WHERE tenant_id = ?)
      */
     private static final Set<String> TENANT_TABLES = Set.of(
+            // RC baseline (20)
             "sys_campus",
             "sys_organization",
             "sys_term",
@@ -44,7 +45,44 @@ public class MybatisPlusConfig {
             "sys_notification",
             "sys_notification_broadcast",
             "security_key_version",
-            "sys_oper_log"
+            "sys_oper_log",
+            // GA Wave1 (19)
+            "course_chapter",
+            "course_member",
+            "course_resource",
+            "course_knowledge_point",
+            "knowledge_document",
+            "knowledge_document_text",
+            "knowledge_document_chunk",
+            "knowledge_index_task",
+            "knowledge_chunk_index",
+            "knowledge_ocr_page",
+            "teaching_exam",
+            "exam_question",
+            "assignment",
+            "assignment_submission",
+            "submission_answer",
+            "ai_message",
+            "ai_memory_item",
+            "ai_memory_feedback",
+            "agent_run",
+            // GA Wave2 (16)
+            "question_bank",
+            "question_option",
+            "question_bank_item",
+            "grading_result",
+            "teaching_resource",
+            "agent_step",
+            "agent_tool_call",
+            "prompt_template",
+            "prompt_template_version",
+            "sys_user_preference",
+            "statistics_daily_snapshot",
+            "learning_record",
+            "knowledge_mastery",
+            "wrong_question_record",
+            "course_statistics",
+            "knowledge_point_relation"
     );
 
     @Bean

@@ -28,6 +28,15 @@
 
         <button
           type="button"
+          class="capsule-tool-btn capsule-tool-btn--primary"
+          @click="openAddChapterDrawer"
+        >
+          <el-icon><Plus /></el-icon>
+          <span>新增章节</span>
+        </button>
+
+        <button
+          type="button"
           class="capsule-tool-btn capsule-tool-btn--ai"
           @click="handleChapterAiQuiz"
         >
@@ -133,6 +142,35 @@
         </div>
       </div>
     </div>
+
+    <!-- 新增大纲章节抽屉 -->
+    <el-drawer
+      v-model="showAddChapterDrawer"
+      title="录入新教学大纲章节"
+      size="480px"
+      destroy-on-close
+    >
+      <el-form label-position="top">
+        <el-form-item label="章节主标题" required>
+          <el-input v-model="newChapterTitle" placeholder="例如：第四章 树与二叉树算法实现" />
+        </el-form-item>
+        <el-form-item label="章节概要说明">
+          <el-input
+            v-model="newChapterDesc"
+            type="textarea"
+            :rows="3"
+            placeholder="简述本章节的核心教学目标与知识架构..."
+          />
+        </el-form-item>
+        <el-form-item label="微课节数预设">
+          <el-input-number v-model="newChapterSectionCount" :min="1" :max="10" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <button type="button" class="capsule-dialog-btn" @click="closeAddChapterDrawer">取消</button>
+        <button type="button" class="capsule-dialog-btn capsule-dialog-btn--primary" @click="handleSaveNewChapter">确认录入</button>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -140,7 +178,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { Search, MagicStick, Check, Clock, Connection, EditPen } from '@element-plus/icons-vue';
+import { Search, MagicStick, Check, Clock, Connection, EditPen, Plus } from '@element-plus/icons-vue';
 import { useCourse } from '@/composables/course/useCourse';
 
 const route = useRoute();
@@ -151,6 +189,19 @@ const { chapters, fetchChapters } = useCourse();
 
 const searchChapterText = ref('');
 const openChapters = ref<number[]>([]);
+
+const showAddChapterDrawer = ref(false);
+const newChapterTitle = ref('');
+const newChapterDesc = ref('');
+const newChapterSectionCount = ref(3);
+
+function openAddChapterDrawer() {
+  showAddChapterDrawer.value = true;
+}
+
+function closeAddChapterDrawer() {
+  showAddChapterDrawer.value = false;
+}
 
 const filteredChapters = computed(() => {
   if (!searchChapterText.value.trim()) return chapters.value;
@@ -198,18 +249,56 @@ function toggleAllCollapse() {
 }
 
 function handleChapterAiQuiz() {
-  router.push('/ai/question/generate');
+  router.push(`/ai/question/generate?courseId=${courseId.value}`);
 }
 
 function handleAiExplain(secTitle: string) {
   router.push({
     path: `/course/${courseId.value}/ai`,
-    query: { prompt: `请详细讲解课时内容：${secTitle}` }
+    query: { prompt: `请结合本课程大纲，深度解析微课时核心内容：${secTitle}` }
   });
 }
 
 function handleStartStudy(sec: any) {
-  ElMessage.success(`进入课时：${sec.title}`);
+  if (sec.type === 'quiz') {
+    router.push(`/ai/question/generate?courseId=${courseId.value}`);
+  } else {
+    router.push({
+      path: `/course/${courseId.value}/ai`,
+      query: { prompt: `请针对课时【${sec.title}】的重点概念、定理公式与代码实现进行苏格拉底式精细辅导。` }
+    });
+  }
+}
+
+function handleSaveNewChapter() {
+  if (!newChapterTitle.value.trim()) {
+    ElMessage.warning('章节标题不能为空');
+    return;
+  }
+  const newId = Date.now();
+  const subSections = Array.from({ length: newChapterSectionCount.value }, (_, i) => ({
+    id: newId * 10 + i + 1,
+    title: `${newChapterTitle.value.trim()} - 核心知识讲义 ${i + 1}`,
+    completed: false,
+    duration: '45分钟',
+    knowledgePointCount: 2,
+    type: i === newChapterSectionCount.value - 1 ? 'quiz' : 'lecture'
+  }));
+
+  chapters.value.push({
+    id: newId,
+    courseId: Number(courseId.value),
+    title: newChapterTitle.value.trim(),
+    sort: chapters.value.length + 1,
+    description: newChapterDesc.value.trim() || '本章涵盖学科核心理论基础与典型案例解析。',
+    sections: subSections
+  });
+
+  openChapters.value.push(newId);
+  ElMessage.success('新章节已成功加入教学大纲！');
+  closeAddChapterDrawer();
+  newChapterTitle.value = '';
+  newChapterDesc.value = '';
 }
 
 onMounted(async () => {
@@ -581,6 +670,46 @@ onMounted(async () => {
           }
         }
       }
+    }
+  }
+}
+
+.capsule-tool-btn--primary {
+  background: #1677FF !important;
+  color: #FFFFFF !important;
+  border-color: #1677FF !important;
+
+  &:hover {
+    background: #4096FF !important;
+    color: #FFFFFF !important;
+  }
+}
+
+.capsule-dialog-btn {
+  height: 38px;
+  padding: 0 20px;
+  border-radius: 9999px;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  color: #475569;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+  }
+
+  &--primary {
+    background: #1677FF;
+    color: #FFFFFF;
+    border-color: #1677FF;
+
+    &:hover {
+      background: #4096FF;
+      border-color: #4096FF;
     }
   }
 }

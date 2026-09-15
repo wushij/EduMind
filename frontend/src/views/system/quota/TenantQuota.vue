@@ -38,9 +38,8 @@
           <el-tag size="small" type="success" effect="plain">企业教育旗舰版</el-tag>
         </div>
         <div class="action-buttons">
-          <el-button plain :loading="refreshing" @click="handleRefreshAll">
-            <el-icon><Refresh /></el-icon>
-            <span>刷新算力大盘</span>
+          <el-button round :icon="Refresh" class="btn-refresh" :loading="refreshing" @click="handleRefreshAll">
+            刷新算力大盘
           </el-button>
           <el-button type="primary" class="gradient-btn" @click="openConfigModal">
             <el-icon><Setting /></el-icon>
@@ -409,7 +408,8 @@
 
               <el-select
                 v-model="modelFilter"
-                placeholder="模型计费规格"
+                :placeholder="modelOptions.length ? '模型计费规格' : '暂无可用模型'"
+                :disabled="!modelOptions.length"
                 clearable
                 size="small"
                 class="filter-select"
@@ -432,12 +432,24 @@
 
               <!-- 查询与重置按钮并排锁定在一组 -->
               <div class="filter-actions-group">
-                <el-button type="primary" size="small" class="action-pill-btn primary" @click="handleSearch">
+                <el-button
+                  type="primary"
+                  size="small"
+                  class="action-pill-btn primary"
+                  :disabled="tableLoading"
+                  @click="handleSearch"
+                >
                   <el-icon><Search /></el-icon>
                   <span>查询</span>
                 </el-button>
-                <el-button size="small" class="action-pill-btn" @click="handleReset">
-                  <el-icon><RefreshRight /></el-icon>
+                <el-button
+                  round
+                  size="small"
+                  class="btn-refresh"
+                  :disabled="tableLoading"
+                  @click="handleReset"
+                >
+                  <el-icon class="mr-1" :class="{ 'is-loading': tableLoading }"><Refresh /></el-icon>
                   <span>重置</span>
                 </el-button>
               </div>
@@ -471,6 +483,7 @@
           <div class="table-wrap">
             <el-table
               v-loading="tableLoading"
+              element-loading-text="正在检索租户算力扣减账单流水..."
               :data="auditLogs"
               stripe
               style="width: 100%;"
@@ -905,7 +918,7 @@ const dateRange = ref<[string, string] | null>(null);
 const sceneFilter = ref('');
 const modelFilter = ref('');
 const searchKeyword = ref('');
-const modelOptions = ref<string[]>(['DeepSeek-V3-Chat', 'DeepSeek-R1-Reasoning', 'deepseek-v4-flash']);
+const modelOptions = ref<string[]>([]);
 
 // 详情抽屉
 const detailDrawerVisible = ref(false);
@@ -980,11 +993,9 @@ async function copyText(text: string) {
 async function loadAvailableModels() {
   try {
     const models = await getAvailableAiModels();
-    if (models && models.length > 0) {
-      modelOptions.value = Array.from(new Set([...modelOptions.value, ...models]));
-    }
+    modelOptions.value = models && models.length > 0 ? Array.from(new Set(models)) : [];
   } catch {
-    // Keep fallback list
+    modelOptions.value = [];
   }
 }
 
@@ -1045,15 +1056,19 @@ async function loadAuditLogs() {
       endDate = dateRange.value[1];
     }
 
-    const res = await getAuditLogs({
-      page: pageNum.value,
-      pageSize: pageSize.value,
-      scene: sceneFilter.value || undefined,
-      model: modelFilter.value || undefined,
-      keyword: searchKeyword.value.trim() || undefined,
-      startDate,
-      endDate
-    });
+    const [res] = await Promise.all([
+      getAuditLogs({
+        page: pageNum.value,
+        pageSize: pageSize.value,
+        scene: sceneFilter.value || undefined,
+        model: modelFilter.value || undefined,
+        keyword: searchKeyword.value.trim() || undefined,
+        startDate,
+        endDate
+      }),
+      // 保底微延时 220ms，确保本地毫秒级极速响应也能呈现清晰平滑的刷新加载反馈
+      new Promise((resolve) => setTimeout(resolve, 220))
+    ]);
 
     auditLogs.value = res.list;
     total.value = res.total;

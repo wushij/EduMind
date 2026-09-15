@@ -35,4 +35,19 @@ public class CourseMemberController {
                                      @Valid @RequestBody CourseMemberAddDTO dto) {
         return ApiResult.success(courseMemberService.addMember(courseId, dto));
     }
+
+    @SaCheckPermission("course:edit")
+    @org.springframework.web.bind.annotation.DeleteMapping("/{userId}")
+    public ApiResult<Void> removeMember(@PathVariable("courseId") Long courseId,
+                                        @PathVariable("userId") Long userId) {
+        courseMemberService.removeMember(courseId, userId);
+        return ApiResult.success();
+    }
+
+    @SaCheckPermission("course:view")
+    @PostMapping("/join")
+    public ApiResult<Long> joinCourse(@PathVariable("courseId") Long courseId) {
+        Long currentUserId = cn.dev33.satoken.stp.StpUtil.getLoginIdAsLong();
+        return ApiResult.success(courseMemberService.joinCourse(courseId, currentUserId));
+    }
 }

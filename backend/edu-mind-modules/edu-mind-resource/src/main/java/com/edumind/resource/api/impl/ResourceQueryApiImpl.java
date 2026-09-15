@@ -17,7 +17,13 @@ import java.util.stream.Collectors;
 public class ResourceQueryApiImpl implements ResourceQueryApi {
 
     private final ResourceDao resourceDao;
+    private final com.edumind.resource.dao.CourseResourceDao courseResourceDao;
     private final ResourceConverter resourceConverter;
+
+    @Override
+    public Long countResourcesByCourseId(Long courseId) {
+        return courseResourceDao.countByCourseId(courseId);
+    }
 
     @Override
     public ResourceVO getResourceById(Long resourceId) {

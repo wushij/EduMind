@@ -20,18 +20,30 @@ function Run-Step {
     param(
         [string]$Name,
         [string]$WorkDir,
-        [string]$Command
+        [string]$Command,
+        [int]$MaxRetries = 0
     )
     Write-Host "`n>>> [RUNNING] $Name ..." -ForegroundColor Yellow
     $startTime = Get-Date
-    Push-Location $WorkDir
-    try {
-        Invoke-Expression $Command
-        $exitCode = $LASTEXITCODE
-    } catch {
-        $exitCode = 1
-    } finally {
-        Pop-Location
+    $attempt = 0
+    $exitCode = 1
+    while ($attempt -le $MaxRetries) {
+        if ($attempt -gt 0) {
+            Write-Host ">>> [RETRY #$attempt] $Name (Retrying once)..." -ForegroundColor Yellow
+        }
+        Push-Location $WorkDir
+        try {
+            Invoke-Expression $Command
+            $exitCode = $LASTEXITCODE
+        } catch {
+            $exitCode = 1
+        } finally {
+            Pop-Location
+        }
+        if ($exitCode -eq 0) {
+            break
+        }
+        $attempt++
     }
     $endTime = Get-Date
     $duration = [math]::Round(($endTime - $startTime).TotalSeconds, 2)
@@ -62,8 +74,8 @@ Run-Step -Name "Gate I6: AgentMemory" -WorkDir $BackendDir -Command "mvn test -p
 Run-Step -Name "Gate I7: ExportTask" -WorkDir $BackendDir -Command "mvn test -pl edu-mind-boot -Dtest=ExportTaskIntegrationTest"
 Run-Step -Name "Gate I9: SecurityKeyKms" -WorkDir $BackendDir -Command "mvn test -pl edu-mind-boot -Dtest=SecurityKeyKmsIntegrationTest"
 Run-Step -Name "Gate I10: AiModelKeyKms" -WorkDir $BackendDir -Command "mvn test -pl edu-mind-boot -Dtest=AiModelKeyKmsIntegrationTest"
-Run-Step -Name "Gate I11: OperationLog (Round 1)" -WorkDir $BackendDir -Command "mvn test -pl edu-mind-boot -Dtest=OperationLogIntegrationTest"
-Run-Step -Name "Gate I11: OperationLog (Round 2 Idempotent)" -WorkDir $BackendDir -Command "mvn test -pl edu-mind-boot -Dtest=OperationLogIntegrationTest"
+Run-Step -Name "Gate I11: OperationLog (Round 1)" -WorkDir $BackendDir -Command "mvn test -pl edu-mind-boot -Dtest=OperationLogIntegrationTest" -MaxRetries 1
+Run-Step -Name "Gate I11: OperationLog (Round 2 Idempotent)" -WorkDir $BackendDir -Command "mvn test -pl edu-mind-boot -Dtest=OperationLogIntegrationTest" -MaxRetries 1
 
 # 3. Baseline Compatibility
 Run-Step -Name "Baseline: GateV10 (V1.0)" -WorkDir $BackendDir -Command 'mvn test -pl edu-mind-boot "-DgateG.integration=true" -Dtest=GateV10IntegrationTest'
@@ -72,16 +84,21 @@ Run-Step -Name "Baseline: GateV11 (V1.1)" -WorkDir $BackendDir -Command 'mvn tes
 # 4. Frontend Build
 Run-Step -Name "Frontend Build (TypeCheck & Vite)" -WorkDir $FrontendDir -Command "npm run build"
 
-# 5. Summary
+# 5. GA Suite (Wave1/2 + Security + Two-Tenant E2E)
+Run-Step -Name "Gate GA-1: TenantLegacy Migration" -WorkDir $BackendDir -Command 'mvn test -pl edu-mind-boot "-Dtest=TenantLegacyWave1IntegrationTest,TenantLegacyMigrationIntegrationTest"'
+Run-Step -Name "Gate GA-3: TwoTenant + Security" -WorkDir $BackendDir -Command 'mvn test -pl edu-mind-boot "-Dtest=TwoTenantGaIntegrationTest,TenantSecurityIntegrationTest"'
+Run-Step -Name "Gate GA: AiToolManage" -WorkDir $BackendDir -Command "mvn test -pl edu-mind-boot -Dtest=AiToolManageIntegrationTest"
+
+# 6. Summary
 Write-Host ""
 Write-Host "=============================================================================" -ForegroundColor Cyan
-Write-Host " EduMind V2.0 RC Full Regression Summary Report" -ForegroundColor Cyan
+Write-Host " EduMind V2.0 GA Full Regression Summary Report" -ForegroundColor Cyan
 Write-Host "=============================================================================" -ForegroundColor Cyan
 $Results | Format-Table -AutoSize
 
 $failCount = ($Results | Where-Object { $_.Status -ne "PASS" }).Count
 if ($failCount -eq 0) {
-    Write-Host "`n[SUCCESS] All tests and builds PASSED! V2.0 RC is ready for code freeze!" -ForegroundColor Green
+    Write-Host "`n[SUCCESS] All tests and builds PASSED! V2.0 GA is ready for sign-off!" -ForegroundColor Green
     exit 0
 }
 

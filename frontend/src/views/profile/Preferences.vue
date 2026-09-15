@@ -732,6 +732,7 @@ onMounted(async () => {
           border-radius: 14px;
           border: 1px solid var(--el-border-color-extra-light, #edf2f7);
           gap: 20px;
+          flex-wrap: wrap;
           transition: all 0.2s ease;
 
           &:hover {
@@ -746,17 +747,18 @@ onMounted(async () => {
             flex: 1;
             min-width: 0;
 
+            .row-title {
+              font-size: 14px;
+              font-weight: 700;
+              line-height: 1.45;
+              color: var(--el-text-color-primary, #1e293b);
+            }
+
             .row-title-line {
               display: flex;
               align-items: center;
               gap: 8px;
               flex-wrap: wrap;
-
-              .row-title {
-                font-size: 14px;
-                font-weight: 700;
-                color: var(--el-text-color-primary, #1e293b);
-              }
 
               .live-status-tag {
                 border-radius: 9999px;
@@ -801,31 +803,58 @@ onMounted(async () => {
   }
 }
 
-/* 药丸单选与输入控件风格定制 */
+/* 药丸单选：外层统一轨道，内层选项无独立边框，避免 Element Plus 连体按钮的方角描边 */
 :deep(.pill-radio-group) {
-  .el-radio-button__inner {
-    border-radius: 9999px !important;
-    padding: 7px 16px;
-    font-size: 12.5px;
-    font-weight: 600;
-    margin: 0 3px;
-    border: 1px solid var(--el-border-color-lighter, #e2e8f0);
-    background: var(--el-bg-color, #ffffff);
-    color: var(--el-text-color-regular, #475569);
-    transition: all 0.2s ease;
-  }
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 5px;
+  background: var(--el-bg-color, #ffffff);
+  border: 1px solid var(--el-border-color-lighter, #e8edf3);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
 
-  .el-radio-button__original-radio:checked + .el-radio-button__inner {
-    background: #2563eb !important;
-    color: #ffffff !important;
-    border-color: #2563eb !important;
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3) !important;
+  .el-radio-button {
+    margin: 0 !important;
+
+    .el-radio-button__inner {
+      border: none !important;
+      border-radius: 9999px !important;
+      margin: 0 !important;
+      padding: 7px 14px;
+      font-size: 12.5px;
+      font-weight: 600;
+      line-height: 1.2;
+      background: transparent;
+      color: var(--el-text-color-regular, #64748b);
+      box-shadow: none !important;
+      transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    &:first-child .el-radio-button__inner,
+    &:last-child .el-radio-button__inner {
+      border-radius: 9999px !important;
+    }
+
+    .el-radio-button__original-radio:checked + .el-radio-button__inner {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+      color: #ffffff !important;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28) !important;
+    }
+
+    &:not(.is-active) .el-radio-button__inner:hover {
+      background: var(--el-fill-color-light, #f1f5f9);
+      color: var(--el-text-color-primary, #334155);
+    }
   }
 
   .opt-btn-inner {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    white-space: nowrap;
   }
 }
 

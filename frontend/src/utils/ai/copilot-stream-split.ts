@@ -82,6 +82,14 @@ export function cleanReasoningText(raw: string): string {
   return raw.replace(/\n{3,}/g, '\n\n').trim();
 }
 
+/** 手动停止生成时展示在回答区的提示文案 */
+export const STOPPED_GENERATION_MARKER = '*(已停止生成)*';
+
+export function buildStoppedGenerationContent(answer: string): string {
+  const trimmed = answer.trim();
+  return trimmed ? `${trimmed}\n\n${STOPPED_GENERATION_MARKER}` : STOPPED_GENERATION_MARKER;
+}
+
 export function formatInlineMarkdown(text: string): string {
   if (!text) return '';
   let s = text

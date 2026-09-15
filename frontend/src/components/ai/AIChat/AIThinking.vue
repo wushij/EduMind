@@ -1,6 +1,7 @@
 <template>
   <div
     v-if="displayText || (active && !hasAnswerBody)"
+    ref="cardRef"
     class="reasoning-card"
   >
     <div class="reasoning-header" @click="toggleFold">
@@ -25,7 +26,7 @@
     </div>
 
     <!-- 思考详情展开区 -->
-    <div v-show="!folded" class="reasoning-body">
+    <div v-show="!folded" ref="bodyRef" class="reasoning-body">
       <div
         v-if="displayText"
         ref="reasoningContentRef"
@@ -36,6 +37,32 @@
         <span class="thinking-spinner" />
         <span>{{ phaseMessage || '正在推理思考与检索切片中…' }}</span>
       </div>
+
+      <button
+        type="button"
+        class="reasoning-collapse-btn"
+        aria-label="收起深度思考"
+        title="收起"
+        @click.stop="toggleFold"
+      >
+        <svg class="reasoning-collapse-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path
+            d="M4.5 10.5 8 7l3.5 3.5"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M4.5 6.5 8 3l3.5 3.5"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            opacity="0.55"
+          />
+        </svg>
+      </button>
     </div>
   </div>
 </template>
@@ -44,6 +71,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { cleanReasoningText } from '@/utils/ai/copilot-stream-split';
 import { bindMarkdownCodeCopy, renderReasoningMarkdown } from '@/utils/ai/chat-markdown';
+import { findChatScrollParent, preserveScrollOnCollapse } from '@/utils/dom/preserve-scroll-on-collapse';
 
 const props = withDefaults(
   defineProps<{
@@ -64,7 +92,11 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   'update:folded': [value: boolean];
+  'user-collapse': [];
 }>();
+
+const cardRef = ref<HTMLElement | null>(null);
+const bodyRef = ref<HTMLElement | null>(null);
 
 const displayText = computed(() => cleanReasoningText(props.content || ''));
 
@@ -94,7 +126,19 @@ watch(
 onMounted(() => refreshReasoningMarkdownUi());
 
 function toggleFold() {
-  emit('update:folded', !props.folded);
+  const nextFolded = !props.folded;
+  if (!nextFolded) {
+    emit('update:folded', false);
+    return;
+  }
+
+  const scrollEl = findChatScrollParent(cardRef.value);
+  const collapsingEl = bodyRef.value;
+
+  preserveScrollOnCollapse(scrollEl, collapsingEl, () => {
+    emit('update:folded', true);
+    emit('user-collapse');
+  });
 }
 </script>
 
@@ -105,6 +149,7 @@ function toggleFold() {
   border: 1px solid rgba(22, 119, 255, 0.2);
   background: linear-gradient(180deg, rgba(235, 245, 255, 0.8) 0%, rgba(248, 250, 252, 0.95) 100%);
   overflow: hidden;
+  overflow-anchor: none;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px rgba(22, 119, 255, 0.05);
 
@@ -181,11 +226,44 @@ function toggleFold() {
 }
 
 .reasoning-body {
-  padding: 10px 14px 12px 16px;
+  position: relative;
+  padding: 10px 14px 30px 16px;
   border-top: 1px dashed rgba(22, 119, 255, 0.15);
   font-size: 12.5px;
   line-height: 1.68;
   color: #334155;
+}
+
+.reasoning-collapse-btn {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #94a3b8;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+
+  &:hover {
+    color: #1677ff;
+    border-color: rgba(22, 119, 255, 0.35);
+    background: rgba(235, 245, 255, 0.95);
+    box-shadow: 0 2px 6px rgba(22, 119, 255, 0.12);
+  }
+}
+
+.reasoning-collapse-icon {
+  width: 12px;
+  height: 12px;
 }
 
 .reasoning-content {

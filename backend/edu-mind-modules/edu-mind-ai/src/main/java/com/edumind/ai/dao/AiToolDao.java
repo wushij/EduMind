@@ -30,8 +30,58 @@ public class AiToolDao {
                     .or().like(AiToolEntity::getDescription, keyword)
                     .or().like(AiToolEntity::getTags, keyword));
         }
-        wrapper.orderByDesc(AiToolEntity::getUseCount);
+        wrapper.orderByAsc(AiToolEntity::getSortOrder)
+                .orderByDesc(AiToolEntity::getUseCount);
         return aiToolMapper.selectList(wrapper);
+    }
+
+    public List<AiToolEntity> listForAdmin(String category, Integer status, String keyword, Boolean isRecommended) {
+        LambdaQueryWrapper<AiToolEntity> wrapper = new LambdaQueryWrapper<>();
+        if (status != null) {
+            wrapper.eq(AiToolEntity::getStatus, status);
+        }
+        if (StringUtils.hasText(category) && !"ALL".equalsIgnoreCase(category)) {
+            if ("RECOMMENDED".equalsIgnoreCase(category)) {
+                wrapper.eq(AiToolEntity::getIsRecommended, 1);
+            } else {
+                wrapper.eq(AiToolEntity::getCategory, category);
+            }
+        }
+        if (isRecommended != null) {
+            wrapper.eq(AiToolEntity::getIsRecommended, isRecommended ? 1 : 0);
+        }
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(AiToolEntity::getName, keyword)
+                    .or().like(AiToolEntity::getDescription, keyword)
+                    .or().like(AiToolEntity::getTags, keyword)
+                    .or().like(AiToolEntity::getRoute, keyword));
+        }
+        wrapper.orderByAsc(AiToolEntity::getSortOrder)
+                .orderByDesc(AiToolEntity::getUseCount);
+        return aiToolMapper.selectList(wrapper);
+    }
+
+    public List<AiToolEntity> listAll() {
+        return aiToolMapper.selectList(new LambdaQueryWrapper<AiToolEntity>()
+                .orderByAsc(AiToolEntity::getSortOrder)
+                .orderByDesc(AiToolEntity::getUseCount));
+    }
+
+    public boolean existsById(String id) {
+        return aiToolMapper.selectCount(new LambdaQueryWrapper<AiToolEntity>()
+                .eq(AiToolEntity::getId, id)) > 0;
+    }
+
+    public void insert(AiToolEntity entity) {
+        aiToolMapper.insert(entity);
+    }
+
+    public void update(AiToolEntity entity) {
+        aiToolMapper.updateById(entity);
+    }
+
+    public void deleteById(String id) {
+        aiToolMapper.deleteById(id);
     }
 
     public AiToolEntity findById(String id) {

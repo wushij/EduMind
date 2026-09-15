@@ -27,8 +27,9 @@
             新建 Prompt 模板
           </el-button>
           <el-button
-            class="refresh-btn"
-            :icon="RefreshRight"
+            round
+            class="btn-refresh"
+            :icon="Refresh"
             :loading="loading"
             @click="handleReload"
           >
@@ -442,6 +443,7 @@ import { PromptTemplate } from '@/types/system/prompt';
 import {
   Plus,
   Search,
+  Refresh,
   RefreshRight,
   CollectionTag,
   Cpu,

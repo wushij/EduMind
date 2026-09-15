@@ -34,7 +34,9 @@
           </div>
           <div class="header-right-actions">
             <el-button
+              round
               size="small"
+              class="btn-refresh"
               :icon="Refresh"
               :loading="loading"
               @click="handleRefreshAll"
@@ -199,12 +201,29 @@
           <el-option label="失败" :value="2" />
           <el-option label="发送中" :value="0" />
         </el-select>
-        <el-button type="primary" :icon="Search" @click="loadSmsLogsData">搜索</el-button>
-        <el-button :icon="Refresh" @click="handleResetSmsSearch">重置</el-button>
+        <el-button
+          type="primary"
+          :icon="Search"
+          :disabled="smsLogsLoading"
+          @click="loadSmsLogsData"
+        >
+          搜索
+        </el-button>
+        <el-button
+          round
+          size="small"
+          class="btn-refresh"
+          :disabled="smsLogsLoading"
+          @click="handleResetSmsSearch"
+        >
+          <el-icon class="mr-1" :class="{ 'is-loading': smsLogsLoading }"><Refresh /></el-icon>
+          <span>重置</span>
+        </el-button>
       </div>
 
       <el-table
         v-loading="smsLogsLoading"
+        element-loading-text="正在检索短信记录..."
         :data="smsLogsList"
         size="small"
         stripe
@@ -271,12 +290,29 @@
           <el-option label="成功" :value="1" />
           <el-option label="失败" :value="2" />
         </el-select>
-        <el-button type="primary" :icon="Search" @click="loadEmailLogsData">搜索</el-button>
-        <el-button :icon="Refresh" @click="handleResetEmailSearch">重置</el-button>
+        <el-button
+          type="primary"
+          :icon="Search"
+          :disabled="emailLogsLoading"
+          @click="loadEmailLogsData"
+        >
+          搜索
+        </el-button>
+        <el-button
+          round
+          size="small"
+          class="btn-refresh"
+          :disabled="emailLogsLoading"
+          @click="handleResetEmailSearch"
+        >
+          <el-icon class="mr-1" :class="{ 'is-loading': emailLogsLoading }"><Refresh /></el-icon>
+          <span>重置</span>
+        </el-button>
       </div>
 
       <el-table
         v-loading="emailLogsLoading"
+        element-loading-text="正在检索邮件发信日志..."
         :data="emailLogsList"
         size="small"
         stripe
@@ -469,12 +505,16 @@ function handleOpenSmsLogs() {
 async function loadSmsLogsData() {
   smsLogsLoading.value = true;
   try {
-    const res = await getSmsLogs({
-      page: smsPage.page,
-      size: smsPage.size,
-      phone: smsSearch.phone ? smsSearch.phone.trim() : undefined,
-      status: smsSearch.status
-    });
+    const [res] = await Promise.all([
+      getSmsLogs({
+        page: smsPage.page,
+        size: smsPage.size,
+        phone: smsSearch.phone ? smsSearch.phone.trim() : undefined,
+        status: smsSearch.status
+      }),
+      // 保底微延时 220ms，确保本地极速响应也能呈现清晰平滑的刷新加载反馈
+      new Promise((resolve) => setTimeout(resolve, 220))
+    ]);
     if (res?.data) {
       smsLogsList.value = res.data.list || [];
       smsPage.total = res.data.total || 0;
@@ -544,12 +584,16 @@ function handleOpenEmailLogs() {
 async function loadEmailLogsData() {
   emailLogsLoading.value = true;
   try {
-    const res = await getEmailLogs({
-      page: emailPage.page,
-      size: emailPage.size,
-      email: emailSearch.email ? emailSearch.email.trim() : undefined,
-      status: emailSearch.status
-    });
+    const [res] = await Promise.all([
+      getEmailLogs({
+        page: emailPage.page,
+        size: emailPage.size,
+        email: emailSearch.email ? emailSearch.email.trim() : undefined,
+        status: emailSearch.status
+      }),
+      // 保底微延时 220ms，确保本地极速响应也能呈现清晰平滑的刷新加载反馈
+      new Promise((resolve) => setTimeout(resolve, 220))
+    ]);
     if (res?.data) {
       emailLogsList.value = res.data.list || [];
       emailPage.total = res.data.total || 0;

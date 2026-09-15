@@ -250,7 +250,7 @@ export const SIDEBAR_SUBMENUS: Record<string, SidebarSubMenuMeta> = {
   'ai-tools': {
     key: 'ai-tools',
     moduleKey: 'ai-compute',
-    name: 'AI 教学工具',
+    name: '教学工具配置',
     path: '/system/tools',
     icon: 'Operation',
     sort: 3

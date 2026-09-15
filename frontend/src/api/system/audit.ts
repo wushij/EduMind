@@ -134,6 +134,25 @@ function mapLog(raw: BackendLogEntity): AIAuditLog {
   const userRole = raw.userRole || meta?.role || (uid === 1 ? 'ADMIN' : 'USER');
   const avatar = raw.avatar || meta?.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${username}&backgroundColor=e0e7ff`;
 
+  const rawModel = (raw.model || '').trim();
+  let provider = '—';
+  if (rawModel) {
+    const lower = rawModel.toLowerCase();
+    if (lower.includes('deepseek')) {
+      provider = 'DeepSeek';
+    } else if (lower.includes('gpt') || lower.includes('openai')) {
+      provider = 'OpenAI';
+    } else if (lower.includes('qwen')) {
+      provider = 'Qwen';
+    } else if (lower.includes('claude') || lower.includes('anthropic')) {
+      provider = 'Anthropic';
+    } else if (lower.includes('edumind') || lower.includes('mock')) {
+      provider = 'EduMind AI';
+    } else {
+      provider = '—';
+    }
+  }
+
   return {
     id: raw.id,
     traceId: `tr_${raw.id}`,
@@ -142,8 +161,8 @@ function mapLog(raw: BackendLogEntity): AIAuditLog {
     realName,
     avatar,
     userRole,
-    model: raw.model || 'deepseek-v4-flash',
-    provider: raw.model?.toLowerCase().includes('deepseek') ? 'DeepSeek' : 'EduMind AI',
+    model: rawModel,
+    provider,
     toolName: raw.scene || 'CHAT',
     scene: raw.scene || 'CHAT',
     courseId: raw.courseId,
@@ -162,6 +181,18 @@ function mapLog(raw: BackendLogEntity): AIAuditLog {
   };
 }
 
+function emptyAuditSummary(): AuditSummaryVO {
+  return {
+    totalCalls: 0,
+    totalTokens: 0,
+    totalCostRMB: 0,
+    avgLatencyMs: 0,
+    successRate: 100,
+    dailyTrend: [],
+    modelDistribution: []
+  };
+}
+
 export const getAvailableAiModels = async (): Promise<string[]> => {
   try {
     const res = await get<{ list?: Array<{ modelName?: string; modelKey?: string; configName?: string }> }>('/system/models');
@@ -175,7 +206,7 @@ export const getAvailableAiModels = async (): Promise<string[]> => {
   } catch (err) {
     console.warn('Failed to load system models', err);
   }
-  return ['deepseek-v4-flash'];
+  return USE_MOCK ? ['deepseek-v4-flash'] : [];
 };
 
 export const getAuditSummary = async (): Promise<AuditSummaryVO> => {
@@ -184,12 +215,13 @@ export const getAuditSummary = async (): Promise<AuditSummaryVO> => {
     if (res?.data) {
       return mapSummary(res.data);
     }
-    if (!USE_MOCK) return mockAuditSummary;
+    if (USE_MOCK) return mockAuditSummary;
+    return emptyAuditSummary();
   } catch (err) {
     if (!USE_MOCK) throw err;
     console.warn('[Audit API] Fallback mockAuditSummary', err);
+    return mockAuditSummary;
   }
-  return USE_MOCK ? mockAuditSummary : mockAuditSummary;
 };
 
 export const getAuditLogs = async (params?: Record<string, unknown>): Promise<{ list: AIAuditLog[]; total: number }> => {

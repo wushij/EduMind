@@ -3,7 +3,9 @@
     <h2>AI 学习推荐</h2>
     <div class="toolbar">
       <el-input-number v-model="courseId" :min="1" />
-      <el-button type="primary" :loading="loading" @click="loadData">刷新推荐</el-button>
+      <el-button round class="btn-refresh" :icon="Refresh" :loading="loading" @click="loadData">
+        刷新推荐
+      </el-button>
     </div>
 
     <div class="grid">
@@ -28,6 +30,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
+import { Refresh } from '@element-plus/icons-vue';
 import { getRecommendations } from '@/api/ai/recommendation';
 
 const courseId = ref(1);

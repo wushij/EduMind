@@ -31,8 +31,8 @@
             {{ expandAll ? '折叠全部' : '展开全部' }}
           </el-button>
 
-          <el-button round class="action-btn" :loading="loading" @click="fetchData">
-            <el-icon><Refresh /></el-icon> 刷新
+          <el-button round class="btn-refresh" :icon="Refresh" :loading="loading" @click="fetchData">
+            刷新
           </el-button>
 
           <el-popconfirm

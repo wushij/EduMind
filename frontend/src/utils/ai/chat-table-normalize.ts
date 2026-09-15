@@ -291,8 +291,6 @@ function normalizeMarkdownTables(content: string): string {
       continue;
     }
 
-    if (inTable && trimmed === '') continue;
-
     inTable = false;
     tableRowIndex = 0;
     sawSeparator = false;
@@ -314,6 +312,10 @@ export function normalizeChatTables(content: string): string {
       .join('\n');
     let text = normalizePlainPipeTables(withHeadingSplit);
     text = normalizeMarkdownTables(text);
+    // 若非代码段末尾是以 | 结尾的表格行，确保其末尾保留空行，防止在还原代码块时与 ``` 紧贴
+    if (text.trimEnd().endsWith('|') && !text.endsWith('\n\n')) {
+      text = text.trimEnd() + '\n\n';
+    }
     return text;
   });
   return withoutCodeBlocks.join('');

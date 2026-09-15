@@ -23,6 +23,9 @@ sql/
 │   ├── V2_0_4__ai_model_key_version.sql        # V2.0.21 AI 模型 API Key 接入 KMS（Gate I10）
 │   ├── V2_0_5__sys_org_quota.sql               # V2.0.22 组织院系算力配额表（sys_org_quota）
 │   ├── V2_0_6__oper_log_tenant_hardening.sql   # V2.0.23 操作日志多租户加固与审计闭环（Gate I11）
+│   ├── V2_1_0__ai_tool_admin.sql               # V2.1.0 AI 工具管理端字段与 system:tool:edit 权限
+│   ├── V2_2_0__tenant_wave1.sql                # GA Wave1：19 张高泄漏风险子表 tenant_id
+│   ├── V2_2_1__tenant_wave2.sql                # GA Wave2：16 张剩余业务表 tenant_id
 │   ├── R__seed_data.sql                        # V0 增量路径演示种子（用户/课程/题库/AI 等，幂等）
 │   ├── R__seed_legacy.sql                      # 旧库升级补丁（租户角色/组织成员/权限乱码修复，幂等）
 │   └── R__gate_e2e_seeds.sql                   # Gate F/G/H 集成测试种子（幂等，init 不含 Gate F）
@@ -66,6 +69,7 @@ mysql -u root -p < sql/init.sql
 11. V2_0_4__ai_model_key_version.sql          # V2.0.21 AI 模型密钥 KMS (Gate I10)
 12. V2_0_5__sys_org_quota.sql                 # V2.0.22 组织院系算力配额
 13. V2_0_6__oper_log_tenant_hardening.sql     # V2.0.23 操作日志多租户加固 (Gate I11)
+14. V2_1_0__ai_tool_admin.sql                 # V2.1.0 AI 工具 sort_order/update_time + 编辑权限
 14. R__seed_data.sql          # 可选，V0 增量路径补充演示数据
 15. R__seed_legacy.sql        # 可选，旧库升级补丁（租户 RBAC / 组织成员）
 16. R__gate_e2e_seeds.sql     # 可选，Gate F/G/H 集成测试专用

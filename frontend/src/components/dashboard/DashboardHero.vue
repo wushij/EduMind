@@ -29,7 +29,7 @@
         type="button"
         class="dashboard-hero__hitbox dashboard-hero__hitbox--card-2"
         aria-label="课程 AI 助手"
-        @click="router.push('/course/ai-assistant')"
+        @click="router.push('/course/ai')"
       />
       <!-- AI 出题 / 组卷：x:559~796 -->
       <button

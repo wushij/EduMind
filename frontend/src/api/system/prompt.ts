@@ -272,6 +272,14 @@ function mapPromptTemplate(raw: Record<string, unknown>): PromptTemplate {
   };
 }
 
+function resolveMockPromptTemplates(category?: string): PromptTemplate[] {
+  let result = [...mockPromptTemplates];
+  if (category && category !== 'ALL') {
+    result = result.filter((p) => p.category === category);
+  }
+  return result;
+}
+
 export const getPromptTemplates = async (category?: string): Promise<PromptTemplate[]> => {
   const queryParam = category && category !== 'ALL' ? { category } : undefined;
   try {
@@ -279,23 +287,16 @@ export const getPromptTemplates = async (category?: string): Promise<PromptTempl
     if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
       return res.data.map((item) => mapPromptTemplate(item));
     }
-    // 若后端数据库暂无数据，使用高品质预置提示词工程资产进行降级保障
-    if (!res?.data || (Array.isArray(res.data) && res.data.length === 0)) {
-      let result = [...mockPromptTemplates];
-      if (category && category !== 'ALL') {
-        result = result.filter((p) => p.category === category);
-      }
-      return result;
+    // 若后端数据库暂无数据且启用了 Mock，才降级使用预置提示词工程资产
+    if (USE_MOCK) {
+      return resolveMockPromptTemplates(category);
     }
-    if (!USE_MOCK) return [];
+    return [];
   } catch (err) {
+    if (!USE_MOCK) throw err;
     console.warn('[Prompt API] Fallback mockPromptTemplates', err);
+    return resolveMockPromptTemplates(category);
   }
-  let result = [...mockPromptTemplates];
-  if (category && category !== 'ALL') {
-    result = result.filter((p) => p.category === category);
-  }
-  return result;
 };
 
 export const getPromptById = async (id: number): Promise<PromptTemplate | null> => {
@@ -304,9 +305,12 @@ export const getPromptById = async (id: number): Promise<PromptTemplate | null> 
     if (res?.data) {
       return mapPromptTemplate(res.data);
     }
+    if (!USE_MOCK) return null;
   } catch (err) {
+    if (!USE_MOCK) throw err;
     console.warn('[Prompt API] Fallback getPromptById mock', err);
   }
+  if (!USE_MOCK) return null;
   return mockPromptTemplates.find((p) => p.id === Number(id)) || null;
 };
 

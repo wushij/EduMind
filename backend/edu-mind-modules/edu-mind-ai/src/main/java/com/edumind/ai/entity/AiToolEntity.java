@@ -24,6 +24,8 @@ public class AiToolEntity implements Serializable {
     private Integer isRecommended;
     private Integer isHot;
     private Integer useCount;
+    private Integer sortOrder;
     private Integer status;
     private LocalDateTime createTime;
+    private LocalDateTime updateTime;
 }

@@ -68,9 +68,8 @@
         </div>
 
         <div class="action-buttons">
-            <el-button plain round class="refresh-btn" @click="loadMetrics">
-              <el-icon :class="{ 'is-loading': loading }"><Refresh /></el-icon>
-              <span>刷新</span>
+            <el-button round class="btn-refresh" :icon="Refresh" :loading="loading" @click="loadMetrics">
+              刷新
             </el-button>
 
             <el-button type="primary" round class="gradient-btn" @click="router.push('/system/gateway/routes')">

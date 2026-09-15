@@ -24,6 +24,9 @@ public class CourseDetailVO implements Serializable {
     private Long teacherId;
     private String teacherName;
     private Long studentCount;
+    private Long chapterCount;
+    private Long knowledgePointCount;
+    private Long resourceCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -69,4 +69,13 @@ public class CourseMemberDao {
     public int insert(CourseMemberEntity entity) {
         return courseMemberMapper.insert(entity);
     }
+
+    public int deleteByCourseIdAndUserId(Long courseId, Long userId) {
+        if (courseId == null || userId == null) {
+            return 0;
+        }
+        return courseMemberMapper.delete(new LambdaQueryWrapper<CourseMemberEntity>()
+                .eq(CourseMemberEntity::getCourseId, courseId)
+                .eq(CourseMemberEntity::getUserId, userId));
+    }
 }

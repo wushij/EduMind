@@ -18,11 +18,19 @@ import {
   isPersistedMessageId,
   removeMessagesByIds
 } from '@/utils/ai/chat-message-pair';
-import { splitCopilotStream, cleanReasoningText } from '@/utils/ai/copilot-stream-split';
+import {
+  splitCopilotStream,
+  cleanReasoningText,
+  buildStoppedGenerationContent,
+  STOPPED_GENERATION_MARKER
+} from '@/utils/ai/copilot-stream-split';
 import { useStreamingMarkdown } from '@/composables/ai/useStreamingMarkdown';
 import { bindMarkdownCodeCopy } from '@/utils/ai/chat-markdown';
 import type { CitationItem } from '@/types/ai/assistant';
-import { usePreferenceStore } from '@/stores/user/preference';
+import {
+  getDefaultReasoningFolded,
+  isThinkingPanelHidden
+} from '@/utils/ai/thinking-display';
 
 export interface ChatMessage {
   id: string;
@@ -54,6 +62,13 @@ export interface StreamOptions {
   isRegenerate?: boolean;
 }
 
+export interface LoadSessionsOptions {
+  /** 是否恢复上次会话（localStorage 或列表首条），默认 true */
+  restoreLastSession?: boolean;
+  /** 仅刷新会话列表，不重载当前会话消息（用于手动停止后保留本地结算消息） */
+  skipMessageReload?: boolean;
+}
+
 function resolveStreamModelKey(options?: StreamOptions): string | undefined {
   return options?.modelKey || options?.model;
 }
@@ -64,6 +79,100 @@ function isDefaultSessionTitle(title?: string): boolean {
 }
 
 const SESSION_STORAGE_PREFIX = 'edumind_course_ai_session:';
+const MESSAGE_CACHE_PREFIX = 'edumind_course_ai_messages:';
+
+function messageCacheKey(courseId?: number, conversationId?: string): string {
+  if (!courseId || !conversationId) return '';
+  return `${MESSAGE_CACHE_PREFIX}${courseId}:${conversationId}`;
+}
+
+function persistMessageCache(courseId: number | undefined, conversationId: string | undefined, msgs: ChatMessage[]) {
+  const key = messageCacheKey(courseId, conversationId);
+  if (!key || msgs.length === 0) return;
+  try {
+    sessionStorage.setItem(key, JSON.stringify(msgs));
+  } catch {
+    // ignore quota errors
+  }
+}
+
+function readMessageCache(courseId?: number, conversationId?: string): ChatMessage[] {
+  const key = messageCacheKey(courseId, conversationId);
+  if (!key) return [];
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return [];
+    return JSON.parse(raw) as ChatMessage[];
+  } catch {
+    return [];
+  }
+}
+
+function clearMessageCache(courseId?: number, conversationId?: string) {
+  const key = messageCacheKey(courseId, conversationId);
+  if (key) sessionStorage.removeItem(key);
+}
+
+function isStoppedAssistantMessage(msg: ChatMessage): boolean {
+  return msg.role === 'assistant' && !!msg.content?.includes(STOPPED_GENERATION_MARKER);
+}
+
+/** 服务端未持久化的「手动停止」回合，合并回消息列表 */
+function mergeServerWithLocalDrafts(server: ChatMessage[], local: ChatMessage[]): ChatMessage[] {
+  if (!local.length) return server;
+  if (!server.length) return local;
+
+  const result = [...server];
+
+  const hasUserContent = (content: string) =>
+    result.some((m) => m.role === 'user' && m.content === content);
+
+  const hasAssistantContent = (content: string) =>
+    result.some((m) => m.role === 'assistant' && m.content === content);
+
+  for (let i = 0; i < local.length - 1; i++) {
+    if (local[i].role !== 'user') continue;
+    const draftAssistant = local[i + 1];
+    if (!draftAssistant || draftAssistant.role !== 'assistant' || !isStoppedAssistantMessage(draftAssistant)) {
+      continue;
+    }
+
+    const userContent = local[i].content;
+    if (!hasUserContent(userContent)) {
+      if (!result.some((m) => m.id === local[i].id)) result.push(local[i]);
+      if (!result.some((m) => m.id === draftAssistant.id)) result.push(draftAssistant);
+      continue;
+    }
+
+    const userIdx = result.findIndex((m) => m.role === 'user' && m.content === userContent);
+    const next = result[userIdx + 1];
+    if (!next || next.role !== 'assistant') {
+      if (!hasAssistantContent(draftAssistant.content)) {
+        result.splice(userIdx + 1, 0, draftAssistant);
+      }
+    }
+  }
+
+  // 仅追加服务端尚未收录的用户追问（按 content 去重，避免本地/服务端 id 不同导致重复气泡）
+  for (const localMsg of local) {
+    if (localMsg.role === 'user') {
+      if (hasUserContent(localMsg.content)) continue;
+      if (!result.some((m) => m.id === localMsg.id)) {
+        result.push(localMsg);
+      }
+      continue;
+    }
+    if (
+      isStoppedAssistantMessage(localMsg) &&
+      !hasAssistantContent(localMsg.content) &&
+      !result.some((m) => m.id === localMsg.id)
+    ) {
+      result.push(localMsg);
+    }
+  }
+
+  return result;
+}
 
 function getStoredSessionId(courseId?: number): string {
   if (!courseId) return '';
@@ -176,14 +285,7 @@ export function useAIStream() {
   const messagesScrollRef = ref<HTMLDivElement | null>(null);
   const streamAnchorRef = ref<HTMLDivElement | null>(null);
 
-  function getInitialReasoningFolded(): boolean {
-    try {
-      const prefStore = usePreferenceStore();
-      return prefStore.preferences.thinkingDisplayMode !== 'EXPANDED';
-    } catch {
-      return true;
-    }
-  }
+  const getInitialReasoningFolded = getDefaultReasoningFolded;
 
   // 流式过程中的临时状态 (对标全局副驾驶独立顶级 ref)
   const streamingReasoning = ref('');
@@ -194,6 +296,9 @@ export function useAIStream() {
   const streamPhaseMessage = ref('');
   const answerStreamStarted = ref(false);
   const followUpPrompts = ref<string[]>([]);
+  /** 用户手动点击停止后置位，避免 fallback / 重载消息覆盖已结算内容 */
+  const userStoppedGeneration = ref(false);
+  const activeStreamCourseId = ref<number | undefined>();
 
   // 增量高效流式 Markdown 渲染引擎
   const {
@@ -212,16 +317,22 @@ export function useAIStream() {
   });
 
   const showScrollToBottom = ref(false);
+  const userScrolledUp = ref(false);
   let followAnimationFrameId: number | null = null;
+
+  function pauseAutoScrollFollow() {
+    userScrolledUp.value = true;
+    showScrollToBottom.value = true;
+  }
 
   /** 流式输出时自动平滑向上滚动贴底；用户手动上滑后暂停贴底（与侧边栏 AI 一致） */
   function scheduleFollowStreamOutput() {
-    if (!streaming.value || showScrollToBottom.value) return;
+    if (!streaming.value || userScrolledUp.value || showScrollToBottom.value) return;
     if (followAnimationFrameId) return;
     followAnimationFrameId = requestAnimationFrame(() => {
       followAnimationFrameId = null;
       nextTick(() => {
-        if (!streaming.value || showScrollToBottom.value) return;
+        if (!streaming.value || userScrolledUp.value || showScrollToBottom.value) return;
         if (messagesScrollRef.value) {
           messagesScrollRef.value.scrollTop = messagesScrollRef.value.scrollHeight;
           bindMarkdownCodeCopy(messagesScrollRef.value);
@@ -234,7 +345,13 @@ export function useAIStream() {
     const el = e.target as HTMLElement;
     if (!el) return;
     const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    showScrollToBottom.value = distanceToBottom > 160;
+    if (distanceToBottom > 160) {
+      userScrolledUp.value = true;
+      showScrollToBottom.value = true;
+    } else if (distanceToBottom < 30) {
+      userScrolledUp.value = false;
+      showScrollToBottom.value = false;
+    }
   }
 
   function scrollToBottomInstant() {
@@ -246,6 +363,8 @@ export function useAIStream() {
   }
 
   function scrollToBottomSmooth() {
+    userScrolledUp.value = false;
+    showScrollToBottom.value = false;
     nextTick(() => {
       if (streamAnchorRef.value) {
         streamAnchorRef.value.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -349,7 +468,6 @@ export function useAIStream() {
       role: 'assistant',
       content: finalAnswer.trim() || '已处理你的课程学习咨询。',
       reasoningContent: finalReasoning,
-      reasoningFolded: true,
       createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       citations: [...streamingCitations.value],
       followUpPrompts: generateSmartFollowUps(promptText)
@@ -357,6 +475,7 @@ export function useAIStream() {
 
     followUpPrompts.value = generateSmartFollowUps(promptText);
     resetStreamingState();
+    persistMessageCache(activeStreamCourseId.value, currentSessionId.value, messages.value);
     window.dispatchEvent(new CustomEvent('edumind:ai-usage-changed'));
     scrollToBottomInstant();
     nextTick(() => {
@@ -383,7 +502,6 @@ export function useAIStream() {
       role: (raw.role || 'assistant') as ChatMessage['role'],
       content: (raw.content as string) || '',
       reasoningContent: (raw.reasoningContent as string) || (raw.reasoning_content as string) || '',
-      reasoningFolded: true,
       createdAt: raw.createTime
         ? new Date(raw.createTime as string).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -391,7 +509,42 @@ export function useAIStream() {
     };
   }
 
-  async function loadSessions(courseId?: number) {
+  async function refreshSessionsMeta(courseId?: number) {
+    const preservedTitles = new Map(
+      sessions.value
+        .filter((s) => !isDefaultSessionTitle(s.title))
+        .map((s) => [s.id, s.title] as const)
+    );
+    try {
+      const res = await getConversations(courseId);
+      sessions.value = (res.data || []).map((item) => {
+        const mapped = mapSession(item as unknown as Record<string, unknown>);
+        const preserved = preservedTitles.get(mapped.id);
+        if (preserved && isDefaultSessionTitle(mapped.title)) {
+          mapped.title = preserved;
+        }
+        return mapped;
+      });
+      if (
+        currentSessionId.value &&
+        !sessions.value.some((s) => s.id === currentSessionId.value)
+      ) {
+        const firstUser = messages.value.find((m) => m.role === 'user');
+        sessions.value.unshift({
+          id: currentSessionId.value,
+          title: firstUser?.content
+            ? buildSessionTitleFromPrompt(firstUser.content)
+            : '新问答会话',
+          updatedAt: '刚刚'
+        });
+      }
+    } catch {
+      // 保留本地会话列表，避免手动停止后左侧列表闪空
+    }
+  }
+
+  async function loadSessions(courseId?: number, options?: LoadSessionsOptions) {
+    const restoreLastSession = options?.restoreLastSession !== false;
     const preservedTitles = new Map(
       sessions.value
         .filter((s) => !isDefaultSessionTitle(s.title))
@@ -408,6 +561,13 @@ export function useAIStream() {
         return mapped;
       });
 
+      if (!restoreLastSession) {
+        currentSessionId.value = '';
+        messages.value = [];
+        followUpPrompts.value = [];
+        return;
+      }
+
       const storedId = getStoredSessionId(courseId);
       const preferredId =
         (storedId && sessions.value.some((s) => s.id === storedId) ? storedId : '') ||
@@ -420,8 +580,10 @@ export function useAIStream() {
       if (preferredId) {
         currentSessionId.value = preferredId;
         storeSessionId(courseId, preferredId);
-        await loadMessages(preferredId);
-      } else {
+        if (!options?.skipMessageReload) {
+          await loadMessages(preferredId, courseId);
+        }
+      } else if (!options?.skipMessageReload) {
         currentSessionId.value = '';
         messages.value = [];
       }
@@ -455,15 +617,25 @@ export function useAIStream() {
     }
   }
 
-  async function loadMessages(conversationId: string) {
+  async function loadMessages(conversationId: string, courseId?: number) {
+    const localDraft =
+      messages.value.length > 0 && currentSessionId.value === conversationId
+        ? [...messages.value]
+        : readMessageCache(courseId, conversationId);
     try {
       const res = await getMessages(conversationId);
-      messages.value = (res.data || []).map((item) => mapMessage(item));
+      const serverMsgs = (res.data || []).map((item) => mapMessage(item));
+      messages.value = mergeServerWithLocalDrafts(serverMsgs, localDraft);
+      persistMessageCache(courseId, conversationId, messages.value);
       await syncSessionTitleIfDefault(conversationId);
       restoreFollowUpsForLastTurn();
     } catch {
-      messages.value = [];
-      followUpPrompts.value = [];
+      if (localDraft.length > 0) {
+        messages.value = localDraft;
+      } else {
+        messages.value = [];
+        followUpPrompts.value = [];
+      }
     }
   }
 
@@ -483,6 +655,7 @@ export function useAIStream() {
         regenerate: options?.isRegenerate === true
       },
       (event, data) => {
+        if (userStoppedGeneration.value) return;
         if (event === 'status') {
           const s = data as { phase?: string; message?: string };
           if (s?.message) streamPhaseMessage.value = s.message;
@@ -584,6 +757,8 @@ export function useAIStream() {
     const text = promptText.trim();
     if (!text || streaming.value) return;
 
+    activeStreamCourseId.value = courseId;
+
     if (!currentSessionId.value) {
       await createNewSession(courseId, true);
     }
@@ -617,6 +792,7 @@ export function useAIStream() {
 
     try {
       const streamed = await streamAssistantChat(text, courseId, options);
+      if (userStoppedGeneration.value) return;
       if (!streamed && !streamingContent.value) {
         if (options?.isRegenerate) {
           throw new Error('重新生成未返回有效内容，请稍后重试');
@@ -624,6 +800,7 @@ export function useAIStream() {
         await fallbackAsk(text, courseId);
       }
     } catch (err: unknown) {
+      if (userStoppedGeneration.value) return;
       if (options?.isRegenerate) {
         const errorMsg = err instanceof Error ? err.message : '服务繁忙，请稍后重试';
         messages.value.push({
@@ -648,13 +825,21 @@ export function useAIStream() {
         }
       }
     } finally {
+      const wasStopped = userStoppedGeneration.value;
+      userStoppedGeneration.value = false;
       streaming.value = false;
       scrollToBottomInstant();
       if (currentSessionId.value) {
         storeSessionId(courseId, currentSessionId.value);
-        await syncSessionTitleIfDefault(currentSessionId.value, text, { tryLlmTitle: true });
+        if (wasStopped) {
+          persistMessageCache(courseId, currentSessionId.value, messages.value);
+          await refreshSessionsMeta(courseId);
+        } else {
+          await syncSessionTitleIfDefault(currentSessionId.value, text, { tryLlmTitle: true });
+          await loadSessions(courseId);
+          persistMessageCache(courseId, currentSessionId.value, messages.value);
+        }
       }
-      await loadSessions(courseId);
       nextTick(() => {
         if (messagesScrollRef.value) {
           bindMarkdownCodeCopy(messagesScrollRef.value);
@@ -665,24 +850,22 @@ export function useAIStream() {
 
   function stopStream() {
     if (!streaming.value) return;
+    userStoppedGeneration.value = true;
     sseClient.stop();
     streaming.value = false;
 
-    // 若已有生成内容，结算为一条消息
     const answer = streamingAnswerBody.value || streamingContent.value;
-    if (answer.trim() || streamingReasoning.value.trim()) {
-      finishStreamingMarkdown();
-      messages.value.push({
-        id: `ai_${Date.now()}`,
-        role: 'assistant',
-        content: answer.trim() + '\n\n*(已停止生成)*',
-        reasoningContent: cleanReasoningText(streamingReasoning.value || streamingThinkingBody.value),
-        reasoningFolded: true,
-        createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        citations: [...streamingCitations.value]
-      });
-    }
+    finishStreamingMarkdown();
+    messages.value.push({
+      id: `ai_${Date.now()}`,
+      role: 'assistant',
+      content: buildStoppedGenerationContent(answer),
+      reasoningContent: cleanReasoningText(streamingReasoning.value || streamingThinkingBody.value),
+      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      citations: [...streamingCitations.value]
+    });
     resetStreamingState();
+    persistMessageCache(activeStreamCourseId.value, currentSessionId.value, messages.value);
     ElMessage.info('已停止当前生成');
     scrollToBottomInstant();
   }
@@ -718,7 +901,7 @@ export function useAIStream() {
     storeSessionId(courseId, id);
     followUpPrompts.value = [];
     resetStreamingState();
-    await loadMessages(id);
+    await loadMessages(id, courseId);
     scrollToBottomInstant();
   }
 
@@ -730,11 +913,12 @@ export function useAIStream() {
     }
     sessions.value = sessions.value.filter((s) => s.id !== id);
     clearStoredSessionId(courseId, id);
+    clearMessageCache(courseId, id);
     if (currentSessionId.value === id) {
       currentSessionId.value = sessions.value[0]?.id || '';
       if (currentSessionId.value) {
         storeSessionId(courseId, currentSessionId.value);
-        await loadMessages(currentSessionId.value);
+        await loadMessages(currentSessionId.value, courseId);
       } else {
         messages.value = [];
       }
@@ -796,6 +980,7 @@ export function useAIStream() {
         }
       }
       messages.value = removeMessagesByIds(messages.value, deletedIds);
+      persistMessageCache(activeStreamCourseId.value, currentSessionId.value, messages.value);
       followUpPrompts.value = [];
       ElMessage.success('已删除本轮对话记录');
     } catch {
@@ -827,6 +1012,7 @@ export function useAIStream() {
     isReasoningActive,
     streamPhaseMessage,
     followUpPrompts,
+    showThinkingPanel: computed(() => !isThinkingPanelHidden()),
     // 方法
     loadSessions,
     loadMessages,
@@ -843,6 +1029,7 @@ export function useAIStream() {
     scrollToBottomInstant,
     scheduleFollowStreamOutput,
     showScrollToBottom,
+    pauseAutoScrollFollow,
     handleViewportScroll
   };
 }

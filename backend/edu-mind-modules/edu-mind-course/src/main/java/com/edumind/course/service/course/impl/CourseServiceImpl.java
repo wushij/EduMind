@@ -43,6 +43,8 @@ public class CourseServiceImpl implements CourseService {
     private final CourseDao courseDao;
     private final CourseMemberDao courseMemberDao;
     private final KnowledgePointDao knowledgePointDao;
+    private final com.edumind.course.dao.ChapterDao chapterDao;
+    private final com.edumind.resource.api.ResourceQueryApi resourceQueryApi;
     private final CourseConverter courseConverter;
     private final UserQueryApi userQueryApi;
     private final TenantDataScopeApi tenantDataScopeApi;
@@ -76,8 +78,8 @@ public class CourseServiceImpl implements CourseService {
                     if (!CollectionUtils.isEmpty(userIds)) {
                         for (Long uid : userIds) {
                             allowedCourseIds.addAll(courseDao.findByTeacherId(uid).stream()
-                                    .map(CourseEntity::getId)
-                                    .collect(Collectors.toList()));
+                                     .map(CourseEntity::getId)
+                                     .collect(Collectors.toList()));
                         }
                     }
                 }
@@ -90,10 +92,20 @@ public class CourseServiceImpl implements CourseService {
         }
 
         List<CourseVO> list = page.getRecords().stream()
-                .map(entity -> courseConverter.toVO(
-                        entity,
-                        resolveTeacherName(entity.getTeacherId()),
-                        courseMemberDao.countStudentsByCourseId(entity.getId())))
+                .map(entity -> {
+                    Long cid = entity.getId();
+                    Long studentCount = courseMemberDao.countStudentsByCourseId(cid);
+                    Long chapterCount = chapterDao.countByCourseId(cid);
+                    Long kpCount = knowledgePointDao.countByCourseId(cid);
+                    Long resourceCount = resourceQueryApi != null ? resourceQueryApi.countResourcesByCourseId(cid) : 0L;
+                    return courseConverter.toVO(
+                            entity,
+                            resolveTeacherName(entity.getTeacherId()),
+                            studentCount,
+                            chapterCount,
+                            kpCount,
+                            resourceCount);
+                })
                 .collect(Collectors.toList());
 
         return PageResult.<CourseVO>builder()
@@ -111,10 +123,17 @@ public class CourseServiceImpl implements CourseService {
             throw new BusinessException("课程不存在");
         }
         assertCourseAccessible(entity);
+        Long studentCount = courseMemberDao.countStudentsByCourseId(entity.getId());
+        Long chapterCount = chapterDao.countByCourseId(entity.getId());
+        Long kpCount = knowledgePointDao.countByCourseId(entity.getId());
+        Long resourceCount = resourceQueryApi != null ? resourceQueryApi.countResourcesByCourseId(entity.getId()) : 0L;
         return courseConverter.toDetailVO(
                 entity,
                 resolveTeacherName(entity.getTeacherId()),
-                courseMemberDao.countStudentsByCourseId(entity.getId()));
+                studentCount,
+                chapterCount,
+                kpCount,
+                resourceCount);
     }
 
     @Override
@@ -182,6 +201,43 @@ public class CourseServiceImpl implements CourseService {
 
         knowledgePointDao.insert(entity);
         return courseConverter.toKnowledgePointVO(entity);
+    }
+
+    @Override
+    public void deleteKnowledgePoint(Long courseId, Long kpId) {
+        CourseEntity course = courseDao.findById(courseId);
+        if (course == null) {
+            throw new BusinessException("课程不存在");
+        }
+        assertCourseEditable(course);
+        knowledgePointDao.deleteById(kpId);
+    }
+
+    @Override
+    public Long joinCourseByCode(String code) {
+        if (!org.springframework.util.StringUtils.hasText(code)) {
+            throw new BusinessException("请输入有效的课程代码");
+        }
+        CourseEntity course = courseDao.findByCode(code.trim());
+        if (course == null) {
+            try {
+                Long courseId = Long.parseLong(code.trim());
+                course = courseDao.findById(courseId);
+            } catch (NumberFormatException ignored) {}
+        }
+        if (course == null) {
+            throw new BusinessException("未找到匹配的课程，请核对课程代号");
+        }
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (courseMemberDao.findByCourseIdAndUserId(course.getId(), currentUserId) != null) {
+            throw new BusinessException("您已在此课程班级中，无需重复加入");
+        }
+        com.edumind.course.entity.CourseMemberEntity member = new com.edumind.course.entity.CourseMemberEntity();
+        member.setCourseId(course.getId());
+        member.setUserId(currentUserId);
+        member.setMemberRole("STUDENT");
+        courseMemberDao.insert(member);
+        return course.getId();
     }
 
     private void assertCourseEditable(CourseEntity course) {

@@ -211,22 +211,26 @@ CREATE TABLE IF NOT EXISTS course (
 
 CREATE TABLE IF NOT EXISTS course_chapter (
     id          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '章节ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     course_id   BIGINT       NOT NULL COMMENT '所属课程ID',
     parent_id   BIGINT       DEFAULT 0 COMMENT '父章节ID',
     title       VARCHAR(128) NOT NULL COMMENT '章节标题',
     sort_order  INT          DEFAULT 0 COMMENT '排序号',
     create_time DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_course_id (course_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程章节表';
 
 CREATE TABLE IF NOT EXISTS course_knowledge_point (
     id          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '知识点ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     course_id   BIGINT       NOT NULL COMMENT '所属课程ID',
     chapter_id  BIGINT       DEFAULT NULL COMMENT '所属章节ID',
     title       VARCHAR(128) NOT NULL COMMENT '知识点名称',
     sort_order  INT          DEFAULT 0 COMMENT '排序号',
     create_time DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_course_id (course_id),
     KEY idx_chapter_id (chapter_id)
@@ -234,10 +238,12 @@ CREATE TABLE IF NOT EXISTS course_knowledge_point (
 
 CREATE TABLE IF NOT EXISTS course_member (
     id          BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     course_id   BIGINT      NOT NULL COMMENT '课程ID',
     user_id     BIGINT      NOT NULL COMMENT '用户ID',
     member_role VARCHAR(16) NOT NULL COMMENT '角色（TEACHER/STUDENT）',
     create_time DATETIME    DEFAULT CURRENT_TIMESTAMP COMMENT '加入时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     UNIQUE KEY uk_course_user (course_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程成员表';
@@ -249,6 +255,7 @@ CREATE TABLE IF NOT EXISTS course_member (
 
 CREATE TABLE IF NOT EXISTS question_bank (
     id             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '题库ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     name           VARCHAR(128) NOT NULL COMMENT '题库名称',
     course_id      BIGINT       DEFAULT NULL COMMENT '所属课程ID',
     description    TEXT         DEFAULT NULL COMMENT '题库描述',
@@ -257,6 +264,7 @@ CREATE TABLE IF NOT EXISTS question_bank (
     deleted        TINYINT      DEFAULT 0 COMMENT '逻辑删除',
     create_time    DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time    DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_course_id (course_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='题库表';
@@ -286,25 +294,30 @@ CREATE TABLE IF NOT EXISTS edu_question (
 
 CREATE TABLE IF NOT EXISTS question_option (
     id          BIGINT     NOT NULL AUTO_INCREMENT COMMENT '选项ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     question_id BIGINT     NOT NULL COMMENT '所属试题ID',
     option_key  VARCHAR(8) DEFAULT NULL COMMENT '选项标识（A/B/C/D）',
     content     TEXT       DEFAULT NULL COMMENT '选项文本内容',
     is_correct  TINYINT    DEFAULT 0 COMMENT '是否为正确答案（1-是 0-否）',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_question_id (question_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='试题选项明细表';
 
 CREATE TABLE IF NOT EXISTS question_bank_item (
     id          BIGINT   NOT NULL AUTO_INCREMENT COMMENT '关联ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     bank_id     BIGINT   NOT NULL COMMENT '题库ID',
     question_id BIGINT   NOT NULL COMMENT '试题ID',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '关联时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     UNIQUE KEY uk_bank_question (bank_id, question_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='题库试题关联表';
 
 CREATE TABLE IF NOT EXISTS teaching_exam (
     id               BIGINT       NOT NULL AUTO_INCREMENT COMMENT '试卷ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     course_id        BIGINT       NOT NULL COMMENT '所属课程ID',
     title            VARCHAR(128) NOT NULL COMMENT '试卷标题',
     total_score      INT          DEFAULT 100 COMMENT '试卷满分',
@@ -316,16 +329,19 @@ CREATE TABLE IF NOT EXISTS teaching_exam (
     deleted          TINYINT      DEFAULT 0 COMMENT '逻辑删除',
     create_time      DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time      DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_course_id (course_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='试卷测验表';
 
 CREATE TABLE IF NOT EXISTS exam_question (
     id          BIGINT NOT NULL AUTO_INCREMENT COMMENT '关联ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     exam_id     BIGINT NOT NULL COMMENT '试卷ID',
     question_id BIGINT NOT NULL COMMENT '试题ID',
     score       INT    DEFAULT 5 COMMENT '本题在试卷中的分值',
     sort_order  INT    DEFAULT 0 COMMENT '试卷内题目序号',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_exam_id (exam_id),
     KEY idx_question_id (question_id)
@@ -338,6 +354,7 @@ CREATE TABLE IF NOT EXISTS exam_question (
 
 CREATE TABLE IF NOT EXISTS assignment (
     id          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '作业ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     course_id   BIGINT       NOT NULL COMMENT '所属课程ID',
     exam_id     BIGINT       DEFAULT NULL COMMENT '关联试卷测验ID（可选）',
     title       VARCHAR(128) NOT NULL COMMENT '作业标题',
@@ -346,12 +363,14 @@ CREATE TABLE IF NOT EXISTS assignment (
     status      VARCHAR(16)  DEFAULT 'DRAFT' COMMENT '状态（DRAFT/PUBLISHED/CLOSED）',
     create_time DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_course_id (course_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='教学作业表';
 
 CREATE TABLE IF NOT EXISTS assignment_submission (
     id            BIGINT      NOT NULL AUTO_INCREMENT COMMENT '提交记录ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     assignment_id BIGINT      NOT NULL COMMENT '作业ID',
     student_id    BIGINT      NOT NULL COMMENT '提交学生用户ID',
     status        VARCHAR(16) DEFAULT 'IN_PROGRESS' COMMENT '状态（IN_PROGRESS/SUBMITTED/GRADED）',
@@ -360,22 +379,26 @@ CREATE TABLE IF NOT EXISTS assignment_submission (
     submit_time   DATETIME    DEFAULT NULL COMMENT '提交时间',
     create_time   DATETIME    DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time   DATETIME    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     UNIQUE KEY uk_assignment_student (assignment_id, student_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学生作业提交记录表';
 
 CREATE TABLE IF NOT EXISTS submission_answer (
     id            BIGINT   NOT NULL AUTO_INCREMENT COMMENT '答题记录ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     submission_id BIGINT   NOT NULL COMMENT '作业提交记录ID',
     question_id   BIGINT   NOT NULL COMMENT '题目ID',
     answer        TEXT     DEFAULT NULL COMMENT '学生作答内容',
     create_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_submission_id (submission_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学生答题详情表';
 
 CREATE TABLE IF NOT EXISTS grading_result (
     id              BIGINT      NOT NULL AUTO_INCREMENT COMMENT '批改结果ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     submission_id   BIGINT      NOT NULL COMMENT '作业提交记录ID',
     question_id     BIGINT      NOT NULL COMMENT '题目ID',
     score           INT         DEFAULT 0 COMMENT '得分',
@@ -386,6 +409,7 @@ CREATE TABLE IF NOT EXISTS grading_result (
     status          VARCHAR(32) DEFAULT 'PENDING' COMMENT '状态（PENDING/AI_GRADED/CONFIRMED）',
     create_time     DATETIME    DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time     DATETIME    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_submission_id (submission_id),
     KEY idx_question_id (question_id)
@@ -414,6 +438,7 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
 
 CREATE TABLE IF NOT EXISTS knowledge_document (
     id                BIGINT       NOT NULL AUTO_INCREMENT COMMENT '文档ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     knowledge_base_id BIGINT       NOT NULL COMMENT '所属知识库ID',
     file_name         VARCHAR(256) NOT NULL COMMENT '文件名称',
     file_type         VARCHAR(32)  DEFAULT NULL COMMENT '文件类型（PDF/WORD/MD/TXT）',
@@ -424,21 +449,25 @@ CREATE TABLE IF NOT EXISTS knowledge_document (
     status            INT          DEFAULT 1 COMMENT '状态（1-正常 0-禁用）',
     create_time       DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time       DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_kb_id (knowledge_base_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库文档表';
 
 CREATE TABLE IF NOT EXISTS knowledge_document_text (
     id          BIGINT   NOT NULL AUTO_INCREMENT COMMENT '切片文本ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     document_id BIGINT   NOT NULL UNIQUE COMMENT '所属文档ID',
     content     LONGTEXT DEFAULT NULL COMMENT '切片提取正文/纯文本内容',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     UNIQUE KEY uk_doc_id (document_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库切片纯文本表';
 
 CREATE TABLE IF NOT EXISTS knowledge_document_chunk (
     id                BIGINT       NOT NULL AUTO_INCREMENT COMMENT 'Chunk ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     document_id       BIGINT       NOT NULL COMMENT '所属文档ID',
     knowledge_base_id BIGINT       NOT NULL COMMENT '所属知识库ID',
     chunk_index       INT          NOT NULL DEFAULT 0 COMMENT '切片序号',
@@ -448,6 +477,7 @@ CREATE TABLE IF NOT EXISTS knowledge_document_chunk (
     char_count        INT          DEFAULT 0 COMMENT '字符数',
     token_estimate    INT          DEFAULT 0 COMMENT 'Token 估算',
     create_time       DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_document_id (document_id),
     KEY idx_kb_id (knowledge_base_id),
@@ -456,6 +486,7 @@ CREATE TABLE IF NOT EXISTS knowledge_document_chunk (
 
 CREATE TABLE IF NOT EXISTS knowledge_index_task (
     id                BIGINT       NOT NULL AUTO_INCREMENT COMMENT '任务ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     knowledge_base_id BIGINT       NOT NULL COMMENT '知识库ID',
     mode              VARCHAR(16)  NOT NULL DEFAULT 'FULL' COMMENT 'FULL/INCREMENTAL',
     status            VARCHAR(32)  NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/INDEXING/INDEXED/INDEX_FAILED',
@@ -468,12 +499,14 @@ CREATE TABLE IF NOT EXISTS knowledge_index_task (
     finished_at       DATETIME     DEFAULT NULL COMMENT '结束时间',
     create_time       DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time       DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_kb_id (knowledge_base_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库向量索引任务表';
 
 CREATE TABLE IF NOT EXISTS knowledge_chunk_index (
     id                BIGINT       NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     chunk_id          BIGINT       NOT NULL COMMENT 'Chunk ID',
     knowledge_base_id BIGINT       NOT NULL COMMENT '知识库ID',
     document_id       BIGINT       NOT NULL COMMENT '文档ID',
@@ -483,6 +516,7 @@ CREATE TABLE IF NOT EXISTS knowledge_chunk_index (
     error_message     VARCHAR(512) DEFAULT NULL COMMENT '错误信息',
     create_time       DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time       DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     UNIQUE KEY uk_chunk_id (chunk_id),
     KEY idx_kb_id (knowledge_base_id),
@@ -496,6 +530,7 @@ CREATE TABLE IF NOT EXISTS knowledge_chunk_index (
 
 CREATE TABLE IF NOT EXISTS teaching_resource (
     id            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '资源ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     course_id     BIGINT       DEFAULT NULL COMMENT '所属课程ID',
     chapter_id    BIGINT       DEFAULT NULL COMMENT '所属章节ID',
     title         VARCHAR(128) NOT NULL COMMENT '资源标题',
@@ -504,6 +539,7 @@ CREATE TABLE IF NOT EXISTS teaching_resource (
     description   TEXT         DEFAULT NULL COMMENT '资源介绍',
     status        INT          DEFAULT 1 COMMENT '状态（1-正常 0-下架）',
     create_time   DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_course_id (course_id),
     KEY idx_chapter_id (chapter_id)
@@ -511,12 +547,14 @@ CREATE TABLE IF NOT EXISTS teaching_resource (
 
 CREATE TABLE IF NOT EXISTS course_resource (
     id            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '关联ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     course_id     BIGINT       NOT NULL COMMENT '课程ID',
     resource_id   BIGINT       DEFAULT NULL COMMENT '教学资源ID',
     document_id   BIGINT       DEFAULT NULL COMMENT '知识库文档ID',
     title         VARCHAR(128) DEFAULT NULL COMMENT '资源名称快照',
     resource_type VARCHAR(32)  DEFAULT NULL COMMENT '资源类型快照',
     create_time   DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '绑定时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_course_id (course_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程资源关联表';
@@ -540,8 +578,10 @@ CREATE TABLE IF NOT EXISTS ai_tool (
     is_recommended TINYINT      DEFAULT 0 COMMENT '是否精选推荐（1-是 0-否）',
     is_hot         TINYINT      DEFAULT 0 COMMENT '热门标记（1-是 0-否）',
     use_count      INT          DEFAULT 0 COMMENT '累计调用热度',
+    sort_order     INT          DEFAULT 0 COMMENT '展示排序（越小越靠前）',
     status         INT          DEFAULT 1 COMMENT '状态（1-可用 0-下架）',
     create_time    DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time    DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI工具广场元数据表';
 
@@ -563,6 +603,7 @@ CREATE TABLE IF NOT EXISTS ai_conversation (
 
 CREATE TABLE IF NOT EXISTS ai_message (
     id              VARCHAR(64) NOT NULL COMMENT '消息UUID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     conversation_id VARCHAR(64) NOT NULL COMMENT '所属会话ID',
     role            VARCHAR(16) NOT NULL COMMENT '发送方角色（user/assistant/system）',
     content         TEXT        DEFAULT NULL COMMENT '消息文本',
@@ -570,6 +611,7 @@ CREATE TABLE IF NOT EXISTS ai_message (
     citations_json  TEXT        DEFAULT NULL COMMENT '引用 JSON（RAG 溯源）',
     token_count     INT         DEFAULT 0 COMMENT '本次Token消耗',
     create_time     DATETIME    DEFAULT CURRENT_TIMESTAMP COMMENT '发送时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_conversation_id (conversation_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI会话消息记录表';
@@ -596,6 +638,7 @@ CREATE TABLE IF NOT EXISTS ai_call_log (
 
 CREATE TABLE IF NOT EXISTS prompt_template (
     id            BIGINT        NOT NULL AUTO_INCREMENT COMMENT '模板ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     code          VARCHAR(64)   NOT NULL COMMENT '模板编码',
     name          VARCHAR(128)  NOT NULL COMMENT '模板名称',
     category      VARCHAR(32)   DEFAULT NULL COMMENT '分类',
@@ -610,12 +653,14 @@ CREATE TABLE IF NOT EXISTS prompt_template (
     max_tokens    INT           DEFAULT 2000 COMMENT '最大生成Token',
     create_time   DATETIME      DEFAULT CURRENT_TIMESTAMP,
     update_time   DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     UNIQUE KEY uk_code (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Prompt 模板表';
 
 CREATE TABLE IF NOT EXISTS prompt_template_version (
     id            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '版本ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     template_id   BIGINT       NOT NULL COMMENT '模板ID',
     version       INT          NOT NULL COMMENT '版本号',
     content       TEXT         NOT NULL COMMENT '版本内容',
@@ -623,6 +668,7 @@ CREATE TABLE IF NOT EXISTS prompt_template_version (
     variables     VARCHAR(512) DEFAULT NULL COMMENT '变量列表',
     published_by  BIGINT       DEFAULT NULL COMMENT '发布人',
     create_time   DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     UNIQUE KEY uk_template_version (template_id, version)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Prompt 模板版本表';
@@ -641,6 +687,7 @@ CREATE TABLE IF NOT EXISTS sys_ai_quota (
 
 CREATE TABLE IF NOT EXISTS sys_user_preference (
     user_id            BIGINT       NOT NULL COMMENT '用户ID',
+    tenant_id          BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     theme              VARCHAR(16)  DEFAULT 'LIGHT' COMMENT '主题',
     language           VARCHAR(16)  DEFAULT 'zh-CN' COMMENT '语言',
     default_model      VARCHAR(64)  DEFAULT NULL COMMENT '默认模型',
@@ -648,7 +695,8 @@ CREATE TABLE IF NOT EXISTS sys_user_preference (
     enable_notification TINYINT(1)  DEFAULT 1 COMMENT '启用通知',
     preferences_json   JSON         DEFAULT NULL COMMENT '扩展偏好 JSON',
     updated_at         DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_id)
+    PRIMARY KEY (user_id),
+    KEY idx_tenant_id (tenant_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户偏好设置';
 
 -- -----------------------------------------------------------------------------
@@ -658,12 +706,14 @@ CREATE TABLE IF NOT EXISTS sys_user_preference (
 
 CREATE TABLE IF NOT EXISTS statistics_daily_snapshot (
     id                     BIGINT NOT NULL AUTO_INCREMENT COMMENT '快照ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     stat_date              DATE   NOT NULL COMMENT '快照日期',
     course_id              BIGINT DEFAULT NULL COMMENT '课程ID（NULL表示全局全校汇总）',
     active_student_count   INT    DEFAULT 0 COMMENT '当日活跃学生数',
     total_ai_conversations INT    DEFAULT 0 COMMENT '当日AI对话总轮次',
     total_tokens_consumed  BIGINT DEFAULT 0 COMMENT '当日Token消耗总量',
     avg_score              DOUBLE DEFAULT NULL COMMENT '当日作业/测验平均分',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_stat_date (stat_date),
     KEY idx_course_id (course_id)
@@ -676,12 +726,14 @@ CREATE TABLE IF NOT EXISTS statistics_daily_snapshot (
 
 CREATE TABLE IF NOT EXISTS learning_record (
     id              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '记录ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     student_id      BIGINT       NOT NULL COMMENT '学生ID',
     course_id       BIGINT       NOT NULL COMMENT '课程ID',
     action_type     VARCHAR(32)  NOT NULL COMMENT 'LOGIN/STUDY/RESOURCE_VIEW/AI_CHAT',
     duration_minutes INT         DEFAULT 0 COMMENT '学习时长（分钟）',
     resource_id     BIGINT       DEFAULT NULL COMMENT '关联资源ID',
     create_time     DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_student_course (student_id, course_id),
     KEY idx_course_time (course_id, create_time)
@@ -689,6 +741,7 @@ CREATE TABLE IF NOT EXISTS learning_record (
 
 CREATE TABLE IF NOT EXISTS knowledge_mastery (
     id                  BIGINT        NOT NULL AUTO_INCREMENT COMMENT '掌握度ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     student_id          BIGINT        NOT NULL COMMENT '学生ID',
     course_id           BIGINT        NOT NULL COMMENT '课程ID',
     knowledge_point_id  BIGINT        NOT NULL COMMENT '知识点ID',
@@ -697,6 +750,7 @@ CREATE TABLE IF NOT EXISTS knowledge_mastery (
     last_assessed_at    DATETIME      DEFAULT NULL COMMENT '最近评估时间',
     create_time         DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time         DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     UNIQUE KEY uk_student_kp (student_id, knowledge_point_id),
     KEY idx_course_kp (course_id, knowledge_point_id)
@@ -704,6 +758,7 @@ CREATE TABLE IF NOT EXISTS knowledge_mastery (
 
 CREATE TABLE IF NOT EXISTS wrong_question_record (
     id                  BIGINT       NOT NULL AUTO_INCREMENT COMMENT '错题记录ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     student_id          BIGINT       NOT NULL COMMENT '学生ID',
     course_id           BIGINT       NOT NULL COMMENT '课程ID',
     question_id         BIGINT       NOT NULL COMMENT '题目ID',
@@ -714,6 +769,7 @@ CREATE TABLE IF NOT EXISTS wrong_question_record (
     wrong_count         INT          NOT NULL DEFAULT 1 COMMENT '累计错误次数',
     create_time         DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time         DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_course_question (course_id, question_id),
     KEY idx_student (student_id)
@@ -721,6 +777,7 @@ CREATE TABLE IF NOT EXISTS wrong_question_record (
 
 CREATE TABLE IF NOT EXISTS course_statistics (
     id              BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     course_id       BIGINT        NOT NULL COMMENT '课程ID',
     stat_date       DATE          NOT NULL COMMENT '统计日期 (YYYY-MM-DD)',
     student_count   INT           NOT NULL DEFAULT 0 COMMENT '当日活跃学生数',
@@ -730,6 +787,7 @@ CREATE TABLE IF NOT EXISTS course_statistics (
     wrong_count     INT           NOT NULL DEFAULT 0 COMMENT '当日新增错题记录数',
     create_time     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '生成时间',
     update_time     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     UNIQUE KEY uk_course_date (course_id, stat_date),
     KEY idx_stat_date (stat_date),
@@ -738,11 +796,13 @@ CREATE TABLE IF NOT EXISTS course_statistics (
 
 CREATE TABLE IF NOT EXISTS knowledge_point_relation (
     id                      BIGINT       NOT NULL AUTO_INCREMENT COMMENT '关系ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     source_knowledge_point_id BIGINT       NOT NULL COMMENT '源知识点ID',
     target_knowledge_point_id BIGINT       NOT NULL COMMENT '目标知识点ID',
     relation_type           VARCHAR(32)  NOT NULL COMMENT 'prerequisite/successor/related/assessed_by/supported_by',
     properties              JSON         DEFAULT NULL COMMENT '扩展属性',
     create_time             DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     UNIQUE KEY uk_relation (source_knowledge_point_id, target_knowledge_point_id, relation_type),
     KEY idx_source (source_knowledge_point_id),
@@ -788,6 +848,7 @@ CREATE TABLE IF NOT EXISTS ai_gateway_route (
 
 CREATE TABLE IF NOT EXISTS agent_run (
     id              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     run_id          VARCHAR(64)  NOT NULL COMMENT '运行实例ID',
     agent_code      VARCHAR(32)  NOT NULL COMMENT 'Agent 编码',
     user_id         BIGINT       NOT NULL COMMENT '发起用户ID',
@@ -799,6 +860,7 @@ CREATE TABLE IF NOT EXISTS agent_run (
     token_usage     INT          DEFAULT 0 COMMENT 'Token 消耗',
     create_time     DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time     DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     UNIQUE KEY uk_run_id (run_id),
     KEY idx_user (user_id),
@@ -807,6 +869,7 @@ CREATE TABLE IF NOT EXISTS agent_run (
 
 CREATE TABLE IF NOT EXISTS agent_step (
     id              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '步骤ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     run_id          VARCHAR(64)  NOT NULL COMMENT '运行实例ID',
     step_index      INT          NOT NULL COMMENT '步骤序号',
     step_type       VARCHAR(16)  NOT NULL COMMENT 'INTENT/PLAN/TOOL/LLM/RESULT',
@@ -817,12 +880,14 @@ CREATE TABLE IF NOT EXISTS agent_step (
     output_preview  TEXT         DEFAULT NULL COMMENT '输出预览',
     create_time     DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time     DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_run (run_id, step_index)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Agent 步骤';
 
 CREATE TABLE IF NOT EXISTS agent_tool_call (
     id              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '调用ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     run_id          VARCHAR(64)  NOT NULL COMMENT '运行实例ID',
     step_id         BIGINT       DEFAULT NULL COMMENT '关联步骤ID',
     tool_name       VARCHAR(64)  NOT NULL COMMENT '工具名称',
@@ -831,6 +896,7 @@ CREATE TABLE IF NOT EXISTS agent_tool_call (
     status          VARCHAR(16)  NOT NULL DEFAULT 'RUNNING' COMMENT '调用状态',
     duration_ms     INT          DEFAULT 0 COMMENT '耗时（毫秒）',
     create_time     DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_run_tool (run_id, tool_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Tool 调用日志';
@@ -962,6 +1028,7 @@ CREATE TABLE IF NOT EXISTS ai_memory_namespace (
 
 CREATE TABLE IF NOT EXISTS ai_memory_item (
     id                 BIGINT       NOT NULL AUTO_INCREMENT COMMENT '记忆条目ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     namespace_id       BIGINT       NOT NULL COMMENT '命名空间ID',
     memory_type        VARCHAR(32)  NOT NULL DEFAULT 'PREFERENCE' COMMENT '记忆类型(PREFERENCE/PROFILE/EPISODIC/FEEDBACK)',
     summary            VARCHAR(512) NOT NULL COMMENT '记忆摘要内容(明文脱敏)',
@@ -971,18 +1038,21 @@ CREATE TABLE IF NOT EXISTS ai_memory_item (
     vector_ref         VARCHAR(128) DEFAULT NULL COMMENT '向量数据库ID引用',
     expire_time        DATETIME     DEFAULT NULL COMMENT '生命周期过期时间',
     create_time        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_namespace (namespace_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI长期记忆条目明细表';
 
 CREATE TABLE IF NOT EXISTS ai_memory_feedback (
     id              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '反馈ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     memory_id       BIGINT       NOT NULL COMMENT '记忆条目ID',
     user_id         BIGINT       NOT NULL COMMENT '用户ID',
     feedback_action VARCHAR(32)  NOT NULL COMMENT '操作(FORGET/MODIFY)',
     correct_content TEXT         DEFAULT NULL COMMENT '修正内容',
     reason          VARCHAR(255) DEFAULT NULL COMMENT '反馈原因',
     create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_memory (memory_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI长期记忆反馈与纠错记录';
@@ -1003,6 +1073,7 @@ CREATE TABLE IF NOT EXISTS knowledge_ocr_task (
 
 CREATE TABLE IF NOT EXISTS knowledge_ocr_page (
     id               BIGINT       NOT NULL AUTO_INCREMENT COMMENT '页面ID',
+    tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     task_id          BIGINT       NOT NULL COMMENT '任务ID',
     page_no          INT          NOT NULL COMMENT '页码',
     raw_text         LONGTEXT     DEFAULT NULL COMMENT '识别出的原始文本',
@@ -1010,6 +1081,7 @@ CREATE TABLE IF NOT EXISTS knowledge_ocr_page (
     blocks_json      JSON         DEFAULT NULL COMMENT '带坐标的识别块JSON',
     confidence_score DECIMAL(5,2) DEFAULT NULL COMMENT '置信度',
     proofread_status TINYINT      NOT NULL DEFAULT 0 COMMENT '是否已确认校对',
+    KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     UNIQUE KEY uk_task_page (task_id, page_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='OCR逐页识别与校对记录';
@@ -1191,6 +1263,7 @@ INSERT IGNORE INTO sys_permission (id, permission_code, permission_name, parent_
 (49, 'system:model:view',           'AI模型接入调度', 0),
 (50, 'system:model:edit',           'AI模型接入配置', 0),
 (51, 'system:tool:view',            'AI工具调度查看', 0),
+(70, 'system:tool:edit',            'AI教学工具编辑', 0),
 (52, 'system:gateway:view',         'AI网关监控查看', 0),
 (53, 'ai:memory:view',              '长期记忆查看', 0),
 (54, 'ai:memory:manage',            '长期记忆管理', 0),

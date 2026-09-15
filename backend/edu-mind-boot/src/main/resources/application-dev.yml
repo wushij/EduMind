@@ -17,8 +17,15 @@ ai:
     base-url: https://api.deepseek.com
     model: deepseek-chat
     timeout-ms: 60000
-    mock-enabled: false   # 真实模型走后台「模型配置」；仅 Gateway 降级链保留 mock
+    mock-enabled: false   # 与 prod 一致：真 API；Key 走环境变量或后台「模型配置」
     stream-enabled: true
+
+knowledge:
+  ocr:
+    mock-enabled: true    # 未部署 Paddle 时用 Mock；配 PADDLE_OCR_BASE_URL 后可改为 false
+    engine: mock
+    paddle:
+      base-url: ${PADDLE_OCR_BASE_URL:}
 
 edumind:
   tenant:

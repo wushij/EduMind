@@ -743,7 +743,7 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
       {
         id: 703,
         parentId: 700,
-        name: 'AI 教学工具',
+        name: '教学工具配置',
         type: 2,
         path: '/system/tools',
         component: 'views/system/ai-tool/ToolList.vue',

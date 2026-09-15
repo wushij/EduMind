@@ -17,6 +17,13 @@ ai:
   llm:
     mock-enabled: false
 
+knowledge:
+  ocr:
+    mock-enabled: false
+    engine: paddle
+    paddle:
+      base-url: ${PADDLE_OCR_BASE_URL:}
+
 edumind:
   rate-limit:
     enabled: true

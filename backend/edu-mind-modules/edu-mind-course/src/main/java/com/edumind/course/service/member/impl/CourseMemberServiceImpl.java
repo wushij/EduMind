@@ -60,6 +60,33 @@ public class CourseMemberServiceImpl implements CourseMemberService {
         return entity.getId();
     }
 
+    @Override
+    public void removeMember(Long courseId, Long userId) {
+        CourseEntity course = courseDao.findById(courseId);
+        if (course == null) {
+            throw new BusinessException("课程不存在");
+        }
+        assertCourseManageable(course);
+        courseMemberDao.deleteByCourseIdAndUserId(courseId, userId);
+    }
+
+    @Override
+    public Long joinCourse(Long courseId, Long userId) {
+        CourseEntity course = courseDao.findById(courseId);
+        if (course == null) {
+            throw new BusinessException("课程不存在");
+        }
+        if (courseMemberDao.findByCourseIdAndUserId(courseId, userId) != null) {
+            throw new BusinessException("您已经是该课程成员");
+        }
+        CourseMemberEntity entity = new CourseMemberEntity();
+        entity.setCourseId(courseId);
+        entity.setUserId(userId);
+        entity.setMemberRole("STUDENT");
+        courseMemberDao.insert(entity);
+        return entity.getId();
+    }
+
     private CourseMemberVO toMemberVO(CourseMemberEntity entity) {
         UserVO user = (UserVO) userQueryApi.getUserById(entity.getUserId());
         return CourseMemberVO.builder()

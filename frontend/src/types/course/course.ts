@@ -13,6 +13,7 @@ export interface Course {
   studentCount: number;
   chapterCount: number;
   knowledgePointCount?: number;
+  resourceCount?: number;
   progress?: number;
   aiUsageCount?: number;
   status: CourseStatus;

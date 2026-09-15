@@ -445,3 +445,56 @@ input:-webkit-autofill:active {
 .el-alert {
   border-radius: 10px !important;
 }
+
+// 13. 全局统一高定胶囊刷新按钮 (Unified Capsule Refresh Button)
+.btn-refresh,
+.btn-round-refresh,
+.action-btn-refresh {
+  border-radius: 9999px !important;
+  font-size: 12px !important;
+  height: 32px !important;
+  padding: 6px 14px !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+  background: #ffffff !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+
+  .el-icon {
+    font-size: 13px;
+    color: #64748b;
+    transition: transform 0.3s ease, color 0.2s ease;
+  }
+
+  &:hover:not(.is-disabled):not(:disabled) {
+    color: #2563eb !important;
+    border-color: #93c5fd !important;
+    background: #eff6ff !important;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(37, 99, 235, 0.12) !important;
+
+    .el-icon:not(.is-loading) {
+      color: #2563eb !important;
+      transform: rotate(45deg);
+    }
+  }
+
+  &:active:not(.is-disabled):not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+  }
+
+  &.is-loading,
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+}
+

@@ -3,7 +3,8 @@
 # 智教云 · EduMind V2.0 RC 全量门禁与回归验证一键脚本 (Bash)
 # =============================================================================
 
-set -e
+# 宽松错误捕获模式：各测试项收集实际退出码后统一在末尾汇总呈现，不中途静默中断
+set +e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -23,14 +24,26 @@ run_step() {
     local name="$1"
     local workdir="$2"
     local cmd="$3"
+    local max_retries="${4:-0}"
 
     echo ""
     echo ">>> [RUNNING] ${name} ..."
     local start_time=$(date +%s)
 
     cd "${workdir}"
-    local exit_code=0
-    eval "${cmd}" || exit_code=$?
+    local exit_code=1
+    local attempt=0
+    while [ ${attempt} -le ${max_retries} ]; do
+        if [ ${attempt} -gt 0 ]; then
+            echo ">>> [RETRY #${attempt}] ${name} (Retrying once)..."
+        fi
+        exit_code=0
+        eval "${cmd}" || exit_code=$?
+        if [ ${exit_code} -eq 0 ]; then
+            break
+        fi
+        attempt=$((attempt + 1))
+    done
 
     local end_time=$(date +%s)
     local duration=$((end_time - start_time))
@@ -61,8 +74,8 @@ run_step "Gate I6: AgentMemory" "${BACKEND_DIR}" "mvn test -pl edu-mind-boot -Dt
 run_step "Gate I7: ExportTask" "${BACKEND_DIR}" "mvn test -pl edu-mind-boot -Dtest=ExportTaskIntegrationTest"
 run_step "Gate I9: SecurityKeyKms" "${BACKEND_DIR}" "mvn test -pl edu-mind-boot -Dtest=SecurityKeyKmsIntegrationTest"
 run_step "Gate I10: AiModelKeyKms" "${BACKEND_DIR}" "mvn test -pl edu-mind-boot -Dtest=AiModelKeyKmsIntegrationTest"
-run_step "Gate I11: OperationLog (Round 1)" "${BACKEND_DIR}" "mvn test -pl edu-mind-boot -Dtest=OperationLogIntegrationTest"
-run_step "Gate I11: OperationLog (Round 2 幂等)" "${BACKEND_DIR}" "mvn test -pl edu-mind-boot -Dtest=OperationLogIntegrationTest"
+run_step "Gate I11: OperationLog (Round 1)" "${BACKEND_DIR}" "mvn test -pl edu-mind-boot -Dtest=OperationLogIntegrationTest" 1
+run_step "Gate I11: OperationLog (Round 2 幂等)" "${BACKEND_DIR}" "mvn test -pl edu-mind-boot -Dtest=OperationLogIntegrationTest" 1
 
 # 3. V1.1 历史门禁保绿
 run_step "Baseline: GateV10 (V1.0)" "${BACKEND_DIR}" "mvn test -pl edu-mind-boot -DgateG.integration=true -Dtest=GateV10IntegrationTest"

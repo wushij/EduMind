@@ -144,11 +144,24 @@
           <el-option label="紧急公告" :value="2" />
         </el-select>
 
-        <el-button type="primary" round :icon="Search" class="btn-round-search" @click="handleSearch">
+        <el-button
+          type="primary"
+          round
+          :icon="Search"
+          class="btn-round-search"
+          :disabled="loading"
+          @click="handleSearch"
+        >
           查询
         </el-button>
-        <el-button round :icon="Refresh" class="btn-round-reset" @click="handleReset">
-          重置
+        <el-button
+          round
+          class="btn-round-reset"
+          :disabled="loading"
+          @click="handleReset"
+        >
+          <el-icon class="mr-1" :class="{ 'is-loading': loading }"><Refresh /></el-icon>
+          <span>重置</span>
         </el-button>
       </div>
 
@@ -158,7 +171,11 @@
     </div>
 
     <!-- 数据表格卡片 -->
-    <div v-loading="loading" class="table-card">
+    <div
+      v-loading="loading"
+      element-loading-text="正在检索全校广播推送记录..."
+      class="table-card"
+    >
       <el-table :data="paginatedData" stripe class="broadcast-table">
         <el-table-column prop="id" label="ID" width="80" align="center">
           <template #default="{ row }">
@@ -195,14 +212,21 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="触达 / 已读" width="160" align="center">
+        <el-table-column label="触达 / 已读" width="180" align="center">
           <template #default="{ row }">
-            <div class="reach-cell-wrap">
+            <div
+              class="reach-cell-wrap clickable"
+              title="点击查看受众已读/未读名单明细"
+              @click.stop="openRecipients(row)"
+            >
               <div class="reach-meta-line">
                 <span class="read-count">{{ row.readCount || 0 }}</span>
                 <span class="slash">/</span>
                 <span class="total-count">{{ row.totalCount || 0 }}</span>
                 <span class="rate-badge">({{ calcPercent(row.readCount, row.totalCount) }}%)</span>
+                <span class="detail-link-pill">
+                  明细 <el-icon :size="10"><ArrowRight /></el-icon>
+                </span>
               </div>
               <el-progress
                 :percentage="calcPercent(row.readCount, row.totalCount)"
@@ -239,7 +263,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="170" fixed="right" align="center">
+        <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="{ row }">
             <div class="action-pill-group">
               <el-button
@@ -283,7 +307,17 @@
     <BroadcastCreateDrawer v-model:visible="drawerVisible" @sent="onSent" />
 
     <!-- 广播详情弹窗 -->
-    <BroadcastDetailDialog v-model:visible="detailVisible" :broadcast="currentBroadcast" />
+    <BroadcastDetailDialog
+      v-model:visible="detailVisible"
+      :broadcast="currentBroadcast"
+      @open-recipients="openRecipients(currentBroadcast)"
+    />
+
+    <!-- 受众触达与已读明细弹窗 -->
+    <BroadcastRecipientsDialog
+      v-model:visible="recipientsVisible"
+      :broadcast="currentBroadcast"
+    />
   </div>
 </template>
 
@@ -304,7 +338,8 @@ import {
   User,
   School,
   Reading,
-  Key
+  Key,
+  ArrowRight
 } from '@element-plus/icons-vue';
 import {
   listBroadcasts,
@@ -317,6 +352,7 @@ import { formatDateTime } from '@/utils/format/date';
 import { useAuthStore } from '@/stores/auth/auth';
 import BroadcastCreateDrawer from '@/components/notification/BroadcastCreateDrawer.vue';
 import BroadcastDetailDialog from '@/components/notification/BroadcastDetailDialog.vue';
+import BroadcastRecipientsDialog from '@/components/notification/BroadcastRecipientsDialog.vue';
 
 const authStore = useAuthStore();
 
@@ -327,6 +363,7 @@ const targetTypeFilter = ref('');
 const priorityFilter = ref<number | ''>('');
 const drawerVisible = ref(false);
 const detailVisible = ref(false);
+const recipientsVisible = ref(false);
 const currentBroadcast = ref<NotificationBroadcastVO | null>(null);
 
 const query = reactive({
@@ -353,11 +390,15 @@ async function loadStats() {
 async function fetchData() {
   loading.value = true;
   try {
-    const res = await listBroadcasts({
-      page: 1,
-      pageSize: 100, // 获取全量数据以支持前端实时关键词与多条件极速筛选
-      targetType: targetTypeFilter.value || undefined
-    });
+    const [res] = await Promise.all([
+      listBroadcasts({
+        page: 1,
+        pageSize: 100, // 获取全量数据以支持前端实时关键词与多条件极速筛选
+        targetType: targetTypeFilter.value || undefined
+      }),
+      // 保底微延时 220ms，确保本地毫秒级极速响应也能呈现清晰平滑的刷新加载反馈
+      new Promise((resolve) => setTimeout(resolve, 220))
+    ]);
     rawTableData.value = res.data?.list || [];
   } finally {
     loading.value = false;
@@ -419,6 +460,12 @@ function onSent() {
 function openDetail(row: NotificationBroadcastVO) {
   currentBroadcast.value = row;
   detailVisible.value = true;
+}
+
+function openRecipients(row: NotificationBroadcastVO | null) {
+  if (!row) return;
+  currentBroadcast.value = row;
+  recipientsVisible.value = true;
 }
 
 function priorityLabel(p: number) {
@@ -884,9 +931,27 @@ onMounted(() => {
   flex-direction: column;
   gap: 4px;
   width: 100%;
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+
+  &.clickable {
+    cursor: pointer;
+
+    &:hover {
+      background: #f8fafc;
+
+      .reach-meta-line .detail-link-pill {
+        color: #047857;
+      }
+    }
+  }
 }
 
 .reach-meta-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
   color: #475569;
   font-feature-settings: 'tnum';
@@ -907,6 +972,25 @@ onMounted(() => {
     color: #059669;
     font-weight: 600;
     font-size: 11px;
+  }
+  .detail-link-pill {
+    margin-left: 6px;
+    font-size: 11px;
+    color: #059669;
+    background: transparent;
+    border: none;
+    padding: 0 2px;
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      color: #047857;
+      text-decoration: underline;
+    }
   }
 }
 

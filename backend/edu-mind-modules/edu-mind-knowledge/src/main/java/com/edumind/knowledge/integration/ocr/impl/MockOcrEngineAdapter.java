@@ -4,6 +4,7 @@ import com.edumind.knowledge.integration.ocr.OcrEngineAdapter;
 import com.edumind.knowledge.integration.ocr.OcrPageResult;
 import com.edumind.knowledge.integration.ocr.OcrRecognizeRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +18,7 @@ import java.util.List;
 @Slf4j
 @Primary
 @Component
+@ConditionalOnProperty(prefix = "knowledge.ocr", name = "mock-enabled", havingValue = "true", matchIfMissing = true)
 public class MockOcrEngineAdapter implements OcrEngineAdapter {
 
     private static volatile boolean forceFail = false;

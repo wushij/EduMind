@@ -151,6 +151,58 @@ public class NotificationDao {
         );
     }
 
+    public long countByBroadcast(Long broadcastId) {
+        if (broadcastId == null) {
+            return 0L;
+        }
+        return notificationMapper.selectCount(
+                new LambdaQueryWrapper<NotificationEntity>()
+                        .eq(NotificationEntity::getType, "BROADCAST")
+                        .eq(NotificationEntity::getRefId, broadcastId)
+        );
+    }
+
+    public long countReadByBroadcast(Long broadcastId) {
+        if (broadcastId == null) {
+            return 0L;
+        }
+        return notificationMapper.selectCount(
+                new LambdaQueryWrapper<NotificationEntity>()
+                        .eq(NotificationEntity::getType, "BROADCAST")
+                        .eq(NotificationEntity::getRefId, broadcastId)
+                        .eq(NotificationEntity::getIsRead, 1)
+        );
+    }
+
+    public PageResult<NotificationEntity> pageByBroadcast(Long broadcastId, Integer isRead, List<Long> userIds, long pageNum, long pageSize) {
+        LambdaQueryWrapper<NotificationEntity> wrapper = new LambdaQueryWrapper<NotificationEntity>()
+                .eq(NotificationEntity::getType, "BROADCAST")
+                .eq(NotificationEntity::getRefId, broadcastId)
+                .orderByDesc(NotificationEntity::getIsRead)
+                .orderByDesc(NotificationEntity::getCreateTime);
+        if (isRead != null) {
+            wrapper.eq(NotificationEntity::getIsRead, isRead);
+        }
+        if (userIds != null) {
+            if (userIds.isEmpty()) {
+                return PageResult.<NotificationEntity>builder()
+                        .total(0L)
+                        .pageNum(pageNum)
+                        .pageSize(pageSize)
+                        .list(java.util.Collections.emptyList())
+                        .build();
+            }
+            wrapper.in(NotificationEntity::getUserId, userIds);
+        }
+        Page<NotificationEntity> page = notificationMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+        return PageResult.<NotificationEntity>builder()
+                .total(page.getTotal())
+                .pageNum(page.getCurrent())
+                .pageSize(page.getSize())
+                .list(page.getRecords())
+                .build();
+    }
+
     private void applyCategoryFilter(LambdaQueryWrapper<NotificationEntity> wrapper, String category) {
         if (!StringUtils.hasText(category) || "all".equalsIgnoreCase(category)) {
             return;

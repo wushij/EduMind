@@ -48,10 +48,12 @@ export const getProviderPresets = async (): Promise<AIProviderPresetsResponse> =
     if (data && typeof data === 'object' && 'chat' in data) {
       return data as AIProviderPresetsResponse;
     }
+    if (USE_MOCK) return fallbackPresets();
+    throw new Error('模型 Provider 预设响应格式无效');
   } catch (err) {
     if (!USE_MOCK) throw err;
+    return fallbackPresets();
   }
-  return fallbackPresets();
 };
 
 export const fetchModels = async (): Promise<AIModelConfigItem[]> => {

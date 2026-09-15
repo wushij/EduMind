@@ -7,8 +7,6 @@ import {
   deleteKnowledgeBase
 } from '@/api/knowledge/knowledge-base';
 import { KnowledgeBase } from '@/types/knowledge/knowledge-base';
-import { USE_MOCK } from '@/config/mock';
-import { MOCK_KNOWLEDGE_BASES } from '@/mock/knowledge-bases';
 
 export function useKnowledgeBase() {
   const knowledgeBases = ref<KnowledgeBase[]>([]);
@@ -22,9 +20,10 @@ export function useKnowledgeBase() {
       const res = await getKnowledgeBases(params);
       knowledgeBases.value = (res.data || []).map(normalizeKnowledgeBase);
       total.value = knowledgeBases.value.length;
-    } catch {
-      knowledgeBases.value = USE_MOCK ? [...MOCK_KNOWLEDGE_BASES] : [];
-      total.value = knowledgeBases.value.length;
+    } catch (err) {
+      knowledgeBases.value = [];
+      total.value = 0;
+      throw err;
     } finally {
       loading.value = false;
     }
@@ -34,11 +33,10 @@ export function useKnowledgeBase() {
     loading.value = true;
     try {
       const res = await getKnowledgeBaseDetail(id);
-      currentKnowledgeBase.value = res.data;
-    } catch {
-      currentKnowledgeBase.value = USE_MOCK
-        ? MOCK_KNOWLEDGE_BASES.find(k => k.id === id) || null
-        : null;
+      currentKnowledgeBase.value = res.data ? normalizeKnowledgeBase(res.data as Record<string, any>) : null;
+    } catch (err) {
+      currentKnowledgeBase.value = null;
+      throw err;
     } finally {
       loading.value = false;
     }
@@ -83,7 +81,7 @@ function normalizeKnowledgeBase(raw: Record<string, any>): KnowledgeBase {
     categoryLabel: raw.categoryLabel || '专业核心',
     documentCount: Number(raw.docCount ?? raw.documentCount ?? 0),
     chunkCount: Number(raw.chunkCount ?? 0),
-    vectorStatus: raw.vectorStatus || 'PENDING',
+    vectorStatus: raw.vectorStatus || raw.indexStatus || 'PENDING',
     vectorStatusLabel: raw.vectorStatusLabel || '待解析',
     vectorProgress: raw.vectorProgress ?? 0,
     embeddingModel: raw.embeddingModel || '',

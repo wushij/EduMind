@@ -217,7 +217,13 @@ import kbBannerImg from '@/assets/images/知识库banner.png';
 const router = useRouter();
 const { knowledgeBases, fetchKnowledgeBases, create, remove } = useKnowledgeBase();
 
-onMounted(() => fetchKnowledgeBases());
+onMounted(async () => {
+  try {
+    await fetchKnowledgeBases();
+  } catch {
+    // axios 拦截器已弹出错误提示
+  }
+});
 const selectedCategory = ref<string>('ALL');
 const searchKeyword = ref<string>('');
 const showCreateDialog = ref(false);

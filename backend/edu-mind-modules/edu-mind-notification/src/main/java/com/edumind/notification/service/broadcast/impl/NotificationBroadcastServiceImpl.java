@@ -9,6 +9,7 @@ import com.edumind.notification.dao.NotificationBroadcastDao;
 import com.edumind.notification.dao.NotificationDao;
 import com.edumind.notification.dto.broadcast.BroadcastCreateDTO;
 import com.edumind.notification.entity.NotificationBroadcastEntity;
+import com.edumind.notification.entity.NotificationEntity;
 import com.edumind.notification.service.broadcast.NotificationBroadcastDispatcher;
 import com.edumind.notification.service.broadcast.NotificationBroadcastService;
 import com.edumind.notification.vo.broadcast.BroadcastEstimateVO;
@@ -174,6 +175,103 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
         vo.setTotalRead(read);
         vo.setAvgReadRate(reach > 0 ? (read * 100.0 / reach) : 0.0);
         return vo;
+    }
+
+    @Override
+    public com.edumind.notification.vo.broadcast.BroadcastRecipientSummaryVO getRecipientSummary(
+            Long broadcastId, Integer isRead, String keyword, long page, long pageSize) {
+        NotificationBroadcastEntity broadcast = broadcastDao.findById(broadcastId);
+        if (broadcast == null) {
+            throw new BusinessException("广播记录不存在");
+        }
+        Long currentTenantId = TenantContext.getTenantId();
+        if (currentTenantId != null && broadcast.getTenantId() != null && !currentTenantId.equals(broadcast.getTenantId())) {
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权访问其他租户广播明细");
+        }
+
+        long total = notificationDao.countByBroadcast(broadcastId);
+        long read = notificationDao.countReadByBroadcast(broadcastId);
+        long unread = Math.max(0, total - read);
+        int rate = total > 0 ? (int) Math.min(Math.round((read * 100.0) / total), 100) : 0;
+
+        List<Long> matchedUserIds = null;
+        if (StringUtils.hasText(keyword)) {
+            matchedUserIds = userQueryApi.findUserIdsByKeyword(keyword.trim());
+        }
+
+        PageResult<NotificationEntity> entityPage = notificationDao.pageByBroadcast(broadcastId, isRead, matchedUserIds, page, pageSize);
+
+        List<com.edumind.notification.vo.broadcast.BroadcastRecipientVO> recipientVOList = new ArrayList<>();
+        for (NotificationEntity entity : entityPage.getList()) {
+            com.edumind.notification.vo.broadcast.BroadcastRecipientVO rvo = new com.edumind.notification.vo.broadcast.BroadcastRecipientVO();
+            rvo.setId(entity.getId());
+            rvo.setUserId(entity.getUserId());
+            rvo.setIsRead(entity.getIsRead() != null ? entity.getIsRead() : 0);
+            rvo.setCreateTime(entity.getCreateTime());
+
+            if (entity.getUserId() != null) {
+                try {
+                    Object u = userQueryApi.getUserById(entity.getUserId());
+                    if (u != null) {
+                        try {
+                            java.lang.reflect.Method getUsername = u.getClass().getMethod("getUsername");
+                            Object un = getUsername.invoke(u);
+                            if (un != null) rvo.setUsername(un.toString());
+                        } catch (Exception ignored) {}
+                        try {
+                            java.lang.reflect.Method getRealName = u.getClass().getMethod("getRealName");
+                            Object rn = getRealName.invoke(u);
+                            if (rn != null) rvo.setRealName(rn.toString());
+                        } catch (Exception ignored) {}
+                        try {
+                            java.lang.reflect.Method getAvatar = u.getClass().getMethod("getAvatar");
+                            Object av = getAvatar.invoke(u);
+                            if (av != null) rvo.setAvatar(av.toString());
+                        } catch (Exception ignored) {}
+                    }
+                } catch (Exception ignored) {}
+
+                try {
+                    List<String> roles = userQueryApi.getRolesByUserId(entity.getUserId());
+                    if (roles != null && !roles.isEmpty()) {
+                        String primaryRole = roles.get(0);
+                        rvo.setRoleCode(primaryRole);
+                        rvo.setRoleName(switch (primaryRole.toUpperCase()) {
+                            case "ADMIN" -> "系统管理员";
+                            case "TEACHER" -> "教师";
+                            case "STUDENT" -> "学生";
+                            default -> primaryRole;
+                        });
+                    } else {
+                        rvo.setRoleCode("USER");
+                        rvo.setRoleName("普通用户");
+                    }
+                } catch (Exception ignored) {}
+            }
+            if (!StringUtils.hasText(rvo.getUsername())) {
+                rvo.setUsername("用户#" + entity.getUserId());
+            }
+            recipientVOList.add(rvo);
+        }
+
+        PageResult<com.edumind.notification.vo.broadcast.BroadcastRecipientVO> recipientPageResult =
+                PageResult.<com.edumind.notification.vo.broadcast.BroadcastRecipientVO>builder()
+                        .total(entityPage.getTotal())
+                        .pageNum(entityPage.getPageNum())
+                        .pageSize(entityPage.getPageSize())
+                        .list(recipientVOList)
+                        .build();
+
+        com.edumind.notification.vo.broadcast.BroadcastRecipientSummaryVO summaryVO =
+                new com.edumind.notification.vo.broadcast.BroadcastRecipientSummaryVO();
+        summaryVO.setBroadcastId(broadcastId);
+        summaryVO.setBroadcastTitle(broadcast.getTitle());
+        summaryVO.setTotalCount((int) total);
+        summaryVO.setReadCount((int) read);
+        summaryVO.setUnreadCount((int) unread);
+        summaryVO.setReadRate(rate);
+        summaryVO.setRecipients(recipientPageResult);
+        return summaryVO;
     }
 
     @Override

@@ -1,4 +1,4 @@
-import { renderMarkdownForChat, renderMarkdownForReasoning } from '@/utils/markdown';
+import { renderMarkdownForChat, renderMarkdownForReasoning, normalizeCodeFences } from '@/utils/markdown';
 import { cleanReasoningText } from './copilot-stream-split';
 
 const FENCED_CODE_BLOCK_RE = /(```[\s\S]*?```)/g;
@@ -190,7 +190,7 @@ export function repairChatBoldMarkers(text: string): string {
 export function normalizeChatMarkdown(raw: string): string {
   if (!raw) return '';
 
-  let text = raw;
+  let text = normalizeCodeFences(raw);
 
   text = text.replace(/^\s*#{1,3}\s*(?:回答|答案|解决方案)[:：]?\s*\n+/gi, '');
   text = text.replace(/^\s*#{1,3}\s*((?:针对)?您关于)/, '$1');
@@ -259,4 +259,4 @@ export function renderReasoningMarkdown(raw: string): string {
   return html;
 }
 
-export { bindMarkdownCodeCopy, cleanupOrphanMermaidDom, renderMermaidInElement } from '@/utils/markdown';
+export { bindMarkdownCodeCopy, cleanupOrphanMermaidDom, renderMermaidInElement, normalizeCodeFences } from '@/utils/markdown';

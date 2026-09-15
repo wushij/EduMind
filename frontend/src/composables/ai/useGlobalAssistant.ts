@@ -15,7 +15,11 @@ import {
   removeMessagesByIds
 } from '@/utils/ai/chat-message-pair';
 import { storage } from '@/core/storage/local';
-import { splitCopilotStream, cleanReasoningText } from '@/utils/ai/copilot-stream-split';
+import {
+  splitCopilotStream,
+  cleanReasoningText,
+  buildStoppedGenerationContent
+} from '@/utils/ai/copilot-stream-split';
 import { useStreamingMarkdown } from '@/composables/ai/useStreamingMarkdown';
 import { bindMarkdownCodeCopy } from '@/utils/ai/chat-markdown';
 import type {
@@ -24,7 +28,10 @@ import type {
   GlobalAssistantMessage,
   GlobalAssistantSession
 } from '@/types/ai/assistant';
-import { usePreferenceStore } from '@/stores/user/preference';
+import {
+  getDefaultReasoningFolded,
+  isThinkingPanelHidden
+} from '@/utils/ai/thinking-display';
 
 
 const INTENT_DESC_MAP: Record<string, string> = {
@@ -182,7 +189,6 @@ function mapApiMessage(raw: Record<string, unknown>): GlobalAssistantMessage {
     role: (raw.role || 'assistant') as GlobalAssistantMessage['role'],
     content: String(raw.content || ''),
     reasoningContent: String(raw.reasoningContent || raw.reasoning_content || ''),
-    reasoningFolded: true,
     citations,
     createdAt: raw.createTime ? String(raw.createTime) : undefined
   };
@@ -213,21 +219,16 @@ export function useGlobalAssistant() {
   const streamingCitations = ref<CitationItem[]>([]);
   const streamingIntent = ref<{ intent?: string; intentDesc?: string; targetCode?: string }>({});
 
-  function getInitialReasoningFolded(): boolean {
-    try {
-      const prefStore = usePreferenceStore();
-      return prefStore.preferences.thinkingDisplayMode !== 'EXPANDED';
-    } catch {
-      return true;
-    }
-  }
+  const getInitialReasoningFolded = getDefaultReasoningFolded;
 
-  // 深度思考折叠状态（优先遵循用户个人偏好设置）
+  // 深度思考折叠状态（遵循个人偏好 → 深度思考默认呈现策略）
   const isReasoningFolded = ref(getInitialReasoningFolded());
   const isReasoningActive = ref(false);
   const streamPhaseMessage = ref('');
   const answerStreamStarted = ref(false);
   const followUpPrompts = ref<string[]>([]);
+  /** 用户手动点击停止后置位，避免 fallback / 重新生成错误覆盖已结算内容 */
+  const userStoppedGeneration = ref(false);
 
   const {
     renderedHtml: streamingRenderedHtml,
@@ -546,16 +547,22 @@ export function useGlobalAssistant() {
 
 
   let streamFollowRaf = 0;
+  const userScrolledUp = ref(false);
+
+  function pauseAutoScrollFollow() {
+    userScrolledUp.value = true;
+    showScrollToBottom.value = true;
+  }
 
   /** 流式输出时自动跟随到底部（基于 requestAnimationFrame 每帧至多一次，让输出时内容实时平滑往上移动） */
   function scheduleFollowStreamOutput() {
-    if (!isStreaming.value || showScrollToBottom.value) return;
+    if (!isStreaming.value || userScrolledUp.value || showScrollToBottom.value) return;
     if (streamFollowRaf) return;
 
     streamFollowRaf = requestAnimationFrame(() => {
       streamFollowRaf = 0;
       nextTick(() => {
-        if (!isStreaming.value || showScrollToBottom.value) return;
+        if (!isStreaming.value || userScrolledUp.value || showScrollToBottom.value) return;
         if (messagesScrollRef.value) {
           messagesScrollRef.value.scrollTop = messagesScrollRef.value.scrollHeight;
         }
@@ -572,6 +579,8 @@ export function useGlobalAssistant() {
   }
 
   function scrollToBottomSmooth() {
+    userScrolledUp.value = false;
+    showScrollToBottom.value = false;
     nextTick(() => {
       if (messagesScrollRef.value) {
         messagesScrollRef.value.scrollTo({
@@ -604,7 +613,13 @@ export function useGlobalAssistant() {
     const el = e.target as HTMLElement;
     if (!el) return;
     const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    showScrollToBottom.value = distanceToBottom > 160;
+    if (distanceToBottom > 160) {
+      userScrolledUp.value = true;
+      showScrollToBottom.value = true;
+    } else if (distanceToBottom < 30) {
+      userScrolledUp.value = false;
+      showScrollToBottom.value = false;
+    }
   }
 
   function getIntentTagType(intent?: string) {
@@ -626,26 +641,23 @@ export function useGlobalAssistant() {
 
   function stopStreaming() {
     if (!isStreaming.value) return;
+    userStoppedGeneration.value = true;
     sseClient.stop();
     isStreaming.value = false;
 
-    // 若有已生成的回答，结算为一条消息
     const answer = streamingAnswerBody.value || streamingContent.value;
-    if (answer.trim() || streamingReasoning.value.trim()) {
-      finishStreamingMarkdown();
-      messages.value.push({
-        id: Date.now(),
-        role: 'assistant',
-        content: answer.trim(),
-        reasoningContent: cleanReasoningText(streamingReasoning.value || streamingThinkingBody.value),
-        reasoningFolded: true,
-        intent: streamingIntent.value.intent,
-        intentDesc: streamingIntent.value.intentDesc,
-        targetCode: streamingIntent.value.targetCode,
-        citations: [...streamingCitations.value],
-        createdAt: Date.now()
-      });
-    }
+    finishStreamingMarkdown();
+    messages.value.push({
+      id: Date.now(),
+      role: 'assistant',
+      content: buildStoppedGenerationContent(answer),
+      reasoningContent: cleanReasoningText(streamingReasoning.value || streamingThinkingBody.value),
+      intent: streamingIntent.value.intent,
+      intentDesc: streamingIntent.value.intentDesc,
+      targetCode: streamingIntent.value.targetCode,
+      citations: [...streamingCitations.value],
+      createdAt: Date.now()
+    });
 
     resetStreamingState();
     saveCurrentSessionToHistory();
@@ -677,7 +689,6 @@ export function useGlobalAssistant() {
       role: 'assistant',
       content: finalAnswer.trim(),
       reasoningContent: finalReasoning,
-      reasoningFolded: true,
       intent: streamingIntent.value.intent,
       intentDesc: streamingIntent.value.intentDesc,
       targetCode: streamingIntent.value.targetCode,
@@ -814,6 +825,7 @@ export function useGlobalAssistant() {
 
     try {
       const streamed = await streamChat(query);
+      if (userStoppedGeneration.value) return;
       if (!streamed && !streamingContent.value) {
         if (isRegenerate) {
           throw new Error('重新生成未返回有效内容，请稍后重试');
@@ -821,6 +833,7 @@ export function useGlobalAssistant() {
         await fallbackAsk(query);
       }
     } catch {
+      if (userStoppedGeneration.value) return;
       if (isRegenerate) {
         const message = '重新生成失败，请检查模型 API Key 或网络后重试';
         messages.value.push({
@@ -849,6 +862,7 @@ export function useGlobalAssistant() {
         }
       }
     } finally {
+      userStoppedGeneration.value = false;
       isStreaming.value = false;
       scrollToBottomInstant();
       nextTick(() => bindMarkdownCodeCopy(messagesScrollRef.value));
@@ -974,6 +988,7 @@ export function useGlobalAssistant() {
     toggleScopeMode,
     presetChips,
     followUpPrompts,
+    showThinkingPanel: computed(() => !isThinkingPanelHidden()),
     // 历史会话管理 (对标 Code Compass 原型)
     isHistoryPanelOpen,
     isSessionLoading,
@@ -1009,6 +1024,7 @@ export function useGlobalAssistant() {
     scrollToBottomSmooth,
     scrollToBottomInstant,
     scheduleFollowStreamOutput,
+    pauseAutoScrollFollow,
     handleViewportScroll,
     getIntentTagType,
     formatMatchScore

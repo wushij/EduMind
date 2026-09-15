@@ -9,7 +9,9 @@
         <el-option label="related" value="related" />
         <el-option label="successor" value="successor" />
       </el-select>
-      <el-button type="primary" :loading="loading" @click="loadGraph">刷新图谱</el-button>
+      <el-button round class="btn-refresh" :icon="Refresh" :loading="loading" @click="loadGraph">
+        刷新图谱
+      </el-button>
     </div>
 
     <div v-loading="loading" class="graph-layout">
@@ -41,6 +43,7 @@
 import { ref, onMounted, watch, computed } from 'vue';
 import { useAuthStore } from '@/stores/auth/auth';
 import { ElMessage } from 'element-plus';
+import { Refresh } from '@element-plus/icons-vue';
 import { useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
 import { getGraphGaps, getKnowledgeGraph } from '@/api/knowledge/graph';
 import KnowledgeGraphG6 from '@/components/knowledge/KnowledgeGraphG6.vue';

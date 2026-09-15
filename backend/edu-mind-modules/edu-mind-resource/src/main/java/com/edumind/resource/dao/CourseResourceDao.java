@@ -25,4 +25,35 @@ public class CourseResourceDao {
                         .orderByDesc(CourseResourceEntity::getCreateTime)
         );
     }
+
+    public Long countByCourseId(Long courseId) {
+        if (courseId == null) {
+            return 0L;
+        }
+        return courseResourceMapper.selectCount(
+                new LambdaQueryWrapper<CourseResourceEntity>()
+                        .eq(CourseResourceEntity::getCourseId, courseId)
+        );
+    }
+
+    public CourseResourceEntity findById(Long id) {
+        if (id == null) {
+            return null;
+        }
+        return courseResourceMapper.selectById(id);
+    }
+
+    public int insert(CourseResourceEntity entity) {
+        if (entity == null) {
+            return 0;
+        }
+        return courseResourceMapper.insert(entity);
+    }
+
+    public int deleteById(Long id) {
+        if (id == null) {
+            return 0;
+        }
+        return courseResourceMapper.deleteById(id);
+    }
 }

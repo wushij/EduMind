@@ -27,13 +27,14 @@
       </div>
 
       <AIThinking
-        v-if="message.role === 'assistant' && (thinkingDisplay || (message.isStreaming && !answerContent))"
+        v-if="message.role === 'assistant' && showThinkingPanel && (thinkingDisplay || (message.isStreaming && !answerContent))"
         :content="thinkingDisplay"
-        :folded="message.reasoningFolded ?? true"
+        :folded="resolvedReasoningFolded"
         :active="!!message.isStreaming && !!message.isReasoningActive"
         :has-answer-body="!!answerContent"
         :phase-message="message.streamPhaseMessage"
         @update:folded="message.reasoningFolded = $event"
+        @user-collapse="$emit('reasoning-collapse')"
       />
 
       <div ref="bubbleRef" class="msg-bubble" :class="{ 'is-streaming': message.isStreaming }">
@@ -126,6 +127,11 @@ import type { ChatMessage } from '@/composables/ai/useAIStream';
 import CitationList from '@/components/knowledge/CitationList.vue';
 import AIThinking from '@/components/ai/AIChat/AIThinking.vue';
 import { splitCopilotStream } from '@/utils/ai/copilot-stream-split';
+import {
+  isThinkingPanelHidden,
+  resolveReasoningFolded
+} from '@/utils/ai/thinking-display';
+import { usePreferenceStore } from '@/stores/user/preference';
 import { renderChatMarkdown, bindMarkdownCodeCopy, renderMermaidInElement } from '@/utils/ai/chat-markdown';
 import { useAuthStore } from '@/stores/auth/auth';
 import { DEFAULT_AVATAR } from '@/constants/auth';
@@ -147,9 +153,22 @@ defineEmits<{
   (e: 'regenerate'): void;
   (e: 'delete'): void;
   (e: 'send-prompt', prompt: string): void;
+  (e: 'reasoning-collapse'): void;
 }>();
 
+const preferenceStore = usePreferenceStore();
 const authStore = useAuthStore();
+
+const showThinkingPanel = computed(
+  () => !isThinkingPanelHidden(preferenceStore.preferences.thinkingDisplayMode)
+);
+
+const resolvedReasoningFolded = computed(() =>
+  resolveReasoningFolded(
+    props.message.reasoningFolded,
+    preferenceStore.preferences.thinkingDisplayMode
+  )
+);
 const userAvatarBroken = ref(false);
 const userAvatarSrc = computed(() => {
   const avatar = authStore.currentUser?.avatar;

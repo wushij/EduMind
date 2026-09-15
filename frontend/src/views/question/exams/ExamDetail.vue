@@ -307,9 +307,6 @@ import {
 import { getExamDetail, exportExam } from '@/api/question/exam';
 import type { ExamPaper } from '@/types/question/exam';
 import type { QuestionItem, QuestionType } from '@/types/question/question';
-import { USE_MOCK } from '@/config/mock';
-import { MOCK_EXAM_PAPERS } from '@/mock/exams';
-import { MOCK_QUESTIONS } from '@/mock/questions';
 
 const route = useRoute();
 const router = useRouter();
@@ -332,46 +329,14 @@ async function loadExam() {
     const res = await getExamDetail(examId.value);
     examData.value = res.data;
     if (examData.value && (!examData.value.questions || examData.value.questions.length === 0)) {
-      if (USE_MOCK) {
-        examData.value.questions = MOCK_QUESTIONS.slice(0, 5);
-      } else {
-        examData.value.questions = [];
-      }
+      examData.value.questions = [];
     }
   } catch (err: any) {
-    if (USE_MOCK) {
-      examData.value = getFallbackExam(examId.value);
-    } else {
-      examData.value = null;
-      ElMessage.error(err?.message || '加载试卷详情失败，请检查网络或后端状态');
-    }
+    examData.value = null;
+    ElMessage.error(err?.message || '加载试卷详情失败，请检查网络或后端状态');
   } finally {
     loading.value = false;
   }
-}
-
-function getFallbackExam(id: number): ExamPaper {
-  const found = MOCK_EXAM_PAPERS.find((e: ExamPaper) => e.id === id);
-  if (found) return found;
-
-  return {
-    id,
-    courseId: 101,
-    courseName: '数据结构与算法',
-    title: '2025-2026学年第二学期《数据结构》期末测试卷 (A卷)',
-    semester: '2025-2026-2',
-    totalScore: 100,
-    durationMinutes: 120,
-    passScore: 60,
-    rules: [
-      { type: 'SINGLE_CHOICE', label: '单项选择题', count: 3, scoreEach: 5 },
-      { type: 'MULTIPLE_CHOICE', label: '多项选择题', count: 1, scoreEach: 5 },
-      { type: 'SHORT_ANSWER', label: '综合应用与分析题', count: 1, scoreEach: 15 }
-    ],
-    questions: MOCK_QUESTIONS.slice(0, 5),
-    createdAt: '2026-09-09',
-    status: 'PUBLISHED'
-  };
 }
 
 // 按题型将试题归类到大题
@@ -463,14 +428,11 @@ async function handleExportPaper() {
   exportDialogVisible.value = true;
   exportLoading.value = true;
   try {
-    if (USE_MOCK) {
-      exportDataJson.value = JSON.stringify(examData.value, null, 2);
-    } else {
-      const res = await exportExam(examId.value);
-      exportDataJson.value = JSON.stringify(res.data ?? examData.value, null, 2);
-    }
+    const res = await exportExam(examId.value);
+    exportDataJson.value = JSON.stringify(res.data ?? examData.value, null, 2);
   } catch (err: any) {
-    exportDataJson.value = JSON.stringify(examData.value, null, 2);
+    ElMessage.error(err?.message || '导出试卷失败');
+    exportDataJson.value = '';
   } finally {
     exportLoading.value = false;
   }

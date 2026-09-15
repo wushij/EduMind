@@ -19,8 +19,8 @@
           <el-button type="primary" class="add-btn" @click="openCreate">
             <el-icon><Plus /></el-icon> 新增模型
           </el-button>
-          <el-button class="refresh-btn" :loading="refreshing" @click="handleRefresh">
-            <el-icon><RefreshRight /></el-icon> 刷新
+          <el-button round :icon="Refresh" class="btn-refresh" :loading="refreshing" @click="handleRefresh">
+            刷新
           </el-button>
         </div>
       </div>
@@ -329,6 +329,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   Plus,
+  Refresh,
   RefreshRight,
   Connection,
   ChatDotRound,
@@ -531,8 +532,10 @@ function openEdit(item: AIModelConfigItem) {
 async function loadPresets() {
   try {
     presets.value = await getProviderPresets();
-  } catch (err) {
+  } catch (err: unknown) {
     console.warn('获取预设失败', err);
+    const msg = err instanceof Error ? err.message : '获取 Provider 预设配置失败';
+    ElMessage.error(msg);
   }
 }
 

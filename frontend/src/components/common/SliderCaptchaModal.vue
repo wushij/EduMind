@@ -246,7 +246,11 @@ async function submitVerify() {
   } catch (err: any) {
     shaking.value = true;
     offsetX.value = 0;
-    ElMessage.error(err?.message || '验证失败，请重试');
+    ElMessage.closeAll();
+    ElMessage.error({
+      message: err?.message || '验证失败，请重试',
+      grouping: true
+    });
     window.setTimeout(() => {
       shaking.value = false;
     }, 320);

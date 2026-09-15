@@ -2,7 +2,6 @@ import { onUnmounted, ref } from 'vue';
 import { getAgentRun, listAgents, startAgentRun } from '@/api/ai/agent';
 import { API_BASE_URL } from '@/config';
 import { appendSecurityQuery } from '@/core/http/request-signature';
-import { IS_DEV } from '@/config/env';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_AGENT_RUN, MOCK_AGENTS } from '@/mock/agent';
 import { storage } from '@/core/storage/local';
@@ -43,7 +42,7 @@ export function useAgentRun() {
       const res = await listAgents();
       agents.value = res.data ?? [];
     } catch {
-      if (USE_MOCK || IS_DEV) {
+      if (USE_MOCK) {
         usedMockFallback.value = true;
         agents.value = MOCK_AGENTS;
       } else {

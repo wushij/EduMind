@@ -13,7 +13,7 @@
 
         <div class="course-title-row">
           <h1 class="course-title">{{ currentCourse?.title || '正在加载课程...' }}</h1>
-          <span class="pill-tag pill-tag--code">{{ currentCourse?.code || 'MATH1001' }}</span>
+          <span class="pill-tag pill-tag--code">{{ currentCourse?.code || 'COURSE' }}</span>
           <span class="pill-tag pill-tag--status">
             <span class="pulse-circle"></span>
             {{ statusText }}
@@ -86,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useCourse } from '@/composables/course/useCourse';
 import {
@@ -103,7 +103,7 @@ const route = useRoute();
 const router = useRouter();
 const { currentCourse, fetchCourseDetail } = useCourse();
 
-const courseId = computed(() => route.params.id || '101');
+const courseId = computed(() => (route.params.id ? String(route.params.id) : ''));
 const isAiRoute = computed(() => route.path.endsWith('/ai'));
 
 const statusText = computed(() => {
@@ -126,8 +126,27 @@ function navigateToTab(tab: string) {
   router.push(`/course/${courseId.value}/${tab}`);
 }
 
+async function loadCourse(id: string) {
+  if (!id) return;
+  const course = await fetchCourseDetail(id);
+  if (course?.id) {
+    localStorage.setItem('edumind_last_course_id', String(course.id));
+  }
+}
+
+watch(
+  () => route.params.id,
+  (newId) => {
+    if (newId) {
+      void loadCourse(String(newId));
+    }
+  }
+);
+
 onMounted(() => {
-  fetchCourseDetail(courseId.value as string);
+  if (courseId.value) {
+    void loadCourse(courseId.value);
+  }
 });
 </script>
 
@@ -197,7 +216,7 @@ onMounted(() => {
           gap: 6px;
           height: 24px;
           padding: 0 12px;
-          border-radius: 9999px; // 长圆胶囊
+          border-radius: 9999px;
           font-size: 12px;
           font-weight: 600;
 
@@ -250,7 +269,7 @@ onMounted(() => {
         gap: 8px;
         height: 46px;
         padding: 0 20px;
-        border-radius: 9999px; // 胶囊主按钮
+        border-radius: 9999px;
         background: linear-gradient(135deg, #1677FF 0%, #722ED1 100%);
         color: #FFFFFF;
         border: none;
@@ -305,7 +324,7 @@ onMounted(() => {
         gap: 6px;
         height: 38px;
         padding: 0 16px;
-        border-radius: 9999px; // 纯正长圆药丸 Tab
+        border-radius: 9999px;
         font-size: 13.5px;
         font-weight: 500;
         color: #64748B;
@@ -340,7 +359,7 @@ onMounted(() => {
     box-sizing: border-box;
   }
 
-  // AI 助教页：精简顶栏并保留充足底部呼吸空间，允许平滑向下滚动
+  // AI 助教页：精简顶栏并保留充足底部呼吸空间
   &.course-detail-container--ai {
     gap: 12px;
 

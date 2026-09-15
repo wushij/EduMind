@@ -26,4 +26,8 @@ public interface CourseService {
     List<KnowledgePointVO> listKnowledgePoints(Long courseId, Long chapterId);
 
     KnowledgePointVO createKnowledgePoint(Long courseId, KnowledgePointCreateDTO dto);
+
+    void deleteKnowledgePoint(Long courseId, Long kpId);
+
+    Long joinCourseByCode(String code);
 }

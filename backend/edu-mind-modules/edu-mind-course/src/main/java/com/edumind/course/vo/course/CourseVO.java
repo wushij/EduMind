@@ -21,4 +21,9 @@ public class CourseVO implements Serializable {
     private Long studentCount;
     private String status;
     private String semester;
+    private String code;
+    private String description;
+    private Long chapterCount;
+    private Long knowledgePointCount;
+    private Long resourceCount;
 }

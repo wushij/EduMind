@@ -1,8 +1,6 @@
 import { ref } from 'vue';
 import { getExams, getExamDetail, createExam, updateExam, deleteExam, exportExam } from '@/api/question/exam';
 import { ExamPaper } from '@/types/question/exam';
-import { USE_MOCK } from '@/config/mock';
-import { MOCK_EXAMS } from '@/mock/exams';
 import { normalizeExamList, normalizeExamPaper } from '@/utils/question/normalize-exam';
 
 export function useExam() {
@@ -17,9 +15,10 @@ export function useExam() {
       const res = await getExams(params);
       exams.value = normalizeExamList((res.data?.list || []) as Record<string, any>[]);
       total.value = res.data?.total ?? exams.value.length;
-    } catch {
-      exams.value = USE_MOCK ? normalizeExamList(MOCK_EXAMS as unknown as Record<string, any>[]) : [];
-      total.value = exams.value.length;
+    } catch (err) {
+      exams.value = [];
+      total.value = 0;
+      throw err;
     } finally {
       loading.value = false;
     }
@@ -30,9 +29,9 @@ export function useExam() {
     try {
       const res = await getExamDetail(id);
       currentExam.value = normalizeExamPaper((res.data || {}) as Record<string, any>);
-    } catch {
-      const fallback = USE_MOCK ? MOCK_EXAMS.find(e => e.id === id) || null : null;
-      currentExam.value = fallback ? normalizeExamPaper(fallback as unknown as Record<string, any>) : null;
+    } catch (err) {
+      currentExam.value = null;
+      throw err;
     } finally {
       loading.value = false;
     }

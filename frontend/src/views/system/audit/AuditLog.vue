@@ -117,7 +117,8 @@
           <!-- 动态加载已配置的系统模型，不硬编码 mock 或 chat -->
           <el-select
             v-model="modelFilter"
-            placeholder="生成模型"
+            :placeholder="modelOptions.length ? '生成模型' : '暂无可用模型'"
+            :disabled="!modelOptions.length"
             clearable
             class="filter-pill-select"
             @change="handleSearch"
@@ -154,13 +155,23 @@
             @clear="handleSearch"
           />
 
-          <el-button type="primary" class="pill-action-btn primary" @click="handleSearch">
+          <el-button
+            type="primary"
+            class="pill-action-btn primary"
+            :disabled="tableLoading"
+            @click="handleSearch"
+          >
             <el-icon><Search /></el-icon>
             <span>查询</span>
           </el-button>
-          <el-button class="pill-action-btn" @click="handleReset">
-            <el-icon><RefreshRight /></el-icon>
-            <span>重置</span>
+          <el-button
+            round
+            class="btn-refresh"
+            :icon="Refresh"
+            :loading="tableLoading"
+            @click="handleReset"
+          >
+            重置
           </el-button>
         </div>
       </div>
@@ -169,6 +180,7 @@
       <div class="table-wrap">
         <el-table
           v-loading="tableLoading"
+          element-loading-text="正在检索全链路 AI 审计日志..."
           :data="logs"
           stripe
           style="width: 100%"
@@ -467,6 +479,7 @@ import {
   Coin,
   Timer,
   Search,
+  Refresh,
   RefreshRight,
   CopyDocument,
   View,
@@ -479,8 +492,8 @@ import { AIAuditLog, AuditSummaryVO, AuditDailyTrendItem } from '@/types/system/
 import AppPagination from '@/components/common/AppPagination.vue';
 import { normalizeAvatarUrl } from '@/utils/format/file';
 
-// 核心统计指标
-const summary = ref<AuditSummaryVO>({
+// 空统计指标基准
+const createEmptySummary = (): AuditSummaryVO => ({
   totalCalls: 0,
   totalTokens: 0,
   totalCostRMB: 0,
@@ -489,6 +502,9 @@ const summary = ref<AuditSummaryVO>({
   dailyTrend: [],
   modelDistribution: []
 });
+
+// 核心统计指标
+const summary = ref<AuditSummaryVO>(createEmptySummary());
 
 // 趋势折线图
 const trendDays = ref(7);
@@ -508,7 +524,7 @@ const sceneFilter = ref('');
 const modelFilter = ref('');
 const statusFilter = ref('');
 const searchKeyword = ref('');
-const modelOptions = ref<string[]>(['deepseek-v4-flash']);
+const modelOptions = ref<string[]>([]);
 
 // 详情抽屉
 const detailDrawerVisible = ref(false);
@@ -534,11 +550,10 @@ function handleResize() {
 async function loadModels() {
   try {
     const models = await getAvailableAiModels();
-    if (models.length > 0) {
-      modelOptions.value = models;
-    }
+    modelOptions.value = models && models.length > 0 ? models : [];
   } catch (err) {
     console.warn('Failed to load models list', err);
+    modelOptions.value = [];
   }
 }
 
@@ -548,6 +563,8 @@ async function loadSummary() {
     summary.value = await getAuditSummary();
   } catch (err) {
     console.error('Failed to load audit summary', err);
+    summary.value = createEmptySummary();
+    ElMessage.warning('审计摘要加载失败');
   }
 }
 
@@ -712,14 +729,18 @@ function getUserAvatarUrl(row?: AIAuditLog | null): string {
 async function loadLogs() {
   tableLoading.value = true;
   try {
-    const res = await getAuditLogs({
-      page: pageNum.value,
-      pageSize: pageSize.value,
-      scene: sceneFilter.value || undefined,
-      model: modelFilter.value || undefined,
-      status: statusFilter.value || undefined,
-      keyword: searchKeyword.value.trim() || undefined
-    });
+    const [res] = await Promise.all([
+      getAuditLogs({
+        page: pageNum.value,
+        pageSize: pageSize.value,
+        scene: sceneFilter.value || undefined,
+        model: modelFilter.value || undefined,
+        status: statusFilter.value || undefined,
+        keyword: searchKeyword.value.trim() || undefined
+      }),
+      // 保底微延时 220ms，确保本地毫秒级极速响应也能呈现清晰平滑的刷新加载反馈
+      new Promise((resolve) => setTimeout(resolve, 220))
+    ]);
     logs.value = res.list;
     total.value = res.total;
 
@@ -730,6 +751,8 @@ async function loadLogs() {
     }
   } catch (err) {
     console.error('Failed to load audit logs', err);
+    logs.value = [];
+    total.value = 0;
   } finally {
     tableLoading.value = false;
   }

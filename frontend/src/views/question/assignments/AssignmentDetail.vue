@@ -239,8 +239,7 @@ import { getAssignmentDetail } from '@/api/question/assignment';
 import { getSubmissionsByAssignment, gradeSubmission } from '@/api/question/submission';
 import { getExamDetail } from '@/api/question/exam';
 import type { QuestionItem, QuestionType } from '@/types/question/question';
-import { USE_MOCK } from '@/config/mock';
-import { MOCK_QUESTIONS } from '@/mock/questions';
+import { normalizeQuestionList } from '@/utils/question/normalize-question';
 
 const route = useRoute();
 const router = useRouter();
@@ -258,7 +257,13 @@ const questionsList = ref<QuestionItem[]>([]);
 const studentSearch = ref('');
 const statusFilter = ref('');
 
-const totalStudentsCount = ref(45);
+const totalStudentsCount = computed(() => {
+  const enrolled = assignmentInfo.value?.studentCount;
+  if (typeof enrolled === 'number' && enrolled > 0) {
+    return enrolled;
+  }
+  return Math.max(submissionsList.value.length, 1);
+});
 
 onMounted(async () => {
   await loadAssignmentData();
@@ -273,22 +278,17 @@ async function loadAssignmentData() {
     if (res.data?.examId) {
       try {
         const examRes = await getExamDetail(res.data.examId);
-        questionsList.value = examRes.data?.questions || [];
+        questionsList.value = normalizeQuestionList(examRes.data?.questions || []);
       } catch {
-        questionsList.value = USE_MOCK ? MOCK_QUESTIONS.slice(0, 4) : [];
+        questionsList.value = [];
       }
     } else {
-      questionsList.value = USE_MOCK ? MOCK_QUESTIONS.slice(0, 4) : [];
+      questionsList.value = [];
     }
   } catch (err: any) {
-    if (USE_MOCK) {
-      assignmentInfo.value = getDefaultMockAssignment(assignmentId.value);
-      questionsList.value = MOCK_QUESTIONS.slice(0, 4);
-    } else {
-      assignmentInfo.value = null;
-      questionsList.value = [];
-      ElMessage.error(err?.message || '加载作业详情失败，请检查网络或后端状态');
-    }
+    assignmentInfo.value = null;
+    questionsList.value = [];
+    ElMessage.error(err?.message || '加载作业详情失败，请检查网络或后端状态');
   } finally {
     loading.value = false;
   }
@@ -299,75 +299,9 @@ async function loadSubmissions() {
     const res = await getSubmissionsByAssignment(assignmentId.value);
     submissionsList.value = res.data || [];
   } catch (err: any) {
-    if (USE_MOCK) {
-      submissionsList.value = getDefaultMockSubmissions();
-    } else {
-      submissionsList.value = [];
-      ElMessage.error(err?.message || '加载提交记录失败');
-    }
+    submissionsList.value = [];
+    ElMessage.error(err?.message || '加载提交记录失败');
   }
-}
-
-function getDefaultMockAssignment(id: number) {
-  return {
-    id,
-    title: '第三周：单链表与双向链表核心算法实现测验',
-    courseId: 101,
-    courseName: '数据结构与算法',
-    deadline: '2026-09-25 23:59:59',
-    totalScore: 100,
-    passScore: 60,
-    status: 'PENDING'
-  };
-}
-
-function getDefaultMockSubmissions() {
-  return [
-    {
-      id: 201,
-      studentNo: '20240101',
-      studentName: '张子轩',
-      submitTime: '2026-09-11 10:30:15',
-      isLate: false,
-      aiGraded: true,
-      aiScore: 92,
-      finalScore: 95,
-      status: 'GRADED'
-    },
-    {
-      id: 202,
-      studentNo: '20240102',
-      studentName: '李梦琪',
-      submitTime: '2026-09-11 11:15:20',
-      isLate: false,
-      aiGraded: true,
-      aiScore: 86,
-      finalScore: null,
-      status: 'AI_GRADED'
-    },
-    {
-      id: 203,
-      studentNo: '20240103',
-      studentName: '王浩然',
-      submitTime: '2026-09-11 14:02:45',
-      isLate: false,
-      aiGraded: true,
-      aiScore: 78,
-      finalScore: null,
-      status: 'PENDING'
-    },
-    {
-      id: 204,
-      studentNo: '20240104',
-      studentName: '陈思宇',
-      submitTime: '2026-09-11 15:40:10',
-      isLate: true,
-      aiGraded: false,
-      aiScore: null,
-      finalScore: null,
-      status: 'PENDING'
-    }
-  ];
 }
 
 const filteredSubmissions = computed(() => {

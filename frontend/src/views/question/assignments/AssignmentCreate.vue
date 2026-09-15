@@ -230,9 +230,7 @@ import { getCourseList } from '@/api/course/course';
 import { getExams } from '@/api/question/exam';
 import type { Course } from '@/types/course/course';
 import type { QuestionItem, QuestionType } from '@/types/question/question';
-import { USE_MOCK } from '@/config/mock';
-import { MOCK_EXAM_PAPERS } from '@/mock/exams';
-import { MOCK_QUESTIONS } from '@/mock/questions';
+import { normalizeQuestionList } from '@/utils/question/normalize-question';
 
 const router = useRouter();
 const route = useRoute();
@@ -287,33 +285,20 @@ onMounted(async () => {
 async function loadCourses() {
   try {
     const res = await getCourseList({ page: 1, pageSize: 50 });
-    courses.value = res.data?.list || [
-      { id: 101, title: '数据结构与算法' } as any,
-      { id: 102, title: 'Java程序设计' } as any,
-      { id: 103, title: '高等数学（上）' } as any
-    ];
-  } catch {
-    courses.value = [
-      { id: 101, title: '数据结构与算法' } as any,
-      { id: 102, title: 'Java程序设计' } as any,
-      { id: 103, title: '高等数学（上）' } as any
-    ];
+    courses.value = res.data?.list || [];
+  } catch (err: any) {
+    courses.value = [];
+    ElMessage.error(err?.message || '获取课程列表失败');
   }
 }
 
 async function loadExams() {
   try {
     const res = await getExams({ pageSize: 50 });
-    examOptions.value = res.data?.list?.length
-      ? res.data.list
-      : (USE_MOCK ? MOCK_EXAM_PAPERS : []);
+    examOptions.value = res.data?.list || [];
   } catch (err: any) {
-    if (USE_MOCK) {
-      examOptions.value = MOCK_EXAM_PAPERS;
-    } else {
-      examOptions.value = [];
-      ElMessage.error(err?.message || '获取试卷列表失败');
-    }
+    examOptions.value = [];
+    ElMessage.error(err?.message || '获取试卷列表失败');
   }
 }
 
@@ -327,8 +312,8 @@ function handleExamSelected(id?: number) {
     formData.totalScore = e.totalScore || 100;
     formData.passScore = e.passScore || 60;
     selectedQuestions.value = e.questions?.length
-      ? e.questions
-      : (USE_MOCK ? MOCK_QUESTIONS.slice(0, 4) : []);
+      ? normalizeQuestionList(e.questions as Record<string, unknown>[])
+      : [];
   }
 }
 

@@ -90,20 +90,20 @@
           <h4 class="card-sub-header">课程空间数据概览</h4>
           <div class="stat-items-grid">
             <div class="stat-pill-box">
-              <span class="stat-val">{{ course?.chapterCount || 8 }}</span>
+              <span class="stat-val">{{ course?.chapterCount ?? 0 }}</span>
               <span class="stat-label">教学大纲章节</span>
             </div>
             <div class="stat-pill-box">
-              <span class="stat-val">{{ course?.knowledgePointCount || 46 }}</span>
+              <span class="stat-val">{{ course?.knowledgePointCount ?? 0 }}</span>
               <span class="stat-label">核心知识点</span>
             </div>
             <div class="stat-pill-box">
-              <span class="stat-val">{{ course?.studentCount || 128 }}</span>
+              <span class="stat-val">{{ course?.studentCount ?? 0 }}</span>
               <span class="stat-label">在读选课学生</span>
             </div>
             <div class="stat-pill-box">
-              <span class="stat-val">{{ course?.aiUsageCount || 340 }}</span>
-              <span class="stat-label">AI 答疑次数</span>
+              <span class="stat-val">{{ course?.resourceCount ?? 0 }}</span>
+              <span class="stat-label">课件与教学资料</span>
             </div>
           </div>
 
@@ -124,6 +124,22 @@
               <span>向课程 AI 助教提问</span>
               <el-icon><Service /></el-icon>
             </button>
+            <button
+              type="button"
+              class="capsule-block-btn capsule-block-btn--outline"
+              @click="router.push(`/ai/question/generate?courseId=${course?.id || 101}`)"
+            >
+              <span>针对本课 AI 智能出题</span>
+              <el-icon><EditPen /></el-icon>
+            </button>
+            <button
+              type="button"
+              class="capsule-block-btn capsule-block-btn--outline"
+              @click="router.push('/knowledge/bases')"
+            >
+              <span>关联学科知识库</span>
+              <el-icon><FolderOpened /></el-icon>
+            </button>
           </div>
         </div>
 
@@ -131,19 +147,19 @@
         <div class="content-card teacher-card">
           <div class="teacher-header">
             <div class="teacher-large-avatar">
-              {{ (course?.teacherName || '李').slice(0, 1) }}
+              {{ (course?.teacherName || '任').slice(0, 1) }}
             </div>
             <div class="teacher-title-meta">
-              <h4 class="teacher-name">{{ course?.teacherName || '李华 教授' }}</h4>
-              <span class="teacher-dept">计算机与人工智能学院</span>
+              <h4 class="teacher-name">{{ course?.teacherName || '任课教师' }}</h4>
+              <span class="teacher-dept">授课主讲教师 · 负责课程建设</span>
             </div>
           </div>
           <p class="teacher-bio">
-            从事高校教学与科研二十余年，主要研究领域为算法分析、机器学习理论与智能教育技术。曾主持多项国家级精品在线开放课程。
+            从事高校教学与科研工作，主讲学科核心课程，结合 EduMind 智能助教与知识库，为选课学生提供全流程答疑与学情诊断。
           </p>
           <div class="office-hour">
             <span class="oh-label">答疑时间：</span>
-            <span>每周二、四 14:00 - 16:30</span>
+            <span>每周二、四 14:00 - 16:30（支持线上 AI 24h 答疑）</span>
           </div>
         </div>
       </div>
@@ -153,7 +169,7 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import { Reading, Aim, Bell, ArrowRight, Service } from '@element-plus/icons-vue';
+import { Reading, Aim, Bell, ArrowRight, Service, EditPen, FolderOpened } from '@element-plus/icons-vue';
 import { Course } from '@/types/course/course';
 
 defineProps<{
@@ -408,6 +424,19 @@ const router = useRouter();
 
           &:hover {
             background: #E0E7FF;
+            transform: translateY(-1px);
+          }
+        }
+
+        &--outline {
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          color: #334155;
+
+          &:hover {
+            border-color: #1677FF;
+            color: #1677FF;
+            background: #F8FAFC;
             transform: translateY(-1px);
           }
         }

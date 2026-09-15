@@ -36,8 +36,8 @@ export function useDocumentChunk(initialDocId?: number) {
         status: statusFilter.value === 'ALL' ? undefined : statusFilter.value
       };
       chunks.value = await getChunks(selectedDocumentId.value, params);
-    } catch (err: any) {
-      console.warn('[useDocumentChunk] fetchChunks failed:', err);
+    } catch {
+      chunks.value = [];
     } finally {
       loading.value = false;
     }
@@ -46,8 +46,15 @@ export function useDocumentChunk(initialDocId?: number) {
   const fetchStats = async (kbId?: number) => {
     try {
       stats.value = await getChunkStats(kbId);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      stats.value = {
+        totalChunks: 0,
+        indexedChunks: 0,
+        pendingChunks: 0,
+        failedChunks: 0,
+        avgTokens: 0,
+        totalTokens: 0
+      };
     }
   };
 

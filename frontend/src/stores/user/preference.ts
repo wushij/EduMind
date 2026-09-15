@@ -32,7 +32,7 @@ const DEFAULT_PREFERENCES: UserPreferencesState = {
   katexEnabled: true,
   codeHighlightEnabled: true,
   mermaidEnabled: true,
-  thinkingDisplayMode: 'EXPANDED',
+  thinkingDisplayMode: 'COLLAPSED',
   aiTone: 'HEURISTIC',
   notifySubmission: true,
   notifyGrading: true,

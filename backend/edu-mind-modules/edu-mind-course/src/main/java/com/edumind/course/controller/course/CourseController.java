@@ -88,4 +88,18 @@ public class CourseController {
                                                             @Valid @RequestBody com.edumind.course.dto.knowledge.KnowledgePointCreateDTO dto) {
         return ApiResult.success(courseService.createKnowledgePoint(id, dto));
     }
+
+    @SaCheckPermission("course:edit")
+    @DeleteMapping("/{id}/knowledge-points/{kpId}")
+    public ApiResult<Void> deleteKnowledgePoint(@PathVariable("id") Long id,
+                                                @PathVariable("kpId") Long kpId) {
+        courseService.deleteKnowledgePoint(id, kpId);
+        return ApiResult.success();
+    }
+
+    @SaCheckPermission("course:view")
+    @PostMapping("/join")
+    public ApiResult<Long> joinCourse(@Valid @RequestBody com.edumind.course.dto.course.CourseJoinDTO dto) {
+        return ApiResult.success(courseService.joinCourseByCode(dto.getCode()));
+    }
 }

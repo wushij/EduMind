@@ -171,8 +171,9 @@ async function handleSubmit() {
         }
         ElMessage.success(`课程【${newCourse.title}】创建成功！`);
         router.push(`/course/${newCourse.id}/overview`);
-      } catch (err) {
-        ElMessage.error('创建失败，请检查网络');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : '创建失败，请检查网络';
+        ElMessage.error(msg);
       } finally {
         submitting.value = false;
       }

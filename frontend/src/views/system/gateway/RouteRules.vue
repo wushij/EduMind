@@ -17,9 +17,8 @@
         <p>为平台核心教学业务场景配置主选执行模型与故障自动降级模型，当主模型发生限流、异常或超时时无缝熔断切换</p>
       </div>
       <div class="header-actions">
-        <el-button @click="loadData">
-          <el-icon><Refresh /></el-icon>
-          <span>刷新</span>
+        <el-button round class="btn-refresh" :icon="Refresh" :loading="loading" @click="loadData">
+          刷新
         </el-button>
         <el-button type="primary" class="gradient-btn" :loading="saving" @click="saveRoutes">
           <el-icon><Check /></el-icon>

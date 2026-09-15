@@ -141,6 +141,20 @@ axiosInstance.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    if (status === 403) {
+      if (!silent) {
+        showErrorMessage(apiMessage || '没有相关权限');
+      }
+      return Promise.reject(error);
+    }
+
+    if (status === 404) {
+      if (!silent) {
+        showErrorMessage(apiMessage || '请求资源未找到');
+      }
+      return Promise.reject(error);
+    }
+
     if (status === 429) {
       showErrorMessage('操作过于频繁，请稍后重试');
       return Promise.reject(error);

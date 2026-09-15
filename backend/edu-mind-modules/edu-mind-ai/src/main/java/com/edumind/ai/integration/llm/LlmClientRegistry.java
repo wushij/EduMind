@@ -35,6 +35,9 @@ public class LlmClientRegistry {
 
     private LlmClient createClient(String modelKey) {
         if ("mock".equalsIgnoreCase(modelKey)) {
+            if (!Boolean.TRUE.equals(llmProperties.getMockEnabled())) {
+                throw new IllegalStateException("[GA] prod 环境禁止 mock 模型键: " + modelKey);
+            }
             return new MockLlmClient(llmProperties, modelKey);
         }
         AiModelConfigEntity config = aiModelConfigDao.findByModelKey(modelKey);
@@ -44,6 +47,9 @@ public class LlmClientRegistry {
         LlmProperties props = buildProperties(modelKey, config);
         if (Boolean.TRUE.equals(llmProperties.getMockEnabled()) && !StringUtils.hasText(props.getApiKey())) {
             return new MockLlmClient(llmProperties, modelKey);
+        }
+        if (!Boolean.TRUE.equals(llmProperties.getMockEnabled()) && !StringUtils.hasText(props.getApiKey())) {
+            throw new IllegalStateException("[GA] 模型 " + modelKey + " 缺少 API Key，禁止静默 Mock 降级");
         }
         return new OpenAiCompatibleLlmClient(props);
     }

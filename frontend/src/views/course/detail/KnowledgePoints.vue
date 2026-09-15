@@ -35,7 +35,11 @@
       </div>
 
       <div class="toolbar-right">
-        <el-button type="primary" :icon="Plus" @click="showCreateDrawer = true">
+        <el-button class="capsule-secondary-btn" @click="openGraphDrawer(null)">
+          <el-icon><Connection /></el-icon>
+          <span>查看课程全景知识拓扑</span>
+        </el-button>
+        <el-button type="primary" :icon="Plus" class="capsule-primary-btn" @click="showCreateDrawer = true">
           新增知识点
         </el-button>
       </div>
@@ -76,9 +80,17 @@
           <div class="card-footer">
             <span class="chapter-hint">所属：{{ getChapterTitle(kp.chapterId) }}</span>
             <div class="actions">
-              <el-button type="primary" link size="small" @click="handleExploreGraph(kp)">
+              <el-button type="primary" link size="small" @click="openGraphDrawer(kp)">
                 关联图谱
               </el-button>
+              <el-button type="primary" link size="small" @click="handleAskAi(kp)">
+                AI解析
+              </el-button>
+              <el-popconfirm title="确定删除此知识点吗？" @confirm="handleDeleteKp(kp)">
+                <template #reference>
+                  <el-button type="danger" link size="small">删除</el-button>
+                </template>
+              </el-popconfirm>
             </div>
           </div>
         </div>
@@ -93,6 +105,87 @@
         <p>您可以点击上方“新增知识点”，丰富课程的知识体系拓扑结构。</p>
       </div>
     </div>
+
+    <!-- 知识拓扑全景抽屉 -->
+    <el-drawer
+      v-model="showGraphDrawer"
+      title="课程核心知识拓扑全景图谱"
+      size="680px"
+      destroy-on-close
+    >
+      <div class="graph-drawer-content">
+        <div class="graph-info-header">
+          <span class="badge-pill">拓扑节点总数：{{ knowledgePoints.length + chapters.length + 1 }}</span>
+          <span class="badge-pill">大纲章节：{{ chapters.length }}</span>
+          <span class="badge-pill">核心考点：{{ knowledgePoints.length }}</span>
+        </div>
+
+        <!-- 交互式拓扑图模拟树 -->
+        <div class="topology-tree-container">
+          <!-- 根节点：课程核心 -->
+          <div class="topo-root-node">
+            <div class="topo-node-card is-root">
+              <el-icon><Connection /></el-icon>
+              <span>课程知识根基空间</span>
+            </div>
+          </div>
+
+          <!-- 章节分支 -->
+          <div class="topo-branches">
+            <div
+              v-for="chap in chapters"
+              :key="chap.id"
+              class="topo-branch-column"
+            >
+              <div class="topo-chapter-node">
+                <span class="chapter-tag">{{ chap.title }}</span>
+              </div>
+              <div class="topo-kp-leaves">
+                <div
+                  v-for="point in getPointsForChapter(chap.id)"
+                  :key="point.id"
+                  class="topo-kp-leaf"
+                  :class="{ active: selectedGraphKp?.id === point.id }"
+                  @click="selectedGraphKp = point"
+                >
+                  <span class="leaf-dot"></span>
+                  <span class="leaf-title">{{ point.title }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 当前选中知识点详情面板 -->
+        <div v-if="selectedGraphKp" class="active-node-panel">
+          <div class="active-header">
+            <h4>{{ selectedGraphKp.title }}</h4>
+            <el-tag size="small" :type="getLevelTagType(selectedGraphKp.cognitiveDimension)">
+              {{ getLevelLabel(selectedGraphKp.cognitiveDimension) }}
+            </el-tag>
+          </div>
+          <p class="active-desc">
+            {{ selectedGraphKp.description || '该知识点为所在章节的核心考查要点，直接关联课程期末诊断与作业训练。' }}
+          </p>
+          <div class="active-actions">
+            <button
+              type="button"
+              class="capsule-btn-action capsule-btn-action--ai"
+              @click="handleAskAi(selectedGraphKp)"
+            >
+              向 AI 助教提问此考点
+            </button>
+            <button
+              type="button"
+              class="capsule-btn-action capsule-btn-action--quiz"
+              @click="handleGenerateQuizForKp(selectedGraphKp)"
+            >
+              针对该考点出题练习
+            </button>
+          </div>
+        </div>
+      </div>
+    </el-drawer>
 
     <!-- 新增知识点抽屉 -->
     <el-drawer v-model="showCreateDrawer" title="录入课程新知识点" size="520px" destroy-on-close>
@@ -141,18 +234,21 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { Search, Plus, StarFilled, Opportunity } from '@element-plus/icons-vue';
-import { getCourseKnowledgePoints, createKnowledgePoint } from '@/api/course/knowledge-point';
+import { Search, Plus, StarFilled, Opportunity, Connection } from '@element-plus/icons-vue';
+import { getCourseKnowledgePoints, createKnowledgePoint, deleteKnowledgePoint } from '@/api/course/knowledge-point';
 import { getChapters } from '@/api/course/chapter';
 
 const route = useRoute();
+const router = useRouter();
 const courseId = computed(() => Number(route.params.id) || 101);
 
 const loading = ref(false);
 const creating = ref(false);
 const showCreateDrawer = ref(false);
+const showGraphDrawer = ref(false);
+const selectedGraphKp = ref<any>(null);
 
 const searchKeyword = ref('');
 const selectedChapterId = ref<number | undefined>(undefined);
@@ -215,6 +311,10 @@ function getChapterTitle(chapterId?: number) {
   return c?.title || '通用教学大纲';
 }
 
+function getPointsForChapter(chapterId: number) {
+  return knowledgePoints.value.filter(k => k.chapterId === chapterId || (!k.chapterId && chapterId === 1));
+}
+
 function getLevelLabel(level?: string) {
   const map: Record<string, string> = {
     REMEMBER: '识记概念',
@@ -259,8 +359,30 @@ async function handleSaveNewKp() {
   }
 }
 
-function handleExploreGraph(kp: any) {
-  ElMessage.info(`正在聚焦知识图谱节点：${kp.title}`);
+function openGraphDrawer(kp: any) {
+  selectedGraphKp.value = kp || knowledgePoints.value[0] || null;
+  showGraphDrawer.value = true;
+}
+
+function handleAskAi(kp: any) {
+  router.push({
+    path: `/course/${courseId.value}/ai`,
+    query: { prompt: `请结合本课程知识图谱，详细讲解核心考点【${kp.title || kp.name}】的定义、推导与常见考查题型。` }
+  });
+}
+
+function handleGenerateQuizForKp(kp: any) {
+  router.push(`/ai/question/generate?courseId=${courseId.value}&kp=${encodeURIComponent(kp.title || kp.name)}`);
+}
+
+async function handleDeleteKp(kp: any) {
+  try {
+    await deleteKnowledgePoint(courseId.value, kp.id);
+    ElMessage.success(`知识点【${kp.title || kp.name}】已成功删除`);
+    await loadKnowledgePoints();
+  } catch (err: any) {
+    ElMessage.error(err?.message || '删除知识点失败');
+  }
 }
 </script>
 
@@ -415,6 +537,213 @@ function handleExploreGraph(kp: any) {
       p {
         font-size: 14px;
         color: #64748b;
+      }
+    }
+  }
+}
+
+.capsule-secondary-btn {
+  border-radius: 9999px !important;
+  background: #F1F5F9 !important;
+  color: #334155 !important;
+  border: 1px solid #E2E8F0 !important;
+
+  &:hover {
+    background: #EAF3FF !important;
+    color: #1677FF !important;
+    border-color: #BFDBFE !important;
+  }
+}
+
+.capsule-primary-btn {
+  border-radius: 9999px !important;
+}
+
+// 知识拓扑抽屉样式
+.graph-drawer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  .graph-info-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+
+    .badge-pill {
+      padding: 4px 12px;
+      border-radius: 9999px;
+      background: #F1F5F9;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 500;
+    }
+  }
+
+  .topology-tree-container {
+    background: #0F172A;
+    border-radius: 18px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    min-height: 360px;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+
+    .topo-root-node {
+      .topo-node-card.is-root {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 20px;
+        border-radius: 9999px;
+        background: linear-gradient(135deg, #1677FF 0%, #722ED1 100%);
+        color: #FFFFFF;
+        font-size: 13.5px;
+        font-weight: 600;
+        box-shadow: 0 4px 14px rgba(22, 119, 255, 0.4);
+      }
+    }
+
+    .topo-branches {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 16px;
+      width: 100%;
+
+      .topo-branch-column {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 14px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 180px;
+        max-width: 260px;
+        flex: 1;
+
+        .topo-chapter-node {
+          .chapter-tag {
+            font-size: 12px;
+            font-weight: 600;
+            color: #93C5FD;
+            display: block;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 6px;
+          }
+        }
+
+        .topo-kp-leaves {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+
+          .topo-kp-leaf {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.04);
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            .leaf-dot {
+              width: 6px;
+              height: 6px;
+              border-radius: 50%;
+              background: #60A5FA;
+              flex-shrink: 0;
+            }
+
+            .leaf-title {
+              font-size: 12px;
+              color: #E2E8F0;
+              line-height: 1.3;
+            }
+
+            &:hover {
+              background: rgba(22, 119, 255, 0.25);
+            }
+
+            &.active {
+              background: #1677FF;
+              box-shadow: 0 2px 10px rgba(22, 119, 255, 0.5);
+
+              .leaf-dot {
+                background: #FFFFFF;
+              }
+
+              .leaf-title {
+                color: #FFFFFF;
+                font-weight: 600;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .active-node-panel {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 14px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    .active-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      h4 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+        color: #0F172A;
+      }
+    }
+
+    .active-desc {
+      margin: 0;
+      font-size: 13px;
+      color: #64748B;
+      line-height: 1.6;
+    }
+
+    .active-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 6px;
+
+      .capsule-btn-action {
+        height: 34px;
+        padding: 0 16px;
+        border-radius: 9999px;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: none;
+
+        &--ai {
+          background: #1677FF;
+          color: #FFFFFF;
+          &:hover { background: #4096FF; }
+        }
+
+        &--quiz {
+          background: #EEF2FF;
+          color: #4F46E5;
+          &:hover { background: #E0E7FF; }
+        }
       }
     }
   }

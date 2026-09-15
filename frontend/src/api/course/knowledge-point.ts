@@ -1,4 +1,4 @@
-import { get, post } from '@/core/http/request';
+import { get, post, del } from '@/core/http/request';
 import { KnowledgePoint } from '@/types/course/knowledge-point';
 
 export const getCourseKnowledgePoints = (courseId: number, chapterId?: number) =>
@@ -11,3 +11,7 @@ export const createKnowledgePoint = (
   courseId: number,
   data: { chapterId?: number; title: string; sortOrder?: number }
 ) => post<KnowledgePoint>(`/courses/${courseId}/knowledge-points`, data);
+
+export const deleteKnowledgePoint = (courseId: number, kpId: number) =>
+  del<void>(`/courses/${courseId}/knowledge-points/${kpId}`);
+

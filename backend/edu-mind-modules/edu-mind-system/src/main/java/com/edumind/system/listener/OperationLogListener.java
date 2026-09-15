@@ -28,11 +28,19 @@ public class OperationLogListener {
         }
 
         OperationLogEvent.OperationLogPayload p = event.getPayload();
-        Long tenantId = p.getTenantId() != null && p.getTenantId() > 0 ? p.getTenantId() : 1L;
-        TenantContext.runWithTenant(tenantId, () -> {
+        Long tenantId = p.getTenantId();
+        if (tenantId == null || tenantId <= 0) {
+            tenantId = TenantContext.getTenantId();
+        }
+        if (tenantId == null || tenantId <= 0) {
+            log.warn("Skip oper log persistence: missing tenant context for {}", p.getTitle());
+            return;
+        }
+        final Long resolvedTenantId = tenantId;
+        TenantContext.runWithTenant(resolvedTenantId, () -> {
             try {
                 SysOperLogEntity entity = SysOperLogEntity.builder()
-                        .tenantId(tenantId)
+                        .tenantId(resolvedTenantId)
                         .title(p.getTitle())
                         .businessType(p.getBusinessType())
                         .method(p.getMethod())

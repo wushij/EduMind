@@ -119,6 +119,77 @@
       :total="total"
       @change="loadData"
     />
+
+    <!-- 加入课程长圆弹窗 -->
+    <el-dialog
+      v-model="showJoinDialog"
+      title="加入课程修读空间"
+      width="560px"
+      append-to-body
+      destroy-on-close
+      class="capsule-course-dialog"
+    >
+      <div class="join-dialog-body">
+        <!-- 药丸 Tab 切换 -->
+        <div class="dialog-pill-tabs">
+          <button
+            type="button"
+            class="dialog-pill-tab"
+            :class="{ active: joinTab === 'code' }"
+            @click="joinTab = 'code'"
+          >
+            <span>课程代号 / 邀请码选课</span>
+          </button>
+          <button
+            type="button"
+            class="dialog-pill-tab"
+            :class="{ active: joinTab === 'browse' }"
+            @click="joinTab = 'browse'"
+          >
+            <span>全校公开课程速选</span>
+          </button>
+        </div>
+
+        <!-- 模式一：输入课程代号 -->
+        <div v-if="joinTab === 'code'" class="tab-pane-code">
+          <p class="dialog-tip">
+            请输入教师公布的 6 位课程代号或邀请码（如 <strong>CS201</strong>、<strong>CS101</strong>、<strong>MATH101</strong>）
+          </p>
+          <div class="dialog-capsule-input">
+            <input
+              v-model="courseCodeInput"
+              type="text"
+              class="native-code-input"
+              placeholder="例如：CS201"
+              maxlength="20"
+              @keyup.enter="handleJoinByCode"
+            />
+            <button
+              type="button"
+              class="capsule-submit-btn"
+              :disabled="!courseCodeInput.trim() || joining"
+              @click="handleJoinByCode"
+            >
+              <span>{{ joining ? '加入中...' : '立即选课加入' }}</span>
+            </button>
+          </div>
+          <div class="quick-code-hints">
+            <span class="hint-label">热门课程快速填入：</span>
+            <span class="quick-code-tag" @click="courseCodeInput = 'CS201'">CS201 数据结构</span>
+            <span class="quick-code-tag" @click="courseCodeInput = 'CS101'">CS101 Java程序设计</span>
+            <span class="quick-code-tag" @click="courseCodeInput = 'MATH101'">MATH101 高等数学</span>
+          </div>
+        </div>
+
+        <!-- 模式二：公开课程速选（需后端公开列表 API，暂仅支持代号加入） -->
+        <div v-else class="tab-pane-browse">
+          <div class="browse-empty-state">
+            <p class="dialog-tip">暂无全校公开课程列表，请切换到「课程代号 / 邀请码选课」输入教师公布的代号。</p>
+            <p class="dialog-tip muted">演示库示例代号：CS201、CS101、MATH101（以数据库 seed 为准）</p>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -132,7 +203,7 @@ import AppPagination from '@/components/common/AppPagination.vue';
 import { useCourse } from '@/composables/course/useCourse';
 
 const router = useRouter();
-const { courses, loading, total, fetchCourses } = useCourse();
+const { courses, loading, total, fetchCourses, enrollCourseByCode } = useCourse();
 
 const searchKeyword = ref('');
 const currentStatusTab = ref('ALL');
@@ -140,19 +211,28 @@ const selectedSemester = ref('ALL');
 const currentPage = ref(1);
 const pageSize = ref(10);
 
+const showJoinDialog = ref(false);
+const joinTab = ref<'code' | 'browse'>('code');
+const courseCodeInput = ref('');
+const joining = ref(false);
+
 const statusTabs = computed(() => [
   { label: '全部课程', value: 'ALL', count: total.value },
   { label: '进行中', value: 'ACTIVE', count: courses.value.filter(c => c.status === 'ACTIVE' || c.status === 1).length },
   { label: '已结课', value: 'ARCHIVED', count: courses.value.filter(c => c.status === 'ARCHIVED' || c.status === 2).length }
 ]);
 
-function loadData() {
-  fetchCourses({
-    keyword: searchKeyword.value,
-    status: currentStatusTab.value,
-    page: currentPage.value,
-    pageSize: pageSize.value
-  });
+async function loadData() {
+  try {
+    await fetchCourses({
+      keyword: searchKeyword.value,
+      status: currentStatusTab.value,
+      page: currentPage.value,
+      pageSize: pageSize.value
+    });
+  } catch {
+    // axios 拦截器已弹出错误提示
+  }
 }
 
 function handleStatusTabChange(tabVal: string) {
@@ -180,7 +260,30 @@ function resetFilters() {
 }
 
 function handleJoinCourse() {
-  ElMessage.info('正在开启全校课程选课通道与课程邀请码输入弹窗...');
+  courseCodeInput.value = '';
+  showJoinDialog.value = true;
+}
+
+async function handleJoinByCode() {
+  if (!courseCodeInput.value.trim()) {
+    ElMessage.warning('请输入课程代号或邀请码');
+    return;
+  }
+  joining.value = true;
+  try {
+    const courseId = await enrollCourseByCode(courseCodeInput.value.trim());
+    ElMessage.success('选课成功！已成功加入该课程空间！');
+    showJoinDialog.value = false;
+    courseCodeInput.value = '';
+    loadData();
+    if (courseId) {
+      router.push(`/course/${courseId}/overview`);
+    }
+  } catch (err: any) {
+    ElMessage.error(err?.message || '加入课程失败，请检查课程代号是否存在');
+  } finally {
+    joining.value = false;
+  }
 }
 
 onMounted(() => {
@@ -507,6 +610,202 @@ onMounted(() => {
         .semester-select,
         .capsule-search-container {
           width: 100%;
+        }
+      }
+    }
+  }
+}
+
+// 加入课程长圆弹窗样式
+.join-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .dialog-pill-tabs {
+    display: flex;
+    background: #F1F5F9;
+    padding: 4px;
+    border-radius: 9999px;
+    gap: 4px;
+
+    .dialog-pill-tab {
+      flex: 1;
+      height: 36px;
+      border-radius: 9999px;
+      border: none;
+      background: transparent;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: #64748B;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &.active {
+        background: #FFFFFF;
+        color: #1677FF;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      }
+    }
+  }
+
+  .dialog-tip {
+    margin: 0;
+    font-size: 13px;
+    color: #64748B;
+    line-height: 1.6;
+
+    strong {
+      color: #1677FF;
+    }
+  }
+
+  .dialog-capsule-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #FFFFFF;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 9999px;
+    padding: 4px 6px 4px 18px;
+    transition: all 0.2s ease;
+
+    &:focus-within {
+      border-color: #1677FF;
+      box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
+    }
+
+    .native-code-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 15px;
+      font-family: inherit;
+      color: #0F172A;
+      letter-spacing: 0.5px;
+
+      &::placeholder {
+        color: #94A3B8;
+        font-size: 13.5px;
+      }
+    }
+
+    .capsule-submit-btn {
+      height: 38px;
+      padding: 0 20px;
+      border-radius: 9999px;
+      border: none;
+      background: #1677FF;
+      color: #FFFFFF;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+
+      &:hover:not(:disabled) {
+        background: #4096FF;
+        transform: translateY(-1px);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  .quick-code-hints {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+
+    .hint-label {
+      color: #94A3B8;
+    }
+
+    .quick-code-tag {
+      padding: 3px 10px;
+      border-radius: 9999px;
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: #EAF3FF;
+        color: #1677FF;
+        border-color: #BFDBFE;
+      }
+    }
+  }
+
+  .quick-course-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 4px;
+
+    .quick-course-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-radius: 14px;
+      background: #F8FAFC;
+      border: 1px solid #F1F5F9;
+      transition: all 0.2s ease;
+
+      &:hover {
+        border-color: #BFDBFE;
+        background: #F0F7FF;
+      }
+
+      .course-mini-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        .mini-code {
+          font-size: 11px;
+          color: #1677FF;
+          font-weight: 600;
+        }
+
+        .mini-title {
+          margin: 0;
+          font-size: 14px;
+          font-weight: 600;
+          color: #0F172A;
+        }
+
+        .mini-teacher {
+          font-size: 12px;
+          color: #64748B;
+        }
+      }
+
+      .capsule-btn-mini {
+        height: 30px;
+        padding: 0 16px;
+        border-radius: 9999px;
+        border: none;
+        background: #1677FF;
+        color: #FFFFFF;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: #4096FF;
+          transform: translateY(-1px);
         }
       }
     }

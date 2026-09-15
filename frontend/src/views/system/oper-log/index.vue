@@ -113,12 +113,22 @@
         </div>
 
         <div class="filter-actions">
-          <button type="button" class="pill-btn pill-btn--primary" @click="handleQuery">
+          <button
+            type="button"
+            class="pill-btn pill-btn--primary"
+            :disabled="loading"
+            @click="handleQuery"
+          >
             <el-icon class="mr-1"><Search /></el-icon>
             <span>检索</span>
           </button>
-          <button type="button" class="pill-btn pill-btn--default" @click="resetQuery">
-            <el-icon class="mr-1"><Refresh /></el-icon>
+          <button
+            type="button"
+            class="pill-btn pill-btn--default"
+            :disabled="loading"
+            @click="resetQuery"
+          >
+            <el-icon class="mr-1" :class="{ 'is-loading': loading }"><Refresh /></el-icon>
             <span>重置</span>
           </button>
         </div>
@@ -126,7 +136,11 @@
     </div>
 
     <!-- 3. 操作日志主表格卡片 -->
-    <div v-loading="loading" class="log-table-card">
+    <div
+      v-loading="loading"
+      element-loading-text="正在检索审计日志..."
+      class="log-table-card"
+    >
       <div class="table-toolbar-bar">
         <div class="toolbar-left">
           <span class="table-title">操作日志列表</span>
@@ -632,16 +646,20 @@ async function loadStats() {
 async function loadData() {
   loading.value = true;
   try {
-    const res = await pageOperLog({
-      pageNo: queryParams.pageNo,
-      pageSize: queryParams.pageSize,
-      title: queryParams.title || undefined,
-      operName: queryParams.operName || undefined,
-      businessType: queryParams.businessType,
-      status: queryParams.status,
-      startTime: queryParams.startTime,
-      endTime: queryParams.endTime
-    });
+    const [res] = await Promise.all([
+      pageOperLog({
+        pageNo: queryParams.pageNo,
+        pageSize: queryParams.pageSize,
+        title: queryParams.title || undefined,
+        operName: queryParams.operName || undefined,
+        businessType: queryParams.businessType,
+        status: queryParams.status,
+        startTime: queryParams.startTime,
+        endTime: queryParams.endTime
+      }),
+      // 保底微延时 220ms，确保本地毫秒级极速响应也能呈现清晰平滑的刷新加载反馈
+      new Promise((resolve) => setTimeout(resolve, 220))
+    ]);
     tableData.value = res.data?.list || [];
     total.value = Number(res.data?.total) || 0;
   } catch (err: any) {
@@ -1000,6 +1018,12 @@ onMounted(() => {
       background: #e2e8f0;
       color: #1e293b;
     }
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none !important;
   }
 }
 

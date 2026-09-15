@@ -21,3 +21,8 @@ ai:
     mock-enabled: true
   milvus:
     enabled: false
+
+knowledge:
+  ocr:
+    mock-enabled: true
+    engine: mock

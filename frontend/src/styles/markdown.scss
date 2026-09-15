@@ -1,0 +1,214 @@
+/* ==========================================================================
+   全局 Markdown / AI 聊天排版与代码块容器样式 (对齐 Code Compass 工业级规范)
+   ========================================================================== */
+
+.chat-md-content {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: #1e293b;
+  word-break: break-word;
+
+  p {
+    margin: 8px 0;
+    &:first-child { margin-top: 0; }
+    &:last-child { margin-bottom: 0; }
+  }
+
+  strong {
+    font-weight: 700;
+    color: #0958d9;
+  }
+
+  h1, h2, h3, h4 {
+    margin: 14px 0 8px;
+    color: #0f172a;
+    font-weight: 700;
+  }
+
+  h1 { font-size: 1.25em; }
+  h2 { font-size: 1.15em; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
+  h3 { font-size: 1.05em; }
+
+  ul, ol {
+    margin: 8px 0;
+    padding-left: 1.5em;
+  }
+
+  li {
+    margin: 4px 0;
+  }
+
+  blockquote {
+    margin: 10px 0;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-left: 3px solid #1677ff;
+    color: #64748b;
+    border-radius: 4px;
+    font-size: 12.5px;
+  }
+
+  hr {
+    margin: 14px 0;
+    border: none;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .katex {
+    word-break: normal;
+    overflow-wrap: normal;
+  }
+
+  .table-wrap {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 10px 0 12px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #fafbfc;
+    box-sizing: border-box;
+
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    &::-webkit-scrollbar-button {
+      display: none;
+      width: 0;
+      height: 0;
+    }
+  }
+
+  table {
+    width: 100%;
+    min-width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    line-height: 1.55;
+    table-layout: auto;
+  }
+
+  th,
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 6px 10px;
+    text-align: left;
+    vertical-align: top;
+    word-break: break-word;
+    min-width: 72px;
+  }
+
+  th {
+    background: #f8fafc;
+    font-weight: 600;
+    color: #1677ff;
+    white-space: nowrap;
+  }
+
+  /* 代码块全站统一排版规范 (流式状态与结算状态完全一致) */
+  .code-block-wrapper {
+    margin: 12px 0;
+    border-radius: 8px;
+    background: #1e1e1e;
+    overflow: hidden;
+    border: 1px solid #333333;
+
+    .code-header {
+      background: #252526;
+      padding: 6px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-sizing: border-box;
+
+      .code-lang {
+        font-size: 11px;
+        color: #9cdcfe;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .code-copy-btn {
+        background: #3c3c3c;
+        color: #cccccc;
+        border: none;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 10.5px;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+          background: #505050;
+          color: #ffffff;
+        }
+
+        &.is-copied {
+          background: #52c41a;
+          color: #ffffff;
+        }
+      }
+    }
+
+    pre {
+      margin: 0;
+      padding: 10px 12px;
+      overflow-x: auto;
+      font-size: 12px;
+      line-height: 1.55;
+      background: transparent;
+    }
+  }
+
+  .mermaid-diagram-wrapper {
+    margin: 14px 0;
+    border-radius: 10px;
+    border: 1px solid rgba(22, 119, 255, 0.22);
+    background: #fdfdfd;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+
+    .mermaid-header {
+      background: #f0f7ff;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #1677ff;
+      border-bottom: 1px solid rgba(22, 119, 255, 0.15);
+    }
+
+    .mermaid-diagram {
+      padding: 14px 10px;
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      .mermaid-loading {
+        color: #8c8c8c;
+        font-size: 12px;
+      }
+    }
+  }
+
+  .math-fallback {
+    font-family: 'Fira Code', Consolas, monospace;
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 10px 0;
+    display: block;
+  }
+}

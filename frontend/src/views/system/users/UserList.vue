@@ -35,11 +35,37 @@
           <el-option label="正常活跃" value="ENABLE" />
           <el-option label="冻结停用" value="DISABLED" />
         </el-select>
+
+        <div class="filter-actions-group">
+          <el-button
+            type="primary"
+            round
+            :icon="Search"
+            class="action-pill-btn primary"
+            :disabled="loading"
+            @click="handleSearch"
+          >
+            查询
+          </el-button>
+          <el-button
+            round
+            class="btn-refresh"
+            :icon="Refresh"
+            :loading="loading"
+            @click="handleReset"
+          >
+            重置
+          </el-button>
+        </div>
       </div>
     </div>
 
     <!-- 用户列表表格卡片 -->
-    <div v-loading="loading" class="user-table-card">
+    <div
+      v-loading="loading"
+      element-loading-text="正在检索系统用户信息..."
+      class="user-table-card"
+    >
       <el-table :data="users" stripe class="main-table">
         <el-table-column label="用户信息" min-width="220">
           <template #default="{ row }">
@@ -161,7 +187,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
-import { Plus, Search } from '@element-plus/icons-vue';
+import { Plus, Search, Refresh } from '@element-plus/icons-vue';
 import { getUsers, createUser, updateUserStatus, deleteUser } from '@/api/system/user';
 import { getRoles } from '@/api/system/role';
 import AppPagination from '@/components/common/AppPagination.vue';
@@ -226,13 +252,17 @@ async function loadRoles() {
 async function loadUsers() {
   loading.value = true;
   try {
-    const res = await getUsers({
-      page: pageNum.value,
-      pageSize: pageSize.value,
-      keyword: searchKeyword.value.trim() || undefined,
-      role: selectedRole.value || undefined,
-      status: selectedStatus.value || undefined
-    });
+    const [res] = await Promise.all([
+      getUsers({
+        page: pageNum.value,
+        pageSize: pageSize.value,
+        keyword: searchKeyword.value.trim() || undefined,
+        role: selectedRole.value || undefined,
+        status: selectedStatus.value || undefined
+      }),
+      // 保底微延时 220ms，确保本地毫秒级极速响应也能呈现清晰平滑的刷新加载反馈
+      new Promise((resolve) => setTimeout(resolve, 220))
+    ]);
     users.value = res.data?.list || [];
     total.value = res.data?.total ?? users.value.length;
   } catch {
@@ -244,6 +274,14 @@ async function loadUsers() {
 }
 
 function handleSearch() {
+  pageNum.value = 1;
+  loadUsers();
+}
+
+function handleReset() {
+  searchKeyword.value = '';
+  selectedRole.value = '';
+  selectedStatus.value = '';
   pageNum.value = 1;
   loadUsers();
 }
@@ -452,6 +490,13 @@ async function handleCreateUser() {
 
       .filter-select {
         width: 150px;
+      }
+
+      .filter-actions-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: 4px;
       }
     }
   }

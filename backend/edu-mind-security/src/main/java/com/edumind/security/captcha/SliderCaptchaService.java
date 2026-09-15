@@ -2,6 +2,7 @@ package com.edumind.security.captcha;
 
 import cn.hutool.core.util.IdUtil;
 import com.edumind.common.exception.BusinessException;
+import com.edumind.infrastructure.redis.RedisKeyBuilder;
 import com.edumind.infrastructure.redis.RedisService;
 import com.edumind.infrastructure.redis.RedisSupport;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -241,19 +242,21 @@ public class SliderCaptchaService {
         }
     }
 
+    private static final String LOGIN_CONFIG_KEY = "sys.login.config";
+
     /**
      * 获取系统当前验证码策略配置
      */
     public CaptchaPolicyVO getCaptchaPolicy() {
         boolean captchaEnabled = true;
-        String captchaType = "slider";
+        String captchaType = "image";
         boolean smsLoginSliderCaptchaEnabled = false;
         boolean emailLoginSliderCaptchaEnabled = false;
 
         try {
             String configJson = null;
             if (redisSupport.useRedisOrFallback()) {
-                configJson = redisService.get("sys:config:sys.login.config");
+                configJson = redisService.get(RedisKeyBuilder.sysConfig(LOGIN_CONFIG_KEY));
             }
             if (configJson != null) {
                 JsonNode root = objectMapper.readTree(configJson);
@@ -261,7 +264,7 @@ public class SliderCaptchaService {
                     captchaEnabled = root.get("captchaEnabled").asBoolean(true);
                 }
                 if (root.has("captchaType")) {
-                    captchaType = root.get("captchaType").asText("slider");
+                    captchaType = root.get("captchaType").asText("image");
                 }
                 if (root.has("smsLoginSliderCaptchaEnabled")) {
                     smsLoginSliderCaptchaEnabled = root.get("smsLoginSliderCaptchaEnabled").asBoolean(false);
@@ -271,7 +274,7 @@ public class SliderCaptchaService {
                 }
             }
         } catch (Exception ex) {
-            log.warn("读取验证码策略配置异常，采用默认滑块配置: {}", ex.getMessage());
+            log.warn("读取验证码策略配置异常，采用默认图片验证码: {}", ex.getMessage());
         }
 
         return CaptchaPolicyVO.builder()

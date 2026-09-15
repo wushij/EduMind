@@ -3,6 +3,7 @@ package com.edumind.security.captcha;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.infrastructure.redis.RedisService;
 import com.edumind.infrastructure.redis.RedisSupport;
+import com.edumind.infrastructure.redis.RedisKeyBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,14 +19,30 @@ import static org.mockito.Mockito.when;
 class SliderCaptchaServiceTest {
 
     private SliderCaptchaService sliderCaptchaService;
+    private RedisService redisService;
+    private RedisSupport redisSupport;
 
     @BeforeEach
     void setUp() {
-        RedisService redisService = Mockito.mock(RedisService.class);
-        RedisSupport redisSupport = Mockito.mock(RedisSupport.class);
+        redisService = Mockito.mock(RedisService.class);
+        redisSupport = Mockito.mock(RedisSupport.class);
         // 走本地内存缓存分支测试
         when(redisSupport.useRedisOrFallback()).thenReturn(false);
         sliderCaptchaService = new SliderCaptchaService(redisService, redisSupport);
+    }
+
+    @Test
+    @DisplayName("读取登录配置时应使用与系统配置一致的 Redis Key")
+    void testGetCaptchaPolicy_ReadsLoginConfigFromStandardRedisKey() throws Exception {
+        when(redisSupport.useRedisOrFallback()).thenReturn(true);
+        String configJson = "{\"captchaEnabled\":true,\"captchaType\":\"image\",\"emailLoginSliderCaptchaEnabled\":false}";
+        when(redisService.get(RedisKeyBuilder.sysConfig("sys.login.config"))).thenReturn(configJson);
+
+        CaptchaPolicyVO policy = sliderCaptchaService.getCaptchaPolicy();
+
+        assertEquals("image", policy.getCaptchaType());
+        assertTrue(policy.isCaptchaEnabled());
+        assertFalse(policy.isEmailLoginSliderCaptchaEnabled());
     }
 
     @Test

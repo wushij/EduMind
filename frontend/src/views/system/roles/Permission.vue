@@ -21,8 +21,8 @@
             <el-icon><Operation /></el-icon>
             {{ expandAll ? '折叠全部' : '展开全部' }}
           </el-button>
-          <el-button type="primary" round :loading="loading" @click="fetchData">
-            <el-icon><Refresh /></el-icon> 刷新
+          <el-button round :icon="Refresh" class="btn-refresh" :loading="loading" @click="fetchData">
+            刷新
           </el-button>
         </div>
       </div>
@@ -335,7 +335,8 @@ function getDefaultPermissionMock(): PermissionVO[] {
     { id: 41, permissionCode: 'system:model:edit', permissionName: 'AI 模型参数配置' },
     { id: 28, permissionCode: 'system:prompt:view', permissionName: 'Prompt 模板库' },
     { id: 42, permissionCode: 'system:prompt:edit', permissionName: 'Prompt 模板编辑' },
-    { id: 43, permissionCode: 'system:tool:view', permissionName: 'AI 教学工具管理' },
+    { id: 43, permissionCode: 'system:tool:view', permissionName: 'AI 教学工具查看' },
+    { id: 70, permissionCode: 'system:tool:edit', permissionName: 'AI 教学工具编辑' },
     { id: 44, permissionCode: 'system:gateway:view', permissionName: 'AI 网关监控调度' },
     { id: 29, permissionCode: 'system:quota:view', permissionName: '算力与配额管控' },
     { id: 45, permissionCode: 'system:quota:edit', permissionName: '配额限流与充值' },

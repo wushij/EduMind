@@ -15,4 +15,6 @@ public interface ResourceQueryApi {
     List<?> listResourcesByCourse(Long courseId, Long chapterId, Integer limit);
 
     String getResourceDownloadUrl(Long resourceId);
+
+    Long countResourcesByCourseId(Long courseId);
 }

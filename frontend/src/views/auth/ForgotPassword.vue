@@ -41,8 +41,8 @@
               <div class="sms-code-box">
                 <el-input
                   v-model="step1Form.code"
-                  placeholder="请输入6位验证码"
-                  :prefix-icon="Message"
+                  placeholder="请输入 6 位邮箱验证码"
+                  :prefix-icon="Lock"
                   maxlength="6"
                   size="large"
                   @keyup.enter="handleVerifyStep1"
@@ -297,20 +297,19 @@ onBeforeUnmount(() => {
   position: relative;
   width: 100vw;
   height: 100vh;
-  min-height: 640px;
-  background: url('@/assets/images/登录2.png') no-repeat left center;
+  min-height: 600px;
+  background: #EAF3FD url('@/assets/images/登录2.png') no-repeat left center;
   background-size: cover;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-right: 9vw;
+  /* 严格 1:1 对齐登录页 Login.vue：距离右侧 4.8vw (~70px)，彻底远离左侧机器人 */
+  padding-right: clamp(30px, 4.8vw, 88px);
+  box-sizing: border-box;
   overflow: hidden;
 
   .forgot-bg-mask {
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 80% 50%, rgba(255, 255, 255, 0.05) 0%, rgba(10, 27, 57, 0.12) 100%);
-    pointer-events: none;
+    display: none;
   }
 
   .forgot-card-box {
@@ -320,11 +319,11 @@ onBeforeUnmount(() => {
   }
 
   .forgot-card {
-    width: 440px;
+    width: 416px;
     background: #FFFFFF;
-    border-radius: 20px;
-    box-shadow: 0 20px 50px rgba(10, 27, 57, 0.12), 0 4px 16px rgba(22, 119, 255, 0.08);
-    padding: 34px 38px 32px;
+    border-radius: 16px;
+    box-shadow: 0 12px 36px rgba(16, 68, 148, 0.08), 0 2px 8px rgba(0, 0, 0, 0.02);
+    padding: 32px 34px 28px;
     box-sizing: border-box;
 
     .card-header {
@@ -380,7 +379,7 @@ onBeforeUnmount(() => {
         .get-code-btn {
           white-space: nowrap;
           border-radius: 9999px !important;
-          min-width: 120px;
+          min-width: 108px;
           height: 46px;
           font-size: 13.5px;
           font-weight: 600;
@@ -393,7 +392,7 @@ onBeforeUnmount(() => {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          padding: 0 22px;
+          padding: 0 16px;
           user-select: none;
           letter-spacing: 0.3px;
           box-sizing: border-box;
@@ -500,7 +499,7 @@ onBeforeUnmount(() => {
 
     .forgot-card-box {
       width: 90%;
-      max-width: 440px;
+      max-width: 416px;
     }
 
     .forgot-card {

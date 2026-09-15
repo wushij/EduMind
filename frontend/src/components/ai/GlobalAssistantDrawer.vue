@@ -168,7 +168,8 @@
             <!-- 2. 消息流式主列表区域 -->
             <div
               ref="messagesScrollRef"
-              class="chat-viewport"
+              class="chat-viewport ga-messages-scroll"
+              data-chat-scroll="true"
               @scroll="handleViewportScroll"
             >
               <div v-if="isSessionLoading" class="session-loading">
@@ -249,14 +250,15 @@
                         </el-button>
                       </div>
 
-                      <!-- 深度思考卡片 (默认折叠) -->
+                      <!-- 深度思考卡片（遵循个人偏好 → 默认呈现策略） -->
                       <AIThinking
-                        v-if="msg.role === 'assistant' && msg.reasoningContent"
+                        v-if="msg.role === 'assistant' && showThinkingPanel && msg.reasoningContent"
                         :content="msg.reasoningContent"
-                        :folded="msg.reasoningFolded ?? true"
+                        :folded="resolveReasoningFolded(msg.reasoningFolded)"
                         :active="false"
                         :has-answer-body="true"
                         @update:folded="msg.reasoningFolded = $event"
+                        @user-collapse="pauseAutoScrollFollow"
                       />
 
                       <!-- Markdown 渲染正文 -->
@@ -386,15 +388,16 @@
                         </el-tag>
                       </div>
 
-                      <!-- 思考卡片：流式生成中动态自转，默认折叠 -->
+                      <!-- 思考卡片：流式生成中遵循个人偏好默认呈现策略 -->
                       <AIThinking
-                        v-if="!streamingAnswerBody || streamingThinkingDisplay"
+                        v-if="showThinkingPanel && (!streamingAnswerBody || streamingThinkingDisplay)"
                         :content="streamingThinkingDisplay"
                         :folded="isReasoningFolded"
                         :active="!streamingAnswerBody && (isReasoningActive || !streamingThinkingDisplay)"
                         :has-answer-body="!!streamingAnswerBody"
                         :phase-message="streamPhaseMessage"
                         @update:folded="isReasoningFolded = $event"
+                        @user-collapse="pauseAutoScrollFollow"
                       />
 
                       <!-- 正文流式渲染：rAF + 80ms 节流 -->
@@ -538,6 +541,7 @@ import { renderChatMarkdown } from '@/utils/ai/chat-markdown';
 import { useAuthStore } from '@/stores/auth/auth';
 import { DEFAULT_AVATAR } from '@/constants/auth';
 import { normalizeAvatarUrl } from '@/utils/format/file';
+import { resolveReasoningFolded } from '@/utils/ai/thinking-display';
 
 const authStore = useAuthStore();
 const userAvatarBroken = ref(false);
@@ -573,6 +577,7 @@ const {
   toggleScopeMode,
   presetChips,
   followUpPrompts,
+  showThinkingPanel,
   // 历史会话管理
   isHistoryPanelOpen,
   isSessionLoading,
@@ -605,6 +610,7 @@ const {
   scrollToBottomSmooth,
   scrollToBottomInstant,
   scheduleFollowStreamOutput,
+  pauseAutoScrollFollow,
   handleViewportScroll,
   getIntentTagType,
   formatMatchScore
@@ -1081,6 +1087,7 @@ function handleTextareaKeydown(e: KeyboardEvent) {
 .chat-viewport {
   flex: 1;
   overflow-y: auto;
+  overflow-anchor: none;
   padding: 16px 18px;
   display: flex;
   flex-direction: column;

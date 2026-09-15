@@ -219,7 +219,7 @@ function buildModuleDefinitions(): NavModule[] {
       children: [
         { path: '/course', name: '我的课程', icon: Collection },
         { path: '/course/create', name: '创建课程', icon: DocumentAdd, roles: ['ADMIN', 'TEACHER'], permissions: ['course:create'] },
-        { path: '/course/ai-assistant', name: '课程 AI', icon: ChatDotRound, roles: ['ADMIN', 'STUDENT'] }
+        { path: '/course/ai', name: '课程 AI', icon: ChatDotRound }
       ]
     },
 
@@ -323,7 +323,7 @@ function buildModuleDefinitions(): NavModule[] {
       children: [
         { path: '/system/models', name: 'AI 模型', icon: Cpu },
         { path: '/system/prompts', name: 'Prompt 模板', icon: ChatLineSquare },
-        { path: '/system/tools', name: 'AI 工具', icon: Operation },
+        { path: '/system/tools', name: '教学工具配置', icon: Operation },
         { path: '/system/gateway', name: 'AI 网关', icon: Connection },
         { path: '/system/quotas', name: '算力与配额', icon: Money },
         { path: '/system/audit', name: 'AI 审计日志', icon: Clock }
@@ -421,8 +421,8 @@ const activeMenu = computed(() => {
   if (path.startsWith('/dashboard')) {
     return '/dashboard';
   }
-  if (path.match(/^\/course\/[^/]+\/ai/)) {
-    return '/course/ai-assistant';
+  if (path === '/course/ai' || path === '/course/ai-assistant' || path.match(/^\/course\/[^/]+\/ai/)) {
+    return '/course/ai';
   }
   if (path.startsWith('/knowledge/') && path.includes('/documents')) {
     return knowledgePath('documents');

@@ -82,13 +82,13 @@ export const systemRoutes: RouteRecordRaw[] = [
     path: '/system/tools',
     name: 'SystemToolList',
     component: () => import('@/views/system/ai-tool/ToolList.vue'),
-    meta: { title: 'AI 教学工具维护', requiresAuth: true, roles: ['ADMIN'] }
+    meta: { title: '教学工具配置', requiresAuth: true, roles: ['ADMIN'] }
   },
   {
     path: '/system/tools/edit/:id?',
     name: 'SystemToolEdit',
     component: () => import('@/views/system/ai-tool/ToolEdit.vue'),
-    meta: { title: '编辑 AI 工具', requiresAuth: true, roles: ['ADMIN'] }
+    meta: { title: '编辑教学工具', requiresAuth: true, roles: ['ADMIN'] }
   },
 
   // 配额与额度 (V2.0 租户用量与配额大盘)

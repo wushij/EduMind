@@ -778,8 +778,8 @@
             <h3>近期试卷导出任务与云端归档</h3>
           </div>
           <div class="history-actions">
-            <el-button size="small" link type="primary" @click="refreshHistory">
-              <el-icon><Refresh /></el-icon> 刷新任务状态
+            <el-button round size="small" class="btn-refresh" :icon="Refresh" @click="refreshHistory">
+              刷新任务状态
             </el-button>
           </div>
         </div>
