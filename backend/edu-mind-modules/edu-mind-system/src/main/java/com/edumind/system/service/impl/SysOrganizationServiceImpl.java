@@ -5,7 +5,6 @@ import com.edumind.common.api.ResultCode;
 import com.edumind.common.api.analytics.KnowledgeMasteryQueryApi;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
-import com.edumind.system.api.OrganizationQueryApi;
 import com.edumind.system.api.TenantDataScope;
 import com.edumind.system.api.TenantDataScopeApi;
 import com.edumind.system.converter.SysOrganizationConverter;
@@ -48,7 +47,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SysOrganizationServiceImpl implements SysOrganizationService, OrganizationQueryApi {
+public class SysOrganizationServiceImpl implements SysOrganizationService {
 
     private final SysOrganizationDao sysOrganizationDao;
     private final SysMemberOrgDao sysMemberOrgDao;
@@ -578,54 +577,4 @@ public class SysOrganizationServiceImpl implements SysOrganizationService, Organ
         sysOrganizationDao.deleteByIdAndTenantId(id, tenantId);
     }
 
-    @Override
-    public List<Map<String, Object>> getOrganizationTree(Long tenantId) {
-        List<OrganizationNodeVO> tree = getTree(tenantId);
-        return tree.stream().map(node -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", node.getId());
-            map.put("name", node.getName());
-            map.put("orgType", node.getOrgType());
-            map.put("memberCount", node.getMemberCount());
-            return map;
-        }).collect(Collectors.toList());
-    }
-
-    @Override
-    public List<Map<String, Object>> listOrgsByMemberId(Long tenantId, Long memberId) {
-        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
-        List<SysMemberOrgEntity> relations = sysMemberOrgDao.listByMemberId(resolvedTenantId, memberId);
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (SysMemberOrgEntity rel : relations) {
-            SysOrganizationEntity org = sysOrganizationDao.findByIdAndTenantId(rel.getOrganizationId(), resolvedTenantId);
-            if (org != null) {
-                Map<String, Object> map = new HashMap<>();
-                map.put("id", org.getId());
-                map.put("name", org.getName());
-                map.put("type", org.getOrgType());
-                map.put("roleType", rel.getRoleType());
-                result.add(map);
-            }
-        }
-        return result;
-    }
-
-    @Override
-    public List<Long> listMemberIdsByOrgId(Long tenantId, Long organizationId) {
-        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
-        return sysMemberOrgDao.listMemberIdsByOrgId(resolvedTenantId, organizationId);
-    }
-
-    @Override
-    public List<Long> listUserIdsByOrgId(Long tenantId, Long organizationId) {
-        Long resolvedTenantId = resolveAndVerifyTenantId(tenantId);
-        List<Long> memberIds = sysMemberOrgDao.listMemberIdsByOrgId(resolvedTenantId, organizationId);
-        if (CollectionUtils.isEmpty(memberIds)) {
-            return Collections.emptyList();
-        }
-        return sysTenantMemberDao.listByIds(resolvedTenantId, memberIds).stream()
-                .map(SysTenantMemberEntity::getUserId)
-                .distinct()
-                .collect(Collectors.toList());
-    }
 }

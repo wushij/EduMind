@@ -1,0 +1,121 @@
+    .paper-sidebar-area {
+      width: 320px;
+      flex-shrink: 0;
+
+      .sidebar-card {
+        position: sticky;
+        top: 80px;
+        background: #ffffff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+        padding: 16px;
+
+        .side-card-title {
+          font-size: 15px;
+          font-weight: 700;
+          color: #0f172a;
+          margin: 0 0 16px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+
+          .title-icon {
+            font-size: 17px;
+            color: #2563eb;
+          }
+        }
+
+        .side-stat-row {
+          display: flex;
+          justify-content: space-between;
+          font-size: 13px;
+          margin-bottom: 8px;
+
+          .label {
+            color: #64748b;
+          }
+
+          .val {
+            color: #1e293b;
+          }
+        }
+
+        .difficulty-breakdown {
+          .sub-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+            display: block;
+            margin-bottom: 10px;
+          }
+
+          .diff-bars-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+
+            .diff-bar-item {
+              .diff-header {
+                display: flex;
+                justify-content: space-between;
+                font-size: 12px;
+                margin-bottom: 4px;
+              }
+            }
+          }
+        }
+
+        .kps-breakdown {
+          .sub-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+            display: block;
+            margin-bottom: 10px;
+          }
+
+          .kps-chips-flow {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+
+            .kp-badge-chip {
+              background: #eff6ff;
+              color: #2563eb;
+              font-size: 12px;
+              padding: 3px 8px;
+              border-radius: 6px;
+              font-weight: 500;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .export-dialog-body {
+    .export-tip {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 12px;
+    }
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-exam-paper, #printable-exam-paper * {
+    visibility: visible;
+  }
+  #printable-exam-paper {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    box-shadow: none !important;
+    border: none !important;
+  }
+}

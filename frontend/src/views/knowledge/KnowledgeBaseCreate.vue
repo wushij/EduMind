@@ -164,78 +164,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import { ArrowLeft, UploadFilled, Collection, Promotion } from '@element-plus/icons-vue';
-import { createKnowledgeBase } from '@/api/knowledge/knowledge-base';
-import { getCourseList } from '@/api/course/course';
-import type { Course } from '@/types/course/course';
+import { useKnowledgeBaseCreate } from '@/composables/knowledge/useKnowledgeBase';
 
-const router = useRouter();
-const formRef = ref<FormInstance>();
-const submitting = ref(false);
-const courses = ref<Course[]>([]);
-
-const formData = reactive({
-  name: '',
-  courseId: 101 as number | undefined,
-  description: '',
-  embeddingModel: 'bge-large-zh-v1.5',
-  chunkStrategy: 'PARAGRAPH',
-  chunkSize: 500,
-  chunkOverlap: 50
-});
-
-const rules = reactive<FormRules>({
-  name: [{ required: true, message: '请输入知识库名称', trigger: 'blur' }],
-  courseId: [{ required: true, message: '请选择所属课程', trigger: 'change' }]
-});
-
-onMounted(async () => {
-  await loadCourses();
-});
-
-async function loadCourses() {
-  try {
-    const res = await getCourseList({ page: 1, pageSize: 50 });
-    courses.value = res.data?.list || [
-      { id: 101, title: '数据结构与算法' } as any,
-      { id: 102, title: 'Java程序设计' } as any,
-      { id: 103, title: '大学数学：高等数学（上）' } as any
-    ];
-  } catch {
-    courses.value = [
-      { id: 101, title: '数据结构与算法' } as any,
-      { id: 102, title: 'Java程序设计' } as any,
-      { id: 103, title: '大学数学：高等数学（上）' } as any
-    ];
-  }
-}
-
-async function handleSubmit() {
-  if (!formRef.value) return;
-  await formRef.value.validate(async (valid) => {
-    if (!valid) return;
-    submitting.value = true;
-    try {
-      const res = await createKnowledgeBase(formData);
-      const newId = res.data || 1;
-      ElMessage.success('知识库已成功创建！正在为您跳转到文档维护详情页...');
-      setTimeout(() => {
-        router.push(`/knowledge/${newId}`);
-      }, 600);
-    } catch (err) {
-      console.error(err);
-      ElMessage.success('知识库已成功创建！');
-      setTimeout(() => {
-        router.push('/knowledge');
-      }, 600);
-    } finally {
-      submitting.value = false;
-    }
-  });
-}
+const { router, formRef, submitting, courses, formData, rules, handleSubmit } = useKnowledgeBaseCreate();
 </script>
 
 <style scoped lang="scss">

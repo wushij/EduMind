@@ -12,6 +12,9 @@
 </template>
 
 <script setup lang="ts">
+import { useDashboard } from '@/composables/dashboard/useDashboard';
+
+useDashboard();
 </script>
 
 <style scoped lang="scss">

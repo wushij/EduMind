@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, reactive, watch } from 'vue';
-import { getUserPreferences, saveUserPreferences, type UserPreferenceVO } from '@/api/profile/preferences';
+import { getUserPreferences, saveUserPreferences } from '@/api/profile/preferences';
+import type { UserPreferenceVO } from '@/types/profile/preferences';
 import { tokenUtil } from '@/core/auth/token';
 import { ElMessage } from 'element-plus';
 

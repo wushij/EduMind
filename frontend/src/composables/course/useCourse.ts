@@ -9,15 +9,18 @@ import {
   deleteCourse,
   joinCourseByCode
 } from '@/api/course/course';
-import { getChapters } from '@/api/course/chapter';
+import { createChapterApi, getChapters } from '@/api/course/chapter';
 import { mapCourse } from '@/utils/course/map-course';
 
+// 模块级单例响应式状态，确保跨组件、跨子路由切换时数据秒开不闪烁
+const courses = ref<Course[]>([]);
+const currentCourse = ref<Course | null>(null);
+const chapters = ref<Chapter[]>([]);
+const loading = ref(false);
+const total = ref(0);
+const courseCache = new Map<number, Course>();
+
 export function useCourse() {
-  const courses = ref<Course[]>([]);
-  const currentCourse = ref<Course | null>(null);
-  const chapters = ref<Chapter[]>([]);
-  const loading = ref(false);
-  const total = ref(0);
 
   async function fetchCourses(query: CourseQuery = {}) {
     loading.value = true;
@@ -40,18 +43,47 @@ export function useCourse() {
   }
 
   async function fetchCourseDetail(id: number | string) {
-    loading.value = true;
     const numId = Number(id);
+    // 1. 如果当前已有该课程且ID匹配，直接静默后台刷新，彻底避免前台白屏/占位闪烁
+    if (currentCourse.value?.id === numId) {
+      void getCourseDetail(numId).then(res => {
+        if (res.data) {
+          const mapped = mapCourse(res.data);
+          currentCourse.value = mapped;
+          courseCache.set(numId, mapped);
+        }
+      }).catch(() => {});
+      return currentCourse.value;
+    }
+
+    // 2. 如果内存缓存有该课程，先立即呈现
+    if (courseCache.has(numId)) {
+      currentCourse.value = courseCache.get(numId)!;
+    }
+
+    loading.value = true;
     try {
       const res = await getCourseDetail(numId);
-      currentCourse.value = mapCourse(res.data || {});
+      const mapped = mapCourse(res.data || {});
+      currentCourse.value = mapped;
+      courseCache.set(numId, mapped);
     } catch (err) {
-      currentCourse.value = null;
+      if (!currentCourse.value) {
+        currentCourse.value = null;
+      }
       throw err;
     } finally {
       loading.value = false;
     }
     return currentCourse.value;
+  }
+
+  function setCurrentCourse(course: Course | null) {
+    if (!course) return;
+    currentCourse.value = course;
+    if (course.id) {
+      courseCache.set(course.id, course);
+    }
   }
 
   function normalizeChapterTree(tree: any[]): Chapter[] {
@@ -90,6 +122,20 @@ export function useCourse() {
     return chapters.value;
   }
 
+  async function createChapter(
+    courseId: number | string,
+    payload: { title: string; parentId?: number; sortOrder?: number; description?: string }
+  ) {
+    const numId = Number(courseId);
+    const res = await createChapterApi(numId, {
+      title: payload.title,
+      parentId: payload.parentId ?? 0,
+      sortOrder: payload.sortOrder
+    });
+    await fetchChapters(numId);
+    return res.data;
+  }
+
   async function createCourse(data: CourseCreateRequest): Promise<Course | null> {
     const res = await createCourseApi(data);
     const id = res.data;
@@ -126,9 +172,11 @@ export function useCourse() {
     fetchCourses,
     fetchCourseDetail,
     fetchChapters,
+    createChapter,
     createCourse,
     removeCourse,
     saveCourse,
-    enrollCourseByCode
+    enrollCourseByCode,
+    setCurrentCourse
   };
 }

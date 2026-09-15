@@ -222,199 +222,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
 import { ArrowLeft, Cpu, User, Reading, MagicStick, Service, Select, Finished, Check, Close } from '@element-plus/icons-vue';
-import {
-  getSubmissionDetail,
-  getSubmissionGrading,
-  gradeSubmission,
-  reviewGrading
-} from '@/api/question/submission';
-import type { QuestionType } from '@/types/question/question';
+import { useSubmission } from '@/composables/question/useSubmission';
 
-const route = useRoute();
-const router = useRouter();
-
-const submissionId = computed(() => Number(route.params.id) || 201);
-const loading = ref(false);
-const saving = ref(false);
-const gradingInProgress = ref(false);
-
-const submissionData = ref<any>(null);
-
-interface GradingItem {
-  questionId: number;
-  type: QuestionType;
-  stem: string;
-  maxScore: number;
-  studentAnswer: string;
-  standardAnswer: string;
-  analysis: string;
-  isObjective: boolean;
-  isCorrect: boolean;
-  aiScore: number;
-  aiComment: string;
-  teacherScore: number;
-  teacherComment: string;
-}
-
-const gradingItems = ref<GradingItem[]>([]);
-
-onMounted(async () => {
-  await loadSubmissionData();
-});
-
-async function loadSubmissionData() {
-  loading.value = true;
-  try {
-    const res = await getSubmissionDetail(submissionId.value);
-    submissionData.value = res.data;
-    if (!submissionData.value) {
-      ElMessage.error('未找到该答卷详情');
-      return;
-    }
-
-    // 尝试拉取真实的批改结果
-    let gradingResults: any[] = [];
-    try {
-      const gRes = await getSubmissionGrading(submissionId.value);
-      gradingResults = gRes.data || [];
-    } catch (gErr) {
-      gradingResults = submissionData.value?.gradingItems || [];
-    }
-
-    // 组装真实评阅呈现项（若尚未评阅则为 []，由界面引导执行 AI 批改）
-    gradingItems.value = buildGradingItems(submissionData.value, gradingResults);
-  } catch (err: any) {
-    ElMessage.error(err?.message || '加载答卷详情失败');
-    submissionData.value = null;
-    gradingItems.value = [];
-  } finally {
-    loading.value = false;
-  }
-}
-
-function buildGradingItems(sub: any, gList: any[]): GradingItem[] {
-  if (!Array.isArray(gList) || gList.length === 0) {
-    return [];
-  }
-  const answersMap = new Map<number, string>();
-  if (sub?.answers && Array.isArray(sub.answers)) {
-    sub.answers.forEach((ans: any) => {
-      answersMap.set(ans.questionId, ans.answer);
-    });
-  }
-
-  return gList.map((g: any, idx: number) => {
-    const qid = g.questionId || (idx + 1);
-    const stuAns = answersMap.get(qid) || '';
-    const isObj = g.isCorrect !== undefined;
-
-    return {
-      questionId: qid,
-      type: isObj ? 'SINGLE_CHOICE' : 'SHORT_ANSWER',
-      stem: g.stem || `答卷试题 #${qid} 评分考查点`,
-      maxScore: g.maxScore || 10,
-      studentAnswer: stuAns || '（考生作答内容）',
-      standardAnswer: g.standardAnswer || '标准参考答案与评分细则',
-      analysis: g.analysis || '考查知识体系掌握与解题规范程度。',
-      isObjective: isObj,
-      isCorrect: g.isCorrect ?? (g.score === g.maxScore),
-      aiScore: g.score !== undefined ? g.score : 0,
-      aiComment: g.aiComment || 'AI智能辅助评阅已完成。',
-      teacherScore: g.score !== undefined ? g.score : 0,
-      teacherComment: g.teacherComment || ''
-    };
-  });
-}
-
-// 动态总得分
-const calculatedTotalScore = computed(() => {
-  return gradingItems.value.reduce((acc, item) => acc + (item.teacherScore || 0), 0);
-});
-
-// 立即触发 AI 评阅
-async function handleTriggerGradeNow() {
-  gradingInProgress.value = true;
-  try {
-    await gradeSubmission(submissionId.value);
-    ElMessage.success('已成功触发该答卷的 AI 智能分析与评分！');
-    await loadSubmissionData();
-  } catch (err: any) {
-    ElMessage.error(err?.message || '触发 AI 评阅失败，请稍后重试');
-  } finally {
-    gradingInProgress.value = false;
-  }
-}
-
-// 采纳单题 AI 评分
-function adoptSingleAIScore(item: GradingItem) {
-  item.teacherScore = item.aiScore;
-  if (!item.teacherComment && item.aiComment) {
-    item.teacherComment = item.aiComment;
-  }
-  ElMessage.success(`已采纳本题 AI 建议得分：${item.aiScore} 分`);
-}
-
-// 采纳全卷 AI 评分
-function adoptAllAIScores() {
-  gradingItems.value.forEach(item => {
-    item.teacherScore = item.aiScore;
-    if (!item.teacherComment) {
-      item.teacherComment = item.aiComment;
-    }
-  });
-  ElMessage.success('已将所有试题的得分一键同步为 AI 建议评分！');
-}
-
-// 保存最终成绩
-async function handleSaveGrading() {
-  saving.value = true;
-  try {
-    const payload = gradingItems.value.map(item => ({
-      questionId: item.questionId,
-      score: item.teacherScore,
-      teacherComment: item.teacherComment || ''
-    }));
-
-    await reviewGrading(submissionId.value, payload);
-    if (submissionData.value) {
-      submissionData.value.status = 'GRADED';
-    }
-    ElMessage.success('评阅成绩已正式确认并发布！总成绩：' + calculatedTotalScore.value + ' 分');
-    setTimeout(() => {
-      router.push('/question/submissions');
-    }, 800);
-  } catch (err: any) {
-    ElMessage.error(err?.message || '评阅结果保存失败，请检查网络与登录权限');
-  } finally {
-    saving.value = false;
-  }
-}
-
-function getTypeLabel(type: QuestionType | string) {
-  const map: Record<string, string> = {
-    SINGLE_CHOICE: '单选题',
-    MULTIPLE_CHOICE: '多选题',
-    TRUE_FALSE: '判断题',
-    FILL_BLANK: '填空题',
-    SHORT_ANSWER: '综合简答题'
-  };
-  return map[type] || type || '题目';
-}
-
-function getTypeTagType(type: QuestionType | string) {
-  const map: Record<string, string> = {
-    SINGLE_CHOICE: 'primary',
-    MULTIPLE_CHOICE: 'success',
-    TRUE_FALSE: 'warning',
-    FILL_BLANK: 'info',
-    SHORT_ANSWER: 'danger'
-  };
-  return (map[type] as any) || '';
-}
+const {
+  router,
+  loading,
+  saving,
+  gradingInProgress,
+  submissionData,
+  gradingItems,
+  calculatedTotalScore,
+  handleTriggerGradeNow,
+  adoptSingleAIScore,
+  adoptAllAIScores,
+  handleSaveGrading,
+  getTypeLabel,
+  getTypeTagType
+} = useSubmission();
 </script>
 
 <style scoped lang="scss">

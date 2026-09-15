@@ -1,0 +1,19 @@
+.security-page-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+  color: #0f172a;
+}
+
+.security-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 992px) {
+  .security-main-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,63 @@
+import { describe, it, expect } from 'vitest';
+import type { TeachingInterventionVO } from '@/types/analytics/intervention';
+import {
+  filterInterventions,
+  getInterventionTriggerLabel,
+  getInterventionStatusLabel,
+  resolveCourseNameById
+} from './useIntervention';
+
+const sample: TeachingInterventionVO[] = [
+  {
+    id: 1,
+    tenantId: 1,
+    courseId: 101,
+    courseName: '数据结构',
+    triggerType: 'EXAM_WEAK',
+    status: 'PENDING',
+    title: 'A',
+    proposalText: '方案A',
+    affectedStudentCount: 3,
+    createTime: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 2,
+    tenantId: 1,
+    courseId: 102,
+    courseName: '高数',
+    triggerType: 'ACTIVITY_DROP',
+    status: 'DISPATCHED',
+    title: 'B',
+    proposalText: '方案B',
+    affectedStudentCount: 5,
+    createTime: '2026-01-02T00:00:00Z'
+  }
+];
+
+describe('filterInterventions', () => {
+  it('returns all items when filters are empty', () => {
+    expect(filterInterventions(sample)).toHaveLength(2);
+  });
+
+  it('filters by course and status', () => {
+    expect(filterInterventions(sample, 101, undefined, 'PENDING')).toHaveLength(1);
+  });
+
+  it('filters by trigger type', () => {
+    expect(filterInterventions(sample, undefined, 'ACTIVITY_DROP')).toHaveLength(1);
+  });
+});
+
+describe('intervention label helpers', () => {
+  it('maps trigger labels', () => {
+    expect(getInterventionTriggerLabel('EXAM_WEAK')).toBe('考试薄弱断层');
+  });
+
+  it('maps status labels', () => {
+    expect(getInterventionStatusLabel('DISPATCHED')).toBe('已分发');
+  });
+
+  it('resolves known course names', () => {
+    expect(resolveCourseNameById(101)).toBe('数据结构与算法');
+  });
+});

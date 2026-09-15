@@ -11,7 +11,7 @@ import com.edumind.course.entity.CourseMemberEntity;
 import com.edumind.course.service.member.CourseMemberService;
 import com.edumind.course.vo.member.CourseMemberVO;
 import com.edumind.system.api.UserQueryApi;
-import com.edumind.system.vo.user.UserVO;
+import com.edumind.system.vo.user.UserBriefVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -48,7 +48,7 @@ public class CourseMemberServiceImpl implements CourseMemberService {
         if (courseMemberDao.findByCourseIdAndUserId(courseId, dto.getUserId()) != null) {
             throw new BusinessException("该用户已是课程成员");
         }
-        UserVO user = (UserVO) userQueryApi.getUserById(dto.getUserId());
+        UserBriefVO user = userQueryApi.getUserById(dto.getUserId());
         if (user == null) {
             throw new BusinessException("用户不存在");
         }
@@ -88,13 +88,14 @@ public class CourseMemberServiceImpl implements CourseMemberService {
     }
 
     private CourseMemberVO toMemberVO(CourseMemberEntity entity) {
-        UserVO user = (UserVO) userQueryApi.getUserById(entity.getUserId());
+        UserBriefVO user = userQueryApi.getUserById(entity.getUserId());
         return CourseMemberVO.builder()
                 .id(entity.getId())
                 .courseId(entity.getCourseId())
                 .userId(entity.getUserId())
                 .username(user != null ? user.getUsername() : null)
                 .realName(user != null ? user.getRealName() : null)
+                .avatar(user != null ? user.getAvatar() : null)
                 .memberRole(entity.getMemberRole())
                 .build();
     }

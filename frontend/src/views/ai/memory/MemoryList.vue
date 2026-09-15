@@ -208,216 +208,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
 import { Lock, Search, MagicStick, Plus, Check, Close, Delete } from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
-import {
-  getMemoryNamespace,
-  updateMemoryConsent,
-  createMemoryItem,
-  forgetMemoryItem,
-  forgetAllMemories,
-  feedbackMemoryItem,
-  retrieveMemories
-} from '@/api/ai/memory';
-import type { MemoryItemVO } from '@/types/ai/memory';
+import { useAgentMemory } from '@/composables/ai/useAgentMemory';
 
-const loading = ref(false);
-const consentGranted = ref(false);
-const retentionDays = ref(180);
-const searchKeyword = ref('');
-const typeFilter = ref<string | undefined>(undefined);
-
-// 真实后端数据源，初始化为空
-const memoryItems = ref<MemoryItemVO[]>([]);
-
-const preferenceCount = computed(() => memoryItems.value.filter(i => i.memoryType === 'PREFERENCE').length);
-const episodicCount = computed(() => memoryItems.value.filter(i => i.memoryType === 'EPISODIC').length);
-
-const filteredMemories = computed(() => {
-  return memoryItems.value.filter(item => {
-    const text = ((item.summary || '') + ' ' + (item.memoryKey || '') + ' ' + (item.memoryValue || '')).toLowerCase();
-    const matchKw = !searchKeyword.value || text.includes(searchKeyword.value.toLowerCase());
-    const matchType = !typeFilter.value || item.memoryType === typeFilter.value;
-    return matchKw && matchType;
-  });
-});
-
-const createDialogVisible = ref(false);
-const createForm = ref({
-  memoryKey: '',
-  memoryType: 'PREFERENCE',
-  sensitivityLevel: 'NORMAL',
-  memoryValue: ''
-});
-
-const recallDrawerVisible = ref(false);
-const queryPrompt = ref('请结合我平时的做题习惯与知识盲区进行诊断');
-const recalledItems = ref<MemoryItemVO[]>([]);
-
-const getTypeLabel = (type?: string) => {
-  switch (type) {
-    case 'PREFERENCE': return '学习偏好';
-    case 'PROFILE': return '认知画像';
-    case 'EPISODIC': return '情境片段';
-    case 'FEEDBACK': return '交互反馈';
-    default: return '记忆';
-  }
-};
-
-const getTypeTagType = (type?: string) => {
-  switch (type) {
-    case 'PREFERENCE': return 'success';
-    case 'PROFILE': return 'danger';
-    case 'EPISODIC': return 'warning';
-    default: return 'info';
-  }
-};
-
-const loadMemories = async () => {
-  try {
-    loading.value = true;
-    const res = await getMemoryNamespace();
-    if (res?.data) {
-      consentGranted.value = !!res.data.consentGranted;
-      retentionDays.value = res.data.retentionDays || 180;
-      memoryItems.value = res.data.items || [];
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.message || '加载长期记忆空间失败');
-    memoryItems.value = [];
-  } finally {
-    loading.value = false;
-  }
-};
-
-const handleConsentChange = async () => {
-  try {
-    await updateMemoryConsent({
-      consentGranted: consentGranted.value,
-      retentionDays: retentionDays.value
-    });
-    if (!consentGranted.value) {
-      memoryItems.value = [];
-      ElMessage.warning('已撤销记忆知情同意，系统已级联擦除历史记忆条目');
-    } else {
-      ElMessage.success('知情同意偏好已成功更新');
-      await loadMemories();
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.message || '更新授权失败');
-  }
-};
-
-const handleForgetAll = () => {
-  ElMessageBox.confirm('确认清空并物理擦除所有 Agent 长期记忆吗？此操作将使 Agent 回归初始零知识状态。', '行使被遗忘权警告', {
-    confirmButtonText: '立即清空',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(async () => {
-    try {
-      await forgetAllMemories();
-      memoryItems.value = [];
-      ElMessage.success('已清空并物理擦除全部记忆资产');
-    } catch (e: any) {
-      ElMessage.error(e?.message || '一键清空记忆失败');
-    }
-  });
-};
-
-const openCreateDialog = () => {
-  createForm.value = {
-    memoryKey: '',
-    memoryType: 'PREFERENCE',
-    sensitivityLevel: 'NORMAL',
-    memoryValue: ''
-  };
-  createDialogVisible.value = true;
-};
-
-const submitCreateMemory = async () => {
-  const summaryContent = createForm.value.memoryValue.trim();
-  if (!summaryContent) {
-    ElMessage.warning('请填写记忆描述内容');
-    return;
-  }
-  try {
-    await createMemoryItem({
-      summary: summaryContent,
-      memoryType: createForm.value.memoryType,
-      sensitivityLevel: createForm.value.sensitivityLevel
-    });
-    ElMessage.success('长期记忆已成功沉淀入库');
-    createDialogVisible.value = false;
-    await loadMemories();
-  } catch (e: any) {
-    ElMessage.error(e?.message || '注入长期记忆失败');
-  }
-};
-
-const forgetSingle = (item: MemoryItemVO) => {
-  const displayTitle = item.summary ? item.summary.substring(0, 16) + '...' : '#' + item.id;
-  ElMessageBox.confirm(`确认让 Agent 遗忘条目【${displayTitle}】吗？`, '确认遗忘', {
-    confirmButtonText: '确认',
-    cancelButtonText: '取消',
-    type: 'info'
-  }).then(async () => {
-    try {
-      await forgetMemoryItem(item.id);
-      memoryItems.value = memoryItems.value.filter(i => i.id !== item.id);
-      ElMessage.success('条目已安全物理擦除');
-    } catch (e: any) {
-      ElMessage.error(e?.message || '遗忘操作失败');
-    }
-  });
-};
-
-const giveFeedback = async (item: MemoryItemVO, score: number) => {
-  try {
-    await feedbackMemoryItem(item.id, {
-      feedbackAction: score > 3 ? 'MODIFY' : 'FORGET',
-      relevanceScore: score,
-      reason: score > 3 ? '用户标记记忆准确' : '用户标记记忆偏差，行使遗忘'
-    });
-    if (score <= 2) {
-      memoryItems.value = memoryItems.value.filter(i => i.id !== item.id);
-      ElMessage.success('已记录负向反馈并物理遗忘该条目');
-    } else {
-      ElMessage.success('感谢正向反馈，Agent 将持续强化此项记忆');
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.message || '反馈提交失败');
-  }
-};
-
-const openRecallTester = () => {
-  recalledItems.value = [];
-  recallDrawerVisible.value = true;
-};
-
-const doRetrieve = async () => {
-  if (!queryPrompt.value.trim()) {
-    ElMessage.warning('请输入检索 Prompt');
-    return;
-  }
-  try {
-    const res = await retrieveMemories(queryPrompt.value.trim());
-    recalledItems.value = res?.data || [];
-    if (recalledItems.value.length === 0) {
-      ElMessage.info('未召回相关记忆条目');
-    } else {
-      ElMessage.success(`已完成 Top-${recalledItems.value.length} 记忆语义召回`);
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.message || '检索召回失败');
-    recalledItems.value = [];
-  }
-};
-
-onMounted(() => {
-  loadMemories();
-});
+const {
+  loading,
+  consentGranted,
+  retentionDays,
+  searchKeyword,
+  typeFilter,
+  memoryItems,
+  preferenceCount,
+  episodicCount,
+  filteredMemories,
+  createDialogVisible,
+  createForm,
+  recallDrawerVisible,
+  queryPrompt,
+  recalledItems,
+  handleConsentChange,
+  handleForgetAll,
+  openCreateDialog,
+  submitCreateMemory,
+  forgetSingle,
+  giveFeedback,
+  openRecallTester,
+  doRetrieve,
+  getTypeLabel,
+  getTypeTagType
+} = useAgentMemory();
 </script>
 
 <style scoped lang="scss">

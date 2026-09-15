@@ -15,4 +15,11 @@ public class CourseCreateDTO implements Serializable {
     private String coverUrl;
     private String semester;
     private String code;
+    private String category;
+    private java.math.BigDecimal credits;
+    private Integer plannedHours;
+    private Long knowledgeBaseId;
+    private String aiPersona;
+    private String welcomeMessage;
+    private java.util.List<String> initialChapters;
 }

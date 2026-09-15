@@ -42,6 +42,7 @@
     <modules>
         <module>edu-mind-common</module>
         <module>edu-mind-system-api</module>
+        <module>edu-mind-ai-api</module>
         <module>edu-mind-security</module>
         <module>edu-mind-infrastructure</module>
         <module>edu-mind-modules</module>
@@ -60,6 +61,11 @@
             <dependency>
                 <groupId>com.edumind</groupId>
                 <artifactId>edu-mind-system-api</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-ai-api</artifactId>
                 <version>${edumind.version}</version>
             </dependency>
             <dependency>

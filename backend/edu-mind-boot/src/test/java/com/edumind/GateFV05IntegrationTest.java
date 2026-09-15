@@ -22,7 +22,7 @@ import com.edumind.knowledge.dao.KnowledgeDocumentChunkDao;
 import com.edumind.knowledge.entity.KnowledgeBaseEntity;
 import com.edumind.knowledge.service.chunk.ChunkService;
 import com.edumind.knowledge.service.index.IndexingService;
-import com.edumind.knowledge.service.knowledge.KnowledgeAccessService;
+import com.edumind.knowledge.api.KnowledgeAccessApi;
 import com.edumind.knowledge.vo.knowledge.IndexStatusVO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -93,7 +93,7 @@ class GateFV05IntegrationTest {
     @Autowired
     private TokenStatisticsService tokenStatisticsService;
     @Autowired
-    private KnowledgeAccessService knowledgeAccessService;
+    private KnowledgeAccessApi knowledgeAccessApi;
     @BeforeEach
     void assumeInfrastructureAndSeed() {
         assumeTrue(canConnectDatabase(), "MySQL edumind 不可用，跳过 Gate F 集成测试");
@@ -199,7 +199,7 @@ class GateFV05IntegrationTest {
     @Test
     void knowledgeAccess_deniesCrossTeacher() {
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> knowledgeAccessService.assertAccessible(GATE_F_KB_ID));
+                () -> knowledgeAccessApi.assertAccessible(GATE_F_KB_ID));
         assertTrue(ex.getMessage().contains("无权") || ex.getMessage().contains("知识库"),
                 "teacher 不应访问 teacher2 专属知识库");
     }

@@ -33,10 +33,10 @@
 import { onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
-  createKnowledgePointRelation,
-  deleteKnowledgePointRelation,
-  listKnowledgePointRelations
-} from '@/api/knowledge/graph';
+  fetchKnowledgePointRelations,
+  saveKnowledgePointRelation,
+  removeKnowledgePointRelation
+} from '@/composables/knowledge/useKnowledgeGraph';
 
 const emit = defineEmits<{ saved: [] }>();
 const loading = ref(false);
@@ -49,7 +49,7 @@ const form = reactive({
 
 async function loadRelations() {
   try {
-    const res = await listKnowledgePointRelations(form.sourceId);
+    const res = await fetchKnowledgePointRelations(form.sourceId);
     relations.value = res.data ?? [];
   } catch {
     relations.value = [];
@@ -59,7 +59,7 @@ async function loadRelations() {
 async function submit() {
   loading.value = true;
   try {
-    await createKnowledgePointRelation(form.sourceId, {
+    await saveKnowledgePointRelation(form.sourceId, {
       targetKnowledgePointId: form.targetId,
       relationType: form.relationType
     });
@@ -75,7 +75,7 @@ async function submit() {
 
 async function removeRelation(id: number) {
   try {
-    await deleteKnowledgePointRelation(id);
+    await removeKnowledgePointRelation(id);
     ElMessage.success('已删除');
     await loadRelations();
     emit('saved');

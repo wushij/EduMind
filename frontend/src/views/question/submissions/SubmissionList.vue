@@ -141,82 +141,26 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Search, Document, Service, Cpu } from '@element-plus/icons-vue';
-import { getCourseList } from '@/api/course/course';
-import { getAssignments } from '@/api/question/assignment';
-import { getSubmissionsByAssignment, gradeSubmission } from '@/api/question/submission';
-import type { Course } from '@/types/course/course';
+import { useSubmissionList } from '@/composables/question/useSubmission';
 
 const router = useRouter();
-const loading = ref(false);
-const batchLoading = ref(false);
-const courses = ref<Course[]>([]);
+const {
+  loading,
+  batchLoading,
+  courses,
+  allSubmissions,
+  loadCourses,
+  fetchAllSubmissions,
+  batchGradePending
+} = useSubmissionList();
 
 const searchKeyword = ref('');
 const selectedCourseId = ref<number | null>(null);
 const selectedStatus = ref('');
 
-const allSubmissions = ref<any[]>([]);
-
 onMounted(async () => {
-  await Promise.all([loadCourses(), loadRealSubmissions()]);
+  await Promise.all([loadCourses(), fetchAllSubmissions()]);
 });
-
-async function loadCourses() {
-  try {
-    const res = await getCourseList({ page: 1, pageSize: 50 });
-    courses.value = res.data?.list || [
-      { id: 101, title: '数据结构与算法' } as any,
-      { id: 102, title: 'Java程序设计' } as any,
-      { id: 103, title: '大学数学：高等数学（上）' } as any
-    ];
-  } catch {
-    courses.value = [
-      { id: 101, title: '数据结构与算法' } as any,
-      { id: 102, title: 'Java程序设计' } as any,
-      { id: 103, title: '大学数学：高等数学（上）' } as any
-    ];
-  }
-}
-
-async function loadRealSubmissions() {
-  loading.value = true;
-  try {
-    const aRes = await getAssignments({ page: 1, pageSize: 50 });
-    const assignments = aRes.data?.list || [];
-    const aggregated: any[] = [];
-
-    for (const a of assignments) {
-      try {
-        const sRes = await getSubmissionsByAssignment(a.id);
-        const subs = sRes.data || [];
-        for (const sub of subs) {
-          aggregated.push({
-            id: sub.id,
-            studentNo: sub.studentNo || `2024010${sub.studentId || 1}`,
-            studentName: sub.studentName || (sub.studentId === 2 ? '李梦琪' : '张子轩'),
-            courseId: a.courseId,
-            courseName: a.courseName || '数据结构与算法',
-            assignmentId: a.id,
-            assignmentTitle: a.title,
-            submitTime: sub.submitTime ? String(sub.submitTime).replace('T', ' ').slice(0, 19) : '2026-09-11 12:00',
-            aiScore: sub.totalScore !== undefined ? sub.totalScore : null,
-            finalScore: sub.status === 'GRADED' ? sub.totalScore : null,
-            status: sub.status || 'PENDING'
-          });
-        }
-      } catch (subErr) {
-        console.warn(`获取作业 #${a.id} 答卷列表异常:`, subErr);
-      }
-    }
-
-    allSubmissions.value = aggregated;
-  } catch (err: any) {
-    ElMessage.error(err?.message || '获取提交列表失败');
-    allSubmissions.value = [];
-  } finally {
-    loading.value = false;
-  }
-}
 
 const filteredSubmissions = computed(() => {
   return allSubmissions.value.filter(s => {
@@ -252,22 +196,7 @@ function getStatusTagType(status: string) {
 }
 
 async function handleBatchAIGrading() {
-  batchLoading.value = true;
-  let successCount = 0;
-  for (const s of allSubmissions.value) {
-    if (s.status === 'PENDING') {
-      try {
-        await gradeSubmission(s.id);
-        s.status = 'AI_GRADED';
-        if (!s.aiScore) s.aiScore = Math.floor(Math.random() * 15) + 80;
-        successCount++;
-      } catch (err) {
-        console.warn(`评阅答卷 #${s.id} 异常:`, err);
-      }
-    }
-  }
-  batchLoading.value = false;
-  ElMessage.success(`全队列批改完成，共成功智能预评 ${successCount} 份待评答卷！`);
+  await batchGradePending();
 }
 </script>
 

@@ -51,7 +51,10 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { suggestRelations, createKnowledgePointRelation } from '@/api/knowledge/graph';
+import {
+  fetchRelationSuggestions,
+  saveKnowledgePointRelation
+} from '@/composables/knowledge/useKnowledgeGraph';
 import type { GraphRelationSuggestion } from '@/types/knowledge/graph';
 
 const props = defineProps<{
@@ -71,7 +74,7 @@ async function loadSuggestions() {
   if (!props.kbId) return;
   loading.value = true;
   try {
-    const res = await suggestRelations(props.kbId, {
+    const res = await fetchRelationSuggestions(props.kbId, {
       sourceKnowledgePointId: props.sourceKnowledgePointId,
       maxSuggestions: 5
     });
@@ -87,7 +90,7 @@ async function loadSuggestions() {
 async function handleAccept(item: GraphRelationSuggestion) {
   acceptingId.value = item.targetKnowledgePointId;
   try {
-    await createKnowledgePointRelation(item.sourceKnowledgePointId, {
+    await saveKnowledgePointRelation(item.sourceKnowledgePointId, {
       targetKnowledgePointId: item.targetKnowledgePointId,
       relationType: item.relationType
     });

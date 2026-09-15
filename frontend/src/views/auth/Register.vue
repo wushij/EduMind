@@ -187,79 +187,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
-import { useRouter } from 'vue-router';
-import { ElMessage, FormInstance, FormRules } from 'element-plus';
 import { User, Management } from '@element-plus/icons-vue';
-import { register } from '@/api/auth/auth';
+import { useRegister } from '@/composables/auth/useRegister';
 
-const router = useRouter();
-const registerFormRef = ref<FormInstance>();
-const loading = ref(false);
-const showPassword = ref(false);
-const agreePolicy = ref(true);
-
-const registerForm = reactive({
-  username: '',
-  realName: '',
-  role: 'STUDENT',
-  password: '',
-  confirmPassword: ''
-});
-
-const validateConfirmPwd = (_rule: any, value: string, callback: any) => {
-  if (value !== registerForm.password) {
-    callback(new Error('两次输入的密码不一致'));
-  } else {
-    callback();
-  }
-};
-
-const registerRules = reactive<FormRules>({
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 20, message: '长度在 3 到 20 个字符', trigger: 'blur' }
-  ],
-  realName: [{ required: true, message: '请输入真实姓名', trigger: 'blur' }],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码至少 6 位', trigger: 'blur' }
-  ],
-  confirmPassword: [
-    { required: true, message: '请确认密码', trigger: 'blur' },
-    { validator: validateConfirmPwd, trigger: 'blur' }
-  ]
-});
-
-async function handleRegister() {
-  if (!agreePolicy.value) {
-    ElMessage.warning('请勾选同意服务协议与隐私政策');
-    return;
-  }
-
-  if (!registerFormRef.value) return;
-  await registerFormRef.value.validate(async (valid) => {
-    if (valid) {
-      loading.value = true;
-      try {
-        await register({
-          username: registerForm.username,
-          realName: registerForm.realName,
-          password: registerForm.password,
-          role: registerForm.role as 'TEACHER' | 'STUDENT'
-        });
-        ElMessage.success('注册成功！正在跳转至登录页面...');
-        setTimeout(() => {
-          router.push('/auth/login');
-        }, 800);
-      } catch (err: any) {
-        ElMessage.error(err?.message || '注册失败，请检查用户名是否已存在或稍后重试');
-      } finally {
-        loading.value = false;
-      }
-    }
-  });
-}
+const {
+  registerFormRef,
+  loading,
+  showPassword,
+  agreePolicy,
+  registerForm,
+  registerRules,
+  handleRegister
+} = useRegister();
 </script>
 
 <style scoped lang="scss">

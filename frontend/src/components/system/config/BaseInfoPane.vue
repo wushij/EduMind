@@ -66,7 +66,7 @@
 import { reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Monitor, Check } from '@element-plus/icons-vue';
-import { getBaseInfo } from '@/api/system/config';
+import { fetchBaseInfo } from '@/composables/system/useSystemConfig';
 
 const baseInfo = reactive({
   platformName: '智教云 · EduMind',
@@ -77,7 +77,7 @@ const baseInfo = reactive({
 
 async function loadBaseInfo() {
   try {
-    const res = await getBaseInfo();
+    const res = await fetchBaseInfo();
     if (res?.data) {
       Object.assign(baseInfo, res.data);
     }

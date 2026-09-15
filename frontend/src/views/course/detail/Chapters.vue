@@ -185,7 +185,7 @@ const route = useRoute();
 const router = useRouter();
 const courseId = computed(() => route.params.id || '101');
 
-const { chapters, fetchChapters } = useCourse();
+const { chapters, fetchChapters, createChapter } = useCourse();
 
 const searchChapterText = ref('');
 const openChapters = ref<number[]>([]);
@@ -270,35 +270,31 @@ function handleStartStudy(sec: any) {
   }
 }
 
-function handleSaveNewChapter() {
+async function handleSaveNewChapter() {
   if (!newChapterTitle.value.trim()) {
     ElMessage.warning('章节标题不能为空');
     return;
   }
-  const newId = Date.now();
-  const subSections = Array.from({ length: newChapterSectionCount.value }, (_, i) => ({
-    id: newId * 10 + i + 1,
-    title: `${newChapterTitle.value.trim()} - 核心知识讲义 ${i + 1}`,
-    completed: false,
-    duration: '45分钟',
-    knowledgePointCount: 2,
-    type: i === newChapterSectionCount.value - 1 ? 'quiz' : 'lecture'
-  }));
-
-  chapters.value.push({
-    id: newId,
-    courseId: Number(courseId.value),
-    title: newChapterTitle.value.trim(),
-    sort: chapters.value.length + 1,
-    description: newChapterDesc.value.trim() || '本章涵盖学科核心理论基础与典型案例解析。',
-    sections: subSections
-  });
-
-  openChapters.value.push(newId);
-  ElMessage.success('新章节已成功加入教学大纲！');
-  closeAddChapterDrawer();
-  newChapterTitle.value = '';
-  newChapterDesc.value = '';
+  const cId = Number(courseId.value);
+  const title = newChapterTitle.value.trim();
+  const sort = chapters.value.length + 1;
+  try {
+    const res = await createChapter(cId, {
+      title,
+      parentId: 0,
+      sortOrder: sort
+    });
+    ElMessage.success('新章节已成功持久化存入教学大纲！');
+    closeAddChapterDrawer();
+    newChapterTitle.value = '';
+    newChapterDesc.value = '';
+    await fetchChapters(cId);
+    if (res) {
+      openChapters.value.push(Number(res));
+    }
+  } catch (err: any) {
+    ElMessage.error(err?.message || '保存章节失败');
+  }
 }
 
 onMounted(async () => {

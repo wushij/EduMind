@@ -44,15 +44,11 @@ public class ExamGenerateServiceImpl implements ExamGenerateService {
             int calculatedScore = 0;
 
             for (ExamRuleDTO rule : dto.getRules()) {
-                List<?> rawQuestions = questionQueryApi.listQuestionsByCourseAndTypes(
+                List<QuestionVO> candidates = questionQueryApi.listQuestionsByCourseAndTypes(
                         dto.getCourseId(),
                         Collections.singletonList(rule.getType()),
                         rule.getCount() * 3
                 );
-                List<QuestionVO> candidates = rawQuestions.stream()
-                        .filter(QuestionVO.class::isInstance)
-                        .map(QuestionVO.class::cast)
-                        .collect(Collectors.toList());
                 if (candidates.size() < rule.getCount()) {
                     throw new BusinessException("题型 " + rule.getType() + " 可用题目不足，需要 "
                             + rule.getCount() + " 道，当前仅有 " + candidates.size() + " 道");

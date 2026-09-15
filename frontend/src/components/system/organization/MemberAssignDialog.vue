@@ -140,7 +140,7 @@
 import { ref, computed, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Search, InfoFilled } from '@element-plus/icons-vue';
-import { getOrgCandidates, batchAssignOrgMembers, assignOrgMember } from '@/api/system/tenant';
+import { getOrgCandidates, batchAssignOrgMembers, assignOrgMember } from '@/composables/system/useOrganization';
 import type { OrganizationNodeVO, TenantMemberCandidateVO } from '@/types/system/tenant';
 
 const props = defineProps<{

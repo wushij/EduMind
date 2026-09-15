@@ -1,4 +1,4 @@
-import type { RecommendationQuestion, RecommendationResource } from '@/api/learning/recommendation';
+import type { RecommendationQuestion, RecommendationResource } from '@/types/learning/recommendation';
 import type { RecommendationItem } from '@/types/learning/recommendation';
 
 const DIFFICULTY_LABELS: Record<string, string> = {

@@ -22,6 +22,12 @@ public class CourseEntity implements Serializable {
     private String semester;
     private String description;
     private String coverImage;
+    private String category;
+    private java.math.BigDecimal credits;
+    private Integer plannedHours;
+    private Long knowledgeBaseId;
+    private String aiPersona;
+    private String welcomeMessage;
     private Integer status;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

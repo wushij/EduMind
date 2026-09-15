@@ -7,7 +7,7 @@ import com.edumind.ai.rag.model.RagResult;
 import com.edumind.ai.rag.pipeline.RagPipelineImpl;
 import com.edumind.ai.vo.rag.RagDebugResponseVO;
 import com.edumind.common.api.ApiResult;
-import com.edumind.knowledge.service.knowledge.KnowledgeAccessService;
+import com.edumind.knowledge.api.KnowledgeAccessApi;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,12 +22,12 @@ public class RagDebugController {
 
     private final RagPipelineImpl ragPipeline;
     private final RagConverter ragConverter;
-    private final KnowledgeAccessService knowledgeAccessService;
+    private final KnowledgeAccessApi knowledgeAccessApi;
 
     @SaCheckPermission("knowledge:rag:debug")
     @PostMapping("/debug")
     public ApiResult<RagDebugResponseVO> debug(@Valid @RequestBody RagDebugRequestDTO request) {
-        knowledgeAccessService.assertAccessible(request.getKnowledgeBaseId());
+        knowledgeAccessApi.assertAccessible(request.getKnowledgeBaseId());
         RagResult result = ragPipeline.executeDetailed(
                 request.getQuery(),
                 request.getKnowledgeBaseId(),

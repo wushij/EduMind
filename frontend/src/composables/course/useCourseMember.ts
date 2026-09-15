@@ -1,6 +1,8 @@
 import { ref } from 'vue';
-import { getCourseMembers, addCourseMember, removeCourseMember, CourseMemberItem } from '@/api/course/member';
-import { getCourseResources, createCourseResource, deleteCourseResource, CourseResourceItem } from '@/api/course/resource';
+import { getCourseMembers, addCourseMember, removeCourseMember } from '@/api/course/member';
+import { getCourseResources, createCourseResource, deleteCourseResource } from '@/api/course/resource';
+import type { CourseMemberItem } from '@/types/course/member';
+import type { CourseResourceItem } from '@/types/course/resource';
 
 export function useCourseMember(courseId: number) {
   const members = ref<CourseMemberItem[]>([]);
@@ -12,9 +14,9 @@ export function useCourseMember(courseId: number) {
     loading.value = true;
     try {
       const res = await getCourseMembers(courseId);
-      members.value = (res.data || []).map((m, idx) => ({
+      members.value = (res.data || []).map((m) => ({
         ...m,
-        progress: m.progress ?? (m.memberRole === 'TEACHER' ? 100 : Math.max(0, 70 - idx * 18)),
+        progress: m.progress != null ? Math.round(Number(m.progress)) : (m.memberRole === 'TEACHER' ? 100 : 0),
         joinTime: m.joinTime || '',
         status: m.status || 'ACTIVE'
       }));

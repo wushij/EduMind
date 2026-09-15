@@ -186,7 +186,7 @@ import {
   Promotion,
   ChatDotRound
 } from '@element-plus/icons-vue';
-import { getStudentCognitiveProfile } from '@/api/system/tenant';
+import { getStudentCognitiveProfile } from '@/composables/system/useOrganization';
 import type { OrganizationMemberVO, StudentCognitiveProfileVO } from '@/types/system/tenant';
 
 const props = defineProps<{

@@ -1,10 +1,6 @@
 import { ref } from 'vue';
-import {
-  getQuestionRecommendations,
-  getResourceRecommendations,
-  RecommendationQuestion,
-  RecommendationResource
-} from '@/api/learning/recommendation';
+import { getQuestionRecommendations, getResourceRecommendations } from '@/api/learning/recommendation';
+import type { RecommendationQuestion, RecommendationResource } from '@/types/learning/recommendation';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_RECOMMENDATIONS } from '@/mock/recommendations';
 import type { RecommendationItem } from '@/types/learning/recommendation';

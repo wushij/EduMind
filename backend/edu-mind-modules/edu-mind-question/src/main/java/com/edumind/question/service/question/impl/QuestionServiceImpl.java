@@ -65,7 +65,7 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     public QuestionVO getQuestionById(Long id) {
-        return (QuestionVO) questionQueryApi.getQuestionById(id);
+        return questionQueryApi.getQuestionById(id);
     }
 
     @Override
@@ -103,29 +103,21 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     public List<QuestionVO> listQuestionsByIds(List<Long> ids) {
-        return questionQueryApi.listQuestionsByIds(ids).stream()
-                .map(QuestionVO.class::cast)
-                .collect(Collectors.toList());
+        return questionQueryApi.listQuestionsByIds(ids);
     }
 
     @Override
     public List<QuestionVO> listQuestionsByKnowledgePointId(Long pointId, Integer limit) {
-        return questionQueryApi.listQuestionsByKnowledgePointId(pointId, limit).stream()
-                .map(QuestionVO.class::cast)
-                .collect(Collectors.toList());
+        return questionQueryApi.listQuestionsByKnowledgePointId(pointId, limit);
     }
 
     @Override
     public List<QuestionVO> listQuestionsByCourseId(Long courseId) {
-        return questionQueryApi.listQuestionsByCourseId(courseId).stream()
-                .map(QuestionVO.class::cast)
-                .collect(Collectors.toList());
+        return questionQueryApi.listQuestionsByCourseId(courseId);
     }
 
     @Override
     public List<QuestionVO> listQuestionsByCourseAndTypes(Long courseId, List<String> types, Integer limit) {
-        return questionQueryApi.listQuestionsByCourseAndTypes(courseId, types, limit).stream()
-                .map(QuestionVO.class::cast)
-                .collect(Collectors.toList());
+        return questionQueryApi.listQuestionsByCourseAndTypes(courseId, types, limit);
     }
 }

@@ -207,7 +207,7 @@ import {
   WarningFilled,
   ChatDotSquare
 } from '@element-plus/icons-vue';
-import { createBroadcast, estimateBroadcastAudience } from '@/api/notification/broadcast';
+import { submitBroadcast, estimateAudience } from '@/composables/system/useBroadcast';
 import type { BroadcastCreateRequest, BroadcastTargetType } from '@/types/notification/broadcast';
 
 const props = defineProps<{
@@ -253,7 +253,7 @@ const rules: FormRules = {
 async function updateEstimate() {
   estimating.value = true;
   try {
-    const res = await estimateBroadcastAudience({
+    const res = await estimateAudience({
       targetType: form.targetType,
       targetPayload: form.targetPayload || undefined
     });
@@ -304,7 +304,7 @@ async function handleSend() {
       }
     );
     sending.value = true;
-    await createBroadcast({
+    await submitBroadcast({
       title: form.title.trim(),
       content: form.content.trim(),
       targetType: form.targetType as BroadcastTargetType,

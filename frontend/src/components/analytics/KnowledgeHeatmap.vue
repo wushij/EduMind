@@ -133,32 +133,22 @@ import { ref, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Grid, Cpu } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
-import { getKnowledgeHeatmap } from '@/api/analytics/knowledge';
-import type { KnowledgeHeatmapVO } from '@/types/analytics/mastery';
-
-interface HeatmapKpItem {
-  id: number;
-  title: string;
-  chapterName?: string;
-}
-
-interface HeatmapStudentItem {
-  id: number;
-  name: string;
-  studentNo?: string;
-  scores: Record<number, number>;
-}
+import { useKnowledgeHeatmap } from '@/composables/analytics/useKnowledgeHeatmap';
 
 const props = defineProps<{
   courseId?: number;
 }>();
 
 const router = useRouter();
-const loading = ref(false);
 
-const kpList = ref<HeatmapKpItem[]>([]);
-const studentRows = ref<HeatmapStudentItem[]>([]);
-const classAvgScores = ref<Record<number, number>>({});
+const {
+  loading,
+  loadError,
+  kpList,
+  studentRows,
+  classAvgScores,
+  fetchHeatmap
+} = useKnowledgeHeatmap(() => props.courseId);
 
 const drilldownVisible = ref(false);
 const activeCell = ref<{
@@ -169,75 +159,6 @@ const activeCell = ref<{
   studentId?: number;
   kpId?: number;
 } | null>(null);
-
-const loadError = ref(false);
-
-const fetchHeatmap = async () => {
-  const cId = props.courseId || 102;
-  loading.value = true;
-  loadError.value = false;
-  kpList.value = [];
-  studentRows.value = [];
-  classAvgScores.value = {};
-  try {
-    const res: any = await getKnowledgeHeatmap(cId);
-    const data: KnowledgeHeatmapVO = res?.data || res;
-    if (data?.knowledgePoints?.length) {
-      parseHeatmapVO(data);
-    } else {
-      loadError.value = true;
-    }
-  } catch {
-    loadError.value = true;
-    ElMessage.error('加载知识掌握度热力矩阵失败');
-  } finally {
-    loading.value = false;
-  }
-};
-
-const parseHeatmapVO = (vo: KnowledgeHeatmapVO) => {
-  kpList.value = vo.knowledgePoints.map(p => ({
-    id: p.id,
-    title: p.title
-  }));
-
-  // 将 cells 转为 Map
-  const cellMap = new Map<string, number>();
-  if (vo.cells) {
-    for (const c of vo.cells) {
-      const score = c.mastery <= 1.0 ? Math.round(c.mastery * 100) : Math.round(c.mastery);
-      cellMap.set(`${c.studentId}_${c.knowledgePointId}`, score);
-    }
-  }
-
-  // 组装学生行
-  const rows: HeatmapStudentItem[] = [];
-  for (const s of vo.students || []) {
-    const scores: Record<number, number> = {};
-    for (const kp of kpList.value) {
-      scores[kp.id] = cellMap.get(`${s.id}_${kp.id}`) ?? 70;
-    }
-    rows.push({
-      id: s.id,
-      name: s.name,
-      studentNo: s.studentNo,
-      scores
-    });
-  }
-  studentRows.value = rows;
-
-  // 计算班级各考点均分
-  const avgScores: Record<number, number> = {};
-  for (const kp of kpList.value) {
-    if (rows.length > 0) {
-      const sum = rows.reduce((acc, curr) => acc + (curr.scores[kp.id] || 0), 0);
-      avgScores[kp.id] = Math.round(sum / rows.length);
-    } else {
-      avgScores[kp.id] = 0;
-    }
-  }
-  classAvgScores.value = avgScores;
-};
 
 const getScoreColor = (score: number) => {
   if (score >= 85) return 'rgba(82, 196, 26, 0.75)'; // 深绿

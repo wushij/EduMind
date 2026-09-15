@@ -30,33 +30,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { ElMessage } from 'element-plus';
-import { getLearningPath } from '@/api/learning/learning-path';
-import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
-import { useAuthStore } from '@/stores/auth/auth';
-import type { LearningPathVO } from '@/types/learning/learning-path';
+import { useLearning } from '@/composables/learning/useLearning';
 
-const { courseOptions, courseId } = useTeacherCourses(102);
-const authStore = useAuthStore();
-const loading = ref(false);
-const path = ref<LearningPathVO | null>(null);
-
-async function loadPath() {
-  loading.value = true;
-  try {
-    const studentId = authStore.currentUser?.id;
-    const res = await getLearningPath(courseId.value, studentId);
-    path.value = res?.data || null;
-  } catch {
-    path.value = null;
-    ElMessage.error('加载学习路径失败');
-  } finally {
-    loading.value = false;
-  }
-}
-
-onMounted(loadPath);
+const { courseOptions, courseId, loading, path, loadPath } = useLearning(102);
 </script>
 
 <style scoped lang="scss">

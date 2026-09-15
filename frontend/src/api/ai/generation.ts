@@ -1,15 +1,6 @@
 import { post } from '@/core/http/request';
-import { QuestionItem } from '@/types/question/question';
-
-export interface GenerateQuestionRequest {
-  courseId: number;
-  chapterIds?: number[];
-  knowledgePointIds?: number[];
-  questionTypes?: string[];
-  difficulty?: string;
-  count?: number;
-  scorePerQuestion?: number;
-}
+import type { QuestionItem } from '@/types/question/question';
+import type { GenerateQuestionRequest } from '@/types/ai/generation';
 
 export const generateQuestions = (params: GenerateQuestionRequest) =>
   post<QuestionItem[]>('/ai/questions/generate', params);

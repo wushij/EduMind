@@ -40,60 +40,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue';
+import { computed } from 'vue';
 import { useAuthStore } from '@/stores/auth/auth';
-import { ElMessage } from 'element-plus';
 import { Refresh } from '@element-plus/icons-vue';
 import { useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
-import { getGraphGaps, getKnowledgeGraph } from '@/api/knowledge/graph';
+import { useKnowledgeGraph } from '@/composables/knowledge/useKnowledgeGraph';
 import KnowledgeGraphG6 from '@/components/knowledge/KnowledgeGraphG6.vue';
 import GraphGapPanel from '@/components/knowledge/GraphGapPanel.vue';
 import GraphSuggestPanel from '@/components/knowledge/GraphSuggestPanel.vue';
 import GraphRelationEditor from '@/components/knowledge/GraphRelationEditor.vue';
-import type { GraphGapVO, KnowledgeGraphNode, KnowledgeGraphVO } from '@/types/knowledge/graph';
 
 const { kbId } = useKnowledgeRoute();
 const authStore = useAuthStore();
 const studentId = computed(() => authStore.currentUser?.id ?? 3);
-const loading = ref(false);
-const selectedNode = ref<KnowledgeGraphNode | null>(null);
-const graphData = ref<KnowledgeGraphVO>({ nodes: [], edges: [] });
-const gaps = ref<GraphGapVO[]>([]);
-const depth = ref(2);
-const relationTypes = ref<string[]>(['prerequisite', 'related']);
 
-const selectedKpId = computed(() => {
-  if (selectedNode.value?.type === 'KNOWLEDGE_POINT' && selectedNode.value.refId) {
-    return selectedNode.value.refId;
-  }
-  return undefined;
-});
-
-function handleNodeClick(node: KnowledgeGraphNode | null) {
-  selectedNode.value = node;
-}
-
-async function loadGraph() {
-  if (!kbId.value) return;
-  loading.value = true;
-  try {
-    const types = relationTypes.value.join(',');
-    const res = await getKnowledgeGraph(kbId.value, depth.value, types);
-    graphData.value = res?.data || { nodes: [], edges: [] };
-    const gapRes = await getGraphGaps(kbId.value, studentId.value, 0.6);
-    gaps.value = gapRes?.data || [];
-  } catch {
-    graphData.value = { nodes: [], edges: [] };
-    ElMessage.error('加载知识图谱失败');
-  } finally {
-    loading.value = false;
-  }
-}
-
-watch(kbId, () => loadGraph());
-watch([depth, relationTypes], () => loadGraph(), { deep: true });
-
-onMounted(loadGraph);
+const {
+  loading,
+  selectedNode,
+  graphData,
+  gaps,
+  depth,
+  relationTypes,
+  selectedKpId,
+  handleNodeClick,
+  loadGraph
+} = useKnowledgeGraph({ kbId, studentId });
 </script>
 
 <style scoped lang="scss">

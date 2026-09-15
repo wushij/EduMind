@@ -1,7 +1,7 @@
 package com.edumind.teaching.service.grading.impl;
 
 import com.edumind.ai.dto.SubjectiveGradingDTO;
-import com.edumind.ai.service.grading.AiGradingService;
+import com.edumind.ai.api.AiGradingApi;
 import com.edumind.ai.vo.SubjectiveGradingVO;
 import com.edumind.common.enums.QuestionType;
 import com.edumind.common.event.GradingCompletedEvent;
@@ -46,7 +46,7 @@ public class GradingServiceImpl implements GradingService {
     private final ExamQuestionDao examQuestionDao;
     private final GradingResultDao gradingResultDao;
     private final QuestionQueryApi questionQueryApi;
-    private final AiGradingService aiGradingService;
+    private final AiGradingApi aiGradingApi;
     private final DistributedLockService distributedLockService;
     private final TransactionTemplate transactionTemplate;
     private final ApplicationEventPublisher eventPublisher;
@@ -70,8 +70,8 @@ public class GradingServiceImpl implements GradingService {
         int totalScore = 0;
         int maxScore = 0;
         for (SubmissionAnswerEntity answer : answers) {
-            Object rawQuestion = questionQueryApi.getQuestionById(answer.getQuestionId());
-            if (!(rawQuestion instanceof QuestionVO question)) {
+            QuestionVO question = questionQueryApi.getQuestionById(answer.getQuestionId());
+            if (question == null) {
                 continue;
             }
             ExamQuestionEntity examQuestion = examQuestionMap.get(answer.getQuestionId());
@@ -97,7 +97,7 @@ public class GradingServiceImpl implements GradingService {
                 gradingDTO.setReferenceAnswer(question.getAnswer());
                 gradingDTO.setStudentAnswer(answer.getAnswer());
                 gradingDTO.setMaxScore(questionMaxScore);
-                SubjectiveGradingVO aiResult = aiGradingService.gradeSubjective(gradingDTO);
+                SubjectiveGradingVO aiResult = aiGradingApi.gradeSubjective(gradingDTO);
                 result.setScore(aiResult.getScore());
                 result.setAiComment(aiResult.getAiComment());
                 result.setStatus(aiResult.getStatus());

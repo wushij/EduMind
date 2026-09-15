@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { getQuestionRecommendations } from '@/api/learning/recommendation';
-import type { RecommendationQuestion } from '@/api/learning/recommendation';
+import type { RecommendationQuestion } from '@/types/learning/recommendation';
 
 export interface PracticeQuestion {
   id: number;

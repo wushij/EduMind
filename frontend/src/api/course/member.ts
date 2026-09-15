@@ -1,16 +1,5 @@
 import { get, post, del } from '@/core/http/request';
-
-export interface CourseMemberItem {
-  id: number;
-  courseId: number;
-  userId: number;
-  username?: string;
-  realName?: string;
-  memberRole: string;
-  progress?: number;
-  joinTime?: string;
-  status?: string;
-}
+import type { CourseMemberItem } from '@/types/course/member';
 
 export const getCourseMembers = (courseId: number) => get<CourseMemberItem[]>(`/courses/${courseId}/members`);
 
@@ -22,4 +11,3 @@ export const removeCourseMember = (courseId: number, userId: number) =>
 
 export const joinCourse = (courseId: number) =>
   post<number>(`/courses/${courseId}/members/join`);
-

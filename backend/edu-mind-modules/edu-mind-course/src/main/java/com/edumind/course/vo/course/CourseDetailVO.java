@@ -27,6 +27,12 @@ public class CourseDetailVO implements Serializable {
     private Long chapterCount;
     private Long knowledgePointCount;
     private Long resourceCount;
+    private String category;
+    private java.math.BigDecimal credits;
+    private Integer plannedHours;
+    private Long knowledgeBaseId;
+    private String aiPersona;
+    private String welcomeMessage;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

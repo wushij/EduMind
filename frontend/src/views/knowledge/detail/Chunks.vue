@@ -165,11 +165,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted } from 'vue';
 import { useDocumentChunk } from '@/composables/knowledge/useDocumentChunk';
 import { useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
-import { getDocuments } from '@/api/knowledge/document';
-import type { KBDocument } from '@/types/knowledge/document';
 import ChunkViewer from '@/components/knowledge/ChunkViewer.vue';
 import AppPagination from '@/components/common/AppPagination.vue';
 import {
@@ -195,38 +193,18 @@ const {
   pageSize,
   paginatedChunks,
   totalCount,
+  documents,
   fetchChunks,
-  fetchStats,
+  initializeChunksPage,
+  resetFilters,
   handleRechunk,
   openViewer
 } = useDocumentChunk();
 
 const { kbId } = useKnowledgeRoute();
-const documents = ref<KBDocument[]>([]);
-
-const resetFilters = () => {
-  selectedDocumentId.value = undefined;
-  searchKeyword.value = '';
-  statusFilter.value = 'ALL';
-  fetchChunks();
-};
 
 onMounted(async () => {
-  if (kbId.value) {
-    try {
-      const res = await getDocuments(kbId.value);
-      documents.value = res.data || [];
-      if (documents.value.length > 0 && !selectedDocumentId.value) {
-        selectedDocumentId.value = documents.value[0].id;
-      }
-      await fetchStats(kbId.value);
-    } catch {
-      await fetchStats(kbId.value);
-    }
-  }
-  if (selectedDocumentId.value) {
-    await fetchChunks();
-  }
+  await initializeChunksPage(kbId.value);
 });
 </script>
 

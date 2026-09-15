@@ -1,0 +1,72 @@
+  .top-nav-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+
+    .back-link {
+      font-size: 14px;
+      font-weight: 500;
+      color: #3b82f6;
+    }
+  }
+
+  .exam-hero-card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+    padding: 24px 32px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 24px;
+
+    .hero-left {
+      .status-and-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+
+        .exam-main-title {
+          font-size: 22px;
+          font-weight: 800;
+          color: #0f172a;
+          margin: 0;
+        }
+      }
+
+      .meta-pills-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+
+        .meta-pill {
+          background: #f1f5f9;
+          border-radius: 8px;
+          padding: 4px 12px;
+          font-size: 13px;
+          color: #475569;
+
+          .label {
+            color: #64748b;
+          }
+        }
+      }
+    }
+
+    .hero-right-actions {
+      display: flex;
+      gap: 12px;
+
+      .action-btn {
+        border-radius: 8px;
+        font-weight: 500;
+      }
+    }
+  }
+

@@ -165,7 +165,7 @@ import {
   UserFilled,
   Setting
 } from '@element-plus/icons-vue';
-import { listTenantQuotas, updateTenantQuota } from '@/api/system/tenant';
+import { listTenantQuotas, updateTenantQuota } from '@/composables/system/useTenantQuota';
 import type { TenantListVO, TenantQuotaVO } from '@/types/system/tenant';
 
 const props = defineProps<{

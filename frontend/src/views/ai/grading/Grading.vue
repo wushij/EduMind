@@ -182,30 +182,17 @@ import {
   Clock,
   ArrowRight
 } from '@element-plus/icons-vue';
-import { useGrading } from '@/composables/ai/useGrading';
-import { getAssignments } from '@/api/question/assignment';
-import { getSubmissionsByAssignment } from '@/api/question/submission';
+import { useGrading, type GradingTaskRow } from '@/composables/ai/useGrading';
 import gradingBannerImg from '@/assets/images/批改.png';
 
 const router = useRouter();
-const { startGrading, batchGrade, loading: gradingLoading } = useGrading();
+const { startGrading, batchGrade, loadGradingTasks, loading: gradingLoading } = useGrading();
 
 const selectedModel = ref('deepseek-v3');
 const strictness = ref('NORMAL');
 const autoFeedback = ref(true);
 const batchRunning = ref(false);
 const loadingTasks = ref(false);
-
-interface GradingTaskRow {
-  id: number;
-  title: string;
-  courseName: string;
-  submissionCount: number;
-  progress: number;
-  status: 'DONE' | 'RUNNING' | 'PENDING';
-  running: boolean;
-  submissions?: any[];
-}
 
 const gradingTasks = ref<GradingTaskRow[]>([]);
 
@@ -216,33 +203,7 @@ onMounted(async () => {
 async function loadRealTasks() {
   loadingTasks.value = true;
   try {
-    const res = await getAssignments({ page: 1, pageSize: 50 });
-    const list = res.data?.list || [];
-    const taskRows: GradingTaskRow[] = [];
-    for (const a of list) {
-      let subs: any[] = [];
-      try {
-        const sRes = await getSubmissionsByAssignment(a.id);
-        subs = sRes.data || [];
-      } catch {
-        subs = [];
-      }
-      const total = subs.length || a.submissionCount || 0;
-      const graded = subs.filter((s: any) => s.status === 'GRADED' || s.status === 'AI_GRADED').length;
-      const prog = total > 0 ? Math.round((graded / total) * 100) : (a.status === 'GRADED' ? 100 : 0);
-
-      taskRows.push({
-        id: a.id,
-        title: a.title,
-        courseName: a.courseName || '数据结构与算法',
-        submissionCount: total,
-        progress: prog,
-        status: prog === 100 ? 'DONE' : 'PENDING',
-        running: false,
-        submissions: subs
-      });
-    }
-    gradingTasks.value = taskRows;
+    gradingTasks.value = await loadGradingTasks();
   } catch (err: any) {
     ElMessage.error(err?.message || '加载作业批改队列失败');
     gradingTasks.value = [];

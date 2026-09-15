@@ -1,5 +1,7 @@
 import { ref, computed } from 'vue';
 import { DocumentChunk, ChunkStatsVO, ChunkQueryRequest } from '@/types/knowledge/chunk';
+import { KBDocument } from '@/types/knowledge/document';
+import { getDocuments } from '@/api/knowledge/document';
 import { getChunks, triggerChunk, getChunkStats } from '@/api/knowledge/chunk';
 import { ElMessage } from 'element-plus';
 
@@ -93,6 +95,45 @@ export function useDocumentChunk(initialDocId?: number) {
 
   const totalCount = computed(() => chunks.value.length);
 
+  const documents = ref<KBDocument[]>([]);
+
+  async function loadDocuments(kbId?: number) {
+    if (!kbId) {
+      documents.value = [];
+      return;
+    }
+    try {
+      const res = await getDocuments(kbId);
+      documents.value = res.data || [];
+      if (documents.value.length > 0 && !selectedDocumentId.value) {
+        selectedDocumentId.value = documents.value[0].id;
+      }
+    } catch {
+      documents.value = [];
+    }
+  }
+
+  async function initializeChunksPage(kbId?: number) {
+    if (kbId) {
+      await loadDocuments(kbId);
+      try {
+        await fetchStats(kbId);
+      } catch {
+        await fetchStats(kbId);
+      }
+    }
+    if (selectedDocumentId.value) {
+      await fetchChunks();
+    }
+  }
+
+  function resetFilters() {
+    selectedDocumentId.value = undefined;
+    searchKeyword.value = '';
+    statusFilter.value = 'ALL';
+    fetchChunks();
+  }
+
   return {
     loading,
     rechunking,
@@ -107,8 +148,12 @@ export function useDocumentChunk(initialDocId?: number) {
     pageSize,
     paginatedChunks,
     totalCount,
+    documents,
     fetchChunks,
     fetchStats,
+    loadDocuments,
+    initializeChunksPage,
+    resetFilters,
     handleRechunk,
     openViewer,
     closeViewer

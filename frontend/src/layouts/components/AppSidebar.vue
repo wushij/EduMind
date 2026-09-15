@@ -110,7 +110,6 @@ import {
   CollectionTag,
   Promotion,
   DocumentAdd,
-  Service,
   CircleCheck,
   DocumentCopy,
   Search,
@@ -231,15 +230,13 @@ function buildModuleDefinitions(): NavModule[] {
       roles: ['ADMIN', 'TEACHER'],
       permissions: ['ai:question', 'ai:exam', 'ai:grading', 'ai:chat', 'ai:tool:use'],
       children: [
-        { path: '/ai/assistant/chat', name: 'AI 助手', icon: Service, permissions: ['ai:chat'] },
         { path: '/ai/question/generate', name: 'AI 出题', icon: EditPen, permissions: ['ai:question'] },
         { path: '/ai/exam/generate', name: 'AI 组卷', icon: Tickets, permissions: ['ai:exam'] },
         { path: '/ai/grading', name: 'AI 批改', icon: CircleCheck, permissions: ['ai:grading'] },
         { path: '/ai/lesson', name: 'AI 教案', icon: Notebook },
         { path: '/ai/summary', name: 'AI 总结', icon: DocumentCopy },
         { path: '/ai/recommendation', name: 'AI 推荐', icon: Promotion },
-        { path: '/ai/agent', name: 'Agent 中心', icon: Cpu, permissions: ['ai:tool:use'] },
-        { path: '/ai/memory', name: '记忆与隐私', icon: Key }
+        { path: '/ai/agent', name: 'Agent 中心', icon: Cpu, permissions: ['ai:tool:use'] }
       ]
     },
 
@@ -314,11 +311,11 @@ function buildModuleDefinitions(): NavModule[] {
       ]
     },
 
-    // AI 智算中心
+    // AI 运维
     {
       key: 'ai-compute',
-      name: 'AI 智算中心',
-      icon: Cpu,
+      name: 'AI 运维',
+      icon: Monitor,
       roles: ['ADMIN'],
       children: [
         { path: '/system/models', name: 'AI 模型', icon: Cpu },
@@ -370,6 +367,7 @@ function buildModuleDefinitions(): NavModule[] {
         { path: '/notice', name: '消息通知', icon: Bell },
         { path: '/profile', name: '个人资料', icon: Avatar },
         { path: '/profile/security', name: '账号安全', icon: Lock },
+        { path: '/ai/memory', name: '记忆与隐私', icon: Key, permissions: ['ai:memory:view'] },
         { path: '/profile/ai-usage', name: 'AI 消耗明细', icon: CreditCard },
         { path: '/profile/preferences', name: '偏好设置', icon: Tools }
       ]
@@ -435,9 +433,6 @@ const activeMenu = computed(() => {
   }
   if (path.startsWith('/knowledge/') && path.includes('/graph')) {
     return knowledgePath('graph');
-  }
-  if (path.startsWith('/ai/assistant')) {
-    return '/ai/assistant/chat';
   }
   return path;
 });

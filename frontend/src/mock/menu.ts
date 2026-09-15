@@ -5,7 +5,7 @@
 
 import type { SysMenu } from '@/types/system/menu';
 
-export const MENU_STORAGE_KEY = 'edumind_sys_menu_v2_6';
+export const MENU_STORAGE_KEY = 'edumind_sys_menu_v2_10';
 
 /**
  * 默认预设的 EduMind 8 大核心业务模块菜单树
@@ -107,39 +107,6 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
     visible: true,
     children: [
       {
-        id: 201,
-        parentId: 200,
-        name: 'AI 教学助手',
-        type: 2,
-        path: '/ai/assistant/chat',
-        component: 'views/ai/AIChat.vue',
-        icon: 'Service',
-        permission: 'ai:chat',
-        sort: 1,
-        status: 1,
-        visible: true,
-        children: [
-          {
-            id: 2011,
-            parentId: 201,
-            name: '对话交互',
-            type: 3,
-            permission: 'ai:chat:interact',
-            sort: 1,
-            status: 1
-          },
-          {
-            id: 2012,
-            parentId: 201,
-            name: '会话清空',
-            type: 3,
-            permission: 'ai:chat:clear',
-            sort: 2,
-            status: 1
-          }
-        ]
-      },
-      {
         id: 202,
         parentId: 200,
         name: 'AI 智能出题',
@@ -148,7 +115,7 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
         component: 'views/ai/AIQuestion.vue',
         icon: 'EditPen',
         permission: 'ai:question',
-        sort: 2,
+        sort: 1,
         status: 1,
         visible: true
       },
@@ -227,19 +194,6 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
         icon: 'Cpu',
         permission: 'ai:tool:use',
         sort: 8,
-        status: 1,
-        visible: true
-      },
-      {
-        id: 209,
-        parentId: 200,
-        name: '记忆与隐私',
-        type: 2,
-        path: '/ai/memory',
-        component: 'views/ai/AIMemory.vue',
-        icon: 'Key',
-        permission: 'ai:memory:view',
-        sort: 9,
         status: 1,
         visible: true
       }
@@ -702,14 +656,14 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
     ]
   },
 
-  // 7. AI 智算中心
+  // 7. AI 运维
   {
     id: 700,
     parentId: 0,
-    name: 'AI 智算中心',
+    name: 'AI 运维',
     type: 1,
     path: '/system/models',
-    icon: 'Cpu',
+    icon: 'Monitor',
     sort: 7,
     status: 1,
     visible: true,
@@ -1136,6 +1090,31 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
         visible: true
       },
       {
+        id: 209,
+        parentId: 900,
+        name: '记忆与隐私',
+        type: 2,
+        path: '/ai/memory',
+        component: 'views/ai/memory/MemoryList.vue',
+        icon: 'Key',
+        permission: 'ai:memory:view',
+        sort: 4,
+        status: 1,
+        visible: true
+      },
+      {
+        id: 905,
+        parentId: 900,
+        name: 'AI 消耗明细',
+        type: 2,
+        path: '/profile/ai-usage',
+        component: 'views/profile/AIUsage.vue',
+        icon: 'CreditCard',
+        sort: 5,
+        status: 1,
+        visible: true
+      },
+      {
         id: 904,
         parentId: 900,
         name: '偏好设置',
@@ -1144,7 +1123,7 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
         component: 'views/profile/Preferences.vue',
         icon: 'Tools',
         permission: 'profile:preferences',
-        sort: 4,
+        sort: 6,
         status: 1,
         visible: true
       }
@@ -1171,7 +1150,7 @@ function removeMenuByPath(nodes: SysMenu[], path: string): boolean {
 }
 
 /**
- * 将「AI 审计日志」从系统管理迁移至 AI 智算中心，与侧边栏架构保持一致
+ * 将「AI 审计日志」从系统管理迁移至 AI 运维，与侧边栏架构保持一致
  */
 function migrateAuditMenuToAiCompute(tree: SysMenu[]): boolean {
   const aiComputeMod = tree.find((m) => m.id === 700);
@@ -1206,6 +1185,111 @@ function migrateAuditMenuToAiCompute(tree: SysMenu[]): boolean {
   return changed;
 }
 
+/** 将「记忆与隐私」从 AI 教学迁移至个人中心 */
+function migrateMemoryMenuToProfile(tree: SysMenu[]): boolean {
+  const profileMod = tree.find((m) => m.id === 900);
+  if (!profileMod?.children) {
+    return false;
+  }
+
+  const alreadyInProfile = profileMod.children.some((c) => c.path === '/ai/memory');
+  const memoryInAiTeaching = hasMenuPath(tree.find((m) => m.id === 200)?.children || [], '/ai/memory');
+
+  if (alreadyInProfile && !memoryInAiTeaching) {
+    return false;
+  }
+
+  let changed = false;
+
+  if (memoryInAiTeaching) {
+    changed = removeMenuByPath(tree.find((m) => m.id === 200)?.children || [], '/ai/memory') || changed;
+  }
+
+  if (!alreadyInProfile) {
+    const defaultMemoryNode = DEFAULT_MENU_TREE
+      .find((m) => m.id === 900)
+      ?.children?.find((c) => c.path === '/ai/memory');
+    if (defaultMemoryNode) {
+      const securityIdx = profileMod.children.findIndex((c) => c.path === '/profile/security');
+      const insertAt = securityIdx >= 0 ? securityIdx + 1 : profileMod.children.length;
+      profileMod.children.splice(insertAt, 0, JSON.parse(JSON.stringify(defaultMemoryNode)));
+      profileMod.children.forEach((child, index) => {
+        child.sort = index + 1;
+      });
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
+/** 在个人中心补全「AI 消耗明细」菜单（对齐 AppSidebar） */
+function migrateProfileAiUsageMenu(tree: SysMenu[]): boolean {
+  const profileMod = tree.find((m) => m.id === 900);
+  if (!profileMod?.children) {
+    return false;
+  }
+  if (profileMod.children.some((c) => c.path === '/profile/ai-usage')) {
+    return false;
+  }
+
+  const defaultNode = DEFAULT_MENU_TREE
+    .find((m) => m.id === 900)
+    ?.children?.find((c) => c.path === '/profile/ai-usage');
+  if (!defaultNode) {
+    return false;
+  }
+
+  const memoryIdx = profileMod.children.findIndex((c) => c.path === '/ai/memory');
+  const insertAt = memoryIdx >= 0 ? memoryIdx + 1 : profileMod.children.length;
+  profileMod.children.splice(insertAt, 0, JSON.parse(JSON.stringify(defaultNode)));
+  profileMod.children.forEach((child, index) => {
+    child.sort = index + 1;
+  });
+  return true;
+}
+
+/** 将「AI 智算中心」重命名为「AI 运维」，并更换父级图标避免与子项重复 */
+function migrateAiComputeBranding(tree: SysMenu[]): boolean {
+  const aiOpsMod = tree.find((m) => m.id === 700);
+  if (!aiOpsMod) {
+    return false;
+  }
+
+  const needsRename = aiOpsMod.name === 'AI 智算中心';
+  const needsIcon = aiOpsMod.icon === 'Cpu';
+  if (!needsRename && !needsIcon) {
+    return false;
+  }
+
+  if (needsRename) {
+    aiOpsMod.name = 'AI 运维';
+  }
+  if (needsIcon) {
+    aiOpsMod.icon = 'Monitor';
+  }
+  return true;
+}
+
+/** 移除已下线的独立 AI 助手菜单（能力已合并至课程 AI + 全局副驾驶悬浮窗） */
+function migrateRemoveLegacyAiAssistantMenu(tree: SysMenu[]): boolean {
+  const aiTeaching = tree.find((m) => m.id === 200);
+  if (!aiTeaching?.children) {
+    return false;
+  }
+
+  const removedChat = removeMenuByPath(aiTeaching.children, '/ai/assistant/chat');
+  const removedHistory = removeMenuByPath(aiTeaching.children, '/ai/assistant/history');
+  if (!removedChat && !removedHistory) {
+    return false;
+  }
+
+  aiTeaching.children.forEach((child, index) => {
+    child.sort = index + 1;
+  });
+  return true;
+}
+
 /**
  * 获取本地存储的菜单列表
  */
@@ -1215,7 +1299,13 @@ export function getStoredMenuTree(): SysMenu[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        if (migrateAuditMenuToAiCompute(parsed)) {
+        let migrated = false;
+        if (migrateAuditMenuToAiCompute(parsed)) migrated = true;
+        if (migrateRemoveLegacyAiAssistantMenu(parsed)) migrated = true;
+        if (migrateMemoryMenuToProfile(parsed)) migrated = true;
+        if (migrateProfileAiUsageMenu(parsed)) migrated = true;
+        if (migrateAiComputeBranding(parsed)) migrated = true;
+        if (migrated) {
           saveStoredMenuTree(parsed);
         }
         // 自动校验并注入「操作日志」菜单节点，防止历史 localStorage 遗漏

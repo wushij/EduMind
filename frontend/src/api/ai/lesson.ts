@@ -1,11 +1,5 @@
 import { post } from '@/core/http/request';
-
-export interface LessonPlanRequest {
-  courseId: number;
-  topic: string;
-  hours?: number;
-  objectives?: string;
-}
+import type { LessonPlanRequest } from '@/types/ai/lesson';
 
 export const generateLessonPlan = (data: LessonPlanRequest) =>
   post<{ content: string }>('/ai/lesson-plan', data);

@@ -13,7 +13,9 @@ import com.edumind.course.dto.course.CourseCreateDTO;
 import com.edumind.course.dto.course.CourseQueryDTO;
 import com.edumind.course.dto.course.CourseUpdateDTO;
 import com.edumind.course.dto.knowledge.KnowledgePointCreateDTO;
+import com.edumind.course.entity.ChapterEntity;
 import com.edumind.course.entity.CourseEntity;
+import com.edumind.course.entity.CourseMemberEntity;
 import com.edumind.course.entity.KnowledgePointEntity;
 import com.edumind.course.service.course.CourseService;
 import com.edumind.course.vo.course.CourseDetailVO;
@@ -23,7 +25,7 @@ import com.edumind.system.api.OrganizationQueryApi;
 import com.edumind.system.api.TenantDataScope;
 import com.edumind.system.api.TenantDataScopeApi;
 import com.edumind.system.api.UserQueryApi;
-import com.edumind.system.vo.user.UserVO;
+import com.edumind.system.vo.user.UserBriefVO;
 import com.edumind.common.context.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -148,7 +150,37 @@ public class CourseServiceImpl implements CourseService {
             entity.setTenantId(TenantContext.requireTenantId());
         }
         courseDao.insert(entity);
-        return entity.getId();
+        Long newCourseId = entity.getId();
+
+        // 1. 自动将创建教师录入为课程班级主讲教师（全链路成员互通）
+        try {
+            CourseMemberEntity teacherMember = new CourseMemberEntity();
+            teacherMember.setCourseId(newCourseId);
+            teacherMember.setUserId(currentUserId);
+            teacherMember.setMemberRole("TEACHER");
+            teacherMember.setCreateTime(LocalDateTime.now());
+            courseMemberDao.insert(teacherMember);
+        } catch (Exception ignored) {
+            // 忽略非致命写入异常
+        }
+
+        // 2. 初始化大纲章节（全链路章节互通，杜绝空壳 0 章节）
+        if (dto.getInitialChapters() != null && !dto.getInitialChapters().isEmpty()) {
+            int sort = 1;
+            for (String chapTitle : dto.getInitialChapters()) {
+                if (chapTitle != null && !chapTitle.trim().isEmpty()) {
+                    ChapterEntity chapter = new ChapterEntity();
+                    chapter.setCourseId(newCourseId);
+                    chapter.setParentId(0L);
+                    chapter.setTitle(chapTitle.trim());
+                    chapter.setSortOrder(sort++);
+                    chapter.setCreateTime(LocalDateTime.now());
+                    chapterDao.insert(chapter);
+                }
+            }
+        }
+
+        return newCourseId;
     }
 
     @Override
@@ -240,6 +272,31 @@ public class CourseServiceImpl implements CourseService {
         return course.getId();
     }
 
+    @Override
+    public List<CourseVO> listPublicCourses() {
+        CourseQueryDTO query = new CourseQueryDTO();
+        query.setPage(1L);
+        query.setPageSize(20L);
+        Page<CourseEntity> page = courseDao.pageQueryAll(query);
+        return page.getRecords().stream()
+                .filter(c -> c.getStatus() != null && c.getStatus() == 1)
+                .map(entity -> {
+                    Long cid = entity.getId();
+                    Long studentCount = courseMemberDao.countStudentsByCourseId(cid);
+                    Long chapterCount = chapterDao.countByCourseId(cid);
+                    Long kpCount = knowledgePointDao.countByCourseId(cid);
+                    Long resourceCount = resourceQueryApi != null ? resourceQueryApi.countResourcesByCourseId(cid) : 0L;
+                    return courseConverter.toVO(
+                            entity,
+                            resolveTeacherName(entity.getTeacherId()),
+                            studentCount,
+                            chapterCount,
+                            kpCount,
+                            resourceCount);
+                })
+                .collect(Collectors.toList());
+    }
+
     private void assertCourseEditable(CourseEntity course) {
         Long currentUserId = StpUtil.getLoginIdAsLong();
         List<String> roles = userQueryApi.getRolesByUserId(currentUserId);
@@ -274,7 +331,7 @@ public class CourseServiceImpl implements CourseService {
         if (teacherId == null) {
             return "";
         }
-        UserVO teacher = (UserVO) userQueryApi.getUserById(teacherId);
+        UserBriefVO teacher = userQueryApi.getUserById(teacherId);
         if (teacher == null) {
             return "";
         }

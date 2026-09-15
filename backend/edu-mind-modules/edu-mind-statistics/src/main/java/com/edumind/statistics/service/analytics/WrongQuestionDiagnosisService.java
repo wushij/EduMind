@@ -2,7 +2,7 @@ package com.edumind.statistics.service.analytics;
 
 import com.edumind.ai.api.QuestionGenerateApi;
 import com.edumind.ai.dto.QuestionGenerateDTO;
-import com.edumind.ai.gateway.AiGatewayFacade;
+import com.edumind.ai.api.AiChatApi;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.question.api.QuestionCommandApi;
 import com.edumind.question.api.QuestionQueryApi;
@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class WrongQuestionDiagnosisService {
 
-    private final AiGatewayFacade aiGatewayFacade;
+    private final AiChatApi aiChatApi;
     private final WrongQuestionRecordDao wrongQuestionRecordDao;
     private final QuestionQueryApi questionQueryApi;
     private final QuestionGenerateApi questionGenerateApi;
@@ -34,7 +34,7 @@ public class WrongQuestionDiagnosisService {
         String prompt = "题目：" + questionStem + "\n学生答案：" + studentAnswer + "\n正确答案：" + correctAnswer
                 + "\n请用一句话诊断错因，并标注类型 CONCEPT/LOGIC/CALC 之一。";
         try {
-            return aiGatewayFacade.chat("GRADING", "你是错题诊断助手。", prompt);
+            return aiChatApi.chat("GRADING", "你是错题诊断助手。", prompt);
         } catch (Exception ex) {
             return "CONCEPT: 概念理解不完整";
         }
@@ -58,8 +58,8 @@ public class WrongQuestionDiagnosisService {
         if (entity == null) {
             throw new BusinessException("错题记录不存在");
         }
-        Object raw = questionQueryApi.getQuestionById(entity.getQuestionId());
-        if (!(raw instanceof QuestionVO question)) {
+        QuestionVO question = questionQueryApi.getQuestionById(entity.getQuestionId());
+        if (question == null) {
             throw new BusinessException("题目不存在");
         }
         String diagnosis = diagnose(question.getStem(), "", question.getAnswer());

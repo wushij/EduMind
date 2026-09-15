@@ -41,10 +41,9 @@ public class SmartPaperComposeService {
         int targetCount = dto.getTotalCount() != null && dto.getTotalCount() > 0 ? dto.getTotalCount() : 10;
         Long courseId = dto.getCourseId();
 
-        @SuppressWarnings("unchecked")
         List<QuestionVO> pool = courseId == null
                 ? List.of()
-                : (List<QuestionVO>) (List<?>) questionQueryApi.listQuestionsByCourseId(courseId);
+                : questionQueryApi.listQuestionsByCourseId(courseId);
         if (pool == null) {
             pool = new ArrayList<>();
         }

@@ -1,5 +1,7 @@
 package com.edumind.resource.api;
 
+import com.edumind.resource.vo.ResourceVO;
+
 import java.util.List;
 
 /**
@@ -8,11 +10,11 @@ import java.util.List;
  */
 public interface ResourceQueryApi {
 
-    Object getResourceById(Long resourceId);
+    ResourceVO getResourceById(Long resourceId);
 
-    List<?> listResourcesByIds(List<Long> resourceIds);
+    List<ResourceVO> listResourcesByIds(List<Long> resourceIds);
 
-    List<?> listResourcesByCourse(Long courseId, Long chapterId, Integer limit);
+    List<ResourceVO> listResourcesByCourse(Long courseId, Long chapterId, Integer limit);
 
     String getResourceDownloadUrl(Long resourceId);
 

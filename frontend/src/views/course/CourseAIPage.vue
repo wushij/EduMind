@@ -92,7 +92,7 @@
     </div>
 
     <!-- 3. 有课程状态：直接加载完整的 CourseAI 工作台，无任何跳转卡顿，立即可用 -->
-    <CourseAI
+    <CourseAIPanel
       v-else-if="activeCourse"
       :key="activeCourse.id"
       :course="activeCourse"
@@ -102,7 +102,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   Loading,
@@ -113,60 +112,11 @@ import {
   HomeFilled,
   InfoFilled
 } from '@element-plus/icons-vue';
-import { getCourseList } from '@/api/course/course';
-import { useAuthStore } from '@/stores/auth/auth';
-import type { Course } from '@/types/course/course';
-import CourseAI from '@/views/course/detail/CourseAI.vue';
+import { useCourseAIPage } from '@/composables/course/useCourseAIWorkspace';
+import CourseAIPanel from '@/components/course/CourseAIPanel.vue';
 
 const router = useRouter();
-const authStore = useAuthStore();
-
-const loading = ref(true);
-const courses = ref<Course[]>([]);
-const activeCourse = ref<Course | null>(null);
-
-const LAST_COURSE_ID_KEY = 'edumind_last_course_id';
-
-const canCreateCourse = computed(() => {
-  return authStore.hasAnyRole(['ADMIN', 'TEACHER']) || authStore.hasPermission('course:create');
-});
-
-function handleSwitchActiveCourse(courseId: number) {
-  const found = courses.value.find((c) => Number(c.id) === Number(courseId));
-  if (found) {
-    activeCourse.value = found;
-    localStorage.setItem(LAST_COURSE_ID_KEY, String(found.id));
-  }
-}
-
-async function loadCourses() {
-  loading.value = true;
-  try {
-    const res = await getCourseList({ page: 1, pageSize: 50 });
-    const list = res?.data?.list || [];
-    courses.value = list;
-
-    if (list.length > 0) {
-      // 优先选取用户最后访问的有效课程，如果不在当前列表中则取第一门
-      const storedIdStr = localStorage.getItem(LAST_COURSE_ID_KEY);
-      const storedId = storedIdStr ? Number(storedIdStr) : NaN;
-      const matched = !Number.isNaN(storedId) ? list.find((c) => Number(c.id) === storedId) : undefined;
-      activeCourse.value = matched || list[0];
-      localStorage.setItem(LAST_COURSE_ID_KEY, String(activeCourse.value.id));
-    } else {
-      activeCourse.value = null;
-    }
-  } catch {
-    courses.value = [];
-    activeCourse.value = null;
-  } finally {
-    loading.value = false;
-  }
-}
-
-onMounted(() => {
-  loadCourses();
-});
+const { loading, courses, activeCourse, canCreateCourse, handleSwitchActiveCourse } = useCourseAIPage();
 </script>
 
 <style scoped lang="scss">

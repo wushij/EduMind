@@ -1,5 +1,7 @@
 package com.edumind.system.api;
 
+import com.edumind.system.vo.user.UserBriefVO;
+
 import java.util.List;
 
 /**
@@ -7,7 +9,7 @@ import java.util.List;
  */
 public interface UserQueryApi {
 
-    Object getUserById(Long userId);
+    UserBriefVO getUserById(Long userId);
 
     List<String> getRolesByUserId(Long userId);
 
@@ -40,4 +42,3 @@ public interface UserQueryApi {
     /** 按用户名或真实姓名模糊搜索用户 ID 列表 */
     List<Long> findUserIdsByKeyword(String keyword);
 }
-

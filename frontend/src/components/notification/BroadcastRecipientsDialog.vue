@@ -224,7 +224,7 @@ import {
   Search,
   Refresh
 } from '@element-plus/icons-vue';
-import { getBroadcastRecipients } from '@/api/notification/broadcast';
+import { fetchBroadcastRecipients } from '@/composables/system/useBroadcast';
 import type {
   BroadcastRecipientSummaryVO,
   BroadcastRecipientVO,
@@ -282,7 +282,7 @@ async function fetchRecipients() {
   if (!props.broadcast?.id) return;
   loading.value = true;
   try {
-    const res = await getBroadcastRecipients(props.broadcast.id, {
+    const res = await fetchBroadcastRecipients(props.broadcast.id, {
       isRead: currentReadFilter.value,
       keyword: keyword.value.trim() || undefined,
       page: page.value,

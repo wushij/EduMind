@@ -18,7 +18,13 @@ export function mapCourse(raw: Record<string, any>): Course {
     progress: raw.progress,
     aiUsageCount: raw.aiUsageCount,
     status: raw.status ?? 'ACTIVE',
+    category: raw.category || '计算机与软件',
+    credits: raw.credits != null ? Number(raw.credits) : 3.0,
+    plannedHours: raw.plannedHours != null ? Number(raw.plannedHours) : 48,
+    aiPersona: raw.aiPersona || 'socrates',
+    welcomeMessage: raw.welcomeMessage || '',
     description: raw.description,
-    createdAt: raw.createdAt
+    createdAt: raw.createdAt,
+    knowledgeBaseId: raw.knowledgeBaseId != null ? Number(raw.knowledgeBaseId) : undefined
   };
 }

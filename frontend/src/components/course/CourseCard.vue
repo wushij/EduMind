@@ -97,12 +97,14 @@
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { Course } from '@/types/course/course';
+import { useCourse } from '@/composables/course/useCourse';
 
 const props = defineProps<{
   course: Course;
 }>();
 
 const router = useRouter();
+const { setCurrentCourse } = useCourse();
 const imageError = ref(false);
 
 function handleImageError() {
@@ -125,7 +127,8 @@ const statusClass = computed(() => {
 
 // 根据课程 ID 模数分配专属质感学科渐变
 const gradientClass = computed(() => {
-  const mod = props.course.id % 4;
+  const id = Number(props.course.id || 0);
+  const mod = id % 4;
   if (mod === 0) return 'grad-blue';
   if (mod === 1) return 'grad-purple';
   if (mod === 2) return 'grad-cyan';
@@ -133,10 +136,12 @@ const gradientClass = computed(() => {
 });
 
 function handleCardClick() {
+  setCurrentCourse(props.course);
   router.push(`/course/${props.course.id}/overview`);
 }
 
 function handleEnterCourse() {
+  setCurrentCourse(props.course);
   router.push(`/course/${props.course.id}/overview`);
 }
 </script>

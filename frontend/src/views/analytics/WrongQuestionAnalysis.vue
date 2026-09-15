@@ -72,7 +72,6 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { useLearningAnalytics } from '@/composables/analytics/useLearningAnalytics';
-import { diagnoseWrongQuestion } from '@/api/analytics/knowledge';
 import type { WrongQuestionItemVO } from '@/types/analytics/mastery';
 import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
 import AppPagination from '@/components/common/AppPagination.vue';
@@ -84,7 +83,7 @@ const page = ref(1);
 const pageSize = ref(10);
 const diagnosingId = ref<number | null>(null);
 
-const { loading, usedMockFallback, wrongQuestions, fetchWrongQuestions } = useLearningAnalytics();
+const { loading, usedMockFallback, wrongQuestions, fetchWrongQuestions, diagnoseWrong } = useLearningAnalytics();
 
 async function reload() {
   await fetchWrongQuestions(courseId.value, page.value, pageSize.value);
@@ -97,11 +96,14 @@ async function handleDiagnose(row: WrongQuestionItemVO) {
   }
   diagnosingId.value = row.id;
   try {
-    const res = await diagnoseWrongQuestion(row.id);
-    const variantIds = res.data?.variantQuestionIds?.split(',').filter(Boolean) ?? [];
-    row.diagnosis = res.data?.diagnosis ?? row.diagnosis;
-    row.variantQuestionIds = variantIds.map((id) => Number(id));
-    ElMessage.success(`诊断完成，已生成 ${variantIds.length} 道变式题`);
+    const result = await diagnoseWrong(row.id);
+    if (!result) {
+      ElMessage.error('错题诊断失败');
+      return;
+    }
+    row.diagnosis = result.diagnosis ?? row.diagnosis;
+    row.variantQuestionIds = result.variantQuestionIds;
+    ElMessage.success(`诊断完成，已生成 ${result.variantQuestionIds.length} 道变式题`);
   } catch {
     ElMessage.error('错题诊断失败');
   } finally {

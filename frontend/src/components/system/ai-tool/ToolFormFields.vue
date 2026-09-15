@@ -284,7 +284,7 @@ import {
   School,
   Compass
 } from '@element-plus/icons-vue';
-import { fetchModels } from '@/api/system/model';
+import { fetchEnabledChatModels } from '@/composables/system/useAIModel';
 import type { AIModelConfigItem } from '@/types/system/model';
 import {
   TOOL_EXECUTION_MODE_OPTIONS,
@@ -386,8 +386,7 @@ const rules: FormRules = {
 
 async function loadModels() {
   try {
-    const models = await fetchModels();
-    chatModels.value = models.filter(m => m.configType === 'chat' && m.status === 'enabled');
+    chatModels.value = await fetchEnabledChatModels();
   } catch {
     chatModels.value = [];
   }

@@ -1,21 +1,5 @@
 import { get } from '@/core/http/request';
-
-export interface RecommendationQuestion {
-  questionId: number;
-  type: string;
-  difficulty: string;
-  stem: string;
-  knowledgePointName?: string;
-  reason?: string;
-}
-
-export interface RecommendationResource {
-  resourceId?: number;
-  documentId?: number;
-  title: string;
-  resourceType?: string;
-  reason?: string;
-}
+import type { RecommendationQuestion, RecommendationResource } from '@/types/learning/recommendation';
 
 export const getQuestionRecommendations = (params?: { courseId?: number; chapterId?: number; limit?: number }) =>
   get<RecommendationQuestion[]>('/learning/recommendations/questions', params);

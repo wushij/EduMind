@@ -1,13 +1,7 @@
 package com.edumind.notification.api.impl;
 
-import com.edumind.common.context.TenantContext;
 import com.edumind.notification.api.NotificationWriteApi;
-import com.edumind.notification.converter.notification.NotificationConverter;
-import com.edumind.notification.dao.NotificationDao;
-import com.edumind.notification.entity.NotificationEntity;
-import com.edumind.notification.service.push.NotificationPushService;
-import com.edumind.notification.vo.notification.NotificationVO;
-import com.edumind.system.api.UserPreferenceQueryApi;
+import com.edumind.notification.service.notification.NotificationDispatchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -17,62 +11,20 @@ import java.util.List;
 @RequiredArgsConstructor
 public class NotificationWriteApiImpl implements NotificationWriteApi {
 
-    private final NotificationDao notificationDao;
-    private final NotificationPushService notificationPushService;
-    private final UserPreferenceQueryApi userPreferenceQueryApi;
+    private final NotificationDispatchService notificationDispatchService;
 
     @Override
     public void sendToUser(Long userId, String title, String content, String type) {
-        sendToUser(userId, title, content, type, null);
+        notificationDispatchService.sendToUser(userId, title, content, type);
     }
 
     @Override
     public void sendToUser(Long userId, String title, String content, String type, Long refId) {
-        if (userId == null) {
-            return;
-        }
-        if (!userPreferenceQueryApi.isNotificationEnabled(userId)) {
-            return;
-        }
-        NotificationEntity entity = new NotificationEntity();
-        entity.setTenantId(TenantContext.getTenantId());
-        entity.setUserId(userId);
-        entity.setTitle(title);
-        entity.setContent(content);
-        entity.setType(type != null ? type : "SYSTEM");
-        entity.setRefId(refId);
-        entity.setIsRead(0);
-        notificationDao.insert(entity);
-
-        NotificationVO vo = NotificationConverter.toVO(entity);
-        notificationPushService.pushToUser(userId, vo);
+        notificationDispatchService.sendToUser(userId, title, content, type, refId);
     }
 
     @Override
     public void sendToUsers(Long tenantId, List<Long> userIds, String title, String content, String type, Long refId) {
-        if (userIds == null || userIds.isEmpty()) {
-            return;
-        }
-        Long finalTenantId = tenantId != null ? tenantId : TenantContext.getTenantId();
-        for (Long userId : userIds) {
-            if (userId == null) {
-                continue;
-            }
-            if (!userPreferenceQueryApi.isNotificationEnabled(userId)) {
-                continue;
-            }
-            NotificationEntity entity = new NotificationEntity();
-            entity.setTenantId(finalTenantId);
-            entity.setUserId(userId);
-            entity.setTitle(title);
-            entity.setContent(content);
-            entity.setType(type != null ? type : "SYSTEM");
-            entity.setRefId(refId);
-            entity.setIsRead(0);
-            notificationDao.insert(entity);
-
-            NotificationVO vo = NotificationConverter.toVO(entity);
-            notificationPushService.pushToUser(userId, vo);
-        }
+        notificationDispatchService.sendToUsers(tenantId, userIds, title, content, type, refId);
     }
 }

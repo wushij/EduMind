@@ -16,6 +16,7 @@ import com.edumind.notification.vo.broadcast.BroadcastEstimateVO;
 import com.edumind.notification.vo.broadcast.BroadcastStatsVO;
 import com.edumind.notification.vo.broadcast.NotificationBroadcastVO;
 import com.edumind.system.api.UserQueryApi;
+import com.edumind.system.vo.user.UserBriefVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,16 +69,9 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
 
         if (!StringUtils.hasText(senderName) && senderId != null) {
             try {
-                Object u = userQueryApi.getUserById(senderId);
-                if (u != null) {
-                    try {
-                        java.lang.reflect.Method getUsername = u.getClass().getMethod("getUsername");
-                        Object un = getUsername.invoke(u);
-                        if (un != null && StringUtils.hasText(un.toString())) {
-                            senderName = un.toString();
-                        }
-                    } catch (Exception ignored) {
-                    }
+                UserBriefVO u = userQueryApi.getUserById(senderId);
+                if (u != null && StringUtils.hasText(u.getUsername())) {
+                    senderName = u.getUsername();
                 }
             } catch (Exception ignored) {
             }
@@ -140,25 +134,13 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
             return;
         }
         try {
-            Object u = userQueryApi.getUserById(vo.getSenderId());
+            UserBriefVO u = userQueryApi.getUserById(vo.getSenderId());
             if (u != null) {
-                try {
-                    java.lang.reflect.Method getAvatar = u.getClass().getMethod("getAvatar");
-                    Object av = getAvatar.invoke(u);
-                    if (av != null && StringUtils.hasText(av.toString())) {
-                        vo.setSenderAvatar(av.toString());
-                    }
-                } catch (Exception ignored) {
+                if (StringUtils.hasText(u.getAvatar())) {
+                    vo.setSenderAvatar(u.getAvatar());
                 }
-                if (!StringUtils.hasText(vo.getSenderName())) {
-                    try {
-                        java.lang.reflect.Method getUsername = u.getClass().getMethod("getUsername");
-                        Object un = getUsername.invoke(u);
-                        if (un != null && StringUtils.hasText(un.toString())) {
-                            vo.setSenderName(un.toString());
-                        }
-                    } catch (Exception ignored) {
-                    }
+                if (!StringUtils.hasText(vo.getSenderName()) && StringUtils.hasText(u.getUsername())) {
+                    vo.setSenderName(u.getUsername());
                 }
             }
         } catch (Exception ignored) {
@@ -211,23 +193,11 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
 
             if (entity.getUserId() != null) {
                 try {
-                    Object u = userQueryApi.getUserById(entity.getUserId());
+                    UserBriefVO u = userQueryApi.getUserById(entity.getUserId());
                     if (u != null) {
-                        try {
-                            java.lang.reflect.Method getUsername = u.getClass().getMethod("getUsername");
-                            Object un = getUsername.invoke(u);
-                            if (un != null) rvo.setUsername(un.toString());
-                        } catch (Exception ignored) {}
-                        try {
-                            java.lang.reflect.Method getRealName = u.getClass().getMethod("getRealName");
-                            Object rn = getRealName.invoke(u);
-                            if (rn != null) rvo.setRealName(rn.toString());
-                        } catch (Exception ignored) {}
-                        try {
-                            java.lang.reflect.Method getAvatar = u.getClass().getMethod("getAvatar");
-                            Object av = getAvatar.invoke(u);
-                            if (av != null) rvo.setAvatar(av.toString());
-                        } catch (Exception ignored) {}
+                        rvo.setUsername(u.getUsername());
+                        rvo.setRealName(u.getRealName());
+                        rvo.setAvatar(u.getAvatar());
                     }
                 } catch (Exception ignored) {}
 

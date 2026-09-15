@@ -2,15 +2,20 @@ import { ref, reactive, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Exam, ExamRule } from '@/types/question/exam';
+import { composeSmartPaperV2 } from '@/api/ai/paper-compose';
+import { loadGenerationCourseOptions } from '@/services/ai/generation-service';
 import { generateExam, createExam } from '@/api/question/exam';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_EXAMS } from '@/mock/exams';
+import type { SmartPaperComposeRequest, SmartPaperComposeVO } from '@/types/ai/paper-compose';
 
 const currentExam = ref<Exam>({ ...MOCK_EXAMS[0] });
 
 export function useExamGenerate() {
   const router = useRouter();
   const generating = ref(false);
+  const composing = ref(false);
+  const courses = ref<any[]>([]);
 
   const examForm = reactive({
     courseId: 101,
@@ -30,6 +35,25 @@ export function useExamGenerate() {
   );
 
   const isScoreMatched = computed(() => calculatedTotalScore.value === examForm.totalScore);
+
+  async function loadCourseOptions() {
+    const list = await loadGenerationCourseOptions();
+    courses.value = list;
+    if (list.length && !courses.value.some((c) => c.id === examForm.courseId)) {
+      examForm.courseId = courses.value[0].id;
+    }
+    return courses.value;
+  }
+
+  async function composeSmartPaper(request: SmartPaperComposeRequest): Promise<SmartPaperComposeVO | null> {
+    composing.value = true;
+    try {
+      const res = await composeSmartPaperV2(request);
+      return res.data ?? null;
+    } finally {
+      composing.value = false;
+    }
+  }
 
   async function generateExamPreview() {
     if (!isScoreMatched.value) {
@@ -103,8 +127,12 @@ export function useExamGenerate() {
     examForm,
     currentExam,
     generating,
+    composing,
+    courses,
     calculatedTotalScore,
     isScoreMatched,
+    loadCourseOptions,
+    composeSmartPaper,
     generateExam: generateExamPreview,
     swapQuestion,
     saveExam

@@ -206,12 +206,10 @@ import {
 } from '@element-plus/icons-vue';
 import { useAssignment } from '@/composables/question/useAssignment';
 import AppPagination from '@/components/common/AppPagination.vue';
-import { getCourseList } from '@/api/course/course';
-import { getSubmissionsByAssignment, gradeSubmission } from '@/api/question/submission';
 import type { Course } from '@/types/course/course';
 
 const router = useRouter();
-const { assignments, loading, total, fetchAssignments } = useAssignment();
+const { assignments, loading, total, fetchAssignments, loadCourses, gradePendingSubmissions } = useAssignment();
 
 const pageNum = ref(1);
 const pageSize = ref(10);
@@ -222,24 +220,11 @@ const selectedStatus = ref('');
 const usingMockFallback = ref(false);
 
 onMounted(async () => {
-  await Promise.all([loadCourses(), loadAssignments()]);
+  await Promise.all([loadCourseOptions(), loadAssignments()]);
 });
 
-async function loadCourses() {
-  try {
-    const res = await getCourseList({ page: 1, pageSize: 50 });
-    courses.value = res.data?.list || [
-      { id: 101, title: '数据结构与算法' } as any,
-      { id: 102, title: 'Java程序设计' } as any,
-      { id: 103, title: '高等数学（上）' } as any
-    ];
-  } catch {
-    courses.value = [
-      { id: 101, title: '数据结构与算法' } as any,
-      { id: 102, title: 'Java程序设计' } as any,
-      { id: 103, title: '高等数学（上）' } as any
-    ];
-  }
+async function loadCourseOptions() {
+  courses.value = await loadCourses();
 }
 
 async function loadAssignments() {
@@ -337,12 +322,8 @@ function getProgressColor(ratio: number) {
 
 async function handleFastAIGrade(assignmentId: number) {
   try {
-    const sRes = await getSubmissionsByAssignment(assignmentId);
-    const pendingSubs = (sRes.data || []).filter((s: any) => s.status === 'PENDING');
-    for (const sub of pendingSubs) {
-      await gradeSubmission(sub.id);
-    }
-    ElMessage.success(`已成功为该作业的 ${pendingSubs.length} 份答卷触发 AI 智能预评！正在进入批改中心...`);
+    const pendingCount = await gradePendingSubmissions(assignmentId);
+    ElMessage.success(`已成功为该作业的 ${pendingCount} 份答卷触发 AI 智能预评！正在进入批改中心...`);
   } catch (err: any) {
     console.warn('触发智能批改提示:', err);
     ElMessage.info('已发起 AI 智能预评，正在前往评阅工作台...');

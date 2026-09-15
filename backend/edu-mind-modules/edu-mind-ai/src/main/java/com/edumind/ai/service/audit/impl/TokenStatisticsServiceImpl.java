@@ -9,6 +9,7 @@ import com.edumind.ai.service.audit.TokenStatisticsService;
 import com.edumind.ai.vo.audit.AiCallLogVO;
 import com.edumind.ai.vo.audit.TokenAuditSummaryVO;
 import com.edumind.common.api.PageResult;
+import com.edumind.system.vo.user.UserBriefVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -56,18 +57,11 @@ public class TokenStatisticsServiceImpl implements TokenStatisticsService {
             return;
         }
         try {
-            Object userObj = userQueryApi.getUserById(vo.getUserId());
-            if (userObj != null) {
-                org.springframework.beans.BeanWrapper bw = new org.springframework.beans.BeanWrapperImpl(userObj);
-                if (bw.isReadableProperty("username")) {
-                    vo.setUsername((String) bw.getPropertyValue("username"));
-                }
-                if (bw.isReadableProperty("realName")) {
-                    vo.setRealName((String) bw.getPropertyValue("realName"));
-                }
-                if (bw.isReadableProperty("avatar")) {
-                    vo.setAvatar((String) bw.getPropertyValue("avatar"));
-                }
+            UserBriefVO user = userQueryApi.getUserById(vo.getUserId());
+            if (user != null) {
+                vo.setUsername(user.getUsername());
+                vo.setRealName(user.getRealName());
+                vo.setAvatar(user.getAvatar());
             }
             List<String> roles = userQueryApi.getRolesByUserId(vo.getUserId());
             if (roles != null && !roles.isEmpty()) {

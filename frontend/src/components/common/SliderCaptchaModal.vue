@@ -105,7 +105,7 @@ import {
   Lock,
   Refresh
 } from '@element-plus/icons-vue';
-import { createSliderChallenge, verifySliderCaptcha } from '@/api/auth/auth';
+import { loadSliderChallenge, verifySliderChallenge } from '@/composables/auth/useAuthCaptcha';
 import { createTrackRecorder } from '@/utils/captcha-track';
 
 /** 展示宽度：在服务端 320px 逻辑画布上放大，兼顾清晰度与弹层比例 (对齐 Code Compass) */
@@ -175,7 +175,7 @@ async function loadChallenge() {
   challengeId.value = '';
 
   try {
-    const res = await createSliderChallenge(props.operation, props.username);
+    const res = await loadSliderChallenge(props.operation, props.username);
     if (seq !== requestSeq) return;
     const data = res.data;
     challengeId.value = data.challengeId;
@@ -231,7 +231,7 @@ async function submitVerify() {
   const { events, durationMs, offsetX: finalX } = track.end();
 
   try {
-    const res = await verifySliderCaptcha({
+    const res = await verifySliderChallenge({
       challengeId: challengeId.value,
       offsetX: finalX,
       durationMs,

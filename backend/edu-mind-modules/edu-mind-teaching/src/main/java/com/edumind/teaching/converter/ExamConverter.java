@@ -48,10 +48,8 @@ public class ExamConverter {
         List<Long> questionIds = examQuestions.stream()
                 .map(ExamQuestionEntity::getQuestionId)
                 .collect(Collectors.toList());
-        List<?> rawQuestions = questionQueryApi.listQuestionsByIds(questionIds);
+        List<QuestionVO> rawQuestions = questionQueryApi.listQuestionsByIds(questionIds);
         Map<Long, QuestionVO> questionMap = rawQuestions.stream()
-                .filter(QuestionVO.class::isInstance)
-                .map(QuestionVO.class::cast)
                 .collect(Collectors.toMap(QuestionVO::getId, q -> q, (a, b) -> a));
 
         List<ExamQuestionVO> result = new ArrayList<>();

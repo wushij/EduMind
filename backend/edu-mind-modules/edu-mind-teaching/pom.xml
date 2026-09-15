@@ -27,7 +27,7 @@
         </dependency>
         <dependency>
             <groupId>com.edumind</groupId>
-            <artifactId>edu-mind-ai</artifactId>
+            <artifactId>edu-mind-ai-api</artifactId>
         </dependency>
     </dependencies>
 </project>

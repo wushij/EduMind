@@ -53,10 +53,15 @@
           </div>
         </div>
 
-        <!-- 按钮或外部操作区插槽 -->
+        <!-- 按钮或外部操作区插槽（标题下方，左对齐） -->
         <div v-if="$slots.actions" class="hero-actions">
           <slot name="actions" />
         </div>
+      </div>
+
+      <!-- 右侧操作区（与标题同行，右对齐） -->
+      <div v-if="$slots.toolbar" class="hero-toolbar">
+        <slot name="toolbar" />
       </div>
 
       <!-- 右侧自定义插画区 (仅在外部显式传入插槽时呈现，默认不展示 AI logo) -->
@@ -81,7 +86,7 @@ const props = withDefaults(
     title: string;
     subtitle?: string;
     backgroundImage?: string;
-    backgroundVariant?: 'default' | 'ai' | 'learning' | 'knowledge' | 'system' | 'analytics' | 'question';
+    backgroundVariant?: 'default' | 'ai' | 'learning' | 'knowledge' | 'system' | 'analytics' | 'question' | 'course';
     size?: 'normal' | 'large';
     showSearch?: boolean;
     searchPlaceholder?: string;
@@ -173,6 +178,10 @@ function clearSearch() {
     background: linear-gradient(135deg, #FFF7ED 0%, #FEF3C7 40%, #FFFBEB 100%);
   }
 
+  &--course {
+    background: linear-gradient(135deg, #EAF3FF 0%, #EEF2FF 45%, #E0E7FF 100%);
+  }
+
   // 尺寸变体
   &--large {
     padding: 24px 32px 20px;
@@ -211,7 +220,7 @@ function clearSearch() {
     position: relative;
     z-index: 1;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 20px;
   }
@@ -344,7 +353,18 @@ function clearSearch() {
     }
   }
 
-  // 5. 右侧插画 (仅在显式传入 slot 时渲染)
+  // 5. 右侧操作工具栏（与标题同行）
+  .hero-toolbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-top: 2px;
+  }
+
+  // 6. 右侧插画 (仅在显式传入 slot 时渲染)
   .hero-illustration {
     position: relative;
     z-index: 1;
@@ -354,7 +374,7 @@ function clearSearch() {
     align-items: center;
   }
 
-  // 6. 下方扩展区 (如分类 Tabs、统计药丸指标等)
+  // 7. 下方扩展区 (如分类 Tabs、统计药丸指标等)
   .hero-extra {
     position: relative;
     z-index: 1;
@@ -371,6 +391,17 @@ function clearSearch() {
 
     .hero-illustration {
       display: none;
+    }
+
+    .hero-inner-container {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .hero-toolbar {
+      width: 100%;
+      justify-content: flex-end;
+      padding-top: 0;
     }
 
     .hero-content {

@@ -17,8 +17,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { sendEmailCode } from '@/api/auth/auth';
-import { sendBindEmailCode } from '@/api/system/user';
+import { sendAuthEmailCode, sendProfileBindEmailCode } from '@/composables/auth/useEmailCode';
 import type { EmailScene } from '@/types/auth/auth';
 
 const props = withDefaults(
@@ -68,12 +67,9 @@ async function handleSendCode() {
     if (props.customSender) {
       await props.customSender();
     } else if (props.scene === 'bind') {
-      await sendBindEmailCode(targetEmail);
+      await sendProfileBindEmailCode(targetEmail);
     } else {
-      await sendEmailCode({
-        email: targetEmail,
-        scene: props.scene
-      });
+      await sendAuthEmailCode(targetEmail, props.scene);
     }
 
     ElMessage.success('验证码已发送，请前往邮箱查收');

@@ -1,9 +1,26 @@
+export interface RecommendationQuestion {
+  questionId: number;
+  type: string;
+  difficulty: string;
+  stem: string;
+  knowledgePointName?: string;
+  reason?: string;
+}
+
+export interface RecommendationResource {
+  resourceId?: number;
+  documentId?: number;
+  title: string;
+  resourceType?: string;
+  reason?: string;
+}
+
 export interface RecommendationItem {
   id: string;
   title: string;
-  type: 'exercise' | 'resource' | 'concept';
+  type: 'exercise' | 'resource';
   typeLabel: string;
-  category: '薄弱巩固' | '核心必刷' | '精选课件' | '拓展进阶';
+  category: string;
   matchScore: number;
   courseName: string;
   knowledgePoint: string;
@@ -13,12 +30,12 @@ export interface RecommendationItem {
   description: string;
   tags: string[];
   completed?: boolean;
-  resourceMeta?: {
-    format: string;
-    fileSize: string;
-  };
   exerciseMeta?: {
     questionCount: number;
     averageAccuracy: string;
+  };
+  resourceMeta?: {
+    format: string;
+    fileSize: string;
   };
 }

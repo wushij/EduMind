@@ -6,8 +6,15 @@ import {
   updateQuestion,
   deleteQuestion
 } from '@/api/question/question';
+import { getCourseList } from '@/api/course/course';
 import { QuestionItem } from '@/types/question/question';
+import type { Course } from '@/types/course/course';
 import { normalizeQuestion, normalizeQuestionList } from '@/utils/question/normalize-question';
+
+export async function fetchCoursesForForm(pageSize = 50): Promise<Course[]> {
+  const res = await getCourseList({ page: 1, pageSize });
+  return res.data?.list || [];
+}
 
 export function useQuestion() {
   const questions = ref<QuestionItem[]>([]);
@@ -58,6 +65,22 @@ export function useQuestion() {
     total.value = questions.value.length;
   }
 
+  async function loadCourseOptions() {
+    try {
+      const res = await getCourseList({ page: 1, pageSize: 100 });
+      const list = res.data?.list || [];
+      return [
+        { label: '全部课程', value: null as number | null },
+        ...list.map((item: any) => ({
+          label: item.title || item.name,
+          value: item.id as number
+        }))
+      ];
+    } catch {
+      return [{ label: '全部课程', value: null as number | null }];
+    }
+  }
+
   return {
     questions,
     currentQuestion,
@@ -66,6 +89,7 @@ export function useQuestion() {
     fetchQuestions,
     fetchQuestionDetail,
     saveQuestion,
-    removeQuestion
+    removeQuestion,
+    loadCourseOptions
   };
 }

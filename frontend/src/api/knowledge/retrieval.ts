@@ -1,6 +1,6 @@
 import { post } from '@/core/http/request';
 import { RetrievalQuery, RetrievalResultItem } from '@/types/knowledge/rag';
-import { mapRetrievalItem } from './rag-mapper';
+import { mapRetrievalItem } from '@/utils/knowledge/rag-mapper';
 
 export const retrieveChunks = async (queryReq: RetrievalQuery): Promise<RetrievalResultItem[]> => {
   const kbId = queryReq.knowledgeBaseId;

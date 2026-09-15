@@ -68,8 +68,7 @@ public class AIPracticeServiceImpl implements AIPracticeService {
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
 
-        @SuppressWarnings("unchecked")
-        List<QuestionVO> pool = (List<QuestionVO>) (List<?>) questionQueryApi.listQuestionsByCourseId(courseId);
+        List<QuestionVO> pool = questionQueryApi.listQuestionsByCourseId(courseId);
         if (pool == null) {
             pool = List.of();
         }

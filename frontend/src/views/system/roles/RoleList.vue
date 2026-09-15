@@ -203,290 +203,39 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules, type ElTree } from 'element-plus';
-import {
-  Plus,
-  Search,
-  Reading,
-  MagicStick,
-  FolderOpened,
-  Document,
-  DataAnalysis,
-  Files,
-  Setting,
-  Bell,
-  Collection,
-  DocumentAdd,
-  EditPen,
-  Service,
-  Tickets,
-  CircleCheck,
-  Cpu,
-  Folder,
-  FolderAdd,
-  DocumentChecked,
-  Notebook,
-  TrendCharts,
-  Upload,
-  School,
-  Connection,
-  User,
-  Lock,
-  Key,
-  ChatLineSquare,
-  Money
-} from '@element-plus/icons-vue';
-import {
-  createRole,
-  deleteRole,
-  getPermissions,
-  getRoles,
-  updateRole,
-  updateRolePermissions
-} from '@/api/system/role';
-import type { PermissionVO, RoleVO } from '@/types/system/rbac';
-import { buildSidebarMenuTree, flattenPermissions, type SysMenuNode } from '@/constants/permission';
+import { Plus, Search } from '@element-plus/icons-vue';
+import { useRole } from '@/composables/system/useRole';
 
-const roles = ref<RoleVO[]>([]);
-const rawPermissions = ref<PermissionVO[]>([]);
-const loading = ref(false);
-const permissionLoading = ref(false);
-const submitting = ref(false);
-const searchKeyword = ref('');
-
-const formVisible = ref(false);
-const formMode = ref<'create' | 'edit'>('create');
-const editingRoleId = ref<number | null>(null);
-const formRef = ref<FormInstance>();
-
-const permDrawer = ref(false);
-const currentRole = ref<RoleVO | null>(null);
-const treeRef = ref<InstanceType<typeof ElTree>>();
-const treeFilterText = ref('');
-const isTreeExpanded = ref(true);
-
-const form = reactive({
-  roleCode: '',
-  roleName: '',
-  description: ''
-});
-
-const rules: FormRules = {
-  roleCode: [{ required: true, message: '请输入角色编码', trigger: 'blur' }],
-  roleName: [{ required: true, message: '请输入角色名称', trigger: 'blur' }]
-};
-
-const menuTreeData = computed(() => {
-  return buildSidebarMenuTree(rawPermissions.value);
-});
-
-watch(treeFilterText, (val) => {
-  treeRef.value?.filter(val);
-});
-
-function filterTreeNode(val: string, data: any) {
-  if (!val) return true;
-  const kw = val.toLowerCase();
-  return data.name?.toLowerCase().includes(kw) || data.permission?.toLowerCase().includes(kw);
-}
-
-function getIconComponent(iconName?: string) {
-  const map: Record<string, any> = {
-    Reading,
-    MagicStick,
-    FolderOpened,
-    Document,
-    DataAnalysis,
-    Files,
-    Setting,
-    Bell,
-    Collection,
-    DocumentAdd,
-    EditPen,
-    Service,
-    Tickets,
-    CircleCheck,
-    Cpu,
-    Folder,
-    FolderAdd,
-    DocumentChecked,
-    Notebook,
-    TrendCharts,
-    Upload,
-    School,
-    Connection,
-    User,
-    Lock,
-    Key,
-    ChatLineSquare,
-    Money
-  };
-  return (iconName && map[iconName]) || Document;
-}
-
-const filteredRoles = computed(() => {
-  const kw = searchKeyword.value.trim().toLowerCase();
-  if (!kw) return roles.value;
-  return roles.value.filter(
-    (r) =>
-      r.roleName.toLowerCase().includes(kw) ||
-      r.roleCode.toLowerCase().includes(kw) ||
-      (r.description || '').toLowerCase().includes(kw)
-  );
-});
-
-async function loadRoles() {
-  loading.value = true;
-  try {
-    const res = await getRoles();
-    roles.value = res.data || [];
-  } finally {
-    loading.value = false;
-  }
-}
-
-async function loadPermissions() {
-  permissionLoading.value = true;
-  try {
-    const res = await getPermissions();
-    rawPermissions.value = res.data || [];
-  } finally {
-    permissionLoading.value = false;
-  }
-}
-
-function resetForm() {
-  form.roleCode = '';
-  form.roleName = '';
-  form.description = '';
-}
-
-function openCreateDialog() {
-  formMode.value = 'create';
-  editingRoleId.value = null;
-  resetForm();
-  formVisible.value = true;
-}
-
-function openEditDialog(row: RoleVO) {
-  formMode.value = 'edit';
-  editingRoleId.value = row.id;
-  form.roleCode = row.roleCode;
-  form.roleName = row.roleName;
-  form.description = row.description || '';
-  formVisible.value = true;
-}
-
-async function openPermissionDrawer(row: RoleVO) {
-  currentRole.value = row;
-  permDrawer.value = true;
-  treeFilterText.value = '';
-
-  if (!rawPermissions.value.length) {
-    await loadPermissions();
-  }
-
-  await nextTick();
-
-  // 获取该角色所有的权限叶子节点 ID
-  const flat = flattenPermissions(rawPermissions.value);
-  const targetCodes = row.permissions || [];
-  const matchedIds = flat
-    .filter((p) => targetCodes.includes(p.permissionCode))
-    .map((p) => p.id);
-
-  // 严格设置勾选，避免父节点半选引发误勾
-  treeRef.value?.setCheckedKeys(matchedIds, false);
-}
-
-function checkAllNodes(check: boolean) {
-  if (check) {
-    const allLeafIds = flattenPermissions(rawPermissions.value).map((p) => p.id);
-    treeRef.value?.setCheckedKeys(allLeafIds, false);
-  } else {
-    treeRef.value?.setCheckedKeys([], false);
-  }
-}
-
-function toggleTreeExpand() {
-  isTreeExpanded.value = !isTreeExpanded.value;
-  // 切换所有一级节点
-  const nodes = menuTreeData.value;
-  nodes.forEach((node) => {
-    const elNode = treeRef.value?.getNode(node.id);
-    if (elNode) {
-      elNode.expanded = isTreeExpanded.value;
-    }
-  });
-}
-
-async function submitForm() {
-  await formRef.value?.validate();
-  submitting.value = true;
-  try {
-    if (formMode.value === 'create') {
-      await createRole({
-        roleCode: form.roleCode,
-        roleName: form.roleName,
-        description: form.description
-      });
-      ElMessage.success('角色创建成功');
-    } else if (editingRoleId.value) {
-      await updateRole(editingRoleId.value, {
-        roleName: form.roleName,
-        description: form.description
-      });
-      ElMessage.success('角色已保存');
-    }
-    formVisible.value = false;
-    await loadRoles();
-  } finally {
-    submitting.value = false;
-  }
-}
-
-async function savePermissions() {
-  if (!currentRole.value) return;
-  submitting.value = true;
-  try {
-    const checkedKeys = (treeRef.value?.getCheckedKeys(false) as any[]) || [];
-    // 只提交数值类型的叶子权限 ID（排除顶级字符串目录 ID 如 mod-course）
-    const validNumericIds = checkedKeys.filter((k) => typeof k === 'number');
-
-    await updateRolePermissions(currentRole.value.id, validNumericIds);
-    ElMessage.success('已保存权限');
-    permDrawer.value = false;
-    await loadRoles();
-  } catch (err: any) {
-    ElMessage.error(err?.message || '保存权限失败');
-  } finally {
-    submitting.value = false;
-  }
-}
-
-async function handleDelete(row: RoleVO) {
-  if (row.roleCode === 'ADMIN') {
-    ElMessage.warning('超级管理员角色无法删除');
-    return;
-  }
-  await ElMessageBox.confirm(`确定删除角色「${row.roleName}」？`, '确认删除', {
-    type: 'warning'
-  });
-  await deleteRole(row.id);
-  ElMessage.success('已删除');
-  await loadRoles();
-}
-
-function getRoleTagType(code: string) {
-  const c = code.toUpperCase();
-  if (c.includes('ADMIN')) return 'danger';
-  if (c.includes('TEACHER')) return 'primary';
-  if (c.includes('STUDENT')) return 'warning';
-  return 'info';
-}
-
-onMounted(loadRoles);
+const {
+  roles,
+  loading,
+  permissionLoading,
+  submitting,
+  searchKeyword,
+  formVisible,
+  formMode,
+  formRef,
+  permDrawer,
+  currentRole,
+  treeRef,
+  treeFilterText,
+  isTreeExpanded,
+  form,
+  rules,
+  menuTreeData,
+  filteredRoles,
+  openCreateDialog,
+  openEditDialog,
+  openPermissionDrawer,
+  checkAllNodes,
+  toggleTreeExpand,
+  submitForm,
+  savePermissions,
+  handleDelete,
+  getRoleTagType,
+  getIconComponent,
+  filterTreeNode
+} = useRole();
 </script>
 
 <style scoped>

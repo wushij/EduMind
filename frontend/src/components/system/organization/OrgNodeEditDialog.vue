@@ -63,7 +63,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { createOrgNode, updateOrgNode } from '@/api/system/tenant';
+import { createOrgNode, updateOrgNode } from '@/composables/system/useOrganization';
 import type { OrganizationNodeVO } from '@/types/system/tenant';
 
 const props = defineProps<{

@@ -14,11 +14,17 @@ export interface Course {
   chapterCount: number;
   knowledgePointCount?: number;
   resourceCount?: number;
+  category?: string;
+  credits?: number;
+  plannedHours?: number;
+  aiPersona?: string;
+  welcomeMessage?: string;
   progress?: number;
   aiUsageCount?: number;
   status: CourseStatus;
   description?: string;
   createdAt?: string;
+  knowledgeBaseId?: number;
 }
 
 export type CourseVO = Course;
@@ -37,4 +43,11 @@ export interface CourseCreateRequest {
   description?: string;
   coverUrl?: string;
   semester?: string;
+  category?: string;
+  credits?: number;
+  plannedHours?: number;
+  knowledgeBaseId?: number;
+  aiPersona?: string;
+  welcomeMessage?: string;
+  initialChapters?: string[];
 }

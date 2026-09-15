@@ -12,7 +12,7 @@ import com.edumind.ai.service.routing.IntentDispatchService;
 import com.edumind.ai.vo.rag.CitationVO;
 import com.edumind.course.api.CourseQueryApi;
 import com.edumind.course.vo.course.CourseDetailVO;
-import com.edumind.knowledge.service.knowledge.KnowledgeAccessService;
+import com.edumind.knowledge.api.KnowledgeAccessApi;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -29,7 +29,7 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
     private final IntentRouter intentRouter;
     private final PromptService promptService;
     private final RagPipelineImpl ragPipeline;
-    private final KnowledgeAccessService knowledgeAccessService;
+    private final KnowledgeAccessApi knowledgeAccessApi;
     private final CourseQueryApi courseQueryApi;
 
     @Override
@@ -70,7 +70,7 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
         boolean useRag = request.getKnowledgeBaseId() != null;
 
         if (useRag) {
-            knowledgeAccessService.assertAccessible(request.getKnowledgeBaseId());
+            knowledgeAccessApi.assertAccessible(request.getKnowledgeBaseId());
             QueryRewriteContext rewriteContext = QueryRewriteContext.builder()
                     .question(request.getMessage())
                     .courseName(resolveCourseName(request))

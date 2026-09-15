@@ -4,7 +4,7 @@ import com.edumind.common.context.TenantContext;
 import com.edumind.common.utils.TenantObjectKeyBuilder;
 import com.edumind.infrastructure.oss.FileStorageService;
 import com.edumind.infrastructure.redis.RedisService;
-import com.edumind.infrastructure.redis.cache.AiQuotaService;
+import com.edumind.infrastructure.redis.cache.AiQuotaCache;
 import com.edumind.infrastructure.redis.cache.AiSessionCacheService;
 import com.edumind.infrastructure.redis.cache.DashboardCacheService;
 import com.edumind.infrastructure.vector.VectorSearchResult;
@@ -41,7 +41,7 @@ public class TenantMediumIsolationIntegrationTest {
     private DashboardCacheService dashboardCacheService;
 
     @Autowired
-    private AiQuotaService aiQuotaService;
+    private AiQuotaCache aiQuotaCache;
 
     @Autowired
     private RedisService redisService;
@@ -137,14 +137,14 @@ public class TenantMediumIsolationIntegrationTest {
 
             // 3. 配额隔离：A 校消费配额，不影响 B 校
             TenantContext.setTenantId(TENANT_A);
-            boolean allowedA1 = aiQuotaService.checkAndIncrementDailyQuota(sharedUserId, 1);
-            boolean allowedA2 = aiQuotaService.checkAndIncrementDailyQuota(sharedUserId, 1);
+            boolean allowedA1 = aiQuotaCache.checkAndIncrementDailyQuota(sharedUserId, 1);
+            boolean allowedA2 = aiQuotaCache.checkAndIncrementDailyQuota(sharedUserId, 1);
             Assertions.assertTrue(allowedA1, "A 校首次配额允许");
             Assertions.assertFalse(allowedA2, "A 校超出配额拒绝");
 
             // B 校此时配额仍有额度
             TenantContext.setTenantId(TENANT_B);
-            boolean allowedB1 = aiQuotaService.checkAndIncrementDailyQuota(sharedUserId, 1);
+            boolean allowedB1 = aiQuotaCache.checkAndIncrementDailyQuota(sharedUserId, 1);
             Assertions.assertTrue(allowedB1, "B 校相同用户的独立配额不受 A 校耗尽影响");
         } finally {
             TenantContext.setTenantId(TENANT_A);

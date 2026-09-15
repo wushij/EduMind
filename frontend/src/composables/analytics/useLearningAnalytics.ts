@@ -1,7 +1,9 @@
 import { ref } from 'vue';
 import { getLearningAnalytics, getAiUsageAnalytics } from '@/api/analytics/learning';
-import { getKnowledgeMastery, getWrongQuestions } from '@/api/analytics/knowledge';
+import { diagnoseWrongQuestion, getKnowledgeMastery, getWrongQuestions } from '@/api/analytics/knowledge';
+import { getTeachingReport } from '@/api/analytics/report';
 import { generateTeachingAdvice } from '@/api/analytics/teaching';
+import { fetchOverviewAnalyticsBundle } from '@/services/analytics/overview-service';
 import { USE_MOCK } from '@/config/mock';
 import {
   MOCK_AI_USAGE,
@@ -11,12 +13,24 @@ import {
   MOCK_WRONG_QUESTIONS
 } from '@/mock/analytics';
 import type { AiUsageAnalyticsVO, LearningAnalyticsVO } from '@/types/analytics/learning';
+import type { TeachingReportVO } from '@/types/analytics/report';
 import type {
   KnowledgeMasteryVO,
   TeachingAdviceRequest,
   TeachingAdviceVO,
   WrongQuestionAnalyticsVO
 } from '@/types/analytics/mastery';
+
+export interface OverviewAnalyticsData {
+  learning: LearningAnalyticsVO | null;
+  aiUsage: AiUsageAnalyticsVO | null;
+  mastery: KnowledgeMasteryVO | null;
+}
+
+export interface WrongQuestionDiagnoseResult {
+  diagnosis?: string;
+  variantQuestionIds: number[];
+}
 
 export function useLearningAnalytics() {
   const loading = ref(false);
@@ -108,6 +122,32 @@ export function useLearningAnalytics() {
     }
   }
 
+  async function fetchOverview(courseId: number, range = '30d'): Promise<OverviewAnalyticsData> {
+    return fetchOverviewAnalyticsBundle(courseId, range);
+  }
+
+  async function diagnoseWrong(recordId: number): Promise<WrongQuestionDiagnoseResult | null> {
+    try {
+      const res = await diagnoseWrongQuestion(recordId);
+      const variantIds = res.data?.variantQuestionIds?.split(',').filter(Boolean) ?? [];
+      return {
+        diagnosis: res.data?.diagnosis,
+        variantQuestionIds: variantIds.map((id) => Number(id))
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async function fetchTeachingReport(courseId: number): Promise<TeachingReportVO | null> {
+    try {
+      const res = await getTeachingReport(courseId);
+      return res?.data ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   async function fetchTeachingAdvice(request: TeachingAdviceRequest) {
     loading.value = true;
     usedMockFallback.value = false;
@@ -139,6 +179,9 @@ export function useLearningAnalytics() {
     fetchMastery,
     fetchWrongQuestions,
     fetchAiUsage,
+    fetchOverview,
+    diagnoseWrong,
+    fetchTeachingReport,
     fetchTeachingAdvice
   };
 }

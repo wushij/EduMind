@@ -16,7 +16,7 @@
             <span>{{ row.usedTokensToday.toLocaleString() }} / {{ row.isUnlimited ? '不限' : row.dailyTokenLimit.toLocaleString() }}</span>
             <el-progress
               v-if="!row.isUnlimited"
-              :percentage="Math.min(100, Math.round((row.usedTokensToday / row.dailyTokenLimit) * 100))"
+              :percentage="computeQuotaUsagePercent(row.usedTokensToday, row.dailyTokenLimit, row.isUnlimited)"
               :stroke-width="6"
             />
           </div>
@@ -55,48 +55,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { getRoleQuotas, updateRoleQuota } from '@/api/system/quota';
-import type { RoleQuotaConfig } from '@/types/system/quota';
-import { ElMessage } from 'element-plus';
+import { useQuotaOverview, computeQuotaUsagePercent } from '@/composables/system/useQuotaOverview';
 
-const loading = ref(false);
-const userQuotas = ref<RoleQuotaConfig[]>([]);
-const editDialogVisible = ref(false);
-const editingQuota = ref<RoleQuotaConfig | null>(null);
-
-const fetchQuotas = async () => {
-  loading.value = true;
-  try {
-    userQuotas.value = await getRoleQuotas();
-  } catch {
-    userQuotas.value = [];
-    ElMessage.error('加载配额数据失败');
-  } finally {
-    loading.value = false;
-  }
-};
-
-const editQuota = (row: RoleQuotaConfig) => {
-  editingQuota.value = JSON.parse(JSON.stringify(row));
-  editDialogVisible.value = true;
-};
-
-const saveUserQuota = async () => {
-  if (!editingQuota.value) return;
-  try {
-    await updateRoleQuota(editingQuota.value.id, editingQuota.value);
-    ElMessage.success('用户配额已更新');
-    editDialogVisible.value = false;
-    await fetchQuotas();
-  } catch {
-    ElMessage.error('保存失败');
-  }
-};
-
-onMounted(() => {
-  fetchQuotas();
-});
+const {
+  loading,
+  userQuotas,
+  editDialogVisible,
+  editingQuota,
+  editQuota,
+  saveUserQuota
+} = useQuotaOverview();
 </script>
 
 <style scoped lang="scss">

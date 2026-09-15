@@ -159,7 +159,7 @@
 import { ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Check } from '@element-plus/icons-vue';
-import { createTenant, updateTenant } from '@/api/system/tenant';
+import { createTenant, updateTenant } from '@/composables/system/useTenant';
 import type { TenantListVO } from '@/types/system/tenant';
 
 const props = defineProps<{

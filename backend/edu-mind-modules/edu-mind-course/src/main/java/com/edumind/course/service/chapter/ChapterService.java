@@ -7,4 +7,6 @@ import java.util.List;
 public interface ChapterService {
 
     List<ChapterTreeVO> getChapterTree(Long courseId);
+
+    Long createChapter(Long courseId, String title, Long parentId, Integer sortOrder);
 }

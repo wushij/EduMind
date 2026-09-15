@@ -1,6 +1,6 @@
 import { post } from '@/core/http/request';
 import { RAGDebugRequest, RAGDebugResponse } from '@/types/knowledge/rag';
-import { mapRagDebugResponse } from './rag-mapper';
+import { mapRagDebugResponse } from '@/utils/knowledge/rag-mapper';
 
 export const debugRagPipeline = async (req: RAGDebugRequest): Promise<RAGDebugResponse> => {
   const payload = {

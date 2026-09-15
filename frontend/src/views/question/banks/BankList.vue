@@ -137,106 +137,29 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import { FolderOpened, Plus, ArrowRight } from '@element-plus/icons-vue';
-import { getQuestionBanks, createQuestionBank } from '@/api/question/question-bank';
-import { getCourseList } from '@/api/course/course';
+import { useBankList } from '@/composables/question/useBank';
 import AppPagination from '@/components/common/AppPagination.vue';
-import type { Course } from '@/types/course/course';
 
-const router = useRouter();
-const loading = ref(false);
-const creating = ref(false);
-const showCreateDialog = ref(false);
-const dialogFormRef = ref<FormInstance>();
-
-const banks = ref<any[]>([]);
-const courses = ref<Course[]>([]);
-const selectedCourseId = ref<number | null>(null);
-const pageNum = ref(1);
-const pageSize = ref(10);
-const total = ref(0);
-
-const newBankForm = reactive({
-  name: '',
-  courseId: undefined as number | undefined,
-  description: ''
-});
-
-const dialogRules: FormRules = {
-  name: [{ required: true, message: '请输入题库名称', trigger: 'blur' }],
-  courseId: [{ required: true, message: '请选择关联课程', trigger: 'change' }]
-};
-
-function handleCourseFilter(courseId: number | null) {
-  selectedCourseId.value = courseId;
-  pageNum.value = 1;
-  loadBanks();
-}
-
-onMounted(async () => {
-  await Promise.all([loadCourses(), loadBanks()]);
-});
-
-async function loadCourses() {
-  try {
-    const res = await getCourseList({ page: 1, pageSize: 50 });
-    courses.value = res.data?.list || [];
-  } catch (err) {
-    console.error('加载课程失败', err);
-  }
-}
-
-async function loadBanks() {
-  loading.value = true;
-  try {
-    const res = await getQuestionBanks({
-      page: pageNum.value,
-      pageSize: pageSize.value,
-      courseId: selectedCourseId.value || undefined
-    });
-    banks.value = res.data?.list || [];
-    total.value = res.data?.total ?? banks.value.length;
-  } catch {
-    banks.value = [
-      { id: 1, name: '数据结构核心真题库', courseId: 101, questionCount: 5, description: '涵盖408与期末高频真题', updateTime: '2026-09-10' },
-      { id: 2, name: 'Java面向对象精选题集', courseId: 102, questionCount: 3, description: 'Java核心典型题型', updateTime: '2026-09-09' },
-      { id: 3, name: '高等数学期末测试真题库', courseId: 103, questionCount: 3, description: '微积分计算经典测试题', updateTime: '2026-09-08' }
-    ];
-    total.value = banks.value.length;
-  } finally {
-    loading.value = false;
-  }
-}
-
-function getCourseName(courseId: number): string {
-  const c = courses.value.find(item => item.id === courseId);
-  return c ? c.title : '专业核心课';
-}
-
-async function handleCreateBank() {
-  if (!dialogFormRef.value) return;
-  await dialogFormRef.value.validate(async (valid) => {
-    if (valid) {
-      creating.value = true;
-      try {
-        await createQuestionBank(newBankForm);
-        ElMessage.success('题库创建成功！');
-        showCreateDialog.value = false;
-        newBankForm.name = '';
-        newBankForm.description = '';
-        pageNum.value = 1;
-        await loadBanks();
-      } catch (err: any) {
-        ElMessage.error(err?.message || '创建题库失败');
-      } finally {
-        creating.value = false;
-      }
-    }
-  });
-}
+const {
+  router,
+  loading,
+  creating,
+  showCreateDialog,
+  dialogFormRef,
+  banks,
+  courses,
+  selectedCourseId,
+  pageNum,
+  pageSize,
+  total,
+  newBankForm,
+  dialogRules,
+  handleCourseFilter,
+  getCourseName,
+  loadBanks,
+  handleCreateBank
+} = useBankList();
 </script>
 
 <style scoped lang="scss">

@@ -40,6 +40,24 @@ public class CourseConverter {
         if (dto.getCode() != null) {
             entity.setCode(dto.getCode());
         }
+        if (dto.getCategory() != null) {
+            entity.setCategory(dto.getCategory());
+        }
+        if (dto.getCredits() != null) {
+            entity.setCredits(dto.getCredits());
+        }
+        if (dto.getPlannedHours() != null) {
+            entity.setPlannedHours(dto.getPlannedHours());
+        }
+        if (dto.getKnowledgeBaseId() != null) {
+            entity.setKnowledgeBaseId(dto.getKnowledgeBaseId());
+        }
+        if (dto.getAiPersona() != null) {
+            entity.setAiPersona(dto.getAiPersona());
+        }
+        if (dto.getWelcomeMessage() != null) {
+            entity.setWelcomeMessage(dto.getWelcomeMessage());
+        }
         if (StringUtils.hasText(dto.getStatus())) {
             entity.setStatus("ACTIVE".equalsIgnoreCase(dto.getStatus()) ? 1 : 0);
         }
@@ -55,6 +73,12 @@ public class CourseConverter {
         entity.setCoverImage(dto.getCoverUrl());
         entity.setSemester(dto.getSemester());
         entity.setCode(dto.getCode());
+        entity.setCategory(dto.getCategory() != null ? dto.getCategory() : "计算机与软件");
+        entity.setCredits(dto.getCredits() != null ? dto.getCredits() : java.math.BigDecimal.valueOf(3.0));
+        entity.setPlannedHours(dto.getPlannedHours() != null ? dto.getPlannedHours() : 48);
+        entity.setKnowledgeBaseId(dto.getKnowledgeBaseId());
+        entity.setAiPersona(dto.getAiPersona() != null ? dto.getAiPersona() : "socrates");
+        entity.setWelcomeMessage(dto.getWelcomeMessage());
         entity.setTeacherId(teacherId);
         entity.setStatus(1);
         return entity;
@@ -76,6 +100,12 @@ public class CourseConverter {
                 .chapterCount(chapterCount != null ? chapterCount : 0L)
                 .knowledgePointCount(knowledgePointCount != null ? knowledgePointCount : 0L)
                 .resourceCount(resourceCount != null ? resourceCount : 0L)
+                .category(entity.getCategory())
+                .credits(entity.getCredits())
+                .plannedHours(entity.getPlannedHours())
+                .knowledgeBaseId(entity.getKnowledgeBaseId())
+                .aiPersona(entity.getAiPersona())
+                .welcomeMessage(entity.getWelcomeMessage())
                 .status(mapStatus(entity.getStatus()))
                 .semester(entity.getSemester())
                 .build();
@@ -103,6 +133,12 @@ public class CourseConverter {
                 .chapterCount(chapterCount != null ? chapterCount : 0L)
                 .knowledgePointCount(knowledgePointCount != null ? knowledgePointCount : 0L)
                 .resourceCount(resourceCount != null ? resourceCount : 0L)
+                .category(entity.getCategory())
+                .credits(entity.getCredits())
+                .plannedHours(entity.getPlannedHours())
+                .knowledgeBaseId(entity.getKnowledgeBaseId())
+                .aiPersona(entity.getAiPersona())
+                .welcomeMessage(entity.getWelcomeMessage())
                 .createdAt(entity.getCreateTime())
                 .updatedAt(entity.getUpdateTime())
                 .build();

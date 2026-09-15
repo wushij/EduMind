@@ -1,54 +1,124 @@
 <template>
   <div class="course-detail-container" :class="{ 'course-detail-container--ai': isAiRoute }">
-    <!-- 顶部课程上下文信息条 (对齐页面Banner规范，非普通标题) -->
-    <div class="course-header-bar">
-      <div class="header-left">
-        <button type="button" class="back-link" @click="router.push('/course')">
-          <svg viewBox="0 0 24 24" class="back-svg" fill="none" stroke="currentColor" stroke-width="2">
+    <!-- 顶部课程上下文 Hero Banner (模仿课程中心 PageHeroBanner 视觉设计) -->
+    <div class="course-hero-header">
+      <!-- 柔光微动效光晕 -->
+      <div class="glow-orb glow-orb--left"></div>
+      <div class="glow-orb glow-orb--right"></div>
+
+      <!-- 顶层快速导航与辅助工具栏 -->
+      <div class="hero-top-toolbar">
+        <button type="button" class="capsule-btn capsule-btn--default" @click="router.push('/course')">
+          <svg viewBox="0 0 24 24" class="btn-icon-svg" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="19" y1="12" x2="5" y2="12"></line>
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
           <span>返回课程列表</span>
         </button>
 
-        <div class="course-title-row">
-          <h1 class="course-title">{{ currentCourse?.title || '正在加载课程...' }}</h1>
-          <span class="pill-tag pill-tag--code">{{ currentCourse?.code || 'COURSE' }}</span>
-          <span class="pill-tag pill-tag--status">
-            <span class="pulse-circle"></span>
-            {{ statusText }}
-          </span>
-        </div>
-
-        <div class="meta-info-row">
-          <span class="meta-item">
-            <span class="meta-label">主讲教师：</span>
-            <strong class="meta-val">{{ currentCourse?.teacherName || '任课教师' }}</strong>
-          </span>
-          <span class="divider">/</span>
-          <span class="meta-item">
-            <span class="meta-label">开课学期：</span>
-            <strong class="meta-val">{{ currentCourse?.semester || '2026秋季学期' }}</strong>
-          </span>
-          <span class="divider">/</span>
-          <span class="meta-item">
-            <span class="meta-label">修读人数：</span>
-            <strong class="meta-val">{{ currentCourse?.studentCount || 0 }} 人</strong>
-          </span>
+        <div class="toolbar-right-actions">
+          <button
+            v-if="currentCourse?.code"
+            type="button"
+            class="capsule-btn capsule-btn--default code-btn"
+            title="点击复制课程专属代号"
+            @click="copyCourseCode"
+          >
+            <svg viewBox="0 0 24 24" class="btn-icon-svg text-primary" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>课程代号：<strong class="code-highlight">{{ currentCourse.code }}</strong></span>
+            <span class="copy-tag">复制</span>
+          </button>
         </div>
       </div>
 
-      <div class="header-right">
-        <!-- 重点功能：一键进入课程专属 AI 助教 -->
-        <button
-          type="button"
-          class="ai-assistant-btn"
-          @click="navigateToTab('ai')"
-        >
-          <el-icon class="ai-sparkle-icon"><MagicStick /></el-icon>
-          <span>课程专属 AI 助教</span>
-          <span class="ai-pill-bubble">SSE 实时解惑</span>
-        </button>
+      <!-- 中部主信息行：课程标题与 AI 助教操作按钮 -->
+      <div class="hero-main-row">
+        <div class="main-info-col">
+          <div class="title-status-line">
+            <h1 v-if="currentCourse?.title" class="hero-course-title">{{ currentCourse.title }}</h1>
+            <div v-else class="hero-title-skeleton"></div>
+
+            <span v-if="currentCourse?.code" class="course-code-badge">{{ currentCourse.code }}</span>
+            <span class="status-pill-badge" :class="statusClass">
+              <span class="pulse-dot"></span>
+              <span>{{ statusText }}</span>
+            </span>
+          </div>
+
+          <div class="hero-meta-badges">
+            <div class="meta-badge-item">
+              <svg viewBox="0 0 24 24" class="meta-svg" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <span class="meta-label">主讲教师：</span>
+              <strong class="meta-value">{{ currentCourse?.teacherName || '任课教师' }}</strong>
+            </div>
+
+            <div class="meta-badge-item">
+              <svg viewBox="0 0 24 24" class="meta-svg" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <span class="meta-label">开课学期：</span>
+              <strong class="meta-value">{{ currentCourse?.semester || '2026年秋季学期' }}</strong>
+            </div>
+
+            <div class="meta-badge-item">
+              <svg viewBox="0 0 24 24" class="meta-svg" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              <span class="meta-label">修读人数：</span>
+              <strong class="meta-value">{{ currentCourse?.studentCount || 0 }} 人</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧：长圆专属 AI 助教操作按钮（1:1 继承课程中心 capsule-btn--primary 设计） -->
+        <div class="main-action-col">
+          <button
+            type="button"
+            class="capsule-btn capsule-btn--primary"
+            @click="navigateToTab('ai')"
+          >
+            <svg viewBox="0 0 24 24" class="btn-icon-svg" fill="currentColor">
+              <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"></path>
+            </svg>
+            <span>课程专属 AI 助教</span>
+            <svg viewBox="0 0 24 24" class="btn-arrow-svg" fill="none" stroke="currentColor" stroke-width="2.2">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- 底部统计卡片行（完全模仿课程中心，高雅平滑） -->
+      <div class="hero-stats-row">
+        <div class="hero-stat-card">
+          <span class="stat-num text-primary">{{ currentCourse?.chapterCount || 0 }}</span>
+          <span class="stat-label">大纲章节课时</span>
+        </div>
+        <div class="hero-stat-card">
+          <span class="stat-num text-success">{{ currentCourse?.knowledgePointCount || 0 }}</span>
+          <span class="stat-label">知识点图谱节点</span>
+        </div>
+        <div class="hero-stat-card">
+          <span class="stat-num text-warning">{{ currentCourse?.studentCount || 0 }} 人</span>
+          <span class="stat-label">已选修读学生</span>
+        </div>
+        <div class="hero-stat-card">
+          <span class="stat-num text-info">7×24h 在线</span>
+          <span class="stat-label">AI 专属助教已就绪</span>
+        </div>
       </div>
     </div>
 
@@ -88,6 +158,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
 import { useCourse } from '@/composables/course/useCourse';
 import {
   Reading,
@@ -95,8 +166,7 @@ import {
   Connection,
   FolderOpened,
   Service,
-  User,
-  MagicStick
+  User
 } from '@element-plus/icons-vue';
 
 const route = useRoute();
@@ -113,6 +183,13 @@ const statusText = computed(() => {
   return '进行中';
 });
 
+const statusClass = computed(() => {
+  if (currentCourse.value?.status === 'ARCHIVED' || currentCourse.value?.status === 2) {
+    return 'status--archived';
+  }
+  return 'status--active';
+});
+
 const subTabs = computed(() => [
   { label: '课程概览', path: `/course/${courseId.value}/overview`, icon: Reading },
   { label: '大纲与章节', path: `/course/${courseId.value}/chapters`, icon: Document },
@@ -126,18 +203,33 @@ function navigateToTab(tab: string) {
   router.push(`/course/${courseId.value}/${tab}`);
 }
 
+function copyCourseCode() {
+  if (!currentCourse.value?.code) return;
+  navigator.clipboard.writeText(currentCourse.value.code);
+  ElMessage.success(`已复制课程专属代号：${currentCourse.value.code}`);
+}
+
 async function loadCourse(id: string) {
   if (!id) return;
-  const course = await fetchCourseDetail(id);
-  if (course?.id) {
-    localStorage.setItem('edumind_last_course_id', String(course.id));
+  // 单例防抖与防重复刷新：若已有当前课程数据且ID一致，绝不重复拉取触发UI跳动闪烁
+  if (currentCourse.value && String(currentCourse.value.id) === String(id)) {
+    return;
+  }
+  try {
+    const course = await fetchCourseDetail(id);
+    if (course?.id) {
+      localStorage.setItem('edumind_last_course_id', String(course.id));
+    }
+  } catch {
+    // 错误处理已在全局拦截器捕获
   }
 }
 
+// 仅当 params.id 真实跨课程变更时触发，子 Tab 切换（overview -> chapters 等）时绝不重新触发请求
 watch(
   () => route.params.id,
-  (newId) => {
-    if (newId) {
+  (newId, oldId) => {
+    if (newId && newId !== oldId && (!currentCourse.value || String(currentCourse.value.id) !== String(newId))) {
       void loadCourse(String(newId));
     }
   }
@@ -160,145 +252,326 @@ onMounted(() => {
   min-width: 0;
   box-sizing: border-box;
 
-  // 1. 顶部课程上下文信息条
-  .course-header-bar {
-    background: #FFFFFF;
-    border-radius: 18px;
-    padding: 22px 28px;
+  // 1. 顶部课程上下文 Hero Banner (完全模仿课程中心 PageHeroBanner 视觉设计)
+  .course-hero-header {
+    position: relative;
+    width: 100%;
+    border-radius: 24px;
+    padding: 20px 28px 18px;
+    background: linear-gradient(135deg, #EAF3FF 0%, #EEF2FF 45%, #E0E7FF 100%);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+    overflow: hidden;
+    box-sizing: border-box;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border: 1px solid #EBF1F7;
-    box-shadow: 0 4px 20px rgba(30, 80, 150, 0.05);
+    flex-direction: column;
+    gap: 16px;
+    transition: all 0.3s ease;
 
-    .header-left {
-      .back-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        background: transparent;
-        border: none;
-        padding: 0;
-        font-size: 13px;
-        color: #64748B;
-        font-weight: 500;
-        cursor: pointer;
-        margin-bottom: 8px;
-        transition: color 0.2s;
+    // 柔和科技梦幻微光球 (继承自 PageHeroBanner)
+    .glow-orb {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      filter: blur(50px);
+      z-index: 0;
 
-        .back-svg {
-          width: 14px;
-          height: 14px;
-        }
-
-        &:hover {
-          color: #1677FF;
-        }
+      &--left {
+        width: 220px;
+        height: 220px;
+        background: radial-gradient(circle, rgba(22, 119, 255, 0.16) 0%, rgba(22, 119, 255, 0) 70%);
+        top: -60px;
+        left: -40px;
       }
 
-      .course-title-row {
+      &--right {
+        width: 260px;
+        height: 260px;
+        background: radial-gradient(circle, rgba(147, 51, 234, 0.12) 0%, rgba(147, 51, 234, 0) 70%);
+        bottom: -80px;
+        right: 40px;
+      }
+    }
+
+    // 顶层导航与工具栏
+    .hero-top-toolbar {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      .toolbar-right-actions {
         display: flex;
         align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
+        gap: 10px;
+      }
+    }
 
-        .course-title {
-          margin: 0;
-          font-size: 22px;
-          font-weight: 700;
-          color: #0F172A;
-          letter-spacing: -0.2px;
-        }
+    // 中部主信息行
+    .hero-main-row {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
 
-        .pill-tag {
-          display: inline-flex;
+      .main-info-col {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+
+        .title-status-line {
+          display: flex;
           align-items: center;
-          gap: 6px;
-          height: 24px;
-          padding: 0 12px;
-          border-radius: 9999px;
-          font-size: 12px;
-          font-weight: 600;
+          gap: 12px;
+          flex-wrap: wrap;
 
-          &--code {
-            background: #F1F5F9;
-            color: #475569;
+          .hero-course-title {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 800;
+            color: #0F172A;
+            letter-spacing: -0.3px;
+            line-height: 1.3;
           }
 
-          &--status {
-            background: #E8F8F0;
-            color: #10B981;
+          // 平滑无感骨架条，消除文字硬跳变
+          .hero-title-skeleton {
+            width: 260px;
+            height: 28px;
+            border-radius: 8px;
+            background: linear-gradient(90deg, rgba(226, 232, 240, 0.6) 25%, rgba(241, 245, 249, 0.9) 50%, rgba(226, 232, 240, 0.6) 75%);
+            background-size: 200% 100%;
+            animation: shimmer-skeleton 1.5s infinite;
+          }
 
-            .pulse-circle {
-              width: 6px;
-              height: 6px;
-              border-radius: 50%;
-              background: #10B981;
+          .course-code-badge {
+            font-size: 12px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 9999px;
+            background: #FFFFFF;
+            color: #1677FF;
+            border: 1.5px solid rgba(22, 119, 255, 0.2);
+            box-shadow: 0 2px 6px rgba(22, 119, 255, 0.08);
+            letter-spacing: 0.5px;
+          }
+
+          .status-pill-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            height: 24px;
+            padding: 0 10px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 600;
+
+            &.status--active {
+              background: #E6F7ED;
+              color: #16A34A;
+              border: 1px solid #BAE8CB;
+
+              .pulse-dot {
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: #16A34A;
+                box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25);
+              }
+            }
+
+            &.status--archived {
+              background: #F1F5F9;
+              color: #64748B;
+              border: 1px solid #CBD5E1;
+
+              .pulse-dot {
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: #94A3B8;
+              }
+            }
+          }
+        }
+
+        .hero-meta-badges {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          flex-wrap: wrap;
+
+          .meta-badge-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 13px;
+            color: #64748B;
+
+            .meta-svg {
+              width: 14px;
+              height: 14px;
+              color: #94A3B8;
+            }
+
+            .meta-label {
+              color: #64748B;
+            }
+
+            .meta-value {
+              color: #1E293B;
+              font-weight: 600;
             }
           }
         }
       }
 
-      .meta-info-row {
-        margin-top: 10px;
-        font-size: 13px;
-        color: #64748B;
+      // 右侧操作按钮列
+      .main-action-col {
         display: flex;
         align-items: center;
-        gap: 10px;
+      }
+    }
 
-        .meta-label {
-          color: #94A3B8;
+    // 长圆按钮统一样式 (1:1 继承课程中心 PageHeroBanner 按钮规范)
+    .capsule-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 40px;
+      padding: 0 22px;
+      border-radius: 9999px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+      white-space: nowrap;
+
+      .btn-icon-svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+
+        &.text-primary {
+          color: #1677FF;
+        }
+      }
+
+      .btn-arrow-svg {
+        width: 14px;
+        height: 14px;
+        transition: transform 0.2s ease;
+      }
+
+      &--primary {
+        background: #1677FF;
+        color: #FFFFFF;
+        border: none;
+        box-shadow: 0 2px 8px rgba(22, 119, 255, 0.25);
+
+        &:hover {
+          background: #4096FF;
+          transform: translateY(-1px);
+          box-shadow: 0 6px 16px rgba(22, 119, 255, 0.35);
+
+          .btn-arrow-svg {
+            transform: translateX(3px);
+          }
         }
 
-        .meta-val {
-          color: #334155;
-          font-weight: 500;
+        &:active {
+          background: #0958D9;
+          transform: translateY(0);
+        }
+      }
+
+      &--default {
+        height: 34px;
+        padding: 0 16px;
+        font-size: 13px;
+        background: rgba(255, 255, 255, 0.88);
+        backdrop-filter: blur(8px);
+        color: #334155;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+
+        &:hover {
+          border-color: #BFDBFE;
+          color: #1677FF;
+          background: #FFFFFF;
+          transform: translateY(-1px);
+          box-shadow: 0 3px 10px rgba(22, 119, 255, 0.1);
         }
 
-        .divider {
-          color: #CBD5E1;
+        &.code-btn {
+          .code-highlight {
+            color: #1677FF;
+            letter-spacing: 0.5px;
+            margin-left: 2px;
+          }
+
+          .copy-tag {
+            font-size: 11px;
+            padding: 1px 6px;
+            border-radius: 9999px;
+            background: #EAF3FF;
+            color: #1677FF;
+            font-weight: 600;
+            margin-left: 4px;
+          }
         }
       }
     }
 
-    .header-right {
-      .ai-assistant-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        height: 46px;
-        padding: 0 20px;
+    // 底部统计卡片行 (1:1 继承课程中心 hero-stats-row 规范)
+    .hero-stats-row {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+
+      .hero-stat-card {
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(8px);
+        padding: 6px 20px;
         border-radius: 9999px;
-        background: linear-gradient(135deg, #1677FF 0%, #722ED1 100%);
-        color: #FFFFFF;
-        border: none;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        box-shadow: 0 4px 16px rgba(22, 119, 255, 0.35);
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-
-        .ai-sparkle-icon {
-          font-size: 16px;
-        }
-
-        .ai-pill-bubble {
-          font-size: 11px;
-          font-weight: 600;
-          padding: 2px 8px;
-          border-radius: 9999px;
-          background: rgba(255, 255, 255, 0.22);
-          backdrop-filter: blur(4px);
-        }
+        border: 1.5px solid rgba(22, 119, 255, 0.12);
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.25s ease;
 
         &:hover {
+          background: #FFFFFF;
+          border-color: #1677FF;
           transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(114, 46, 209, 0.45);
+          box-shadow: 0 4px 12px rgba(22, 119, 255, 0.1);
         }
 
-        &:active {
-          transform: translateY(0);
+        .stat-num {
+          font-size: 18px;
+          font-weight: 800;
+          line-height: 1;
+
+          &.text-primary { color: #2563EB; }
+          &.text-success { color: #16A34A; }
+          &.text-warning { color: #D97706; }
+          &.text-info { color: #0284C7; }
+        }
+
+        .stat-label {
+          font-size: 12.5px;
+          font-weight: 500;
+          color: #475569;
+          white-space: nowrap;
         }
       }
     }
@@ -307,7 +580,7 @@ onMounted(() => {
   // 2. 药丸二级导航
   .course-nav-bar {
     background: #FFFFFF;
-    border-radius: 14px;
+    border-radius: 16px;
     padding: 6px 10px;
     border: 1px solid #EBF1F7;
     box-shadow: 0 2px 10px rgba(30, 80, 150, 0.03);
@@ -363,7 +636,7 @@ onMounted(() => {
   &.course-detail-container--ai {
     gap: 12px;
 
-    .course-header-bar {
+    .course-hero-header {
       display: none;
     }
 
@@ -376,6 +649,19 @@ onMounted(() => {
       min-width: 0;
     }
   }
+}
+
+// 骨架屏发光微动画
+@keyframes shimmer-skeleton {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+// 星芒微呼吸旋转
+@keyframes pulse-spin {
+  0% { transform: scale(1) rotate(0deg); opacity: 0.9; }
+  50% { transform: scale(1.1) rotate(20deg); opacity: 1; }
+  100% { transform: scale(1) rotate(-10deg); opacity: 0.9; }
 }
 
 // 页面切换微动画

@@ -1,12 +1,9 @@
 package com.edumind.system.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.edumind.common.api.ResultCode;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
-import com.edumind.security.context.LoginUserResolver;
-import com.edumind.system.api.TenantQueryApi;
 import com.edumind.system.converter.TenantConverter;
 import com.edumind.system.dao.SysCampusDao;
 import com.edumind.system.dao.SysMemberOrgDao;
@@ -28,6 +25,8 @@ import com.edumind.system.entity.SysTenantMemberEntity;
 import com.edumind.system.entity.SysTenantQuotaEntity;
 import com.edumind.system.entity.UserEntity;
 import com.edumind.system.service.SysTenantService;
+import com.edumind.system.service.tenant.TenantCampusService;
+import com.edumind.system.service.tenant.TenantSessionService;
 import com.edumind.system.vo.tenant.CampusVO;
 import com.edumind.system.vo.tenant.SysTenantOverviewStatsVO;
 import com.edumind.system.vo.tenant.TenantDetailVO;
@@ -45,7 +44,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SysTenantServiceImpl implements SysTenantService, TenantQueryApi {
+public class SysTenantServiceImpl implements SysTenantService {
 
     private final SysTenantDao sysTenantDao;
     private final SysCampusDao sysCampusDao;
@@ -55,9 +54,8 @@ public class SysTenantServiceImpl implements SysTenantService, TenantQueryApi {
     private final SysOrganizationDao sysOrganizationDao;
     private final UserDao userDao;
     private final TenantConverter tenantConverter;
-
-    @org.springframework.beans.factory.annotation.Value("${edumind.tenant.demo-auto-bind-enabled:true}")
-    private boolean demoAutoBindEnabled = true;
+    private final TenantCampusService tenantCampusService;
+    private final TenantSessionService tenantSessionService;
 
     @Override
     public SysTenantOverviewStatsVO getOverviewStats() {
@@ -414,312 +412,48 @@ public class SysTenantServiceImpl implements SysTenantService, TenantQueryApi {
         }
     }
 
-    // --- 校区完整治理 ---
-
     @Override
     public List<CampusVO> listCampuses(Long tenantId) {
-        boolean prevIgnore = TenantContext.isIgnoreTenant();
-        try {
-            TenantContext.setIgnoreTenant(true);
-            Long tid = tenantId != null ? tenantId : TenantContext.requireTenantId();
-            List<SysCampusEntity> campuses = sysCampusDao.listAllByTenantId(tid);
-            return campuses.stream().map(tenantConverter::toCampusVO).collect(Collectors.toList());
-        } finally {
-            TenantContext.setIgnoreTenant(prevIgnore);
-        }
+        return tenantCampusService.listCampuses(tenantId);
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public Long createCampus(Long tenantId, CampusCreateDTO dto) {
-        boolean prevIgnore = TenantContext.isIgnoreTenant();
-        try {
-            TenantContext.setIgnoreTenant(true);
-            Long tid = tenantId != null ? tenantId : TenantContext.requireTenantId();
-            SysCampusEntity exist = sysCampusDao.findByCode(tid, dto.getCode());
-            if (exist != null) {
-                throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "该校区编码在当前租户下已存在: " + dto.getCode());
-            }
-
-            SysCampusEntity campus = new SysCampusEntity();
-            campus.setTenantId(tid);
-            campus.setCode(dto.getCode().trim().toUpperCase());
-            campus.setName(dto.getName().trim());
-            campus.setAddress(dto.getAddress());
-            campus.setStatus(dto.getStatus() != null ? dto.getStatus() : 1);
-            sysCampusDao.insert(campus);
-
-            SysOrganizationEntity org = new SysOrganizationEntity();
-            org.setTenantId(tid);
-            org.setParentId(0L);
-            org.setOrgType("CAMPUS");
-            org.setName(dto.getName().trim());
-            org.setSortOrder(1);
-            org.setOrgPath("1");
-            sysOrganizationDao.insert(org);
-            org.setOrgPath(String.valueOf(org.getId()));
-            sysOrganizationDao.updateById(org);
-
-            return campus.getId();
-        } finally {
-            TenantContext.setIgnoreTenant(prevIgnore);
-        }
+        return tenantCampusService.createCampus(tenantId, dto);
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void updateCampus(Long tenantId, Long campusId, CampusUpdateDTO dto) {
-        boolean prevIgnore = TenantContext.isIgnoreTenant();
-        try {
-            TenantContext.setIgnoreTenant(true);
-            Long tid = tenantId != null ? tenantId : TenantContext.requireTenantId();
-            SysCampusEntity campus = sysCampusDao.findById(campusId);
-            if (campus == null || !tid.equals(campus.getTenantId())) {
-                throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "校区不存在");
-            }
-            campus.setName(dto.getName().trim());
-            campus.setAddress(dto.getAddress());
-            if (dto.getStatus() != null) {
-                campus.setStatus(dto.getStatus());
-            }
-            sysCampusDao.updateById(campus);
-        } finally {
-            TenantContext.setIgnoreTenant(prevIgnore);
-        }
+        tenantCampusService.updateCampus(tenantId, campusId, dto);
     }
 
     @Override
     public void updateCampusStatus(Long tenantId, Long campusId, Integer status) {
-        boolean prevIgnore = TenantContext.isIgnoreTenant();
-        try {
-            TenantContext.setIgnoreTenant(true);
-            Long tid = tenantId != null ? tenantId : TenantContext.requireTenantId();
-            SysCampusEntity campus = sysCampusDao.findById(campusId);
-            if (campus == null || !tid.equals(campus.getTenantId())) {
-                throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "校区不存在");
-            }
-            campus.setStatus(status != null && status == 1 ? 1 : 0);
-            sysCampusDao.updateById(campus);
-        } finally {
-            TenantContext.setIgnoreTenant(prevIgnore);
-        }
+        tenantCampusService.updateCampusStatus(tenantId, campusId, status);
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void deleteCampus(Long tenantId, Long campusId) {
-        boolean prevIgnore = TenantContext.isIgnoreTenant();
-        try {
-            TenantContext.setIgnoreTenant(true);
-            Long tid = tenantId != null ? tenantId : TenantContext.requireTenantId();
-            SysCampusEntity campus = sysCampusDao.findById(campusId);
-            if (campus == null || !tid.equals(campus.getTenantId())) {
-                throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "校区不存在");
-            }
-            long count = sysCampusDao.countByTenantId(tid);
-            if (count <= 1) {
-                throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "至少保留一个校区，不可删除唯一校区");
-            }
-            sysCampusDao.deleteById(campusId);
-        } finally {
-            TenantContext.setIgnoreTenant(prevIgnore);
-        }
+        tenantCampusService.deleteCampus(tenantId, campusId);
     }
-
-    // --- 租户会话与切换 ---
 
     @Override
     public List<TenantListVO> listUserAvailableTenants(Long userId) {
-        boolean prevIgnore = TenantContext.isIgnoreTenant();
-        try {
-            TenantContext.setIgnoreTenant(true);
-
-            boolean isGlobalAdmin = Long.valueOf(1L).equals(userId)
-                    || StpUtil.hasRole("ADMIN")
-                    || StpUtil.hasRole("PLATFORM_ADMIN")
-                    || StpUtil.hasRole("ROLE_ADMIN");
-
-            if (isGlobalAdmin) {
-                // 超级管理员/系统管理员全平台租户透视与代管
-                List<SysTenantEntity> allActive = sysTenantDao.listAllActive();
-                return allActive.stream().map(t -> {
-                    int campusCount = (int) sysCampusDao.countByTenantId(t.getId());
-                    return tenantConverter.toListVO(t, Math.max(1, campusCount), 0);
-                }).collect(Collectors.toList());
-            }
-
-            List<SysTenantMemberEntity> members = sysTenantMemberDao.listByUserId(userId);
-            if (members.isEmpty()) {
-                SysTenantEntity defaultTenant = sysTenantDao.findById(1L);
-                if (defaultTenant != null) {
-                    return List.of(tenantConverter.toListVO(defaultTenant, 1, 25));
-                }
-                return List.of();
-            }
-            List<Long> tenantIds = members.stream().map(SysTenantMemberEntity::getTenantId).distinct().toList();
-            List<SysTenantEntity> tenants = sysTenantDao.listByIds(tenantIds);
-            return tenants.stream().map(t -> {
-                int campusCount = (int) sysCampusDao.countByTenantId(t.getId());
-                return tenantConverter.toListVO(t, Math.max(1, campusCount), 30);
-            }).collect(Collectors.toList());
-        } finally {
-            TenantContext.setIgnoreTenant(prevIgnore);
-        }
+        return tenantSessionService.listUserAvailableTenants(userId);
     }
 
     @Override
     public TenantDetailVO getCurrentTenantInfo() {
-        boolean prevIgnore = TenantContext.isIgnoreTenant();
-        try {
-            TenantContext.setIgnoreTenant(true);
-            Long tenantId = TenantContext.requireTenantId();
-            return getTenantDetail(tenantId);
-        } finally {
-            TenantContext.setIgnoreTenant(prevIgnore);
-        }
+        return tenantSessionService.getCurrentTenantInfo();
     }
 
     @Override
     public Long initializeLoginTenantSession(Long userId) {
-        boolean prevIgnore = TenantContext.isIgnoreTenant();
-        try {
-            TenantContext.setIgnoreTenant(true);
-
-            List<SysTenantMemberEntity> members = sysTenantMemberDao.listByUserId(userId);
-            Long tenantId = null;
-            boolean isDelegated = false;
-
-            if (!members.isEmpty()) {
-                tenantId = members.stream()
-                        .filter(m -> m.getIsDefault() != null && m.getIsDefault() == 1)
-                        .map(SysTenantMemberEntity::getTenantId)
-                        .findFirst()
-                        .orElse(members.get(0).getTenantId());
-            } else if (Long.valueOf(1L).equals(userId) || StpUtil.hasRole("ADMIN") || StpUtil.hasRole("PLATFORM_ADMIN") || StpUtil.hasRole("ROLE_ADMIN")) {
-                SysTenantEntity defaultTenant = sysTenantDao.findById(1L);
-                if (defaultTenant != null && defaultTenant.getStatus() == 1) {
-                    tenantId = 1L;
-                    isDelegated = true;
-                    log.info("[登录初始化] 管理员 userId={} 无租户成员关系，代管进入默认租户 tenantId=1", userId);
-                }
-            } else if (demoAutoBindEnabled) {
-                SysTenantEntity defaultTenant = sysTenantDao.findById(1L);
-                if (defaultTenant != null && defaultTenant.getStatus() == 1) {
-                    tenantId = 1L;
-                    SysTenantMemberEntity newMember = new SysTenantMemberEntity();
-                    newMember.setTenantId(1L);
-                    newMember.setUserId(userId);
-                    newMember.setMemberNo("USER-" + userId);
-                    newMember.setRealName("学员用户");
-                    newMember.setStatus(1);
-                    newMember.setIsDefault(1);
-                    sysTenantMemberDao.insert(newMember);
-                    log.info("[登录初始化] 普通用户 userId={} 自动绑定默认租户 tenantId=1 (demo 自动绑定模式)", userId);
-                }
-            } else {
-                log.warn("[登录初始化] 用户 userId={} 未加入任何学校/租户且未启用 demo 自动绑定，拒绝登录", userId);
-                tenantId = null;
-            }
-
-            if (tenantId != null) {
-                StpUtil.getSession().set("tenantId", tenantId);
-                StpUtil.getSession().set("isDelegated", isDelegated);
-            } else {
-                log.warn("[登录初始化] 用户 userId={} 未能绑定租户上下文", userId);
-            }
-            return tenantId;
-        } finally {
-            TenantContext.setIgnoreTenant(prevIgnore);
-        }
+        return tenantSessionService.initializeLoginTenantSession(userId);
     }
 
     @Override
     public Map<String, Object> switchTenant(TenantSwitchDTO dto) {
-        Long userId = LoginUserResolver.requireUserId();
-        SysTenantEntity targetTenant = sysTenantDao.findById(dto.getTargetTenantId());
-        if (targetTenant == null || targetTenant.getStatus() != 1) {
-            throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "目标租户不存在或已被停用");
-        }
-
-        boolean isMember = isUserMemberOfTenant(userId, dto.getTargetTenantId());
-        boolean isDelegated = false;
-
-        if (!isMember) {
-            if (Long.valueOf(1L).equals(userId) || StpUtil.hasRole("ADMIN") || StpUtil.hasRole("PLATFORM_ADMIN") || StpUtil.hasRole("ROLE_ADMIN")) {
-                isDelegated = true;
-                log.info("[安全审计] 管理员 userId={} 申请代管进入租户 tenantId={}, 原因: {}",
-                        userId, dto.getTargetTenantId(), dto.getReason());
-            } else {
-                throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权进入该租户");
-            }
-        }
-
-        StpUtil.getSession().set("tenantId", dto.getTargetTenantId());
-        StpUtil.getSession().set("isDelegated", isDelegated);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("tenantId", targetTenant.getId());
-        result.put("tenantName", targetTenant.getName());
-        result.put("tenantCode", targetTenant.getCode());
-        result.put("isDelegated", isDelegated);
-        result.put("token", StpUtil.getTokenValue());
-        return result;
-    }
-
-    // --- TenantQueryApi 跨模块实现 ---
-
-    @Override
-    public Map<String, Object> getTenantById(Long tenantId) {
-        boolean prevIgnore = TenantContext.isIgnoreTenant();
-        try {
-            TenantContext.setIgnoreTenant(true);
-            SysTenantEntity entity = sysTenantDao.findById(tenantId);
-            if (entity == null) return Map.of();
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", entity.getId());
-            map.put("code", entity.getCode());
-            map.put("name", entity.getName());
-            map.put("logo", entity.getLogo());
-            map.put("status", entity.getStatus());
-            return map;
-        } finally {
-            TenantContext.setIgnoreTenant(prevIgnore);
-        }
-    }
-
-    @Override
-    public Long getTenantIdByCode(String code) {
-        SysTenantEntity entity = sysTenantDao.findByCode(code);
-        return entity != null ? entity.getId() : null;
-    }
-
-    @Override
-    public List<Map<String, Object>> listAvailableTenants(Long userId) {
-        return listUserAvailableTenants(userId).stream().map(t -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", t.getId());
-            map.put("name", t.getName());
-            map.put("code", t.getCode());
-            return map;
-        }).collect(Collectors.toList());
-    }
-
-    @Override
-    public boolean isUserMemberOfTenant(Long userId, Long tenantId) {
-        boolean prevIgnore = TenantContext.isIgnoreTenant();
-        try {
-            TenantContext.setIgnoreTenant(true);
-            SysTenantMemberEntity member = sysTenantMemberDao.findByTenantAndUser(tenantId, userId);
-            return member != null && member.getStatus() == 1;
-        } finally {
-            TenantContext.setIgnoreTenant(prevIgnore);
-        }
-    }
-
-    @Override
-    public List<Long> listActiveTenantIds() {
-        return sysTenantDao.listAllActive().stream()
-                .map(SysTenantEntity::getId)
-                .collect(Collectors.toList());
+        return tenantSessionService.switchTenant(dto);
     }
 }

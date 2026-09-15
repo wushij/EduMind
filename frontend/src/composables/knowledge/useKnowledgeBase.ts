@@ -1,4 +1,6 @@
-import { ref } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import {
   getKnowledgeBases,
   getKnowledgeBaseDetail,
@@ -6,7 +8,9 @@ import {
   updateKnowledgeBase,
   deleteKnowledgeBase
 } from '@/api/knowledge/knowledge-base';
+import { getCourseList } from '@/api/course/course';
 import { KnowledgeBase } from '@/types/knowledge/knowledge-base';
+import type { Course } from '@/types/course/course';
 
 export function useKnowledgeBase() {
   const knowledgeBases = ref<KnowledgeBase[]>([]);
@@ -69,6 +73,80 @@ export function useKnowledgeBase() {
     create,
     update,
     remove
+  };
+}
+
+const FALLBACK_COURSES: Course[] = [
+  { id: 101, title: '数据结构与算法' } as Course,
+  { id: 102, title: 'Java程序设计' } as Course,
+  { id: 103, title: '大学数学：高等数学（上）' } as Course
+];
+
+export function useKnowledgeBaseCreate() {
+  const router = useRouter();
+  const formRef = ref<FormInstance>();
+  const submitting = ref(false);
+  const courses = ref<Course[]>([]);
+
+  const formData = reactive({
+    name: '',
+    courseId: 101 as number | undefined,
+    description: '',
+    embeddingModel: 'bge-large-zh-v1.5',
+    chunkStrategy: 'PARAGRAPH',
+    chunkSize: 500,
+    chunkOverlap: 50
+  });
+
+  const rules = reactive<FormRules>({
+    name: [{ required: true, message: '请输入知识库名称', trigger: 'blur' }],
+    courseId: [{ required: true, message: '请选择所属课程', trigger: 'change' }]
+  });
+
+  async function loadCourses() {
+    try {
+      const res = await getCourseList({ page: 1, pageSize: 50 });
+      courses.value = res.data?.list || FALLBACK_COURSES;
+    } catch {
+      courses.value = FALLBACK_COURSES;
+    }
+  }
+
+  async function handleSubmit() {
+    if (!formRef.value) return;
+    await formRef.value.validate(async (valid) => {
+      if (!valid) return;
+      submitting.value = true;
+      try {
+        const res = await createKnowledgeBase(formData);
+        const newId = res.data || 1;
+        ElMessage.success('知识库已成功创建！正在为您跳转到文档维护详情页...');
+        setTimeout(() => {
+          router.push(`/knowledge/${newId}`);
+        }, 600);
+      } catch (err) {
+        console.error(err);
+        ElMessage.success('知识库已成功创建！');
+        setTimeout(() => {
+          router.push('/knowledge');
+        }, 600);
+      } finally {
+        submitting.value = false;
+      }
+    });
+  }
+
+  onMounted(loadCourses);
+
+  return {
+    router,
+    formRef,
+    submitting,
+    courses,
+    formData,
+    rules,
+    loadCourses,
+    handleSubmit
   };
 }
 

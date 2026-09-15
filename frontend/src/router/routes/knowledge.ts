@@ -8,6 +8,10 @@ export const knowledgeRoutes: RouteRecordRaw[] = [
     meta: { title: '知识库管理', requiresAuth: true }
   },
   {
+    path: '/knowledge/bases',
+    redirect: '/knowledge'
+  },
+  {
     path: '/knowledge/create',
     name: 'KnowledgeBaseCreate',
     component: () => import('@/views/knowledge/KnowledgeBaseCreate.vue'),

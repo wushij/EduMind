@@ -105,117 +105,20 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { listGatewayRoutes, updateGatewayRoutes } from '@/api/system/gateway';
-import { fetchModels } from '@/api/system/model';
-import { USE_MOCK } from '@/config/mock';
-import { MOCK_GATEWAY_ROUTES } from '@/mock/gateway';
-import type { GatewayRouteVO } from '@/types/system/gateway';
-import { ElMessage } from 'element-plus';
 import { ArrowLeft, Refresh, Check, InfoFilled } from '@element-plus/icons-vue';
+import { useGatewayRoutes } from '@/composables/system/useGateway';
 
-const router = useRouter();
-const loading = ref(false);
-const saving = ref(false);
-const usedMockFallback = ref(false);
-const routes = ref<GatewayRouteVO[]>([]);
-
-interface ModelOption {
-  label: string;
-  value: string;
-}
-
-const modelOptions = ref<ModelOption[]>([]);
-
-function buildModelOption(model: {
-  name?: string;
-  modelKey?: string;
-  modelName?: string;
-}): ModelOption {
-  const configName = model.name || model.modelKey || model.modelName || '未命名模型';
-  const modelName = model.modelName || configName;
-  const label = modelName !== configName ? `${configName} · ${modelName}` : configName;
-  return {
-    label,
-    value: model.modelKey || model.name || modelName
-  };
-}
-
-function getSceneName(scene: string) {
-  if (!scene) return '通用场景';
-  switch (scene.toLowerCase()) {
-    case 'chat': return '课程智能助教答疑';
-    case 'rag':
-    case 'chat_rag': return '课程知识库问答';
-    case 'question':
-    case 'question_generate': return 'AI 题库出题与变式';
-    case 'grading': return '作业/主观题智能批改';
-    case 'agent': return 'Agent 多步任务规划';
-    case 'embedding': return '向量知识库切片嵌入';
-    case 'stream': return '流式长文本启发对话';
-    default: return scene;
-  }
-}
-
-async function loadData() {
-  loading.value = true;
-  usedMockFallback.value = false;
-  try {
-    // 1. 加载所有系统中配置的模型，供下拉选择
-    const models = await fetchModels();
-    const opts: ModelOption[] = (models || [])
-      .filter((m) => (m.configType === 'chat' || !m.configType) && m.status !== 'disabled')
-      .map((m) => buildModelOption(m));
-
-    // 保障 mock 降级项存在
-    const knownValues = new Set(opts.map((o) => o.value));
-    if (!knownValues.has('mock')) {
-      opts.push({ label: 'mock', value: 'mock' });
-    }
-    modelOptions.value = opts;
-
-    // 2. 加载路由规则
-    const res = await listGatewayRoutes();
-    routes.value = res.data ?? [];
-  } catch {
-    if (USE_MOCK) {
-      usedMockFallback.value = true;
-      routes.value = MOCK_GATEWAY_ROUTES.map((item) => ({ ...item }));
-      if (modelOptions.value.length === 0) {
-        modelOptions.value = [
-          buildModelOption({ name: 'Flash', modelKey: 'Flash', modelName: 'deepseek-v4-flash' }),
-          buildModelOption({ name: 'deepseek-chat', modelKey: 'deepseek-chat', modelName: 'deepseek-chat' }),
-          { label: 'mock', value: 'mock' }
-        ];
-      }
-    } else {
-      routes.value = [];
-      ElMessage.error('加载网关路由规则失败');
-    }
-  } finally {
-    loading.value = false;
-  }
-}
-
-async function saveRoutes() {
-  saving.value = true;
-  try {
-    await updateGatewayRoutes(routes.value);
-    ElMessage.success('网关路由调度规则已成功保存并立即生效');
-    usedMockFallback.value = false;
-  } catch {
-    if (USE_MOCK) {
-      ElMessage.success('Mock 模式：配置已本地保存');
-    } else {
-      ElMessage.error('保存路由规则失败');
-    }
-  } finally {
-    saving.value = false;
-  }
-}
-
-onMounted(loadData);
+const {
+  router,
+  loading,
+  saving,
+  usedMockFallback,
+  routes,
+  modelOptions,
+  getSceneName,
+  loadData,
+  saveRoutes
+} = useGatewayRoutes();
 </script>
 
 <style scoped lang="scss">

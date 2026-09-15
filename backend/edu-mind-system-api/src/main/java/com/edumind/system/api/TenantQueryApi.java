@@ -1,7 +1,8 @@
 package com.edumind.system.api;
 
+import com.edumind.system.vo.tenant.TenantBriefVO;
+
 import java.util.List;
-import java.util.Map;
 
 /**
  * 租户领域跨模块只读查询公开 API
@@ -9,9 +10,9 @@ import java.util.Map;
 public interface TenantQueryApi {
 
     /**
-     * 根据租户ID获取学校租户基本信息 (Map/VO)
+     * 根据租户ID获取学校租户基本信息
      */
-    Map<String, Object> getTenantById(Long tenantId);
+    TenantBriefVO getTenantById(Long tenantId);
 
     /**
      * 根据租户编码获取学校租户ID
@@ -21,7 +22,7 @@ public interface TenantQueryApi {
     /**
      * 获取指定用户可访问的所有租户列表
      */
-    List<Map<String, Object>> listAvailableTenants(Long userId);
+    List<TenantBriefVO> listAvailableTenants(Long userId);
 
     /**
      * 校验用户是否属于指定租户

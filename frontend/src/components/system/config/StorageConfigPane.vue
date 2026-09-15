@@ -224,12 +224,12 @@ import {
   Check
 } from '@element-plus/icons-vue';
 import {
-  getStorageConfig,
-  updateStorageConfig,
-  testStorageConfig,
-  getConfigGroup,
-  updateConfigGroup
-} from '@/api/system/config';
+  fetchStorageConfig,
+  saveStorageConfig,
+  testStorageConnection,
+  fetchFilePolicyConfig,
+  saveFilePolicyConfig
+} from '@/composables/system/useSystemConfig';
 import type { StorageConfigVO, StorageConfigDTO, StorageType } from '@/types/system';
 
 const selectedEngine = ref<StorageType>('local');
@@ -290,7 +290,7 @@ function getEngineTitle(type: StorageType) {
 
 async function loadStorageConfig() {
   try {
-    const res = await getStorageConfig();
+    const res = await fetchStorageConfig();
     if (res?.data) {
       Object.assign(storageForm, res.data);
       if (!storageForm.localPath || !storageForm.localPath.trim()) {
@@ -303,7 +303,7 @@ async function loadStorageConfig() {
     }
 
     try {
-      const pRes = await getConfigGroup('file');
+      const pRes = await fetchFilePolicyConfig();
       if (pRes?.data?.configValue) {
         const p = JSON.parse(pRes.data.configValue);
         if (p.maxSizeMb) storagePolicy.maxSizeMb = p.maxSizeMb;
@@ -338,7 +338,7 @@ async function handleTestStorage() {
       ossAccessKeySecret: storageForm.ossAccessKeySecret?.trim() || undefined,
       ossDomain: storageForm.ossDomain?.trim()
     };
-    await testStorageConfig(payload);
+    await testStorageConnection(payload);
     ElMessage.success(`【${getEngineTitle(selectedEngine.value)}】连通性探测成功，握手正常！`);
   } catch (err: any) {
     ElMessage.error(err?.response?.data?.message || err?.message || '存储引擎连通性测试失败');
@@ -370,9 +370,9 @@ async function handleSaveStorageConfig() {
       ossAccessKeySecret: storageForm.ossAccessKeySecret?.trim() || undefined,
       ossDomain: storageForm.ossDomain?.trim()
     };
-    await updateStorageConfig(payload);
+    await saveStorageConfig(payload);
     try {
-      await updateConfigGroup('file', JSON.stringify(storagePolicy));
+      await saveFilePolicyConfig(JSON.stringify(storagePolicy));
     } catch {}
     storageForm.activeType = selectedEngine.value;
     ElMessage.success(`存储配置已保存，系统已热切换为【${getEngineTitle(selectedEngine.value)}】！`);

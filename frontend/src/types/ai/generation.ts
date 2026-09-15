@@ -1,10 +1,9 @@
-import { QuestionType, DifficultyLevel } from '@/constants/question';
-
-export interface GenerateQuestionParams {
+export interface GenerateQuestionRequest {
   courseId: number;
-  chapterIds: number[];
-  types: QuestionType[];
-  difficulty: DifficultyLevel;
-  count: number;
-  ragEnabled: boolean;
+  chapterIds?: number[];
+  knowledgePointIds?: number[];
+  questionTypes?: string[];
+  difficulty?: string;
+  count?: number;
+  scorePerQuestion?: number;
 }

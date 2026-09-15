@@ -1,5 +1,8 @@
 package com.edumind.teaching.api;
 
+import com.edumind.teaching.vo.assignment.AssignmentVO;
+import com.edumind.teaching.vo.exam.ExamVO;
+
 import java.util.List;
 
 /**
@@ -8,11 +11,11 @@ import java.util.List;
  */
 public interface ExamQueryApi {
 
-    Object getExamById(Long examId);
+    ExamVO getExamById(Long examId);
 
-    List<?> listExamsByCourseId(Long courseId);
+    List<ExamVO> listExamsByCourseId(Long courseId);
 
-    Object getHomeworkById(Long homeworkId);
+    AssignmentVO getHomeworkById(Long homeworkId);
 
     long countExams();
 

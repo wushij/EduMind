@@ -1,16 +1,168 @@
 import { ref } from 'vue';
-import { PromptTemplate, PromptTestRequest, PromptTestResponse } from '@/types/system/prompt';
-import {
-  getPromptTemplates,
-  getPromptById,
-  getPromptVersions,
-  savePromptTemplate,
-  publishPromptTemplate,
-  rollbackPromptTemplate,
-  testPromptTemplate,
-  type PromptVersionItem
-} from '@/api/system/prompt';
 import { ElMessage } from 'element-plus';
+import { USE_MOCK } from '@/config/mock';
+import { mockPromptTemplates } from '@/mock/prompt';
+import {
+  listPromptTemplates,
+  getPromptTemplate,
+  createPromptTemplate,
+  updatePromptTemplate,
+  publishPromptTemplate,
+  listPromptVersions,
+  rollbackPromptTemplate,
+  testPromptTemplate as testPromptTemplateRaw
+} from '@/api/system/prompt';
+import {
+  buildPromptSavePayload,
+  filterPromptTemplatesByCategory,
+  mapPromptTemplate
+} from '@/utils/system/map-prompt';
+import {
+  PromptTemplate,
+  PromptTestRequest,
+  PromptTestResponse,
+  PromptVersionItem
+} from '@/types/system/prompt';
+
+export type { PromptVersionItem };
+
+export async function getPromptTemplates(category?: string): Promise<PromptTemplate[]> {
+  try {
+    const res = await listPromptTemplates(category);
+    if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+      return res.data.map((item) => mapPromptTemplate(item));
+    }
+    if (USE_MOCK) {
+      return filterPromptTemplatesByCategory(mockPromptTemplates, category);
+    }
+    return [];
+  } catch (err) {
+    if (!USE_MOCK) throw err;
+    console.warn('[Prompt] Fallback mockPromptTemplates', err);
+    return filterPromptTemplatesByCategory(mockPromptTemplates, category);
+  }
+}
+
+export async function getPromptById(id: number): Promise<PromptTemplate | null> {
+  try {
+    const res = await getPromptTemplate(id);
+    if (res?.data) {
+      return mapPromptTemplate(res.data);
+    }
+    if (!USE_MOCK) return null;
+  } catch (err) {
+    if (!USE_MOCK) throw err;
+    console.warn('[Prompt] Fallback getPromptById mock', err);
+  }
+  if (!USE_MOCK) return null;
+  return mockPromptTemplates.find((p) => p.id === Number(id)) || null;
+}
+
+export async function savePromptTemplate(
+  template: Partial<PromptTemplate>
+): Promise<{ success: boolean; id: number }> {
+  const payload = buildPromptSavePayload(template);
+  try {
+    if (template.id) {
+      await updatePromptTemplate(template.id, payload);
+      return { success: true, id: template.id };
+    }
+    const res = await createPromptTemplate(payload);
+    return { success: true, id: res?.data?.id || Date.now() };
+  } catch (err) {
+    if (!USE_MOCK) throw err;
+    console.warn('[Prompt] Fallback save mock', err);
+  }
+  return { success: true, id: template.id || Date.now() };
+}
+
+export async function publishPromptTemplateResolved(
+  id: number
+): Promise<{ success: boolean; message: string }> {
+  try {
+    await publishPromptTemplate(id);
+    return { success: true, message: '提示词模板已发布' };
+  } catch (err) {
+    if (!USE_MOCK) throw err;
+    console.warn('[Prompt] Fallback publish mock', err);
+  }
+  return { success: true, message: '提示词模板已成功发布' };
+}
+
+export async function getPromptVersions(id: number): Promise<PromptVersionItem[]> {
+  try {
+    const res = await listPromptVersions(id);
+    if (res?.data && Array.isArray(res.data)) {
+      return res.data;
+    }
+    if (!USE_MOCK) return [];
+  } catch (err) {
+    if (!USE_MOCK) throw err;
+    console.warn('[Prompt] Fallback versions mock', err);
+  }
+  return [];
+}
+
+export async function rollbackPromptTemplateResolved(
+  id: number,
+  targetVersion: number
+): Promise<{ success: boolean; message: string }> {
+  try {
+    await rollbackPromptTemplate(id, targetVersion);
+    return { success: true, message: `已回滚至 v${targetVersion}` };
+  } catch (err) {
+    if (!USE_MOCK) throw err;
+    console.warn('[Prompt] Fallback rollback mock', err);
+  }
+  return { success: true, message: `已回滚至 v${targetVersion}` };
+}
+
+function buildMockTestResponse(req: PromptTestRequest): PromptTestResponse {
+  let rendered = req.userPromptTemplate;
+  Object.keys(req.variables || {}).forEach((k) => {
+    rendered = rendered.replaceAll(`{{${k}}}`, req.variables[k]);
+  });
+  return {
+    renderedUserPrompt: rendered,
+    output: '（Mock）基于模板渲染的测试输出。',
+    promptTokens: Math.round(rendered.length / 4),
+    completionTokens: 64,
+    totalTokens: Math.round(rendered.length / 4) + 64,
+    durationMs: 200
+  };
+}
+
+export async function testPromptTemplate(
+  templateId: number,
+  req: PromptTestRequest
+): Promise<PromptTestResponse> {
+  const startTime = Date.now();
+  try {
+    const res = await testPromptTemplateRaw(templateId, req);
+    const durationMs = Date.now() - startTime;
+    const raw: any = res;
+    const outputText: string = (raw?.output || raw?.data?.output || (typeof raw?.data === 'string' ? raw.data : '') || '').trim();
+    if (outputText) {
+      let rendered = req.userPromptTemplate;
+      Object.entries(req.variables || {}).forEach(([k, v]) => {
+        rendered = rendered.replaceAll(`{{${k}}}`, v);
+      });
+      return {
+        renderedUserPrompt: rendered,
+        output: outputText,
+        promptTokens: Math.round(((req.systemPrompt || '').length + rendered.length) / 4),
+        completionTokens: Math.round(outputText.length / 4),
+        totalTokens: Math.round(((req.systemPrompt || '').length + rendered.length + outputText.length) / 4),
+        durationMs
+      };
+    }
+    throw new Error('LLM 返回空内容，请检查模型配置、maxTokens 或关闭 thinking 后重试');
+  } catch (err) {
+    if (!USE_MOCK) throw err;
+    console.warn('[Prompt] Fallback test mock', err);
+  }
+  return buildMockTestResponse(req);
+}
 
 export function usePrompt() {
   const loading = ref(false);
@@ -66,7 +218,7 @@ export function usePrompt() {
   const handlePublish = async (id: number) => {
     publishing.value = true;
     try {
-      const res = await publishPromptTemplate(id);
+      const res = await publishPromptTemplateResolved(id);
       ElMessage.success(res.message);
       if (currentPrompt.value) currentPrompt.value.status = 'PUBLISHED';
     } catch (err: any) {
@@ -87,7 +239,7 @@ export function usePrompt() {
   const handleRollback = async (id: number, targetVersion: number) => {
     rollingBack.value = true;
     try {
-      const res = await rollbackPromptTemplate(id, targetVersion);
+      const res = await rollbackPromptTemplateResolved(id, targetVersion);
       ElMessage.success(res.message);
       await loadPrompt(id);
       await loadVersions(id);

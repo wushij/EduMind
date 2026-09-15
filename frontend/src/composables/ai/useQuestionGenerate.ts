@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Question, QuestionType, Difficulty } from '@/types/question/question';
 import { generateQuestions } from '@/api/ai/generation';
+import { loadGenerationCourseOptions } from '@/services/ai/generation-service';
 import { batchSaveQuestions } from '@/api/question/question';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_QUESTIONS } from '@/mock/questions';
@@ -14,6 +15,7 @@ export function useQuestionGenerate() {
   const router = useRouter();
   const currentStep = ref(1);
   const generating = ref(false);
+  const courses = ref<any[]>([]);
 
   const formState = reactive({
     courseId: 101,
@@ -32,6 +34,15 @@ export function useQuestionGenerate() {
 
   function prevStep() {
     if (currentStep.value > 1) currentStep.value--;
+  }
+
+  async function loadCourseOptions() {
+    const list = await loadGenerationCourseOptions();
+    courses.value = list;
+    if (list.length && !courses.value.some((c) => c.id === formState.courseId)) {
+      formState.courseId = courses.value[0].id;
+    }
+    return courses.value;
   }
 
   async function generate() {
@@ -87,10 +98,12 @@ export function useQuestionGenerate() {
   return {
     currentStep,
     generating,
+    courses,
     formState,
     generatedQuestions,
     nextStep,
     prevStep,
+    loadCourseOptions,
     generate,
     deleteQuestion,
     batchSave

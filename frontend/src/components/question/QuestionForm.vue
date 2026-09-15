@@ -153,7 +153,7 @@
 import { ref, reactive, watch, onMounted, nextTick } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import QuestionOptionEditor from './QuestionOptionEditor.vue';
-import { getCourseList } from '@/api/course/course';
+import { fetchCoursesForForm } from '@/composables/question/useQuestion';
 import type { Question, QuestionType, Difficulty } from '@/types/question/question';
 import type { Course } from '@/types/course/course';
 
@@ -215,8 +215,7 @@ watch(
 
 onMounted(async () => {
   try {
-    const res = await getCourseList({ page: 1, pageSize: 50 });
-    courses.value = res.data?.list || [];
+    courses.value = await fetchCoursesForForm(50);
     if (!form.courseId && courses.value.length > 0) {
       form.courseId = courses.value[0].id;
       form.courseName = courses.value[0].title;

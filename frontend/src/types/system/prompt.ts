@@ -27,6 +27,17 @@ export interface PromptVersionHistory {
   changeLog?: string;
 }
 
+export interface PromptVersionItem {
+  id: number;
+  templateId: number;
+  version: number;
+  content: string;
+  systemPrompt?: string;
+  variables?: string;
+  publishedBy?: number;
+  createTime?: string;
+}
+
 export interface PromptTestRequest {
   systemPrompt: string;
   userPromptTemplate: string;

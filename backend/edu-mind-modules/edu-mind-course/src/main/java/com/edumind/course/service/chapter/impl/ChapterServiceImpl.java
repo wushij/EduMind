@@ -36,6 +36,27 @@ public class ChapterServiceImpl implements ChapterService {
         return courseConverter.toChapterTree(chapterDao.findByCourseId(courseId));
     }
 
+    @Override
+    public Long createChapter(Long courseId, String title, Long parentId, Integer sortOrder) {
+        CourseEntity course = courseDao.findById(courseId);
+        if (course == null) {
+            throw new BusinessException("课程不存在");
+        }
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        List<String> roles = userQueryApi.getRolesByUserId(currentUserId);
+        if (!roles.contains(RoleCode.ADMIN.getCode()) && !currentUserId.equals(course.getTeacherId())) {
+            throw new BusinessException("无权限为该课程添加章节");
+        }
+        com.edumind.course.entity.ChapterEntity chapter = new com.edumind.course.entity.ChapterEntity();
+        chapter.setCourseId(courseId);
+        chapter.setTitle(title);
+        chapter.setParentId(parentId != null ? parentId : 0L);
+        chapter.setSortOrder(sortOrder != null ? sortOrder : 1);
+        chapter.setCreateTime(java.time.LocalDateTime.now());
+        chapterDao.insert(chapter);
+        return chapter.getId();
+    }
+
     private void assertCourseAccessible(CourseEntity course) {
         Long currentUserId = StpUtil.getLoginIdAsLong();
         List<String> roles = userQueryApi.getRolesByUserId(currentUserId);

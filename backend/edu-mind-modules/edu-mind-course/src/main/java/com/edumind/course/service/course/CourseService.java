@@ -30,4 +30,6 @@ public interface CourseService {
     void deleteKnowledgePoint(Long courseId, Long kpId);
 
     Long joinCourseByCode(String code);
+
+    List<CourseVO> listPublicCourses();
 }

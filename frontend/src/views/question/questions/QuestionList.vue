@@ -183,12 +183,11 @@ import {
 import QuestionCard from '@/components/question/QuestionCard.vue';
 import AppPagination from '@/components/common/AppPagination.vue';
 import { useQuestion } from '@/composables/question/useQuestion';
-import { getCourseList } from '@/api/course/course';
 import { difficultyToLevel } from '@/utils/question/difficulty-level';
 import type { Question } from '@/types/question/question';
 
 const router = useRouter();
-const { questions, loading, total, fetchQuestions, removeQuestion, saveQuestion } = useQuestion();
+const { questions, loading, total, fetchQuestions, removeQuestion, saveQuestion, loadCourseOptions } = useQuestion();
 
 const pageNum = ref(1);
 const pageSize = ref(10);
@@ -216,24 +215,12 @@ const difficultyOptions = [
 ];
 
 onMounted(async () => {
-  await loadCourseOptions();
+  await loadCourseFilterOptions();
   await loadQuestions();
 });
 
-async function loadCourseOptions() {
-  try {
-    const res = await getCourseList({ page: 1, pageSize: 100 });
-    const list = res.data?.list || [];
-    courseOptions.value = [
-      { label: '全部课程', value: null },
-      ...list.map((item: any) => ({
-        label: item.title || item.name,
-        value: item.id
-      }))
-    ];
-  } catch {
-    courseOptions.value = [{ label: '全部课程', value: null }];
-  }
+async function loadCourseFilterOptions() {
+  courseOptions.value = await loadCourseOptions();
 }
 
 async function loadQuestions() {

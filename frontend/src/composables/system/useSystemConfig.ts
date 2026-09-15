@@ -1,17 +1,31 @@
 import { ref, reactive, computed, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
+  getBaseInfo,
   getConfigGroup,
   updateConfigGroup,
   getRoleOptions,
   getUserOptions,
+  getStorageConfig,
+  updateStorageConfig,
+  testStorageConfig,
+  testSms,
+  getRecentSmsLogs,
+  getSmsLogs,
+  testPayment,
+  testMailConfig,
+  getRecentEmailLogs,
+  getEmailLogs
 } from '@/api/system/config';
 import type {
   ConfigGroupCode,
   ConfigGroupMap,
+  EmailLogRecord,
   RoleOption,
+  SmsLogRecord,
   UserOption,
 } from '@/types/system/config';
+import type { StorageConfigDTO } from '@/types/system';
 
 export const GROUP_CODES: readonly ConfigGroupCode[] = [
   'site',
@@ -210,6 +224,30 @@ function setNestedValue(obj: any, path: string, val: any) {
     curr = curr[parts[i]];
   }
   curr[parts[parts.length - 1]] = val;
+}
+
+export async function fetchBaseInfo() {
+  return getBaseInfo();
+}
+
+export async function fetchStorageConfig() {
+  return getStorageConfig();
+}
+
+export async function saveStorageConfig(data: StorageConfigDTO) {
+  return updateStorageConfig(data);
+}
+
+export async function testStorageConnection(data: StorageConfigDTO) {
+  return testStorageConfig(data);
+}
+
+export async function fetchFilePolicyConfig() {
+  return getConfigGroup('file');
+}
+
+export async function saveFilePolicyConfig(configValue: string) {
+  return updateConfigGroup('file', configValue);
 }
 
 export function useSystemConfig() {
@@ -412,6 +450,120 @@ export function useSystemConfig() {
     }
   }
 
+  const paymentTesting = ref(false);
+  const smsTesting = ref(false);
+  const emailTesting = ref(false);
+  const recentSmsLogs = ref<SmsLogRecord[]>([]);
+  const recentEmailLogs = ref<EmailLogRecord[]>([]);
+
+  async function fetchRecentSmsLogs(limit = 5) {
+    try {
+      const res = await getRecentSmsLogs(limit);
+      if (res?.data) recentSmsLogs.value = res.data;
+    } catch {
+      // ignore
+    }
+  }
+
+  async function triggerSmsTest(phone: string, templateCode?: string) {
+    smsTesting.value = true;
+    try {
+      await testSms({
+        phone,
+        templateCode: templateCode || draft.sms.templateVerifyCode
+      });
+      ElMessage.success(`测试短信已成功发送至 ${phone}`);
+      await fetchRecentSmsLogs();
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.message || err?.message || '短信发送失败');
+      throw err;
+    } finally {
+      smsTesting.value = false;
+    }
+  }
+
+  async function fetchSmsLogs(params: {
+    page: number;
+    size: number;
+    phone?: string;
+    status?: number;
+  }) {
+    const res = await getSmsLogs({
+      page: params.page,
+      size: params.size,
+      phone: params.phone,
+      status: params.status
+    });
+    return {
+      list: res?.data?.list || [],
+      total: res?.data?.total || 0
+    };
+  }
+
+  async function fetchRecentEmailLogs(limit = 5) {
+    try {
+      const res = await getRecentEmailLogs(limit);
+      if (res?.data) recentEmailLogs.value = res.data;
+    } catch {
+      // ignore
+    }
+  }
+
+  async function sendTestEmail(toEmail: string) {
+    emailTesting.value = true;
+    try {
+      await testMailConfig(toEmail);
+      ElMessage.success(`测试邮件已成功投递至 ${toEmail}`);
+      await fetchRecentEmailLogs();
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.message || err?.message || '邮件发送失败');
+      throw err;
+    } finally {
+      emailTesting.value = false;
+    }
+  }
+
+  async function fetchEmailLogs(params: {
+    page: number;
+    size: number;
+    email?: string;
+    status?: number;
+  }) {
+    const res = await getEmailLogs({
+      page: params.page,
+      size: params.size,
+      email: params.email,
+      status: params.status
+    });
+    return {
+      list: res?.data?.list || [],
+      total: res?.data?.total || 0
+    };
+  }
+
+  async function triggerPaymentTest(type: 'wechat' | 'alipay') {
+    paymentTesting.value = true;
+    try {
+      const res = await testPayment({ type });
+      if (res?.data) {
+        ElMessage.success('测试支付订单已创建');
+        return {
+          type,
+          orderNo: res.data.orderNo || `PAY_${Date.now()}`,
+          qrcode: res.data.qrcode || '',
+          amount: res.data.amount || '0.01',
+          status: (res.data.status as 'PENDING' | 'PAID') || 'PAID'
+        };
+      }
+      return null;
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.message || err?.message || '生成测试支付订单失败');
+      throw err;
+    } finally {
+      paymentTesting.value = false;
+    }
+  }
+
   return {
     canEdit,
     loading,
@@ -429,5 +581,17 @@ export function useSystemConfig() {
     handleReset,
     handleSaveGroup,
     handleSaveAll,
+    paymentTesting,
+    smsTesting,
+    emailTesting,
+    recentSmsLogs,
+    recentEmailLogs,
+    fetchRecentSmsLogs,
+    triggerSmsTest,
+    fetchSmsLogs,
+    fetchRecentEmailLogs,
+    sendTestEmail,
+    fetchEmailLogs,
+    triggerPaymentTest
   };
 }

@@ -75,6 +75,16 @@ public class CourseController {
         return ApiResult.success(chapterService.getChapterTree(id));
     }
 
+    @SaCheckPermission("course:edit")
+    @PostMapping("/{id}/chapters")
+    public ApiResult<Long> createChapter(@PathVariable("id") Long id,
+                                         @RequestBody java.util.Map<String, Object> body) {
+        String title = (String) body.get("title");
+        Long parentId = body.get("parentId") != null ? Long.valueOf(body.get("parentId").toString()) : 0L;
+        Integer sortOrder = body.get("sortOrder") != null ? Integer.valueOf(body.get("sortOrder").toString()) : 1;
+        return ApiResult.success(chapterService.createChapter(id, title, parentId, sortOrder));
+    }
+
     @SaCheckPermission("course:view")
     @GetMapping("/{id}/knowledge-points")
     public ApiResult<List<KnowledgePointVO>> listKnowledgePoints(@PathVariable("id") Long id,
@@ -101,5 +111,11 @@ public class CourseController {
     @PostMapping("/join")
     public ApiResult<Long> joinCourse(@Valid @RequestBody com.edumind.course.dto.course.CourseJoinDTO dto) {
         return ApiResult.success(courseService.joinCourseByCode(dto.getCode()));
+    }
+
+    @SaCheckPermission("course:view")
+    @GetMapping("/public")
+    public ApiResult<List<CourseVO>> listPublicCourses() {
+        return ApiResult.success(courseService.listPublicCourses());
     }
 }

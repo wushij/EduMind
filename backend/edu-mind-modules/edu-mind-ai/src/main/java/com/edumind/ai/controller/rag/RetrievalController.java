@@ -7,7 +7,7 @@ import com.edumind.ai.rag.model.RagResult;
 import com.edumind.ai.rag.pipeline.RagPipelineImpl;
 import com.edumind.ai.vo.rag.RetrievalResultVO;
 import com.edumind.common.api.ApiResult;
-import com.edumind.knowledge.service.knowledge.KnowledgeAccessService;
+import com.edumind.knowledge.api.KnowledgeAccessApi;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,13 +25,13 @@ public class RetrievalController {
 
     private final RagPipelineImpl ragPipeline;
     private final RagConverter ragConverter;
-    private final KnowledgeAccessService knowledgeAccessService;
+    private final KnowledgeAccessApi knowledgeAccessApi;
 
     @SaCheckPermission("knowledge:view")
     @PostMapping("/{id}/retrieve")
     public ApiResult<List<RetrievalResultVO>> retrieve(@PathVariable("id") Long knowledgeBaseId,
                                                        @Valid @RequestBody RetrievalRequestDTO request) {
-        knowledgeAccessService.assertAccessible(knowledgeBaseId);
+        knowledgeAccessApi.assertAccessible(knowledgeBaseId);
         RagResult result = ragPipeline.executeDetailed(
                 request.getQuery(),
                 knowledgeBaseId,

@@ -163,7 +163,7 @@ import {
   updateCampus,
   updateCampusStatus,
   deleteCampus
-} from '@/api/system/tenant';
+} from '@/composables/system/useTenant';
 import type { TenantListVO, CampusVO } from '@/types/system/tenant';
 
 const props = defineProps<{

@@ -101,18 +101,14 @@ export const aiRoutes: RouteRecordRaw[] = [
     meta: { title: 'AI 智能推荐', requiresAuth: true }
   },
 
-  // 独立 AI 助手与历史
+  // 旧版独立 AI 助手页已下线，兼容历史链接重定向至课程 AI 工作台
   {
     path: '/ai/assistant/chat',
-    name: 'AIAssistantChat',
-    component: () => import('@/views/ai/assistant/Chat.vue'),
-    meta: { title: 'AI 通用教学助手', requiresAuth: true }
+    redirect: '/course/ai'
   },
   {
     path: '/ai/assistant/history',
-    name: 'AIAssistantHistory',
-    component: () => import('@/views/ai/assistant/History.vue'),
-    meta: { title: 'AI 会话历史', requiresAuth: true }
+    redirect: '/course/ai'
   },
 
   // AI Agent 中心

@@ -15,3 +15,5 @@ export const updateCourse = (id: number, data: Partial<CourseCreateRequest>) =>
 export const deleteCourse = (id: number) => del<void>(`/courses/${id}`);
 
 export const joinCourseByCode = (code: string) => post<number>('/courses/join', { code });
+
+export const getPublicCourses = () => get<Course[]>('/courses/public');

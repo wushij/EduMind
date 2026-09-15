@@ -1,14 +1,6 @@
 import { get, put } from '@/core/http/request';
 import type { HttpRequestConfig } from '@/core/http/types';
-
-export interface UserPreferenceVO {
-  theme: string;
-  language: string;
-  defaultModel: string;
-  enableRag: boolean;
-  enableNotification: boolean;
-  preferencesJson?: string;
-}
+import type { UserPreferenceVO } from '@/types/profile/preferences';
 
 export const getUserPreferences = (config?: HttpRequestConfig) =>
   get<UserPreferenceVO>('/users/me/preferences', undefined, config);

@@ -15,7 +15,7 @@ export function getNotificationNavigatePath(type: NotificationType, refId?: numb
     case 'EXAM':
       return `/question/exams/${refId}`;
     case 'AI_TASK':
-      return '/ai/assistant/chat';
+      return '/course/ai';
     default:
       return null;
   }

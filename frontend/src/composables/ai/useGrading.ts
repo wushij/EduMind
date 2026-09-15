@@ -1,6 +1,19 @@
 import { ref } from 'vue';
 import { getGradingResult, triggerGrading, reviewGrading } from '@/api/ai/grading';
+import { getAssignments } from '@/api/question/assignment';
+import { getSubmissionsByAssignment } from '@/api/question/submission';
 import { ElMessage } from 'element-plus';
+
+export interface GradingTaskRow {
+  id: number;
+  title: string;
+  courseName: string;
+  submissionCount: number;
+  progress: number;
+  status: 'DONE' | 'RUNNING' | 'PENDING';
+  running: boolean;
+  submissions?: any[];
+}
 
 export function useGrading() {
   const gradingResult = ref<any>(null);
@@ -59,6 +72,41 @@ export function useGrading() {
     }
   }
 
+  async function loadGradingTasks(): Promise<GradingTaskRow[]> {
+    loading.value = true;
+    try {
+      const res = await getAssignments({ page: 1, pageSize: 50 });
+      const list = res.data?.list || [];
+      const taskRows: GradingTaskRow[] = [];
+      for (const a of list) {
+        let subs: any[] = [];
+        try {
+          const sRes = await getSubmissionsByAssignment(a.id);
+          subs = sRes.data || [];
+        } catch {
+          subs = [];
+        }
+        const total = subs.length || a.submissionCount || 0;
+        const graded = subs.filter((s: any) => s.status === 'GRADED' || s.status === 'AI_GRADED').length;
+        const prog = total > 0 ? Math.round((graded / total) * 100) : (a.status === 'GRADED' ? 100 : 0);
+
+        taskRows.push({
+          id: a.id,
+          title: a.title,
+          courseName: a.courseName || '数据结构与算法',
+          submissionCount: total,
+          progress: prog,
+          status: prog === 100 ? 'DONE' : 'PENDING',
+          running: false,
+          submissions: subs
+        });
+      }
+      return taskRows;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   async function batchGrade(submissionIds: number[]) {
     loading.value = true;
     const results: Record<number, boolean> = {};
@@ -83,6 +131,7 @@ export function useGrading() {
     fetchGrading,
     startGrading,
     submitReview,
+    loadGradingTasks,
     batchGrade
   };
 }

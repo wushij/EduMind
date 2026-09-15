@@ -2,6 +2,9 @@ import { computed, ref, unref, type MaybeRef } from 'vue';
 import { useRoute } from 'vue-router';
 import { RetrievalQuery, RetrievalResultItem, RAGDebugRequest, RAGDebugResponse } from '@/types/knowledge/rag';
 import { RAGDebugService } from '@/services/rag/rag-debug-service';
+import { RAGRetrievalFeature } from '@/features/rag/retrieval';
+import { RAGRerankFeature } from '@/features/rag/rerank';
+import type { RetrievalResultItem as FeatureRetrievalItem } from '@/features/rag/retrieval';
 import { ElMessage } from 'element-plus';
 
 function resolveKbId(explicit?: MaybeRef<number | undefined>): number | undefined {
@@ -54,7 +57,26 @@ export function useRAG(kbIdInput?: MaybeRef<number | undefined>) {
         scoreThreshold: scoreThreshold.value,
         hybridSearch: hybridSearch.value
       };
-      retrievalResults.value = await RAGDebugService.executeRetrieval(params);
+      const raw = await RAGDebugService.executeRetrieval(params);
+      const asFeatureItems: FeatureRetrievalItem[] = raw.map((item) => ({
+        id: String(item.id),
+        content: item.content,
+        score: item.score,
+        sourceDocName: item.documentName,
+        chunkIndex: item.chunkIndex
+      }));
+      const filtered = RAGRetrievalFeature.filterResults(asFeatureItems, scoreThreshold.value);
+      retrievalResults.value = RAGRerankFeature.rerank(filtered).map((item) => {
+        const origin = raw.find((r) => String(r.id) === item.id);
+        return origin ?? {
+          id: item.id,
+          chunkIndex: item.chunkIndex,
+          documentId: 0,
+          documentName: item.sourceDocName,
+          content: item.content,
+          score: item.score
+        };
+      });
       if (retrievalResults.value.length === 0) {
         ElMessage.info('未匹配到高于阈值的切片，请尝试降低相似度阈值');
       }

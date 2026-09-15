@@ -117,41 +117,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { ArrowLeft, ArrowRight, Document } from '@element-plus/icons-vue';
 import { useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
-import { getDocuments, parseDocument } from '@/api/knowledge/document';
-import { getChunks, triggerChunk } from '@/api/knowledge/chunk';
-import { getVectorStats, triggerReindex } from '@/api/knowledge/embedding';
-import type { KBDocument } from '@/types/knowledge/document';
-import type { DocumentChunk } from '@/types/knowledge/chunk';
+import { isPipelineStepDone, useDocumentParse } from '@/composables/knowledge/useDocumentUpload';
 
 const router = useRouter();
-const route = useRoute();
 const { kbId } = useKnowledgeRoute();
 
-const documents = ref<KBDocument[]>([]);
-const selectedDocumentId = ref<number | undefined>();
-const chunks = ref<DocumentChunk[]>([]);
-const loading = ref(false);
-const pipelineRunning = ref(false);
-const indexStatus = ref<{ status?: string; indexedChunks?: number; totalChunks?: number }>({});
-
-const docInfo = computed(() => {
-  const doc = documents.value.find((d) => d.id === selectedDocumentId.value);
-  if (!doc) {
-    return { fileName: '', fileSize: '-', fileType: '-', status: 'PENDING' };
-  }
-  const sizeMb = doc.size ? `${(doc.size / 1024 / 1024).toFixed(2)} MB` : '-';
-  return {
-    fileName: doc.name,
-    fileSize: sizeMb,
-    fileType: doc.type || 'FILE',
-    status: doc.status
-  };
-});
+const {
+  documents,
+  selectedDocumentId,
+  chunks,
+  loading,
+  pipelineRunning,
+  indexStatus,
+  docInfo,
+  handleDocumentChange,
+  handleRunPipeline
+} = useDocumentParse(kbId);
 
 const statusLabel = computed(() => {
   const s = docInfo.value.status;
@@ -177,94 +162,13 @@ const outlineData = computed(() => {
 });
 
 function stepDone(step: number) {
-  if (step === 1) return docInfo.value.status === 'COMPLETED';
-  if (step === 2) return chunks.value.length > 0;
-  if (step === 3) return (indexStatus.value.indexedChunks ?? 0) > 0;
-  return false;
+  return isPipelineStepDone(
+    step,
+    docInfo.value.status,
+    chunks.value.length,
+    indexStatus.value.indexedChunks ?? 0
+  );
 }
-
-async function loadDocuments() {
-  if (!kbId.value) return;
-  try {
-    const res = await getDocuments(kbId.value);
-    documents.value = Array.isArray(res?.data) ? res.data : [];
-    const queryDocId = Number(route.query.documentId);
-    if (queryDocId && documents.value.some((d) => d.id === queryDocId)) {
-      selectedDocumentId.value = queryDocId;
-    } else if (documents.value.length > 0) {
-      selectedDocumentId.value = documents.value[0].id;
-    }
-  } catch {
-    ElMessage.error('加载文档列表失败');
-  }
-}
-
-async function loadChunks() {
-  if (!selectedDocumentId.value) {
-    chunks.value = [];
-    return;
-  }
-  loading.value = true;
-  try {
-    chunks.value = await getChunks(selectedDocumentId.value, { page: 1, pageSize: 100 });
-  } catch {
-    chunks.value = [];
-    ElMessage.error('加载切片失败');
-  } finally {
-    loading.value = false;
-  }
-}
-
-async function loadIndexStatus() {
-  if (!kbId.value) return;
-  try {
-    const stats = await getVectorStats(kbId.value);
-    indexStatus.value = {
-      status: stats.connectionStatus === 'ONLINE' ? 'INDEXED' : 'INDEXING',
-      indexedChunks: stats.totalVectors,
-      totalChunks: stats.expectedVectors
-    };
-  } catch {
-    indexStatus.value = {};
-  }
-}
-
-async function handleDocumentChange() {
-  await loadChunks();
-  await loadIndexStatus();
-}
-
-async function handleRunPipeline() {
-  if (!kbId.value || !selectedDocumentId.value) {
-    ElMessage.warning('请先选择文档');
-    return;
-  }
-  pipelineRunning.value = true;
-  try {
-    await parseDocument(kbId.value, selectedDocumentId.value);
-    await triggerChunk(selectedDocumentId.value);
-    await triggerReindex(kbId.value, 'INCREMENTAL');
-    ElMessage.success('文档流水线已启动：解析 → 切片 → 向量化');
-    await loadDocuments();
-    await loadChunks();
-    await loadIndexStatus();
-  } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '流水线执行失败');
-  } finally {
-    pipelineRunning.value = false;
-  }
-}
-
-watch(kbId, () => {
-  loadDocuments();
-  loadIndexStatus();
-});
-
-onMounted(async () => {
-  await loadDocuments();
-  await loadChunks();
-  await loadIndexStatus();
-});
 </script>
 
 <style scoped lang="scss">
