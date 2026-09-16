@@ -1,6 +1,6 @@
 package com.edumind.statistics.api.impl;
 
-import com.edumind.common.api.analytics.KnowledgeMasteryQueryApi;
+import com.edumind.statistics.api.KnowledgeMasteryQueryApi;
 import com.edumind.statistics.service.query.KnowledgeMasteryQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

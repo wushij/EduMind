@@ -1,6 +1,6 @@
 package com.edumind.ai.rag.retrieval;
 
-import com.edumind.common.api.embedding.EmbeddingApi;
+import com.edumind.ai.api.embedding.EmbeddingApi;
 import com.edumind.common.context.TenantContext;
 import com.edumind.infrastructure.vector.VectorSearchResult;
 import com.edumind.infrastructure.vector.VectorStore;

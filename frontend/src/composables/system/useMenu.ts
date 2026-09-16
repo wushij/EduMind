@@ -53,7 +53,7 @@ import {
   updateMenu,
   deleteMenu,
   resetDefaultMenus
-} from '@/api/system/menu';
+} from '@/services/system/menu-service';
 import type { SysMenu, MenuType } from '@/types/system/menu';
 
 const ICON_COMPONENT_MAP: Record<string, unknown> = {
@@ -198,7 +198,7 @@ export function buildParentTreeOptions(
       .filter((n) => n.type !== 3)
       .map((item) => ({
         id: item.id,
-        name: `${item.type === 1 ? '📁 ' : '📄 '}${item.name}`,
+        name: `${item.type === 1 ? '[目录] ' : '[菜单] '}${item.name}`,
         disabled: isEdit && item.id === editingId,
         children: item.children ? sanitize(item.children) : []
       }));
@@ -207,7 +207,7 @@ export function buildParentTreeOptions(
   return [
     {
       id: 0,
-      name: '🌱 根目录（创建顶级模块）',
+      name: '根目录（创建顶级模块）',
       children: []
     },
     ...sanitize(tableData)

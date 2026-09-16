@@ -196,7 +196,7 @@ public class OrgQuotaServiceImpl implements OrgQuotaService {
                 return requestedTenantId;
             }
         }
-        log.warn("🛡️ [防越权] 拦截非超管跨租户访问院系配额: currentTenantId={}, requestedTenantId={}",
+        log.warn("[防越权] 拦截非超管跨租户访问院系配额: currentTenantId={}, requestedTenantId={}",
                 currentTenantId, requestedTenantId);
         return currentTenantId;
     }

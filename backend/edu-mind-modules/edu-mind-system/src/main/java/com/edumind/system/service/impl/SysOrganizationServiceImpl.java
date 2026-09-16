@@ -2,7 +2,7 @@ package com.edumind.system.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.edumind.common.api.ResultCode;
-import com.edumind.common.api.analytics.KnowledgeMasteryQueryApi;
+import com.edumind.statistics.api.KnowledgeMasteryQueryApi;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.system.api.TenantDataScope;

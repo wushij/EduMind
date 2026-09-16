@@ -1,6 +1,6 @@
 package com.edumind.statistics.api.impl;
 
-import com.edumind.common.api.analytics.RecommendationQueryApi;
+import com.edumind.statistics.api.RecommendationQueryApi;
 import com.edumind.statistics.service.learning.RecommendationService;
 import com.edumind.statistics.vo.learning.RecommendedResourceVO;
 import lombok.RequiredArgsConstructor;

@@ -15,6 +15,7 @@ public class LearningAnalyticsVO {
     private Double knowledgeMasteryAvg;
     private Integer aiUsageCount;
     private Boolean aggregated;
+    private List<StudentLearningItemVO> students = new ArrayList<>();
     private TrendData trends = new TrendData();
 
     @Data

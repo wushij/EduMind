@@ -1,7 +1,7 @@
 package com.edumind.ai.api.impl;
 
 import com.edumind.ai.service.graph.GraphRelationSuggestService;
-import com.edumind.common.api.ai.GraphRelationSuggestApi;
+import com.edumind.ai.api.graph.GraphRelationSuggestApi;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

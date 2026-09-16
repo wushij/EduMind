@@ -72,6 +72,38 @@
             <span class="pill-badge-lesson-count">
               {{ chapter.sections?.length || 0 }} 个微课节
             </span>
+
+            <button
+              type="button"
+              class="capsule-ch-action-btn"
+              title="手工录入微课节"
+              @click.stop="openAddSectionModal(chapter)"
+            >
+              <el-icon><Plus /></el-icon>
+              <span>加课节</span>
+            </button>
+
+            <button
+              type="button"
+              class="capsule-ch-action-btn capsule-ch-action-btn--ai"
+              title="AI 智能生成微课大纲"
+              @click.stop="openAiGenerateModal(chapter)"
+            >
+              <span>AI规划</span>
+            </button>
+
+            <el-dropdown trigger="click" @command="(cmd: string) => handleChapterCommand(cmd, chapter)">
+              <button type="button" class="capsule-ch-action-btn ch-more-btn" @click.stop>
+                <el-icon><MoreFilled /></el-icon>
+              </button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="edit">编辑章节信息</el-dropdown-item>
+                  <el-dropdown-item command="delete" divided style="color: #EF4444;">删除本大纲章节</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+
             <div class="expand-arrow-circle">
               <svg
                 viewBox="0 0 24 24"
@@ -89,53 +121,112 @@
 
         <!-- 展开后的小节列表 -->
         <div v-show="openChapters.includes(chapter.id)" class="sections-drawer">
-          <div
-            v-for="sec in chapter.sections"
-            :key="sec.id"
-            class="section-item-row"
-          >
-            <!-- 状态与图标 -->
-            <div class="sec-left">
-              <div
-                class="sec-status-icon"
-                :class="{ completed: sec.completed }"
-                :title="sec.completed ? '已完成学习' : '未完成'"
-              >
-                <el-icon v-if="sec.completed"><Check /></el-icon>
-                <span v-else>•</span>
-              </div>
-              <div class="sec-meta-col">
-                <span class="sec-title">{{ sec.title }}</span>
-                <div class="sec-sub-tags">
-                  <span v-if="sec.duration" class="pill-mini-tag">
-                    <el-icon><Clock /></el-icon> {{ sec.duration }}
-                  </span>
-                  <span v-if="sec.knowledgePointCount" class="pill-mini-tag">
-                    <el-icon><Connection /></el-icon> {{ sec.knowledgePointCount }} 个考查知识点
-                  </span>
-                  <span v-if="sec.type === 'quiz'" class="pill-mini-tag pill-mini-tag--quiz">
-                    <el-icon><EditPen /></el-icon> 智能自测
-                  </span>
+          <!-- 存在微课节列表 -->
+          <div v-if="chapter.sections && chapter.sections.length > 0" class="sections-list-inner">
+            <div
+              v-for="sec in chapter.sections"
+              :key="sec.id"
+              class="section-item-row"
+            >
+              <!-- 状态与图标 -->
+              <div class="sec-left">
+                <div
+                  class="sec-status-icon"
+                  :class="{ completed: sec.completed }"
+                  :title="sec.completed ? '已完成学习' : '未完成'"
+                >
+                  <el-icon v-if="sec.completed"><Check /></el-icon>
+                  <span v-else>•</span>
                 </div>
+                <div class="sec-meta-col">
+                  <span class="sec-title">{{ sec.title }}</span>
+                  <div class="sec-sub-tags">
+                    <span v-if="sec.duration" class="pill-mini-tag">
+                      <el-icon><Clock /></el-icon> {{ sec.duration }}
+                    </span>
+                    <span v-if="sec.knowledgePointCount" class="pill-mini-tag">
+                      <el-icon><Connection /></el-icon> {{ sec.knowledgePointCount }} 个考查知识点
+                    </span>
+                    <span v-if="sec.type === 'quiz'" class="pill-mini-tag pill-mini-tag--quiz">
+                      <el-icon><EditPen /></el-icon> 智能自测
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 右侧快捷按钮 -->
+              <div class="sec-actions">
+                <button
+                  type="button"
+                  class="capsule-sec-btn capsule-sec-btn--ai"
+                  @click.stop="handleAiExplain(sec.title)"
+                >
+                  <span>AI 辅导</span>
+                </button>
+                <button
+                  type="button"
+                  class="capsule-sec-btn capsule-sec-btn--study"
+                  :class="{ completed: sec.completed }"
+                  @click.stop="handleStartStudy(sec)"
+                >
+                  <span>{{ sec.completed ? '重新复习' : '开始学习' }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="capsule-sec-btn capsule-sec-btn--del"
+                  title="删除微课节"
+                  @click.stop="confirmDeleteSection(chapter, sec)"
+                >
+                  <el-icon><Delete /></el-icon>
+                </button>
               </div>
             </div>
 
-            <!-- 右侧快捷按钮 -->
-            <div class="sec-actions">
+            <!-- 底部微课节快捷追加栏 -->
+            <div class="sections-bottom-bar">
               <button
                 type="button"
-                class="capsule-sec-btn capsule-sec-btn--ai"
-                @click.stop="handleAiExplain(sec.title)"
+                class="capsule-mini-add-btn"
+                @click="openAddSectionModal(chapter)"
               >
-                <span>AI 辅导</span>
+                <el-icon><Plus /></el-icon>
+                <span>继续录入微课节</span>
               </button>
               <button
                 type="button"
-                class="capsule-sec-btn capsule-sec-btn--study"
-                :class="{ completed: sec.completed }"
-                @click.stop="handleStartStudy(sec)"
+                class="capsule-mini-add-btn capsule-mini-add-btn--ai"
+                @click="openAiGenerateModal(chapter)"
               >
-                <span>{{ sec.completed ? '重新复习' : '开始学习' }}</span>
+                <el-icon><MagicStick /></el-icon>
+                <span>AI 扩充微课大纲</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 0 个微课节时的空状态 -->
+          <div v-else class="empty-chapter-sections">
+            <div class="empty-sparkle-icon">
+              <el-icon><Opportunity /></el-icon>
+            </div>
+            <div class="empty-text-meta">
+              <h4>本章暂无微课节与课时安排</h4>
+              <p>您可以手动录入课时微课节，或直接调用 AI 助教一键生成体系化微课时。</p>
+            </div>
+            <div class="empty-action-group">
+              <button
+                type="button"
+                class="capsule-empty-btn capsule-empty-btn--primary"
+                @click.stop="openAddSectionModal(chapter)"
+              >
+                <el-icon><Plus /></el-icon>
+                <span>手工录入微课节</span>
+              </button>
+              <button
+                type="button"
+                class="capsule-empty-btn capsule-empty-btn--ai"
+                @click.stop="openAiGenerateModal(chapter)"
+              >
+                <span>AI 智能生成微课大纲</span>
               </button>
             </div>
           </div>
@@ -143,10 +234,10 @@
       </div>
     </div>
 
-    <!-- 新增大纲章节抽屉 -->
+    <!-- 新增/编辑大纲章节抽屉 -->
     <el-drawer
       v-model="showAddChapterDrawer"
-      title="录入新教学大纲章节"
+      :title="editingChapter ? '编辑教学大纲章节' : '录入新教学大纲章节'"
       size="480px"
       destroy-on-close
     >
@@ -162,45 +253,205 @@
             placeholder="简述本章节的核心教学目标与知识架构..."
           />
         </el-form-item>
-        <el-form-item label="微课节数预设">
-          <el-input-number v-model="newChapterSectionCount" :min="1" :max="10" />
-        </el-form-item>
       </el-form>
       <template #footer>
         <button type="button" class="capsule-dialog-btn" @click="closeAddChapterDrawer">取消</button>
-        <button type="button" class="capsule-dialog-btn capsule-dialog-btn--primary" @click="handleSaveNewChapter">确认录入</button>
+        <button type="button" class="capsule-dialog-btn capsule-dialog-btn--primary" @click="handleSaveNewChapter">
+          {{ editingChapter ? '保存修改' : '确认录入' }}
+        </button>
       </template>
     </el-drawer>
+
+    <!-- 微课节录入/编辑弹窗 -->
+    <ChapterSectionDialog
+      v-model="showSectionDialog"
+      :chapter-id="activeChapter?.id || 0"
+      :chapter-title="activeChapter?.title || ''"
+      :initial-data="editingSection"
+      @submit="handleSectionSubmit"
+    />
+
+    <!-- AI 微课节大纲智能生成弹窗 -->
+    <ChapterAiGenerateModal
+      v-model="showAiGenerateModal"
+      :chapter="activeChapter"
+      @apply="handleAiApplySections"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
-import { Search, MagicStick, Check, Clock, Connection, EditPen, Plus } from '@element-plus/icons-vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import {
+  Search,
+  MagicStick,
+  Check,
+  Clock,
+  Connection,
+  EditPen,
+  Plus,
+  MoreFilled,
+  Delete,
+  Opportunity
+} from '@element-plus/icons-vue';
 import { useCourse } from '@/composables/course/useCourse';
+import ChapterSectionDialog from '@/components/course/ChapterSectionDialog.vue';
+import ChapterAiGenerateModal from '@/components/course/ChapterAiGenerateModal.vue';
 
 const route = useRoute();
 const router = useRouter();
 const courseId = computed(() => route.params.id || '101');
 
-const { chapters, fetchChapters, createChapter } = useCourse();
+const {
+  chapters,
+  fetchChapters,
+  createChapter,
+  updateChapter,
+  removeChapter,
+  createSection,
+  removeSection
+} = useCourse();
 
 const searchChapterText = ref('');
 const openChapters = ref<number[]>([]);
 
 const showAddChapterDrawer = ref(false);
+const editingChapter = ref<any>(null);
 const newChapterTitle = ref('');
 const newChapterDesc = ref('');
-const newChapterSectionCount = ref(3);
+
+// 微课节弹窗
+const showSectionDialog = ref(false);
+const activeChapter = ref<any>(null);
+const editingSection = ref<any>(null);
+
+// AI 生成微课节弹窗
+const showAiGenerateModal = ref(false);
 
 function openAddChapterDrawer() {
+  editingChapter.value = null;
+  newChapterTitle.value = '';
+  newChapterDesc.value = '';
   showAddChapterDrawer.value = true;
 }
 
 function closeAddChapterDrawer() {
   showAddChapterDrawer.value = false;
+  editingChapter.value = null;
+}
+
+function openAddSectionModal(chapter: any) {
+  activeChapter.value = chapter;
+  editingSection.value = null;
+  showSectionDialog.value = true;
+}
+
+function openAiGenerateModal(chapter: any) {
+  activeChapter.value = chapter;
+  showAiGenerateModal.value = true;
+}
+
+async function handleChapterCommand(cmd: string, chapter: any) {
+  if (cmd === 'edit') {
+    editingChapter.value = chapter;
+    newChapterTitle.value = chapter.title;
+    newChapterDesc.value = chapter.description || '';
+    showAddChapterDrawer.value = true;
+  } else if (cmd === 'delete') {
+    try {
+      await ElMessageBox.confirm(
+        `确定要删除大纲章节「${chapter.title}」吗？删除后该章节下的所有微课节将同步被级联移除，且无法恢复。`,
+        '删除确认',
+        {
+          type: 'warning',
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          confirmButtonClass: 'el-button--danger',
+          lockScroll: false
+        }
+      );
+      await handleDeleteChapter(chapter.id);
+    } catch {
+      // 用户取消删除
+    }
+  }
+}
+
+async function confirmDeleteSection(chapter: any, sec: any) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除微课节「${sec.title}」吗？删除后将无法恢复。`,
+      '删除确认',
+      {
+        type: 'warning',
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        confirmButtonClass: 'el-button--danger',
+        lockScroll: false
+      }
+    );
+    await handleDeleteSection(chapter, sec.id);
+  } catch {
+    // 用户取消删除
+  }
+}
+
+async function handleSectionSubmit(data: any) {
+  if (!activeChapter.value?.id) return;
+  const cId = Number(courseId.value);
+  try {
+    await createSection(cId, activeChapter.value.id, {
+      title: data.title,
+      sortOrder: (activeChapter.value.sections?.length || 0) + 1
+    });
+    ElMessage.success('微课节已成功录入大纲！');
+    if (!openChapters.value.includes(activeChapter.value.id)) {
+      openChapters.value.push(activeChapter.value.id);
+    }
+  } catch (err: any) {
+    ElMessage.error(err?.message || '录入微课节失败');
+  }
+}
+
+async function handleAiApplySections(sections: any[]) {
+  if (!activeChapter.value?.id) return;
+  const cId = Number(courseId.value);
+  try {
+    for (let i = 0; i < sections.length; i++) {
+      await createSection(cId, activeChapter.value.id, {
+        title: sections[i].title,
+        sortOrder: (activeChapter.value.sections?.length || 0) + i + 1
+      });
+    }
+    ElMessage.success(`AI 已为本章导入 ${sections.length} 个微课节！`);
+    if (!openChapters.value.includes(activeChapter.value.id)) {
+      openChapters.value.push(activeChapter.value.id);
+    }
+  } catch (err: any) {
+    ElMessage.error(err?.message || '批量导入微课节失败');
+  }
+}
+
+async function handleDeleteSection(chapter: any, sectionId: number) {
+  const cId = Number(courseId.value);
+  try {
+    await removeSection(cId, sectionId);
+    ElMessage.success('微课节已移除');
+  } catch (err: any) {
+    ElMessage.error(err?.message || '删除微课节失败');
+  }
+}
+
+async function handleDeleteChapter(chapterId: number) {
+  const cId = Number(courseId.value);
+  try {
+    await removeChapter(cId, chapterId);
+    ElMessage.success('章节已成功删除');
+  } catch (err: any) {
+    ElMessage.error(err?.message || '删除章节失败');
+  }
 }
 
 const filteredChapters = computed(() => {
@@ -277,21 +528,29 @@ async function handleSaveNewChapter() {
   }
   const cId = Number(courseId.value);
   const title = newChapterTitle.value.trim();
-  const sort = chapters.value.length + 1;
+
   try {
-    const res = await createChapter(cId, {
-      title,
-      parentId: 0,
-      sortOrder: sort
-    });
-    ElMessage.success('新章节已成功持久化存入教学大纲！');
+    if (editingChapter.value?.id) {
+      await updateChapter(cId, editingChapter.value.id, {
+        title
+      });
+      ElMessage.success('章节信息已修改！');
+    } else {
+      const sort = chapters.value.length + 1;
+      const res = await createChapter(cId, {
+        title,
+        parentId: 0,
+        sortOrder: sort
+      });
+      ElMessage.success('新章节已成功持久化存入教学大纲！');
+      if (res) {
+        openChapters.value.push(Number(res));
+      }
+    }
     closeAddChapterDrawer();
     newChapterTitle.value = '';
     newChapterDesc.value = '';
     await fetchChapters(cId);
-    if (res) {
-      openChapters.value.push(Number(res));
-    }
   } catch (err: any) {
     ElMessage.error(err?.message || '保存章节失败');
   }
@@ -662,11 +921,187 @@ onMounted(async () => {
                   transform: translateY(-1px);
                 }
               }
+
+              &--del {
+                background: transparent;
+                color: #94A3B8;
+                padding: 0 8px;
+
+                &:hover {
+                  color: #EF4444;
+                  background: #FEE2E2;
+                }
+              }
+            }
+          }
+        }
+
+        // 底部快捷追加栏
+        .sections-bottom-bar {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-top: 14px;
+          padding-top: 10px;
+          border-top: 1px dashed #E2E8F0;
+
+          .capsule-mini-add-btn {
+            height: 30px;
+            padding: 0 14px;
+            border-radius: 9999px;
+            background: #FFFFFF;
+            border: 1px dashed #CBD5E1;
+            color: #475569;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+
+            &:hover {
+              border-color: #3B82F6;
+              color: #2563EB;
+              background: #EFF6FF;
+            }
+
+            &--ai {
+              background: linear-gradient(135deg, #F0FDF4 0%, #EFF6FF 100%);
+              border-color: #86EFAC;
+              color: #15803D;
+
+              &:hover {
+                background: #DCFCE7;
+                color: #166534;
+                border-color: #4ADE80;
+              }
+            }
+          }
+        }
+
+        // 0 个微课节空状态
+        .empty-chapter-sections {
+          padding: 28px 20px;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
+          background: #FFFFFF;
+          border-radius: 12px;
+          border: 1px dashed #E2E8F0;
+          margin-top: 12px;
+
+          .empty-sparkle-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: #EFF6FF;
+            color: #3B82F6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+          }
+
+          .empty-text-meta {
+            h4 {
+              font-size: 14.5px;
+              font-weight: 700;
+              color: #0F172A;
+              margin: 0 0 4px 0;
+            }
+            p {
+              font-size: 12.5px;
+              color: #64748B;
+              margin: 0;
+            }
+          }
+
+          .empty-action-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 4px;
+
+            .capsule-empty-btn {
+              height: 34px;
+              padding: 0 16px;
+              border-radius: 9999px;
+              font-size: 12.5px;
+              font-weight: 600;
+              cursor: pointer;
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              transition: all 0.2s;
+
+              &--primary {
+                background: #EFF6FF;
+                border: 1px solid #BFDBFE;
+                color: #2563EB;
+
+                &:hover {
+                  background: #DBEAFE;
+                  color: #1D4ED8;
+                }
+              }
+
+              &--ai {
+                background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+                color: #FFFFFF;
+                border: none;
+                box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+
+                &:hover {
+                  transform: translateY(-1px);
+                  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+                }
+              }
             }
           }
         }
       }
     }
+  }
+}
+
+.capsule-ch-action-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #EFF6FF;
+    color: #2563EB;
+    border-color: #BFDBFE;
+  }
+
+  &--ai {
+    background: #EEF2FF;
+    border-color: #C7D2FE;
+    color: #4F46E5;
+    font-weight: 600;
+
+    &:hover {
+      background: #E0E7FF;
+      color: #4338CA;
+    }
+  }
+
+  &.ch-more-btn {
+    padding: 0 8px;
   }
 }
 

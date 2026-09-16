@@ -7,8 +7,14 @@
           <span class="badge badge--cat" :class="`cat-${tool.category?.toLowerCase()}`">
             {{ categoryLabel }}
           </span>
-          <span v-if="tool.isHot" class="badge badge--hot">🔥 热门</span>
-          <span v-if="tool.isRecommended" class="badge badge--rec">✨ 推荐</span>
+          <span v-if="tool.isHot" class="badge badge--hot">
+            <el-icon class="badge-icon"><Aim /></el-icon>
+            <span>热门</span>
+          </span>
+          <span v-if="tool.isRecommended" class="badge badge--rec">
+            <el-icon class="badge-icon"><Star /></el-icon>
+            <span>推荐</span>
+          </span>
         </div>
         <div class="status-glow-pill" :class="tool.status === 1 ? 'online' : 'offline'">
           <span class="status-dot"></span>
@@ -272,10 +278,15 @@ function handleCommand(command: string) {
 .badge {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   padding: 2px 8px;
   border-radius: 9999px;
   font-size: 11px;
   font-weight: 600;
+
+  .badge-icon {
+    font-size: 12px;
+  }
 
   &--hot {
     background: #fffbeb;

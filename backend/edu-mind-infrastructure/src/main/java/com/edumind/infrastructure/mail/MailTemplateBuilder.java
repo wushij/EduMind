@@ -66,7 +66,7 @@ public final class MailTemplateBuilder {
                 【%s】%s安全验证码
                 
                 您好！%s，本次操作的专属验证码为：
-                👉 %s 👈
+                【 %s 】
                 
                 * 验证码有效期为 %d 分钟，请尽快完成核验。
                 * 安全防范提示：验证码为敏感安全凭据，官方团队绝不会主动向您索取，请勿向他人泄露。
@@ -109,7 +109,7 @@ public final class MailTemplateBuilder {
                               <td align="left" style="vertical-align:middle;">
                                 <table border="0" cellpadding="0" cellspacing="0">
                                   <tr>
-                                    <td style="font-size:24px;line-height:1;padding-right:10px;vertical-align:middle;">🎓</td>
+                                    <td style="font-size:20px;line-height:1;padding-right:10px;vertical-align:middle;color:#60a5fa;font-weight:900;">◆</td>
                                     <td style="vertical-align:middle;">
                                       <span style="font-family:'Cabinet Grotesk','Outfit',Cinzel,-apple-system,sans-serif;font-size:20px;font-weight:800;color:#ffffff;letter-spacing:1px;display:inline-block;line-height:1.2;">EduMind</span>
                                     </td>
@@ -141,9 +141,9 @@ public final class MailTemplateBuilder {
                               <td align="center" style="padding:22px 14px;">
                                 <div style="font-size:12px;font-weight:700;color:#1d4ed8;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">【%s】专属安全验证码</div>
                                 <div style="font-size:36px;font-weight:900;letter-spacing:10px;color:#1d4ed8;font-family:Consolas,Monaco,'Lucida Console',monospace;line-height:1.2;margin:6px 0;padding-left:10px;">%s</div>
-                                <div style="margin-top:8px;font-size:13px;color:#1e3a8a;font-weight:600;">
-                                  ⏱ 验证码有效期为 <strong style="color:#2563eb;">%d 分钟</strong>，请尽快完成验证
-                                </div>
+                                  <div style="margin-top:8px;font-size:13px;color:#1e3a8a;font-weight:600;">
+                                    验证码有效期为 <strong style="color:#2563eb;">%d 分钟</strong>，请尽快完成验证
+                                  </div>
                               </td>
                             </tr>
                           </table>
@@ -152,7 +152,7 @@ public final class MailTemplateBuilder {
                           <table border="0" cellpadding="0" cellspacing="0" width="100%%" style="background-color:#fffbeb;border:1px solid #fef3c7;border-left:4px solid #f59e0b;border-radius:8px;">
                             <tr>
                               <td style="padding:12px 14px;color:#92400e;font-size:12.5px;line-height:1.6;">
-                                🛡️ <strong>安全防范提示：</strong>验证码为敏感安全凭据，官方团队绝不会主动向您索取，请勿泄露给任何人。如非本人操作，请忽略此邮件，您的账号依然安全。
+                                <strong>安全防范提示：</strong>验证码为敏感安全凭据，官方团队绝不会主动向您索取，请勿泄露给任何人。如非本人操作，请忽略此邮件，您的账号依然安全。
                               </td>
                             </tr>
                           </table>

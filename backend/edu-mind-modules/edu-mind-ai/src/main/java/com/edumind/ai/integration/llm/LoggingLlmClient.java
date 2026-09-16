@@ -4,7 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.edumind.ai.service.audit.AiCallAuditService;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
-import com.edumind.infrastructure.redis.cache.AiQuotaCache;
+import com.edumind.ai.service.quota.AiDailyQuotaService;
 import com.edumind.system.api.TenantQuotaApi;
 import lombok.RequiredArgsConstructor;
 
@@ -16,7 +16,7 @@ public class LoggingLlmClient implements LlmClient {
 
     private final LlmClient delegate;
     private final AiCallAuditService aiCallAuditService;
-    private final AiQuotaCache aiQuotaCache;
+    private final AiDailyQuotaService aiDailyQuotaService;
     private final long dailyQuota;
     private final TenantQuotaApi tenantQuotaApi;
 
@@ -128,7 +128,7 @@ public class LoggingLlmClient implements LlmClient {
 
     private void assertQuota() {
         if (StpUtil.isLogin()) {
-            if (!aiQuotaCache.checkAndIncrementDailyQuota(StpUtil.getLoginIdAsLong(), dailyQuota)) {
+            if (!aiDailyQuotaService.checkAndIncrementDailyQuota(StpUtil.getLoginIdAsLong(), dailyQuota)) {
                 throw new BusinessException("今日 AI 调用次数已达上限");
             }
         }

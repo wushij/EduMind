@@ -11,4 +11,11 @@
     <artifactId>edu-mind-question</artifactId>
     <name>edu-mind-question</name>
     <description>业务领域模块：题库中心（题目管理、题库管理、AI出题暂存、错题本、组卷抽题API）</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-question-api</artifactId>
+        </dependency>
+    </dependencies>
 </project>

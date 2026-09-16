@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { getLearningAnalytics, getAiUsageAnalytics } from '@/api/analytics/learning';
+import { getLearningAnalytics, getAiUsageAnalytics, getStudentPortrait } from '@/api/analytics/learning';
 import { diagnoseWrongQuestion, getKnowledgeMastery, getWrongQuestions } from '@/api/analytics/knowledge';
 import { getTeachingReport } from '@/api/analytics/report';
 import { generateTeachingAdvice } from '@/api/analytics/teaching';
@@ -9,10 +9,11 @@ import {
   MOCK_AI_USAGE,
   MOCK_KNOWLEDGE_MASTERY,
   MOCK_LEARNING_ANALYTICS,
+  MOCK_STUDENT_PORTRAIT,
   MOCK_TEACHING_ADVICE,
   MOCK_WRONG_QUESTIONS
 } from '@/mock/analytics';
-import type { AiUsageAnalyticsVO, LearningAnalyticsVO } from '@/types/analytics/learning';
+import type { AiUsageAnalyticsVO, LearningAnalyticsVO, StudentPortraitVO } from '@/types/analytics/learning';
 import type { TeachingReportVO } from '@/types/analytics/report';
 import type {
   KnowledgeMasteryVO,
@@ -37,10 +38,14 @@ export function useLearningAnalytics() {
   const usedMockFallback = ref(false);
   const isAggregated = ref(false);
   const learningData = ref<LearningAnalyticsVO | null>(null);
+  const portraitData = ref<StudentPortraitVO | null>(null);
   const masteryData = ref<KnowledgeMasteryVO | null>(null);
   const wrongQuestions = ref<WrongQuestionAnalyticsVO | null>(null);
   const aiUsageData = ref<AiUsageAnalyticsVO | null>(null);
   const teachingAdvice = ref<TeachingAdviceVO | null>(null);
+
+  const activeTab = ref<'overall' | 'personal'>('overall');
+  const selectedStudentId = ref<number | null>(null);
 
   async function fetchLearning(courseId: number, range = '7d') {
     loading.value = true;
@@ -57,6 +62,34 @@ export function useLearningAnalytics() {
       } else {
         learningData.value = null;
         isAggregated.value = false;
+      }
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function fetchStudentPortrait(courseId: number, studentId: number) {
+    loading.value = true;
+    usedMockFallback.value = false;
+    selectedStudentId.value = studentId;
+    try {
+      const res = await getStudentPortrait({ courseId, studentId });
+      portraitData.value = res.data;
+    } catch {
+      if (USE_MOCK) {
+        usedMockFallback.value = true;
+        portraitData.value = {
+          ...MOCK_STUDENT_PORTRAIT,
+          studentInfo: {
+            ...MOCK_STUDENT_PORTRAIT.studentInfo,
+            studentId,
+            username: `student_${studentId}`,
+            realName: studentId === 3 ? '李同学' : (studentId === 4 ? '王同学' : `学员 ${studentId}`),
+            studentNo: `STU-000${studentId}`
+          }
+        };
+      } else {
+        portraitData.value = null;
       }
     } finally {
       loading.value = false;
@@ -171,11 +204,15 @@ export function useLearningAnalytics() {
     usedMockFallback,
     isAggregated,
     learningData,
+    portraitData,
     masteryData,
     wrongQuestions,
     aiUsageData,
     teachingAdvice,
+    activeTab,
+    selectedStudentId,
     fetchLearning,
+    fetchStudentPortrait,
     fetchMastery,
     fetchWrongQuestions,
     fetchAiUsage,

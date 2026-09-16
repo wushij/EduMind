@@ -37,11 +37,19 @@
         <milvus-sdk.version>2.4.4</milvus-sdk.version>
         <aliyun-dypns.version>2.0.0</aliyun-dypns.version>
         <tencent-sms.version>3.1.754</tencent-sms.version>
+        <archunit.version>1.3.0</archunit.version>
     </properties>
 
     <modules>
         <module>edu-mind-common</module>
         <module>edu-mind-system-api</module>
+        <module>edu-mind-course-api</module>
+        <module>edu-mind-question-api</module>
+        <module>edu-mind-knowledge-api</module>
+        <module>edu-mind-teaching-api</module>
+        <module>edu-mind-resource-api</module>
+        <module>edu-mind-notification-api</module>
+        <module>edu-mind-statistics-api</module>
         <module>edu-mind-ai-api</module>
         <module>edu-mind-security</module>
         <module>edu-mind-infrastructure</module>
@@ -66,6 +74,41 @@
             <dependency>
                 <groupId>com.edumind</groupId>
                 <artifactId>edu-mind-ai-api</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-course-api</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-question-api</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-knowledge-api</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-teaching-api</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-resource-api</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-notification-api</artifactId>
+                <version>${edumind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.edumind</groupId>
+                <artifactId>edu-mind-statistics-api</artifactId>
                 <version>${edumind.version}</version>
             </dependency>
             <dependency>
@@ -209,6 +252,12 @@
                 <groupId>com.tencentcloudapi</groupId>
                 <artifactId>tencentcloud-sdk-java-sms</artifactId>
                 <version>${tencent-sms.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit-junit5</artifactId>
+                <version>${archunit.version}</version>
+                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

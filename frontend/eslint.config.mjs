@@ -10,6 +10,10 @@ const viewsRestrictedImports = [
   {
     group: ['@/api', '@/api/**'],
     message: 'Views must not import @/api. Use composables/services instead.'
+  },
+  {
+    group: ['@/mock', '@/mock/**'],
+    message: 'Views must not import @/mock. Use composables/services instead.'
   }
 ];
 

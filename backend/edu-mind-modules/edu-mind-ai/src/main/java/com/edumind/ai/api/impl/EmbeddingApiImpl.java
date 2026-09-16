@@ -1,7 +1,7 @@
 package com.edumind.ai.api.impl;
 
 import com.edumind.ai.integration.embedding.EmbeddingClient;
-import com.edumind.common.api.embedding.EmbeddingApi;
+import com.edumind.ai.api.embedding.EmbeddingApi;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

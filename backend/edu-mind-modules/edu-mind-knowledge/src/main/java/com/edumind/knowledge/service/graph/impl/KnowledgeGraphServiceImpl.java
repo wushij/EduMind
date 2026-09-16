@@ -1,7 +1,7 @@
 package com.edumind.knowledge.service.graph.impl;
 
-import com.edumind.common.api.ai.GraphRelationSuggestApi;
-import com.edumind.common.api.analytics.KnowledgeMasteryQueryApi;
+import com.edumind.ai.api.graph.GraphRelationSuggestApi;
+import com.edumind.statistics.api.KnowledgeMasteryQueryApi;
 import com.edumind.course.vo.knowledge.KnowledgePointVO;
 import com.edumind.knowledge.api.KnowledgePointQueryApi;
 import com.edumind.knowledge.dao.KnowledgeBaseDao;

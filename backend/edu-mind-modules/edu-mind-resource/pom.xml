@@ -11,4 +11,11 @@
     <artifactId>edu-mind-resource</artifactId>
     <name>edu-mind-resource</name>
     <description>业务领域模块：edu-mind-resource</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-resource-api</artifactId>
+        </dependency>
+    </dependencies>
 </project>

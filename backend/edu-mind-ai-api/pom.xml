@@ -15,7 +15,7 @@
     <dependencies>
         <dependency>
             <groupId>com.edumind</groupId>
-            <artifactId>edu-mind-question</artifactId>
+            <artifactId>edu-mind-question-api</artifactId>
         </dependency>
         <dependency>
             <groupId>jakarta.validation</groupId>

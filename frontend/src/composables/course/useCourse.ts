@@ -9,7 +9,12 @@ import {
   deleteCourse,
   joinCourseByCode
 } from '@/api/course/course';
-import { createChapterApi, getChapters } from '@/api/course/chapter';
+import {
+  createChapterApi,
+  getChapters,
+  updateChapterApi,
+  deleteChapterApi
+} from '@/api/course/chapter';
 import { mapCourse } from '@/utils/course/map-course';
 
 // 模块级单例响应式状态，确保跨组件、跨子路由切换时数据秒开不闪烁
@@ -136,6 +141,43 @@ export function useCourse() {
     return res.data;
   }
 
+  async function updateChapter(
+    courseId: number | string,
+    chapterId: number,
+    payload: { title: string; sortOrder?: number }
+  ) {
+    const numId = Number(courseId);
+    await updateChapterApi(numId, chapterId, payload);
+    await fetchChapters(numId);
+  }
+
+  async function removeChapter(courseId: number | string, chapterId: number) {
+    const numId = Number(courseId);
+    await deleteChapterApi(numId, chapterId);
+    await fetchChapters(numId);
+  }
+
+  async function createSection(
+    courseId: number | string,
+    parentChapterId: number,
+    payload: { title: string; sortOrder?: number }
+  ) {
+    const numId = Number(courseId);
+    const res = await createChapterApi(numId, {
+      title: payload.title,
+      parentId: parentChapterId,
+      sortOrder: payload.sortOrder ?? 1
+    });
+    await fetchChapters(numId);
+    return res.data;
+  }
+
+  async function removeSection(courseId: number | string, sectionId: number) {
+    const numId = Number(courseId);
+    await deleteChapterApi(numId, sectionId);
+    await fetchChapters(numId);
+  }
+
   async function createCourse(data: CourseCreateRequest): Promise<Course | null> {
     const res = await createCourseApi(data);
     const id = res.data;
@@ -173,6 +215,10 @@ export function useCourse() {
     fetchCourseDetail,
     fetchChapters,
     createChapter,
+    updateChapter,
+    removeChapter,
+    createSection,
+    removeSection,
     createCourse,
     removeCourse,
     saveCourse,

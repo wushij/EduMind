@@ -150,7 +150,7 @@
       <div class="ai-suggestion-card">
         <div class="ai-card-header">
           <div class="ai-title">
-            <span class="ai-sparkle-icon">✨</span>
+            <el-icon class="ai-sparkle-icon"><MagicStick /></el-icon>
             <h4>EduMind AI 教学导学建议</h4>
           </div>
           <span class="ai-model-tag">DeepSeek-R1 赋能</span>
@@ -184,7 +184,8 @@ import {
   Check,
   CircleCheckFilled,
   Promotion,
-  ChatDotRound
+  ChatDotRound,
+  MagicStick
 } from '@element-plus/icons-vue';
 import { getStudentCognitiveProfile } from '@/composables/system/useOrganization';
 import type { OrganizationMemberVO, StudentCognitiveProfileVO } from '@/types/system/tenant';
@@ -700,6 +701,7 @@ const handleSendNotice = () => {
 
       .ai-sparkle-icon {
         font-size: 16px;
+        color: #7C3AED;
       }
 
       h4 {

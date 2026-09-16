@@ -1,6 +1,6 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { getRoleQuotas, updateRoleQuota } from '@/api/system/quota';
+import { getRoleQuotas, updateRoleQuota } from '@/services/system/quota-service';
 import type { RoleQuotaConfig } from '@/types/system/quota';
 
 export function computeQuotaUsagePercent(used: number, limit: number, isUnlimited?: boolean): number {

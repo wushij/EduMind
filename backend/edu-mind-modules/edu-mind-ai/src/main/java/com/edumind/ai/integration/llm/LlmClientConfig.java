@@ -1,7 +1,7 @@
 package com.edumind.ai.integration.llm;
 
 import com.edumind.ai.service.audit.AiCallAuditService;
-import com.edumind.infrastructure.redis.cache.AiQuotaCache;
+import com.edumind.ai.service.quota.AiDailyQuotaService;
 import lombok.extern.slf4j.Slf4j;
 import com.edumind.system.api.TenantQuotaApi;
 import org.springframework.beans.factory.ObjectProvider;
@@ -19,11 +19,11 @@ public class LlmClientConfig {
     @Bean
     public LlmClient llmClient(LlmProperties properties,
                                AiCallAuditService aiCallAuditService,
-                               AiQuotaCache aiQuotaCache,
+                               AiDailyQuotaService aiDailyQuotaService,
                                ObjectProvider<TenantQuotaApi> tenantQuotaApiProvider,
                                @Value("${edumind.ai.daily-quota:500}") long dailyQuota) {
         LlmClient delegate = createDelegate(properties);
-        return new LoggingLlmClient(delegate, aiCallAuditService, aiQuotaCache, dailyQuota, tenantQuotaApiProvider.getIfAvailable());
+        return new LoggingLlmClient(delegate, aiCallAuditService, aiDailyQuotaService, dailyQuota, tenantQuotaApiProvider.getIfAvailable());
     }
 
     private LlmClient createDelegate(LlmProperties properties) {

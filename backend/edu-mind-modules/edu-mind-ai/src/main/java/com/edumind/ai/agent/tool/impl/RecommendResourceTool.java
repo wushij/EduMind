@@ -1,7 +1,7 @@
 package com.edumind.ai.agent.tool.impl;
 
 import com.edumind.ai.agent.tool.AgentTool;
-import com.edumind.common.api.analytics.RecommendationQueryApi;
+import com.edumind.statistics.api.RecommendationQueryApi;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

@@ -27,6 +27,28 @@ public class LearningRecordDao {
         return learningRecordMapper.insert(entity);
     }
 
+    public List<LearningRecordEntity> listByCourse(Long courseId) {
+        return learningRecordMapper.selectList(
+                new LambdaQueryWrapper<LearningRecordEntity>()
+                        .eq(LearningRecordEntity::getCourseId, courseId)
+        );
+    }
+
+    public List<LearningRecordEntity> listByCourseAndStudent(Long courseId, Long studentId) {
+        return learningRecordMapper.selectList(
+                new LambdaQueryWrapper<LearningRecordEntity>()
+                        .eq(LearningRecordEntity::getCourseId, courseId)
+                        .eq(LearningRecordEntity::getStudentId, studentId)
+        );
+    }
+
+    public int getTotalDuration(Long courseId, Long studentId) {
+        List<LearningRecordEntity> list = listByCourseAndStudent(courseId, studentId);
+        return list.stream()
+                .mapToInt(r -> r.getDurationMinutes() != null ? r.getDurationMinutes() : 0)
+                .sum();
+    }
+
     public List<LearningRecordEntity> listAll() {
         return learningRecordMapper.selectList(new LambdaQueryWrapper<>());
     }

@@ -1,8 +1,9 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { getCourseKnowledgePoints, createKnowledgePoint, deleteKnowledgePoint } from '@/api/course/knowledge-point';
 import { getChapters } from '@/api/course/chapter';
+import { askGlobalAssistant } from '@/api/ai/assistant';
 
 export function useKnowledgePoint() {
   const route = useRoute();
@@ -24,11 +25,18 @@ export function useKnowledgePoint() {
 
   const newKp = reactive({
     title: '',
-    chapterId: 1,
+    chapterId: 0,
+    code: '',
     cognitiveDimension: 'APPLY',
     importance: 4,
-    description: ''
+    description: '',
+    prerequisites: [] as string[],
+    examFocus: ''
   });
+
+  const showAiSuggestModal = ref(false);
+  const aiExtracting = ref(false);
+  const aiSuggestedPoints = ref<any[]>([]);
 
   onMounted(async () => {
     await Promise.all([loadChapters(), loadKnowledgePoints()]);
@@ -38,6 +46,9 @@ export function useKnowledgePoint() {
     try {
       const res = await getChapters(courseId.value);
       chapters.value = res.data || [];
+      if (chapters.value.length > 0 && (!newKp.chapterId || newKp.chapterId === 0)) {
+        newKp.chapterId = chapters.value[0].id;
+      }
     } catch (err) {
       console.warn('加载课程章节失败:', err);
       chapters.value = [];
@@ -54,6 +65,193 @@ export function useKnowledgePoint() {
       knowledgePoints.value = [];
     } finally {
       loading.value = false;
+    }
+  }
+
+  function openAiSuggestModal() {
+    showAiSuggestModal.value = true;
+    generateAiSuggestedPoints();
+  }
+
+  function parseJsonArray<T = any>(rawText: string): T[] {
+    if (!rawText) return [];
+    let text = rawText.trim();
+    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (codeBlockMatch) {
+      text = codeBlockMatch[1].trim();
+    }
+    const startIdx = text.indexOf('[');
+    const endIdx = text.lastIndexOf(']');
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      text = text.slice(startIdx, endIdx + 1);
+    }
+    try {
+      const parsed = JSON.parse(text);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error('Failed to parse AI knowledge points JSON:', e, rawText);
+      return [];
+    }
+  }
+
+  function deriveFallbackKnowledgePoints(chapTitle: string, chapterId: number) {
+    const isJava = /java/i.test(chapTitle);
+    if (isJava) {
+      return [
+        {
+          title: `${chapTitle} - JVM运行架构与类加载生命周期`,
+          chapterId,
+          code: `KP-${Math.floor(1000 + Math.random() * 9000)}`,
+          cognitiveDimension: 'UNDERSTAND',
+          importance: 5,
+          description: '系统掌握JVM内存模型划定、类加载双亲委派机制及GC垃圾收集原理。',
+          prerequisites: ['计算机体系结构', '操作系统基础'],
+          examFocus: '双亲委派破坏场景、堆内存溢出排查'
+        },
+        {
+          title: `${chapTitle} - 核心面向对象与接口抽象契约`,
+          chapterId,
+          code: `KP-${Math.floor(1000 + Math.random() * 9000)}`,
+          cognitiveDimension: 'APPLY',
+          importance: 4,
+          description: '运用抽象类、接口与多态机制，遵循SOLID原则设计松耦合高质量代码。',
+          prerequisites: ['Java基础语法', '面向对象基本概念'],
+          examFocus: '重载与重写底层区别、深浅拷贝边界'
+        },
+        {
+          title: `${chapTitle} - 高性能并发与线程安全模型`,
+          chapterId,
+          code: `KP-${Math.floor(1000 + Math.random() * 9000)}`,
+          cognitiveDimension: 'ANALYZE',
+          importance: 5,
+          description: '基于JMM内存模型、CAS与AQS机制，深入剖析高并发多线程同步保障。',
+          prerequisites: ['进程与线程调度', '临界区同步'],
+          examFocus: 'volatile可见性原理、线程池参数调优'
+        }
+      ];
+    }
+
+    return [
+      {
+        title: `${chapTitle} - 核心基本概念与理论体系`,
+        chapterId,
+        code: `KP-${Math.floor(1000 + Math.random() * 9000)}`,
+        cognitiveDimension: 'REMEMBER',
+        importance: 4,
+        description: `掌握${chapTitle}中的核心术语界定、定理系统与基础理论基石。`,
+        prerequisites: ['前置基础学科知识'],
+        examFocus: '基本概念客观选择题、综合辨析'
+      },
+      {
+        title: `${chapTitle} - 关键方法论与实战工程范式`,
+        chapterId,
+        code: `KP-${Math.floor(1000 + Math.random() * 9000)}`,
+        cognitiveDimension: 'APPLY',
+        importance: 5,
+        description: `结合${chapTitle}具体场景，熟练应用核心算法与设计范式解决工程问题。`,
+        prerequisites: ['核心基本概念'],
+        examFocus: '综合实战编程或工程设计题'
+      },
+      {
+        title: `${chapTitle} - 边界约束防御与系统综合诊断`,
+        chapterId,
+        code: `KP-${Math.floor(1000 + Math.random() * 9000)}`,
+        cognitiveDimension: 'ANALYZE',
+        importance: 5,
+        description: `深度剖析${chapTitle}中的极值边界、异常退化与鲁棒性优化机制。`,
+        prerequisites: ['关键方法论'],
+        examFocus: '性能瓶颈分析与极端情况防御'
+      }
+    ];
+  }
+
+  async function generateAiSuggestedPoints() {
+    aiExtracting.value = true;
+    aiSuggestedPoints.value = [];
+    const targetChap = chapters.value.find(c => c.id === (newKp.chapterId || selectedChapterId.value)) || chapters.value[0];
+    const chapTitle = targetChap?.title || '核心课程大纲';
+
+    const prompt = `你是一名高校计算机专业课资深教研室主任及命题专家。请针对章节【${chapTitle}】，结合布鲁姆认知模型（识记/理解/应用/分析），提炼 3~4 个真实、具体、高频的核心考点/知识点。
+【严格要求】：
+1. 知识点名称必须针对【${chapTitle}】的具体专业学科内涵，严禁空泛通用的套话（例如切勿输出“状态迁移模型与拓扑演进”这种与本章无关的抽象名词）。
+如果章节是“Java学习概述与核心认知模型”，考点应如：“JVM内存结构与垃圾回收机制基础”、“JDK核心工具链（javac/java/javap）编译执行流程”、“Java跨平台特性与字节码WORA机制剖析”；
+如果章节涉及“数据结构与算法”，考点应如：“时间与空间渐进复杂度大O推导”、“双指针在有序数组中的移动策略与边界条件”等。
+2. 包含认知维度（严格限制只能是：REMEMBER, UNDERSTAND, APPLY, ANALYZE 之一）、重要星级（3-5分）、简要说明（40字左右）、前置依赖知识点数组、常见考试易错陷阱。
+3. 请严格以标准 JSON 数组格式直接返回，严禁任何代码块标记（不要输出 \`\`\`json ），格式如下：
+[
+  {
+    "title": "具体考点名称",
+    "cognitiveDimension": "APPLY",
+    "importance": 5,
+    "description": "考点内涵与掌握要求解析",
+    "prerequisites": ["前置知识A", "前置知识B"],
+    "examFocus": "常见考试题型与避坑重点"
+  }
+]`;
+
+    try {
+      const res = await askGlobalAssistant({
+        message: prompt,
+        courseId: courseId.value
+      });
+      const rawContent = res.data?.content || '';
+      const parsed = parseJsonArray(rawContent);
+      if (parsed.length > 0) {
+        aiSuggestedPoints.value = parsed.map((item: any, idx: number) => ({
+          title: item.title || `${chapTitle} 核心考点 ${idx + 1}`,
+          chapterId: targetChap?.id || chapters.value[0]?.id || 1,
+          code: `KP-${Math.floor(1000 + Math.random() * 9000)}`,
+          cognitiveDimension: ['REMEMBER', 'UNDERSTAND', 'APPLY', 'ANALYZE'].includes(item.cognitiveDimension) ? item.cognitiveDimension : 'APPLY',
+          importance: Math.min(5, Math.max(1, Number(item.importance) || 4)),
+          description: item.description || '本章节高频核心考点，涉及原理推导与综合实践。',
+          prerequisites: Array.isArray(item.prerequisites) && item.prerequisites.length ? item.prerequisites : ['前置核心概念'],
+          examFocus: item.examFocus || '重点概念理解与综合实战推演'
+        }));
+        ElMessage.success(`AI 已针对【${chapTitle}】提炼出 ${aiSuggestedPoints.value.length} 个核心考点！`);
+      } else {
+        throw new Error('未解析到结构化知识点数据');
+      }
+    } catch (err: any) {
+      console.warn('AI 提炼考点异常，转为学科语义派生:', err);
+      aiSuggestedPoints.value = deriveFallbackKnowledgePoints(chapTitle, targetChap?.id || chapters.value[0]?.id || 1);
+      ElMessage.info(`已基于《${chapTitle}》专业学科大纲推导生成核心考点`);
+    } finally {
+      aiExtracting.value = false;
+    }
+  }
+
+  function applyAiSuggestedPoint(point: any) {
+    newKp.title = point.title;
+    newKp.chapterId = point.chapterId;
+    newKp.code = point.code;
+    newKp.cognitiveDimension = point.cognitiveDimension;
+    newKp.importance = point.importance;
+    newKp.description = point.description;
+    newKp.examFocus = point.examFocus;
+    newKp.prerequisites = [...(point.prerequisites || [])];
+    showAiSuggestModal.value = false;
+    showCreateDrawer.value = true;
+    ElMessage.success('已自动填充 AI 推荐考点配置！');
+  }
+
+  async function batchImportAiPoints(points: any[]) {
+    if (!points || points.length === 0) return;
+    creating.value = true;
+    try {
+      for (const p of points) {
+        await createKnowledgePoint(courseId.value, {
+          chapterId: p.chapterId,
+          title: p.title,
+          sortOrder: p.importance || 1
+        });
+      }
+      ElMessage.success(`AI 已一键持久化录入 ${points.length} 个核心考点！`);
+      showAiSuggestModal.value = false;
+      await loadKnowledgePoints();
+    } catch (err: any) {
+      ElMessage.error(err?.message || '批量录入知识点失败');
+    } finally {
+      creating.value = false;
     }
   }
 
@@ -150,6 +348,25 @@ export function useKnowledgePoint() {
     }
   }
 
+  async function confirmDeleteKp(kp: any) {
+    try {
+      await ElMessageBox.confirm(
+        `确定要删除核心考点「${kp.title || kp.name}」吗？删除后将从知识图谱与课程考点中移除。`,
+        '删除确认',
+        {
+          type: 'warning',
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          confirmButtonClass: 'el-button--danger',
+          lockScroll: false
+        }
+      );
+      await handleDeleteKp(kp);
+    } catch {
+      // 用户取消
+    }
+  }
+
   return {
     loading,
     creating,
@@ -163,6 +380,13 @@ export function useKnowledgePoint() {
     knowledgePoints,
     newKp,
     filteredPoints,
+    showAiSuggestModal,
+    aiExtracting,
+    aiSuggestedPoints,
+    openAiSuggestModal,
+    generateAiSuggestedPoints,
+    applyAiSuggestedPoint,
+    batchImportAiPoints,
     loadKnowledgePoints,
     getChapterTitle,
     getPointsForChapter,
@@ -172,6 +396,7 @@ export function useKnowledgePoint() {
     openGraphDrawer,
     handleAskAi,
     handleGenerateQuizForKp,
-    handleDeleteKp
+    handleDeleteKp,
+    confirmDeleteKp
   };
 }

@@ -53,11 +53,11 @@
           <button
             type="button"
             class="action-pill-btn action-pill-btn--portrait"
-            title="查看该学生学情诊断画像"
+            :title="m.memberRole === 'TEACHER' ? '查看课程整体学情分析' : '查看该学生学情诊断画像'"
             @click="emit('view-portrait', m)"
           >
             <el-icon><TrendCharts /></el-icon>
-            <span>学情画像</span>
+            <span>{{ m.memberRole === 'TEACHER' ? '课程学情' : '学情画像' }}</span>
           </button>
           <el-popconfirm
             v-if="m.memberRole !== 'TEACHER'"

@@ -5,16 +5,16 @@
       <div class="toolbar-left">
         <el-input
           v-model="searchKeyword"
-          placeholder="搜索知识点名称、编码或核心概念..."
+          placeholder="搜索知识点名称、编码..."
           clearable
           :prefix-icon="Search"
-          style="width: 280px"
+          class="filter-search-input"
         />
         <el-select
           v-model="selectedChapterId"
           placeholder="全部章节"
           clearable
-          style="width: 220px"
+          class="filter-chapter-select"
           @change="loadKnowledgePoints"
         >
           <el-option label="全部章节目录" :value="undefined" />
@@ -25,7 +25,7 @@
             :value="chap.id"
           />
         </el-select>
-        <el-select v-model="selectedLevel" placeholder="认知维度" clearable style="width: 140px">
+        <el-select v-model="selectedLevel" placeholder="认知维度" clearable class="filter-level-select">
           <el-option label="全部维度" value="" />
           <el-option label="识记 (Remember)" value="REMEMBER" />
           <el-option label="理解 (Understand)" value="UNDERSTAND" />
@@ -35,11 +35,14 @@
       </div>
 
       <div class="toolbar-right">
-        <el-button class="capsule-secondary-btn" @click="openGraphDrawer(null)">
+        <el-button class="capsule-btn capsule-btn--secondary" @click="openGraphDrawer(null)">
           <el-icon><Connection /></el-icon>
-          <span>查看课程全景知识拓扑</span>
+          <span>查看课程全景拓扑</span>
         </el-button>
-        <el-button type="primary" :icon="Plus" class="capsule-primary-btn" @click="showCreateDrawer = true">
+        <el-button class="capsule-btn capsule-btn--ai" @click="openAiSuggestModal">
+          <span>AI 提炼考点</span>
+        </el-button>
+        <el-button type="primary" :icon="Plus" class="capsule-btn capsule-btn--primary" @click="showCreateDrawer = true">
           新增知识点
         </el-button>
       </div>
@@ -86,11 +89,9 @@
               <el-button type="primary" link size="small" @click="handleAskAi(kp)">
                 AI解析
               </el-button>
-              <el-popconfirm title="确定删除此知识点吗？" @confirm="handleDeleteKp(kp)">
-                <template #reference>
-                  <el-button type="danger" link size="small">删除</el-button>
-                </template>
-              </el-popconfirm>
+              <el-button type="danger" link size="small" @click="confirmDeleteKp(kp)">
+                删除
+              </el-button>
             </div>
           </div>
         </div>
@@ -187,53 +188,205 @@
       </div>
     </el-drawer>
 
-    <!-- 新增知识点抽屉 -->
-    <el-drawer v-model="showCreateDrawer" title="录入课程新知识点" size="520px" destroy-on-close>
-      <el-form label-position="top">
+    <!-- 录入知识点抽屉 -->
+    <el-drawer v-model="showCreateDrawer" title="录入课程核心知识点" size="540px" destroy-on-close class="kp-drawer">
+      <template #header>
+        <div class="drawer-header-flex">
+          <div class="header-icon-circle">
+            <el-icon><Connection /></el-icon>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #0F172A;">录入课程核心考查知识点</h3>
+            <p style="margin: 2px 0 0 0; font-size: 12px; color: #64748B;">构建知识图谱拓扑节点，支持 AI 助教知识溯源与智能出题</p>
+          </div>
+        </div>
+      </template>
+
+      <!-- AI 智能推荐横幅 -->
+      <div class="kp-ai-helper-banner" @click="openAiSuggestModal">
+        <div class="ai-spark-icon">
+          <el-icon><MagicStick /></el-icon>
+        </div>
+        <div class="ai-spark-meta">
+          <strong>使用 AI 辅助智能提炼核心考点</strong>
+          <p>基于当前章节大纲，AI 智能提炼核心概念、认知目标维度与考查要点</p>
+        </div>
+        <button type="button" class="spark-call-btn">AI提取</button>
+      </div>
+
+      <el-form label-position="top" class="kp-create-form">
         <el-form-item label="知识点名称" required>
-          <el-input v-model="newKp.title" placeholder="例如：双向链表插入与删除节点算法" />
+          <el-input
+            v-model="newKp.title"
+            placeholder="例如：双向链表插入与删除节点算法"
+            maxlength="60"
+            show-word-limit
+          />
         </el-form-item>
-        <el-form-item label="所属课程章节" required>
-          <el-select v-model="newKp.chapterId" placeholder="选择章节" class="w-full">
-            <el-option
-              v-for="chap in chapters"
-              :key="chap.id"
-              :label="chap.title"
-              :value="chap.id"
+
+        <div class="form-grid-2">
+          <el-form-item label="所属课程章节" required>
+            <el-select v-model="newKp.chapterId" placeholder="选择所属章节" class="w-full">
+              <el-option
+                v-for="(chap, idx) in chapters"
+                :key="chap.id"
+                :label="`第 ${idx + 1} 章：${chap.title}`"
+                :value="chap.id"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="认知目标维度">
+            <el-select v-model="newKp.cognitiveDimension" class="w-full">
+              <el-option label="识记概念 (Remember)" value="REMEMBER" />
+              <el-option label="理解领会 (Understand)" value="UNDERSTAND" />
+              <el-option label="实践应用 (Apply)" value="APPLY" />
+              <el-option label="分析综合 (Analyze)" value="ANALYZE" />
+            </el-select>
+          </el-form-item>
+        </div>
+
+        <div class="form-grid-2">
+          <el-form-item label="核心考查重要度">
+            <el-rate v-model="newKp.importance" :max="5" />
+          </el-form-item>
+
+          <el-form-item label="考查易错陷阱与重点">
+            <el-input
+              v-model="newKp.examFocus"
+              placeholder="例如：边界指针判空、断链死循环"
+              maxlength="40"
             />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="认知目标维度">
-          <el-select v-model="newKp.cognitiveDimension" class="w-full">
-            <el-option label="识记 (Remember)" value="REMEMBER" />
-            <el-option label="理解 (Understand)" value="UNDERSTAND" />
-            <el-option label="应用 (Apply)" value="APPLY" />
-            <el-option label="综合探究 (Analyze)" value="ANALYZE" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="重要度星级">
-          <el-rate v-model="newKp.importance" :max="5" />
-        </el-form-item>
+          </el-form-item>
+        </div>
+
         <el-form-item label="核心考点与概念阐述">
           <el-input
             v-model="newKp.description"
             type="textarea"
             :rows="4"
-            placeholder="详细说明该知识点需掌握的概念、代码要求与易错细节..."
+            placeholder="详细说明该知识点需掌握的概念、推导要求与代码实现细节..."
+            maxlength="300"
+            show-word-limit
           />
         </el-form-item>
       </el-form>
 
       <template #footer>
-        <el-button @click="showCreateDrawer = false">取消</el-button>
-        <el-button type="primary" :loading="creating" @click="handleSaveNewKp">确认添加</el-button>
+        <div class="drawer-footer-actions">
+          <button type="button" class="capsule-btn-cancel" @click="showCreateDrawer = false">取消</button>
+          <button
+            type="button"
+            class="capsule-btn-confirm"
+            :disabled="creating || !newKp.title.trim()"
+            @click="handleSaveNewKp"
+          >
+            <span>{{ creating ? '保存入库中...' : '确认添加知识点' }}</span>
+          </button>
+        </div>
       </template>
     </el-drawer>
+
+    <!-- AI 知识点智能提炼与推荐弹窗 -->
+    <el-dialog
+      v-model="showAiSuggestModal"
+      title="AI 智能考点提炼与推荐"
+      width="640px"
+      append-to-body
+      destroy-on-close
+      class="ai-suggest-dialog"
+    >
+      <div class="ai-dialog-intro">
+        <div class="spark-badge">
+          <el-icon><MagicStick /></el-icon>
+          <span>AI 课程知识图谱引擎</span>
+        </div>
+        <p>
+          AI 已结合本课程大纲与高等教育教学大纲规范，为你智能提炼出以下核心考点。你可以选择单条一键回填到表单，或直接一键批量录入到知识图谱：
+        </p>
+      </div>
+
+      <div v-if="aiExtracting" class="ai-loading-box">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>AI 正在研读章节大纲并提炼考点体系...</span>
+      </div>
+
+      <div v-else class="ai-points-list">
+        <div
+          v-for="(p, pIdx) in aiSuggestedPoints"
+          :key="pIdx"
+          class="ai-point-card"
+        >
+          <div class="point-top-row">
+            <span class="point-num">考点 {{ pIdx + 1 }}</span>
+            <strong class="point-title">{{ p.title }}</strong>
+            <el-tag size="small" :type="getLevelTagType(p.cognitiveDimension)">
+              {{ getLevelLabel(p.cognitiveDimension) }}
+            </el-tag>
+          </div>
+
+          <p class="point-desc">{{ p.description }}</p>
+
+          <div class="point-meta-row">
+            <span v-if="p.examFocus" class="focus-tag">
+              考查重点：{{ p.examFocus }}
+            </span>
+            <div class="stars">
+              <span v-for="s in p.importance" :key="s">★</span>
+            </div>
+          </div>
+
+          <div class="card-apply-action">
+            <button
+              type="button"
+              class="capsule-mini-btn"
+              @click="applyAiSuggestedPoint(p)"
+            >
+              带入表单细化
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="ai-modal-footer">
+          <button
+            type="button"
+            class="capsule-btn-cancel"
+            :disabled="aiExtracting"
+            @click="generateAiSuggestedPoints"
+          >
+            <el-icon><Refresh /></el-icon>
+            <span>换一批考点</span>
+          </button>
+          <div class="right-group">
+            <button type="button" class="capsule-btn-cancel" @click="showAiSuggestModal = false">关闭</button>
+            <button
+              type="button"
+              class="capsule-btn-confirm"
+              :disabled="aiExtracting || aiSuggestedPoints.length === 0"
+              @click="batchImportAiPoints(aiSuggestedPoints)"
+            >
+              <span>一键批量导入所有考点 ({{ aiSuggestedPoints.length }})</span>
+            </button>
+          </div>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Search, Plus, StarFilled, Opportunity, Connection } from '@element-plus/icons-vue';
+import {
+  Search,
+  Plus,
+  StarFilled,
+  Opportunity,
+  Connection,
+  MagicStick,
+  Loading,
+  Refresh
+} from '@element-plus/icons-vue';
 import { useKnowledgePoint } from '@/composables/course/useKnowledgePoint';
 
 const {
@@ -249,6 +402,13 @@ const {
   knowledgePoints,
   newKp,
   filteredPoints,
+  showAiSuggestModal,
+  aiExtracting,
+  aiSuggestedPoints,
+  openAiSuggestModal,
+  generateAiSuggestedPoints,
+  applyAiSuggestedPoint,
+  batchImportAiPoints,
   loadKnowledgePoints,
   getChapterTitle,
   getPointsForChapter,
@@ -259,6 +419,7 @@ const {
   handleAskAi,
   handleGenerateQuizForKp,
   handleDeleteKp,
+  confirmDeleteKp,
 } = useKnowledgePoint();
 </script>
 
@@ -283,6 +444,30 @@ const {
       align-items: center;
       gap: 12px;
       flex-wrap: wrap;
+      flex: 1;
+      min-width: 320px;
+
+      .filter-search-input {
+        width: 240px;
+        flex-shrink: 0;
+      }
+
+      .filter-chapter-select {
+        width: 200px;
+        flex-shrink: 0;
+      }
+
+      .filter-level-select {
+        width: 140px;
+        flex-shrink: 0;
+      }
+    }
+
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
     }
   }
 
@@ -418,21 +603,62 @@ const {
   }
 }
 
-.capsule-secondary-btn {
+.capsule-btn {
+  height: 36px !important;
+  line-height: 36px !important;
   border-radius: 9999px !important;
-  background: #F1F5F9 !important;
-  color: #334155 !important;
-  border: 1px solid #E2E8F0 !important;
+  padding: 0 16px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  box-sizing: border-box !important;
+  vertical-align: middle !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 
-  &:hover {
-    background: #EAF3FF !important;
-    color: #1677FF !important;
-    border-color: #BFDBFE !important;
+  .el-icon {
+    font-size: 15px;
+    margin: 0;
   }
-}
 
-.capsule-primary-btn {
-  border-radius: 9999px !important;
+  &--secondary {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #475569 !important;
+
+    &:hover {
+      background: #f1f5f9 !important;
+      border-color: #cbd5e1 !important;
+      color: #1677ff !important;
+    }
+  }
+
+  &--ai {
+    background: #eff6ff !important;
+    border: 1px solid #bfdbfe !important;
+    color: #2563eb !important;
+
+    &:hover {
+      background: #dbeafe !important;
+      border-color: #93c5fd !important;
+      color: #1d4ed8 !important;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15) !important;
+    }
+  }
+
+  &--primary {
+    background: #1677ff !important;
+    border: 1px solid #1677ff !important;
+    color: #ffffff !important;
+
+    &:hover {
+      background: #4096ff !important;
+      border-color: #4096ff !important;
+      box-shadow: 0 4px 12px rgba(22, 119, 255, 0.3) !important;
+    }
+  }
 }
 
 // 知识拓扑抽屉样式
@@ -622,6 +848,299 @@ const {
         }
       }
     }
+  }
+}
+
+.capsule-ai-trigger-btn {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #EEF2FF 0%, #FAF5FF 100%);
+  border: 1px solid #C7D2FE;
+  color: #4F46E5;
+  font-size: 12.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #E0E7FF;
+    color: #4338CA;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+  }
+}
+
+.kp-drawer {
+  .drawer-header-flex {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    .header-icon-circle {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+  }
+
+  .kp-ai-helper-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(135deg, #F0FDF4 0%, #EFF6FF 100%);
+    border: 1.5px dashed #86EFAC;
+    border-radius: 14px;
+    padding: 12px 14px;
+    cursor: pointer;
+    margin-bottom: 18px;
+    transition: all 0.2s;
+
+    &:hover {
+      border-color: #3B82F6;
+      background: #EFF6FF;
+      transform: translateY(-1px);
+    }
+
+    .ai-spark-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #DCFCE7;
+      color: #15803D;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .ai-spark-meta {
+      flex: 1;
+
+      strong {
+        display: block;
+        font-size: 13px;
+        color: #166534;
+        margin-bottom: 2px;
+      }
+
+      p {
+        font-size: 11.5px;
+        color: #64748B;
+        margin: 0;
+      }
+    }
+
+    .spark-call-btn {
+      height: 28px;
+      padding: 0 12px;
+      border-radius: 9999px;
+      background: #10B981;
+      border: none;
+      color: #FFFFFF;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  }
+
+  .form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .drawer-footer-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+
+    .capsule-btn-cancel {
+      height: 36px;
+      padding: 0 18px;
+      border-radius: 9999px;
+      background: #F1F5F9;
+      border: 1px solid #CBD5E1;
+      color: #475569;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .capsule-btn-confirm {
+      height: 36px;
+      padding: 0 20px;
+      border-radius: 9999px;
+      background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+      border: none;
+      color: #FFFFFF;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+}
+
+// AI 智能提炼弹窗样式
+.ai-dialog-intro {
+  margin-bottom: 14px;
+
+  .spark-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    background: #EFF6FF;
+    border: 1px solid #BFDBFE;
+    color: #2563EB;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  p {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.5;
+    margin: 0;
+  }
+}
+
+.ai-loading-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 0;
+  color: #2563EB;
+  font-size: 14px;
+}
+
+.ai-points-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 380px;
+  overflow-y: auto;
+
+  .ai-point-card {
+    background: #F8FAFC;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #FFFFFF;
+      border-color: #93C5FD;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08);
+    }
+
+    .point-top-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .point-num {
+        font-size: 11px;
+        font-weight: 700;
+        color: #2563EB;
+        background: #DBEAFE;
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+
+      .point-title {
+        font-size: 14px;
+        color: #0F172A;
+        flex: 1;
+      }
+    }
+
+    .point-desc {
+      font-size: 12.5px;
+      color: #64748B;
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    .point-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      .focus-tag {
+        font-size: 11.5px;
+        color: #D97706;
+        background: #FEF3C7;
+        padding: 1px 8px;
+        border-radius: 6px;
+      }
+
+      .stars {
+        color: #F59E0B;
+        font-size: 12px;
+        letter-spacing: 2px;
+      }
+    }
+
+    .card-apply-action {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 4px;
+
+      .capsule-mini-btn {
+        height: 26px;
+        padding: 0 12px;
+        border-radius: 9999px;
+        background: #EFF6FF;
+        border: 1px solid #BFDBFE;
+        color: #2563EB;
+        font-size: 11.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+          background: #2563EB;
+          color: #FFFFFF;
+        }
+      }
+    }
+  }
+}
+
+.ai-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+
+  .right-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
 }
 </style>

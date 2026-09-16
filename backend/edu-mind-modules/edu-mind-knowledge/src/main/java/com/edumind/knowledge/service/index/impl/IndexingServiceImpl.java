@@ -1,6 +1,6 @@
 package com.edumind.knowledge.service.index.impl;
 
-import com.edumind.common.api.embedding.EmbeddingApi;
+import com.edumind.ai.api.embedding.EmbeddingApi;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.infrastructure.vector.VectorStore;

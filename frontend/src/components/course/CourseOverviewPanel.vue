@@ -147,6 +147,14 @@
               <span>{{ course?.knowledgeBaseId ? '进入关联知识库' : '关联学科知识库' }}</span>
               <el-icon><FolderOpened /></el-icon>
             </button>
+            <button
+              type="button"
+              class="capsule-block-btn capsule-block-btn--edit"
+              @click="showEditDrawer = true"
+            >
+              <span>编辑修改课程档案</span>
+              <el-icon><EditPen /></el-icon>
+            </button>
           </div>
         </div>
 
@@ -171,21 +179,29 @@
         </div>
       </div>
     </div>
+
+    <!-- 课程快捷编辑抽屉 -->
+    <CourseEditDrawer
+      v-model="showEditDrawer"
+      :course="course || null"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Reading, Aim, Bell, ArrowRight, Service, EditPen, FolderOpened } from '@element-plus/icons-vue';
 import { Course } from '@/types/course/course';
+import CourseEditDrawer from '@/components/course/CourseEditDrawer.vue';
 
 const props = defineProps<{
   course?: Course | null;
 }>();
 
 const router = useRouter();
+const showEditDrawer = ref(false);
 
 const personaLabel = computed(() => {
   const p = props.course?.aiPersona;

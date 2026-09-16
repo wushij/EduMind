@@ -217,7 +217,7 @@
         <div class="toggle-card">
           <div class="toggle-info">
             <span class="toggle-title">热门徽章</span>
-            <span class="toggle-desc">卡片标题旁点亮专属 🔥 HOT 热门徽章</span>
+            <span class="toggle-desc">卡片标题旁点亮专属 HOT 热门徽标</span>
           </div>
           <el-switch v-model="form.isHot" />
         </div>

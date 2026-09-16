@@ -25,4 +25,13 @@ public class LearningAnalyticsController {
             @RequestParam(required = false) Long classId) {
         return ApiResult.success(learningAnalyticsService.getLearningAnalytics(courseId, range, classId));
     }
+
+    @SaCheckPermission("course:view")
+    @GetMapping("/portrait")
+    public ApiResult<com.edumind.statistics.vo.analytics.StudentPortraitVO> getStudentPortrait(
+            @RequestParam Long courseId,
+            @RequestParam(required = false) Long studentId) {
+        Long targetStudent = studentId != null ? studentId : com.edumind.common.model.UserContext.getUserId();
+        return ApiResult.success(learningAnalyticsService.getStudentPortrait(courseId, targetStudent));
+    }
 }

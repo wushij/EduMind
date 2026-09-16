@@ -8,7 +8,7 @@ import {
   queryComponentSuggestions
 } from './useMenu';
 
-vi.mock('@/api/system/menu', () => ({
+vi.mock('@/services/system/menu-service', () => ({
   getMenuTree: vi.fn(),
   createMenu: vi.fn(),
   updateMenu: vi.fn(),
@@ -86,7 +86,7 @@ describe('useMenu composable', () => {
   });
 
   it('loads menu tree on mount', async () => {
-    const { getMenuTree } = await import('@/api/system/menu');
+    const { getMenuTree } = await import('@/services/system/menu-service');
     vi.mocked(getMenuTree).mockResolvedValue({
       code: 200,
       message: 'ok',

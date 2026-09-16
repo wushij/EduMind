@@ -14,8 +14,10 @@
         <span>返回课程中心</span>
       </button>
       <span class="header-guide-badge">
-        <span class="sparkle-icon">✨</span>
-        AI-Native 智能教学空间初始化向导
+        <svg viewBox="0 0 24 24" class="sparkle-svg" fill="currentColor">
+          <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" />
+        </svg>
+        <span>AI-Native 智能教学空间初始化向导</span>
       </span>
     </template>
 
@@ -89,9 +91,11 @@ defineEmits<{ back: [] }>();
   font-weight: 600;
   color: #4f46e5;
 
-  .sparkle-icon {
-    font-size: 13px;
-    line-height: 1;
+  .sparkle-svg {
+    width: 14px;
+    height: 14px;
+    color: #4f46e5;
+    flex-shrink: 0;
   }
 }
 

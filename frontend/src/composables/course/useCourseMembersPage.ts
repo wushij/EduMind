@@ -86,10 +86,17 @@ export function useCourseMembersPage(courseId: number) {
   }
 
   function handleViewPortrait(member: CourseMemberItem) {
-    router.push({
-      path: '/analytics/learning',
-      query: { studentId: member.userId, courseId }
-    });
+    if (member.memberRole === 'TEACHER') {
+      router.push({
+        path: '/analytics/learning',
+        query: { courseId, tab: 'overall' }
+      });
+    } else {
+      router.push({
+        path: '/analytics/learning',
+        query: { studentId: member.userId, courseId, tab: 'personal' }
+      });
+    }
   }
 
   async function handleRemove(userId: number) {

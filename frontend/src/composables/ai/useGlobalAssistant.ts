@@ -2,7 +2,8 @@ import { ref, computed, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { SSEClient } from '@/core/sse/client';
-import { API_BASE_URL } from '@/config';
+import { streamGlobalAssistantChat } from '@/services/ai/copilot-sse-stream';
+import { useAIStreamScrollFollow } from '@/composables/ai/useAIStreamScrollFollow';
 import { askGlobalAssistant } from '@/api/ai/assistant';
 import {
   getMessages,
@@ -206,7 +207,6 @@ export function useGlobalAssistant() {
   const conversationId = ref<string>();
   const messagesScrollRef = ref<HTMLDivElement | null>(null);
   const streamAnchorRef = ref<HTMLDivElement | null>(null);
-  const showScrollToBottom = ref(false);
 
   // 历史对话：localStorage 为主（刷新不丢），UI 对标 Code Compass
   const isHistoryPanelOpen = ref(false);
@@ -243,6 +243,21 @@ export function useGlobalAssistant() {
   const streamingThinkingDisplay = computed(() => {
     const raw = streamingReasoning.value || streamingThinkingBody.value;
     return cleanReasoningText(raw);
+  });
+
+  const {
+    showScrollToBottom,
+    pauseAutoScrollFollow,
+    handleViewportScroll,
+    scrollToBottomInstant,
+    scrollToBottomSmooth,
+    scheduleFollowStreamOutput
+  } = useAIStreamScrollFollow({
+    streaming: isStreaming,
+    streamingRenderedHtml,
+    streamingReasoning,
+    messagesScrollRef,
+    streamAnchorRef
   });
 
   function refreshMarkdownUi() {
@@ -546,82 +561,6 @@ export function useGlobalAssistant() {
   }
 
 
-  let streamFollowRaf = 0;
-  const userScrolledUp = ref(false);
-
-  function pauseAutoScrollFollow() {
-    userScrolledUp.value = true;
-    showScrollToBottom.value = true;
-  }
-
-  /** 流式输出时自动跟随到底部（基于 requestAnimationFrame 每帧至多一次，让输出时内容实时平滑往上移动） */
-  function scheduleFollowStreamOutput() {
-    if (!isStreaming.value || userScrolledUp.value || showScrollToBottom.value) return;
-    if (streamFollowRaf) return;
-
-    streamFollowRaf = requestAnimationFrame(() => {
-      streamFollowRaf = 0;
-      nextTick(() => {
-        if (!isStreaming.value || userScrolledUp.value || showScrollToBottom.value) return;
-        if (messagesScrollRef.value) {
-          messagesScrollRef.value.scrollTop = messagesScrollRef.value.scrollHeight;
-        }
-      });
-    });
-  }
-
-  function scrollToBottomInstant() {
-    nextTick(() => {
-      if (messagesScrollRef.value) {
-        messagesScrollRef.value.scrollTop = messagesScrollRef.value.scrollHeight;
-      }
-    });
-  }
-
-  function scrollToBottomSmooth() {
-    userScrolledUp.value = false;
-    showScrollToBottom.value = false;
-    nextTick(() => {
-      if (messagesScrollRef.value) {
-        messagesScrollRef.value.scrollTo({
-          top: messagesScrollRef.value.scrollHeight,
-          behavior: 'smooth'
-        });
-      }
-    });
-  }
-
-  watch(
-    () => streamingRenderedHtml.value,
-    () => {
-      if (isStreaming.value) {
-        scheduleFollowStreamOutput();
-      }
-    }
-  );
-
-  watch(
-    () => streamingReasoning.value,
-    () => {
-      if (isStreaming.value) {
-        scheduleFollowStreamOutput();
-      }
-    }
-  );
-
-  function handleViewportScroll(e: Event) {
-    const el = e.target as HTMLElement;
-    if (!el) return;
-    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    if (distanceToBottom > 160) {
-      userScrolledUp.value = true;
-      showScrollToBottom.value = true;
-    } else if (distanceToBottom < 30) {
-      userScrolledUp.value = false;
-      showScrollToBottom.value = false;
-    }
-  }
-
   function getIntentTagType(intent?: string) {
     if (intent === 'agent' || intent === 'EXAM_COMPOSE') return 'danger';
     if (intent === 'rag' || intent === 'KNOWLEDGE_RETRIEVAL') return 'warning';
@@ -704,60 +643,43 @@ export function useGlobalAssistant() {
   }
 
   async function streamChat(query: string): Promise<boolean> {
-    let receivedContent = false;
-    let lastStreamedIndex = 0;
-
-    await sseClient.streamEvents(
-      `${API_BASE_URL}/ai/assistant/chat`,
+    return streamGlobalAssistantChat(
+      sseClient,
+      query,
+      activeCourseId.value,
+      conversationId.value,
+      streamingContent,
       {
-        message: query,
-        courseId: activeCourseId.value,
-        conversationId: conversationId.value
-      },
-      (event, data) => {
-        if (event === 'intent') {
-          applyIntentEvent(data as GlobalAssistantIntentEvent);
-        } else if (event === 'status') {
-          const s = data as { phase?: string; message?: string };
-          if (s?.message) streamPhaseMessage.value = s.message;
-          if (s?.phase === 'reasoning') isReasoningActive.value = true;
-          if (s?.phase === 'composing') isReasoningActive.value = false;
-        } else if (event === 'reasoning') {
-          const chunk = String((data as { content?: string })?.content || data || '');
-          if (chunk) {
-            streamingReasoning.value += chunk;
-            isReasoningActive.value = true;
-            streamPhaseMessage.value = '';
+        onIntent: (data) => applyIntentEvent(data as GlobalAssistantIntentEvent),
+        onStatus: (message, phase) => {
+          streamPhaseMessage.value = message;
+          if (phase === 'reasoning') isReasoningActive.value = true;
+          if (phase === 'composing') isReasoningActive.value = false;
+        },
+        onReasoningChunk: (chunk) => {
+          streamingReasoning.value += chunk;
+          isReasoningActive.value = true;
+          streamPhaseMessage.value = '';
+        },
+        onDeltaChunk: (_chunk, answerDelta) => {
+          if (!answerDelta) return;
+          isReasoningActive.value = false;
+          streamPhaseMessage.value = '';
+          if (!answerStreamStarted.value) {
+            answerStreamStarted.value = true;
+            isReasoningFolded.value = getInitialReasoningFolded();
           }
-        } else if (event === 'delta') {
-          // 仅监听唯一的 delta 事件，杜绝重复叠加
-          const chunk = String((data as { content?: string; text?: string })?.content || (data as { text?: string })?.text || data || '');
-          if (chunk) {
-            receivedContent = true;
-            streamingContent.value += chunk;
-
-            const split = splitCopilotStream(streamingContent.value);
-            if (split.answer) {
-              isReasoningActive.value = false;
-              streamPhaseMessage.value = '';
-              if (!answerStreamStarted.value) {
-                answerStreamStarted.value = true;
-                isReasoningFolded.value = getInitialReasoningFolded();
-              }
-              const answerDelta = split.answer.slice(lastStreamedIndex);
-              lastStreamedIndex = split.answer.length;
-              if (answerDelta) {
-                appendStreamingMarkdown(answerDelta);
-              }
-            }
-          }
-        } else if (event === 'citation' || event === 'citations') {
-          const cits = (Array.isArray(data) ? data : (data as { citations?: CitationItem[] })?.citations) || [];
-          if (Array.isArray(cits) && cits.length > 0) {
-            streamingCitations.value = cits as CitationItem[];
-          }
-        } else if (event === 'done') {
-          const d = data as { conversationId?: string; citations?: CitationItem[]; reasoningContent?: string };
+          appendStreamingMarkdown(answerDelta);
+        },
+        onCitations: (cits) => {
+          streamingCitations.value = cits;
+        },
+        onDone: (data) => {
+          const d = data as {
+            conversationId?: string;
+            citations?: CitationItem[];
+            reasoningContent?: string;
+          };
           if (d.conversationId) conversationId.value = String(d.conversationId);
           if (d.citations && d.citations.length > 0) {
             streamingCitations.value = d.citations;
@@ -767,14 +689,10 @@ export function useGlobalAssistant() {
           }
           followUpPrompts.value = generateSmartFollowUps(query);
           finalizeAssistantMessage();
-        } else if (event === 'error') {
-          throw new Error(String((data as { message?: string })?.message || '流式响应异常'));
-        }
-        scheduleFollowStreamOutput();
+        },
+        onFollowOutput: scheduleFollowStreamOutput
       }
     );
-
-    return receivedContent;
   }
 
   async function fallbackAsk(query: string) {

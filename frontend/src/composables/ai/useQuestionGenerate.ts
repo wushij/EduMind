@@ -1,7 +1,9 @@
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Question, QuestionType, Difficulty } from '@/types/question/question';
+import { MOCK_COURSES } from '@/mock/courses';
+import { MOCK_CHAPTERS } from '@/mock/chapters';
 import { generateQuestions } from '@/api/ai/generation';
 import { loadGenerationCourseOptions } from '@/services/ai/generation-service';
 import { batchSaveQuestions } from '@/api/question/question';
@@ -10,6 +12,17 @@ import { MOCK_QUESTIONS } from '@/mock/questions';
 import { normalizeQuestionList } from '@/utils/question/normalize-question';
 
 const generatedQuestions = ref<Question[]>([]);
+
+export const QUESTION_GENERATE_KNOWLEDGE_POINTS = [
+  '极限性质与保号性',
+  '等价无穷小代换',
+  '左右导数与连续性',
+  '复合函数链式法则',
+  '拉格朗日中值定理',
+  '泰勒公式近似展开',
+  '反常积分收敛判别',
+  '循环队列队满判断'
+];
 
 export function useQuestionGenerate() {
   const router = useRouter();
@@ -34,6 +47,63 @@ export function useQuestionGenerate() {
 
   function prevStep() {
     if (currentStep.value > 1) currentStep.value--;
+  }
+
+  const displayCourses = computed(() =>
+    courses.value.length ? courses.value : USE_MOCK ? MOCK_COURSES : []
+  );
+
+  const currentCourseChapters = computed(
+    () => MOCK_CHAPTERS[formState.courseId] || MOCK_CHAPTERS[101]
+  );
+
+  const selectedCourseName = computed(() => {
+    const found = displayCourses.value.find((c) => c.id === formState.courseId);
+    return found?.title || '未指定课程';
+  });
+
+  function goToStep(idx: number) {
+    if (idx < currentStep.value) {
+      currentStep.value = idx;
+    }
+  }
+
+  function toggleChapterSelect(id: number) {
+    const idx = formState.chapterIds.indexOf(id);
+    if (idx > -1) {
+      formState.chapterIds.splice(idx, 1);
+    } else {
+      formState.chapterIds.push(id);
+    }
+  }
+
+  function toggleKpSelect(kp: string) {
+    const idx = formState.knowledgePointNames.indexOf(kp);
+    if (idx > -1) {
+      formState.knowledgePointNames.splice(idx, 1);
+    } else {
+      formState.knowledgePointNames.push(kp);
+    }
+  }
+
+  function toggleTypeSelect(type: QuestionType) {
+    const idx = formState.questionTypes.indexOf(type);
+    if (idx > -1) {
+      if (formState.questionTypes.length > 1) {
+        formState.questionTypes.splice(idx, 1);
+      }
+    } else {
+      formState.questionTypes.push(type);
+    }
+  }
+
+  function difficultyLabel(difficulty: Difficulty) {
+    const map: Record<Difficulty, string> = {
+      EASY: '简单',
+      MEDIUM: '中等',
+      HARD: '困难'
+    };
+    return map[difficulty] || '中等难度';
   }
 
   async function loadCourseOptions() {
@@ -99,10 +169,18 @@ export function useQuestionGenerate() {
     currentStep,
     generating,
     courses,
+    displayCourses,
+    currentCourseChapters,
+    selectedCourseName,
     formState,
     generatedQuestions,
     nextStep,
     prevStep,
+    goToStep,
+    toggleChapterSelect,
+    toggleKpSelect,
+    toggleTypeSelect,
+    difficultyLabel,
     loadCourseOptions,
     generate,
     deleteQuestion,

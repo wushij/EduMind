@@ -42,11 +42,7 @@ public class ChapterServiceImpl implements ChapterService {
         if (course == null) {
             throw new BusinessException("课程不存在");
         }
-        Long currentUserId = StpUtil.getLoginIdAsLong();
-        List<String> roles = userQueryApi.getRolesByUserId(currentUserId);
-        if (!roles.contains(RoleCode.ADMIN.getCode()) && !currentUserId.equals(course.getTeacherId())) {
-            throw new BusinessException("无权限为该课程添加章节");
-        }
+        assertCanEditCourse(course);
         com.edumind.course.entity.ChapterEntity chapter = new com.edumind.course.entity.ChapterEntity();
         chapter.setCourseId(courseId);
         chapter.setTitle(title);
@@ -55,6 +51,54 @@ public class ChapterServiceImpl implements ChapterService {
         chapter.setCreateTime(java.time.LocalDateTime.now());
         chapterDao.insert(chapter);
         return chapter.getId();
+    }
+
+    @Override
+    public void updateChapter(Long courseId, Long chapterId, String title, Integer sortOrder) {
+        CourseEntity course = courseDao.findById(courseId);
+        if (course == null) {
+            throw new BusinessException("课程不存在");
+        }
+        assertCanEditCourse(course);
+        com.edumind.course.entity.ChapterEntity chapter = chapterDao.findById(chapterId);
+        if (chapter == null || !courseId.equals(chapter.getCourseId())) {
+            throw new BusinessException("章节不存在");
+        }
+        if (title != null && !title.isBlank()) {
+            chapter.setTitle(title.trim());
+        }
+        if (sortOrder != null) {
+            chapter.setSortOrder(sortOrder);
+        }
+        chapterDao.updateById(chapter);
+    }
+
+    @Override
+    public void deleteChapter(Long courseId, Long chapterId) {
+        CourseEntity course = courseDao.findById(courseId);
+        if (course == null) {
+            throw new BusinessException("课程不存在");
+        }
+        assertCanEditCourse(course);
+        com.edumind.course.entity.ChapterEntity chapter = chapterDao.findById(chapterId);
+        if (chapter == null || !courseId.equals(chapter.getCourseId())) {
+            throw new BusinessException("章节不存在");
+        }
+        chapterDao.deleteById(chapterId);
+        List<com.edumind.course.entity.ChapterEntity> allChapters = chapterDao.findByCourseId(courseId);
+        for (com.edumind.course.entity.ChapterEntity c : allChapters) {
+            if (chapterId.equals(c.getParentId())) {
+                chapterDao.deleteById(c.getId());
+            }
+        }
+    }
+
+    private void assertCanEditCourse(CourseEntity course) {
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        List<String> roles = userQueryApi.getRolesByUserId(currentUserId);
+        if (!roles.contains(RoleCode.ADMIN.getCode()) && !currentUserId.equals(course.getTeacherId())) {
+            throw new BusinessException("无权限编辑该课程大纲");
+        }
     }
 
     private void assertCourseAccessible(CourseEntity course) {

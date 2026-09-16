@@ -85,6 +85,25 @@ public class CourseController {
         return ApiResult.success(chapterService.createChapter(id, title, parentId, sortOrder));
     }
 
+    @SaCheckPermission("course:edit")
+    @PutMapping("/{id}/chapters/{chapterId}")
+    public ApiResult<Void> updateChapter(@PathVariable("id") Long id,
+                                         @PathVariable("chapterId") Long chapterId,
+                                         @RequestBody java.util.Map<String, Object> body) {
+        String title = (String) body.get("title");
+        Integer sortOrder = body.get("sortOrder") != null ? Integer.valueOf(body.get("sortOrder").toString()) : null;
+        chapterService.updateChapter(id, chapterId, title, sortOrder);
+        return ApiResult.success();
+    }
+
+    @SaCheckPermission("course:edit")
+    @DeleteMapping("/{id}/chapters/{chapterId}")
+    public ApiResult<Void> deleteChapter(@PathVariable("id") Long id,
+                                         @PathVariable("chapterId") Long chapterId) {
+        chapterService.deleteChapter(id, chapterId);
+        return ApiResult.success();
+    }
+
     @SaCheckPermission("course:view")
     @GetMapping("/{id}/knowledge-points")
     public ApiResult<List<KnowledgePointVO>> listKnowledgePoints(@PathVariable("id") Long id,

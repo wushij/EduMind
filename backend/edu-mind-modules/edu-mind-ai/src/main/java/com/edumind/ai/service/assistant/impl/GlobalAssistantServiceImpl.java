@@ -195,10 +195,10 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
 
     private String buildIntentDesc(IntentDispatchPlan plan) {
         return switch (plan.getRoute()) {
-            case "agent" -> "🎯 识别意图：Agent 任务编排（" + plan.getAgentCode() + "）";
-            case "rag" -> "🔍 识别意图：知识库考点检索";
-            case "navigate" -> "🧭 识别意图：页面功能直达";
-            default -> "🤖 识别意图：课程助教答疑";
+            case "agent" -> "识别意图：Agent 任务编排（" + plan.getAgentCode() + "）";
+            case "rag" -> "识别意图：知识库考点检索";
+            case "navigate" -> "识别意图：页面功能直达";
+            default -> "识别意图：课程助教答疑";
         };
     }
 

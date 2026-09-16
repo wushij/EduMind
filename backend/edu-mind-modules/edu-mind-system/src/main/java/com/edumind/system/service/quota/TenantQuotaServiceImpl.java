@@ -96,7 +96,7 @@ public class TenantQuotaServiceImpl implements TenantQuotaService {
             SysTenantQuotaEntity entity = sysTenantQuotaDao.findByTenantAndType(tenantId, "TOKEN");
             if (entity != null && entity.getLimitValue() != null && entity.getUsedValue() != null) {
                 if (entity.getUsedValue() >= entity.getLimitValue()) {
-                    log.warn("🛑 [租户配额预检阻断] 租户 {} 的 TOKEN 配额已耗尽 ({} / {})",
+                    log.warn("[租户配额预检阻断] 租户 {} 的 TOKEN 配额已耗尽 ({} / {})",
                             tenantId, entity.getUsedValue(), entity.getLimitValue());
                     throw new BusinessException(ResultCode.TOO_MANY_REQUESTS.getCode(), "租户 Token 配额已耗尽，请联系管理员扩容");
                 }
@@ -208,7 +208,7 @@ public class TenantQuotaServiceImpl implements TenantQuotaService {
             }
         }
         // 普通用户试图查看/修改其他租户配额，一律阻断并重写为当前租户
-        log.warn("🛡️ [防越权] 拦截非超管跨租户访问配额请求: currentTenantId={}, requestedTenantId={}",
+        log.warn("[防越权] 拦截非超管跨租户访问配额请求: currentTenantId={}, requestedTenantId={}",
                 currentTenantId, requestedTenantId);
         return currentTenantId;
     }

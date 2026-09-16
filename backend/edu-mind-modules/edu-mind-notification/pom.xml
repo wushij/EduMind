@@ -15,6 +15,10 @@
     <dependencies>
         <dependency>
             <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-notification-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.edumind</groupId>
             <artifactId>edu-mind-system-api</artifactId>
         </dependency>
         <dependency>

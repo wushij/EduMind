@@ -18,6 +18,16 @@
 
         <div class="toolbar-right-actions">
           <button
+            type="button"
+            class="capsule-btn capsule-btn--default edit-btn"
+            title="编辑当前课程档案与AI人设"
+            @click="showEditDrawer = true"
+          >
+            <el-icon class="btn-icon-svg text-primary"><EditPen /></el-icon>
+            <span>编辑课程信息</span>
+          </button>
+
+          <button
             v-if="currentCourse?.code"
             type="button"
             class="capsule-btn capsule-btn--default code-btn"
@@ -152,6 +162,12 @@
         </router-view>
       </div>
     </div>
+    <!-- 课程快速编辑抽屉 -->
+    <CourseEditDrawer
+      v-model="showEditDrawer"
+      :course="currentCourse"
+      @saved="handleCourseSaved"
+    />
   </div>
 </template>
 
@@ -160,18 +176,27 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { useCourse } from '@/composables/course/useCourse';
+import CourseEditDrawer from '@/components/course/CourseEditDrawer.vue';
 import {
   Reading,
   Document,
   Connection,
   FolderOpened,
   Service,
-  User
+  User,
+  EditPen
 } from '@element-plus/icons-vue';
 
 const route = useRoute();
 const router = useRouter();
 const { currentCourse, fetchCourseDetail } = useCourse();
+const showEditDrawer = ref(false);
+
+function handleCourseSaved(updated: any) {
+  if (currentCourse.value) {
+    Object.assign(currentCourse.value, updated);
+  }
+}
 
 const courseId = computed(() => (route.params.id ? String(route.params.id) : ''));
 const isAiRoute = computed(() => route.path.endsWith('/ai'));

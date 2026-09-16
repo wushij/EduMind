@@ -1,4 +1,8 @@
-import type { AiUsageAnalyticsVO, LearningAnalyticsVO } from '@/types/analytics/learning';
+import type {
+  AiUsageAnalyticsVO,
+  LearningAnalyticsVO,
+  StudentPortraitVO
+} from '@/types/analytics/learning';
 import type {
   KnowledgeMasteryVO,
   TeachingAdviceVO,
@@ -32,7 +36,163 @@ export const MOCK_LEARNING_ANALYTICS: LearningAnalyticsVO = {
       { date: '周六', avgScore: 80.8 },
       { date: '周日', avgScore: 79.6 }
     ]
-  }
+  },
+  students: [
+    {
+      studentId: 3,
+      username: 'student',
+      realName: '李同学',
+      studentNo: 'STU-0003',
+      avatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
+      studyMinutes: 154,
+      avgScore: 88.5,
+      submissionRate: 100,
+      masteryScore: 82.0,
+      aiUsageCount: 26,
+      wrongCount: 2,
+      status: 'EXCELLENT'
+    },
+    {
+      studentId: 4,
+      username: 'student2',
+      realName: '王同学',
+      studentNo: 'STU-0004',
+      avatar: 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png',
+      studyMinutes: 110,
+      avgScore: 78.0,
+      submissionRate: 85,
+      masteryScore: 74.0,
+      aiUsageCount: 18,
+      wrongCount: 4,
+      status: 'GOOD'
+    },
+    {
+      studentId: 6,
+      username: 'chen_student',
+      realName: '陈晨',
+      studentNo: 'STU-0006',
+      studyMinutes: 65,
+      avgScore: 62.5,
+      submissionRate: 60,
+      masteryScore: 58.0,
+      aiUsageCount: 8,
+      wrongCount: 7,
+      status: 'WARNING'
+    }
+  ]
+};
+
+export const MOCK_STUDENT_PORTRAIT: StudentPortraitVO = {
+  studentInfo: {
+    studentId: 3,
+    username: 'student',
+    realName: '李同学',
+    avatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
+    studentNo: 'STU-0003',
+    className: '2026级 卓越先锋班',
+    role: '在册学员',
+    lastActiveTime: '2026-09-16 10:45'
+  },
+  summary: {
+    totalStudyMinutes: 154,
+    classAvgStudyMinutes: 142,
+    avgScore: 88.5,
+    classAvgScore: 82.4,
+    submissionRate: 100,
+    overallMastery: 82.0,
+    aiUsageCount: 26,
+    wrongQuestionCount: 2,
+    learningPace: 'FAST'
+  },
+  radar: {
+    dimensions: ['注意力机制', 'Transformer架构', '预训练与微调', '模型对齐RLHF', '长文本推理', '量化与部署'],
+    personalScores: [92, 88, 75, 62, 85, 90],
+    classAvgScores: [80, 78, 72, 68, 76, 75]
+  },
+  knowledgePoints: [
+    {
+      knowledgePointId: 101,
+      title: 'Self-Attention 矩阵运算与缩放点积',
+      masteryScore: 92,
+      sampleCount: 6,
+      status: 'MASTERED',
+      lastAssessedAt: '2026-09-15',
+      suggestion: '掌握牢固，建议继续挑战高阶变式'
+    },
+    {
+      knowledgePointId: 102,
+      title: '多头注意力机制维度投影',
+      masteryScore: 88,
+      sampleCount: 5,
+      status: 'MASTERED',
+      lastAssessedAt: '2026-09-15',
+      suggestion: '核心考点理解充分'
+    },
+    {
+      knowledgePointId: 103,
+      title: 'LoRA 低秩自适应参数更新机理',
+      masteryScore: 75,
+      sampleCount: 4,
+      status: 'LEARNING',
+      lastAssessedAt: '2026-09-14',
+      suggestion: '梯度截断细节需进一步巩固'
+    },
+    {
+      knowledgePointId: 104,
+      title: 'PPO 与 DPO 强化学习偏好对齐损失函数',
+      masteryScore: 62,
+      sampleCount: 4,
+      status: 'WEAK',
+      lastAssessedAt: '2026-09-14',
+      suggestion: 'KL 散度约束项理解存在偏差，建议复习相关推导'
+    }
+  ],
+  weakPoints: [
+    {
+      knowledgePointId: 104,
+      title: 'PPO 与 DPO 强化学习偏好对齐损失函数',
+      mastery: 62,
+      suggestion: '建议针对对齐损失推导进行 10 分钟强化测验并结合 AI 答疑'
+    }
+  ],
+  masteredPoints: [
+    {
+      knowledgePointId: 101,
+      title: 'Self-Attention 矩阵运算与缩放点积',
+      mastery: 92
+    },
+    {
+      knowledgePointId: 102,
+      title: '多头注意力机制维度投影',
+      mastery: 88
+    }
+  ],
+  wrongQuestions: [
+    {
+      recordId: 1,
+      questionId: 1007,
+      questionStem: '在 DPO 算法优化目标中，隐式奖励模型与标准 PPO 策略梯度的主要区别体现在哪个方面？',
+      knowledgePointId: 104,
+      knowledgePointTitle: 'PPO 与 DPO 强化学习偏好对齐损失函数',
+      errorTypes: 'CONCEPT,LOGIC',
+      diagnosis: '混淆了直接策略优化与显式 Critic 估值网络的更新时机',
+      wrongCount: 2,
+      createTime: '2026-09-15'
+    }
+  ],
+  adaptiveWeeks: [
+    {
+      weekNo: 1,
+      theme: '强化：PPO 与 DPO 强化学习偏好对齐',
+      tasks: [
+        { title: '复习知识点与公式推导精讲', type: 'READ', status: 'COMPLETED' },
+        { title: '完成 3 道偏好对齐损失变式题', type: 'PRACTICE', status: 'PENDING' },
+        { title: 'AI 助教答疑辨析 KL 散度约束', type: 'AI_CHAT', status: 'PENDING' }
+      ]
+    }
+  ],
+  aiDiagnosis:
+    '【AI 导师学情综合评价】李同学在《深度学习与大语言模型系统工程》中的学习表现极其突出，平均分达 88.5 分（高于班级均值 6.1 分），知识图谱达成度为 82.0%。在注意力机制、模型量化部署等工程实践考点展现出强大的理解力；仅在偏好对齐损失函数推导上存在偶发概念混淆。已为您生成自适应巩固周计划，建议通过 AI 专属助教进行 1 对 1 定向突破。'
 };
 
 export const MOCK_KNOWLEDGE_MASTERY: KnowledgeMasteryVO = {

@@ -15,15 +15,15 @@
     <dependencies>
         <dependency>
             <groupId>com.edumind</groupId>
-            <artifactId>edu-mind-common</artifactId>
+            <artifactId>edu-mind-teaching-api</artifactId>
         </dependency>
         <dependency>
             <groupId>com.edumind</groupId>
-            <artifactId>edu-mind-course</artifactId>
+            <artifactId>edu-mind-course-api</artifactId>
         </dependency>
         <dependency>
             <groupId>com.edumind</groupId>
-            <artifactId>edu-mind-question</artifactId>
+            <artifactId>edu-mind-question-api</artifactId>
         </dependency>
         <dependency>
             <groupId>com.edumind</groupId>

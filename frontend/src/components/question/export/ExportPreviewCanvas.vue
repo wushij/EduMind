@@ -8,7 +8,7 @@
         <el-radio-button label="page2">第 2 页 · 解答题与压轴题</el-radio-button>
         <el-radio-button label="page3" v-if="configForm.showAnswerSheet">第 3 页 · 标准答题卡</el-radio-button>
         <el-radio-button label="page4" v-if="configForm.showAnalysis">第 4 页 · 踩分细则与解析</el-radio-button>
-        <el-radio-button label="continuous">📑 连续整卷排版</el-radio-button>
+        <el-radio-button label="continuous">连续整卷排版</el-radio-button>
       </el-radio-group>
     </div>
 

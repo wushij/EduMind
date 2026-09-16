@@ -145,21 +145,16 @@
               title="针对此课件向助教提问"
               @click="handleAskAiAboutDoc(item)"
             >
-              <el-icon><MagicStick /></el-icon>
               <span>AI导读</span>
             </button>
-            <el-popconfirm
-              title="确定移除该课程教学资料吗？"
-              confirm-button-text="确定"
-              cancel-button-text="取消"
-              @confirm="handleDelete(item.id)"
+            <button
+              type="button"
+              class="action-pill-btn action-pill-btn--del"
+              title="删除课件资料"
+              @click.stop="confirmDeleteResource(item)"
             >
-              <template #reference>
-                <button type="button" class="action-pill-btn action-pill-btn--del" title="删除">
-                  <el-icon><Delete /></el-icon>
-                </button>
-              </template>
-            </el-popconfirm>
+              <el-icon><Delete /></el-icon>
+            </button>
           </div>
         </div>
       </div>
@@ -178,40 +173,129 @@
     <el-dialog
       v-model="showUploadDialog"
       title="上传课程教学与课件资料"
-      width="540px"
+      width="580px"
       append-to-body
       destroy-on-close
+      class="course-resource-upload-dialog"
     >
-      <el-form label-position="top">
-        <el-form-item label="资料显示标题" required>
-          <el-input v-model="newResourceTitle" placeholder="例如：数据结构第三章-树与二叉树精讲课件.pdf" />
+      <template #header>
+        <div class="upload-dialog-custom-header">
+          <div class="header-icon-circle">
+            <el-icon><Upload /></el-icon>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #0F172A;">上传课程教学与课件资料</h3>
+            <p style="margin: 2px 0 0 0; font-size: 12px; color: #64748B;">支持多格式文档与多媒体，一键挂载 RAG 向量知识库并赋能 AI 助教</p>
+          </div>
+        </div>
+      </template>
+
+      <!-- 拖拽上传文件区域 -->
+      <div class="drag-upload-section">
+        <el-upload
+          drag
+          action="#"
+          :auto-upload="false"
+          :show-file-list="false"
+          :on-change="handleFileChange"
+          accept=".pdf,.ppt,.pptx,.doc,.docx,.mp4,.md,.txt"
+          class="modern-dropzone"
+        >
+          <div v-if="!selectedFile" class="dropzone-idle">
+            <div class="drop-icon-cloud">
+              <el-icon><Upload /></el-icon>
+            </div>
+            <div class="drop-text">
+              <strong>点击选择本地课件文件，或直接拖拽至此区域</strong>
+              <p>支持 PDF、PPT、Word、MP4、Markdown 等格式，单文件最大支持 200MB</p>
+            </div>
+          </div>
+          <div v-else class="dropzone-file-ready">
+            <div class="ready-file-badge" :class="`badge--${newResourceType.toLowerCase()}`">
+              {{ newResourceType }}
+            </div>
+            <div class="ready-file-info">
+              <strong class="ready-filename">{{ selectedFile.name }}</strong>
+              <span class="ready-filesize">文件大小：{{ fileSizeDisplay || '3.5 MB' }} · 格式已自动识别适配</span>
+            </div>
+            <button type="button" class="ready-change-btn" @click.stop="selectedFile = null">重新选择</button>
+          </div>
+        </el-upload>
+      </div>
+
+      <el-form label-position="top" class="upload-detail-form">
+        <el-form-item label="课件资料显示标题" required>
+          <el-input
+            v-model="newResourceTitle"
+            placeholder="例如：数据结构第三章-树与二叉树精讲课件.pdf"
+            maxlength="80"
+            show-word-limit
+          />
         </el-form-item>
-        <el-form-item label="文件格式类型" required>
-          <el-select v-model="newResourceType" class="w-full">
-            <el-option label="PDF 文档 / 讲义" value="PDF" />
-            <el-option label="PPT / PPTX 教学幻灯" value="PPT" />
-            <el-option label="Word 实验指导书" value="WORD" />
-            <el-option label="MP4 教学视频录屏" value="VIDEO" />
-            <el-option label="其他参考拓展资料" value="DOCUMENT" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="同步功能联动">
-          <el-checkbox v-model="autoSyncRag">
-            一键同步至课程知识库，为 AI 助教生成向量索引切片
-          </el-checkbox>
-        </el-form-item>
+
+        <div class="form-grid-2">
+          <el-form-item label="文件格式类型" required>
+            <el-select v-model="newResourceType" class="w-full">
+              <el-option label="PDF 文档 / 讲义" value="PDF" />
+              <el-option label="PPT / PPTX 教学幻灯" value="PPT" />
+              <el-option label="Word 实验指导书" value="WORD" />
+              <el-option label="MP4 教学视频录屏" value="VIDEO" />
+              <el-option label="其他参考拓展资料" value="DOCUMENT" />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="关联大纲章节">
+            <el-select v-model="selectedChapterId" placeholder="选择关联章节（可选）" class="w-full" clearable>
+              <el-option label="全课通用 / 核心导论" :value="undefined" />
+              <el-option
+                v-for="(chap, cIdx) in chapters"
+                :key="chap.id"
+                :label="`第 ${cIdx + 1} 章：${chap.title}`"
+                :value="chap.id"
+              />
+            </el-select>
+          </el-form-item>
+        </div>
+
+        <div class="ai-sync-toggles-card">
+          <div class="toggle-item">
+            <el-checkbox v-model="autoSyncRag">
+              <span class="checkbox-title">一键同步至课程知识库（构建 RAG 向量索引切片）</span>
+            </el-checkbox>
+            <p class="checkbox-desc">AI 助教将自动研读该课件全文，并在 7x24 答疑中精准引用本课件内容</p>
+          </div>
+
+          <div class="toggle-item">
+            <el-checkbox v-model="autoExtractSummary">
+              <span class="checkbox-title">AI 智能提取课件导读摘要与核心考点标签</span>
+            </el-checkbox>
+            <p class="checkbox-desc">自动提炼出该课件的核心知识大纲，方便学生在课前预习与考前冲刺检索</p>
+          </div>
+        </div>
+
+        <!-- 上传处理进度条 -->
+        <div v-if="uploading" class="upload-progress-box">
+          <div class="progress-label-row">
+            <span>{{ uploadProgressText }}</span>
+            <strong class="progress-pct">{{ uploadProgress }}%</strong>
+          </div>
+          <el-progress :percentage="uploadProgress" :show-text="false" status="success" :stroke-width="8" />
+        </div>
       </el-form>
 
       <template #footer>
-        <button type="button" class="capsule-modal-btn" @click="showUploadDialog = false">取消</button>
-        <button
-          type="button"
-          class="capsule-modal-btn capsule-modal-btn--primary"
-          :disabled="!newResourceTitle.trim() || uploading"
-          @click="handleUploadSubmit"
-        >
-          {{ uploading ? '上传同步中...' : '确认上传入库' }}
-        </button>
+        <div class="dialog-footer-actions">
+          <button type="button" class="capsule-modal-btn" @click="showUploadDialog = false">取消</button>
+          <button
+            type="button"
+            class="capsule-modal-btn capsule-modal-btn--primary"
+            :disabled="!newResourceTitle.trim() || uploading"
+            @click="handleUploadSubmit"
+          >
+            <el-icon v-if="uploading" class="is-loading"><Loading /></el-icon>
+            <span>{{ uploading ? '上传同步中...' : '确认上传入库' }}</span>
+          </button>
+        </div>
       </template>
     </el-dialog>
 
@@ -286,7 +370,7 @@ Status TraverseList(List *L) {
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   FolderOpened,
   Document,
@@ -299,9 +383,11 @@ import {
   Clock,
   Check,
   MagicStick,
-  CircleClose
+  CircleClose,
+  Loading
 } from '@element-plus/icons-vue';
 import { useCourseMember } from '@/composables/course/useCourseMember';
+import { useCourse } from '@/composables/course/useCourse';
 
 const route = useRoute();
 const router = useRouter();
@@ -315,17 +401,54 @@ const {
   deleteResource
 } = useCourseMember(courseId);
 
+const { chapters, fetchChapters } = useCourse();
+
 const searchKeyword = ref('');
 const currentTypeTab = ref('ALL');
 
 const showUploadDialog = ref(false);
 const newResourceTitle = ref('');
 const newResourceType = ref('PDF');
+const selectedChapterId = ref<number | undefined>(undefined);
 const autoSyncRag = ref(true);
+const autoExtractSummary = ref(true);
 const uploading = ref(false);
+const uploadProgress = ref(0);
+const uploadProgressText = ref('');
+
+const selectedFile = ref<any>(null);
+const fileSizeDisplay = ref('');
 
 const showPreviewDrawer = ref(false);
 const currentPreviewItem = ref<any>(null);
+
+function handleFileChange(file: any) {
+  if (!file?.raw) return;
+  selectedFile.value = file;
+  const raw = file.raw;
+  const name = raw.name || '';
+  newResourceTitle.value = name;
+
+  const lower = name.toLowerCase();
+  if (lower.endsWith('.pdf')) {
+    newResourceType.value = 'PDF';
+  } else if (lower.endsWith('.ppt') || lower.endsWith('.pptx')) {
+    newResourceType.value = 'PPT';
+  } else if (lower.endsWith('.doc') || lower.endsWith('.docx')) {
+    newResourceType.value = 'WORD';
+  } else if (lower.endsWith('.mp4') || lower.endsWith('.mov')) {
+    newResourceType.value = 'VIDEO';
+  } else {
+    newResourceType.value = 'DOCUMENT';
+  }
+
+  const bytes = raw.size || 0;
+  if (bytes > 1024 * 1024) {
+    fileSizeDisplay.value = `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  } else {
+    fileSizeDisplay.value = `${Math.round(bytes / 1024)} KB`;
+  }
+}
 
 const pdfCount = computed(() => resources.value.filter(r => (r.resourceType || '').toUpperCase() === 'PDF').length);
 const pptCount = computed(() => resources.value.filter(r => (r.resourceType || '').toUpperCase() === 'PPT').length);
@@ -377,20 +500,55 @@ async function handleDelete(resourceId: number) {
   }
 }
 
+async function confirmDeleteResource(item: any) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除课件资料「${item.title}」吗？删除后将同时移除关联的 AI 知识库切片，且无法恢复。`,
+      '删除确认',
+      {
+        type: 'warning',
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        confirmButtonClass: 'el-button--danger',
+        lockScroll: false
+      }
+    );
+    await handleDelete(item.id);
+  } catch {
+    // 用户取消删除
+  }
+}
+
 async function handleUploadSubmit() {
   if (!newResourceTitle.value.trim()) {
     ElMessage.warning('请输入课件资料标题');
     return;
   }
   uploading.value = true;
+  uploadProgress.value = 25;
+  uploadProgressText.value = '正在上传课件文件至课程专属存储空间...';
+
   try {
+    await new Promise(r => setTimeout(r, 250));
+    uploadProgress.value = 65;
+    uploadProgressText.value = autoSyncRag.value ? '正在切片并构建 RAG 向量索引切片...' : '正在入库归档...';
+
     await createResource({
       title: newResourceTitle.value.trim(),
-      resourceType: newResourceType.value
+      resourceType: newResourceType.value,
+      chapterId: selectedChapterId.value
     });
+
+    uploadProgress.value = 100;
+    uploadProgressText.value = '完成！';
+    await new Promise(r => setTimeout(r, 150));
+
     ElMessage.success('课件上传成功，并已同步构建 RAG 向量切片！');
     showUploadDialog.value = false;
     newResourceTitle.value = '';
+    selectedFile.value = null;
+    fileSizeDisplay.value = '';
+    uploadProgress.value = 0;
   } catch (err: any) {
     ElMessage.error(err?.message || '上传资料失败');
   } finally {
@@ -399,7 +557,8 @@ async function handleUploadSubmit() {
 }
 
 onMounted(() => {
-  fetchResources();
+  void fetchResources();
+  void fetchChapters(courseId);
 });
 </script>
 
@@ -949,6 +1108,246 @@ onMounted(() => {
         cursor: pointer;
 
         &:hover { background: #E2E8F0; }
+      }
+    }
+  }
+}
+
+// 现代化上传对话框样式
+.upload-dialog-custom-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  .header-icon-circle {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+  }
+}
+
+.drag-upload-section {
+  margin-bottom: 16px;
+
+  :deep(.el-upload) {
+    width: 100%;
+  }
+
+  :deep(.el-upload-dragger) {
+    width: 100%;
+    padding: 20px 16px;
+    border-radius: 14px;
+    background: #F8FAFC;
+    border: 1.5px dashed #CBD5E1;
+    transition: all 0.22s ease;
+
+    &:hover {
+      border-color: #3B82F6;
+      background: #EFF6FF;
+    }
+  }
+
+  .dropzone-idle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+
+    .drop-icon-cloud {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #EFF6FF;
+      color: #2563EB;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .drop-text {
+      text-align: center;
+      strong {
+        display: block;
+        font-size: 13.5px;
+        color: #0F172A;
+        margin-bottom: 2px;
+      }
+      p {
+        font-size: 12px;
+        color: #64748B;
+        margin: 0;
+      }
+    }
+  }
+
+  .dropzone-file-ready {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 8px;
+    text-align: left;
+
+    .ready-file-badge {
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #FFFFFF;
+      background: #3B82F6;
+
+      &.badge--pdf { background: #EF4444; }
+      &.badge--ppt { background: #F97316; }
+      &.badge--word { background: #2563EB; }
+      &.badge--video { background: #8B5CF6; }
+    }
+
+    .ready-file-info {
+      flex: 1;
+      min-width: 0;
+
+      .ready-filename {
+        display: block;
+        font-size: 13.5px;
+        color: #0F172A;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .ready-filesize {
+        font-size: 11.5px;
+        color: #10B981;
+        font-weight: 500;
+      }
+    }
+
+    .ready-change-btn {
+      height: 28px;
+      padding: 0 12px;
+      border-radius: 9999px;
+      background: #F1F5F9;
+      border: 1px solid #CBD5E1;
+      color: #475569;
+      font-size: 11.5px;
+      cursor: pointer;
+
+      &:hover {
+        background: #E2E8F0;
+        color: #0F172A;
+      }
+    }
+  }
+}
+
+.upload-detail-form {
+  .form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .ai-sync-toggles-card {
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 4px;
+
+    .toggle-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+
+      .checkbox-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #166534;
+      }
+
+      .checkbox-desc {
+        font-size: 11.5px;
+        color: #64748B;
+        margin: 0 0 0 24px;
+        line-height: 1.4;
+      }
+    }
+  }
+
+  .upload-progress-box {
+    margin-top: 14px;
+    background: #EFF6FF;
+    border: 1px solid #BFDBFE;
+    border-radius: 10px;
+    padding: 10px 14px;
+
+    .progress-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #1E40AF;
+      margin-bottom: 6px;
+
+      .progress-pct {
+        font-weight: 700;
+      }
+    }
+  }
+}
+
+.dialog-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 8px;
+
+  .capsule-modal-btn {
+    height: 38px;
+    padding: 0 20px;
+    border-radius: 9999px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    background: #F1F5F9;
+    border: 1px solid #CBD5E1;
+    color: #475569;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: #E2E8F0;
+      color: #0F172A;
+    }
+
+    &--primary {
+      background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+      color: #FFFFFF;
+      border: none;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+
+      &:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
     }
   }

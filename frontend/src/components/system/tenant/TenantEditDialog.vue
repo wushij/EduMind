@@ -26,7 +26,7 @@
             @click="form.planCode = plan.code"
           >
             <div class="plan-top">
-              <span class="plan-icon">{{ plan.icon }}</span>
+              <el-icon class="plan-icon"><component :is="plan.icon" /></el-icon>
               <span class="plan-name">{{ plan.name }}</span>
             </div>
             <div class="plan-specs">
@@ -158,7 +158,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Check } from '@element-plus/icons-vue';
+import { Check, Trophy, Promotion, HelpFilled } from '@element-plus/icons-vue';
 import { createTenant, updateTenant } from '@/composables/system/useTenant';
 import type { TenantListVO } from '@/types/system/tenant';
 
@@ -185,7 +185,7 @@ const planOptions = [
   {
     code: 'FLAGSHIP',
     name: '尊享旗舰版',
-    icon: '👑',
+    icon: Trophy,
     tokens: '5,000万 Token',
     storage: '500GB 存储',
     seats: '2,000 席位'
@@ -193,7 +193,7 @@ const planOptions = [
   {
     code: 'PRO',
     name: '高配专业版',
-    icon: '🚀',
+    icon: Promotion,
     tokens: '3,000万 Token',
     storage: '300GB 存储',
     seats: '1,000 席位'
@@ -201,7 +201,7 @@ const planOptions = [
   {
     code: 'STANDARD',
     name: '敏捷标准版',
-    icon: '🌿',
+    icon: HelpFilled,
     tokens: '1,500万 Token',
     storage: '100GB 存储',
     seats: '500 席位'

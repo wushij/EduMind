@@ -78,4 +78,22 @@ public class WrongQuestionRecordDao {
                         .le(end != null, WrongQuestionRecordEntity::getCreateTime, end)
         );
     }
+
+    public long countByStudentAndCourse(Long studentId, Long courseId) {
+        return wrongQuestionRecordMapper.selectCount(
+                new LambdaQueryWrapper<WrongQuestionRecordEntity>()
+                        .eq(WrongQuestionRecordEntity::getStudentId, studentId)
+                        .eq(WrongQuestionRecordEntity::getCourseId, courseId)
+        );
+    }
+
+    public java.util.List<WrongQuestionRecordEntity> listByStudentAndCourse(Long studentId, Long courseId, int limit) {
+        return wrongQuestionRecordMapper.selectList(
+                new LambdaQueryWrapper<WrongQuestionRecordEntity>()
+                        .eq(WrongQuestionRecordEntity::getStudentId, studentId)
+                        .eq(WrongQuestionRecordEntity::getCourseId, courseId)
+                        .orderByDesc(WrongQuestionRecordEntity::getWrongCount)
+                        .last(limit > 0 ? "LIMIT " + limit : "")
+        );
+    }
 }

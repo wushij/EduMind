@@ -33,7 +33,8 @@ function analyzeView(content, relPath) {
   const directApi = /from\s+['"]@\/api\//.test(content);
   const usesComposable = /from\s+['"]@\/composables\//.test(content);
   const viewsImport = /from\s+['"]@\/views\//.test(content);
-  return { relPath, lines, directApi, usesComposable, viewsImport };
+  const mockImport = /from\s+['"]@\/mock\//.test(content);
+  return { relPath, lines, directApi, usesComposable, viewsImport, mockImport };
 }
 
 function analyzeComponent(content, relPath) {
@@ -75,6 +76,7 @@ async function main() {
 
   const viewsDirectApi = viewResults.filter((r) => r.directApi);
   const viewsInterImport = viewResults.filter((r) => r.viewsImport);
+  const viewsMockImport = viewResults.filter((r) => r.mockImport);
   const over800 = viewResults.filter((r) => r.lines > 800).sort((a, b) => b.lines - a.lines);
   const over600 = viewResults.filter((r) => r.lines > 600 && r.lines <= 800).sort((a, b) => b.lines - a.lines);
   const noComposable = viewResults.filter((r) => !r.usesComposable);
@@ -90,6 +92,7 @@ async function main() {
   console.log(`Views 600-800 lines: ${over600.length}`);
   console.log(`Views without composable: ${noComposable.length}`);
   console.log(`Views inter-import: ${viewsInterImport.length}`);
+  console.log(`Views direct @/mock: ${viewsMockImport.length}`);
   console.log(`Components direct @/api: ${componentsDirectApi.length}`);
   console.log(`API files flagged (fat/mock/map): ${fatApi.length}`);
   console.log(`API files exporting interface: ${apiExportsTypes.length}\n`);
@@ -109,6 +112,12 @@ async function main() {
   if (viewsInterImport.length) {
     console.log('--- Views inter-import (FAIL) ---');
     viewsInterImport.forEach((r) => console.log(`  ${r.relPath}`));
+    console.log('');
+  }
+
+  if (viewsMockImport.length) {
+    console.log('--- Direct mock in views (FAIL) ---');
+    viewsMockImport.forEach((r) => console.log(`  ${r.relPath}`));
     console.log('');
   }
 
@@ -142,10 +151,11 @@ async function main() {
   const failed =
     viewsDirectApi.length > 0 ||
     componentsDirectApi.length > 0 ||
-    viewsInterImport.length > 0;
+    viewsInterImport.length > 0 ||
+    viewsMockImport.length > 0;
 
   if (failed) {
-    console.log('AUDIT: FAILED (fix direct API in views/components or views inter-import)');
+    console.log('AUDIT: FAILED (fix direct API/mock in views, components API, or views inter-import)');
     process.exit(1);
   }
 

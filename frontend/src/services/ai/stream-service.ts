@@ -11,7 +11,8 @@ import {
   deleteMessage,
   generateConversationTitle
 } from '@/api/ai/chat';
-import { splitCopilotStream, STOPPED_GENERATION_MARKER } from '@/utils/ai/copilot-stream-split';
+import { STOPPED_GENERATION_MARKER } from '@/utils/ai/copilot-stream-split';
+import { runCopilotSseStream } from '@/services/ai/copilot-sse-stream';
 import type { CitationItem } from '@/types/ai/assistant';
 
 export interface ChatMessage {
@@ -370,10 +371,8 @@ export async function streamAssistantChat(
   handlers: StreamEventHandlers,
   streamingContentRef: { value: string }
 ): Promise<boolean> {
-  let receivedContent = false;
-  let lastStreamedIndex = 0;
-
-  await sseClient.streamEvents(
+  return runCopilotSseStream(
+    sseClient,
     `${API_BASE_URL}/ai/chat/stream`,
     {
       message: query,
@@ -384,46 +383,18 @@ export async function streamAssistantChat(
       useRag: options?.useRag ?? true,
       regenerate: options?.isRegenerate === true
     },
-    (event, data) => {
-      if (handlers.isStopped?.()) return;
-      if (event === 'status') {
-        const s = data as { phase?: string; message?: string };
-        if (s?.message) handlers.onStatus?.(s.message, s?.phase);
-      } else if (event === 'reasoning') {
-        const chunk = String((data as { content?: string })?.content || data || '');
-        if (chunk) handlers.onReasoningChunk?.(chunk);
-      } else if (event === 'delta') {
-        const chunk = String(
-          (data as { content?: string; text?: string })?.content ||
-            (data as { text?: string })?.text ||
-            data ||
-            ''
-        );
-        if (chunk) {
-          receivedContent = true;
-          streamingContentRef.value += chunk;
-          const split = splitCopilotStream(streamingContentRef.value);
-          if (split.answer) {
-            const answerDelta = split.answer.slice(lastStreamedIndex);
-            lastStreamedIndex = split.answer.length;
-            handlers.onDeltaChunk?.(chunk, answerDelta);
-          }
-        }
-      } else if (event === 'citation' || event === 'citations') {
-        const cits = (Array.isArray(data) ? data : (data as { citations?: CitationItem[] })?.citations) || [];
-        if (Array.isArray(cits) && cits.length > 0) {
-          handlers.onCitations?.(cits as CitationItem[]);
-        }
-      } else if (event === 'done') {
-        handlers.onDone?.(data as StreamDonePayload);
-      } else if (event === 'error') {
-        throw new Error(String((data as { message?: string })?.message || '流式输出服务异常'));
-      }
-      handlers.onFollowOutput?.();
+    streamingContentRef,
+    {
+      isStopped: handlers.isStopped,
+      onStatus: handlers.onStatus,
+      onReasoningChunk: handlers.onReasoningChunk,
+      onDeltaChunk: handlers.onDeltaChunk,
+      onCitations: handlers.onCitations,
+      onDone: (data) => handlers.onDone?.(data as StreamDonePayload),
+      onFollowOutput: handlers.onFollowOutput,
+      defaultErrorMessage: '流式输出服务异常'
     }
   );
-
-  return receivedContent;
 }
 
 export async function fallbackAskAssistant(query: string, courseId: number, conversationId: string) {

@@ -1,7 +1,7 @@
 package com.edumind.statistics.service.learning.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.edumind.common.api.analytics.KnowledgeMasteryQueryApi;
+import com.edumind.statistics.api.KnowledgeMasteryQueryApi;
 import com.edumind.common.event.LearningActivityEvent;
 import com.edumind.common.utils.IdUtil;
 import com.edumind.question.api.QuestionQueryApi;
