@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  parseProfileExtras,
-  maskEmail,
-  getProfileRoleLabel,
-  PROFILE_MODEL_OPTIONS
-} from './useProfile';
+import { parseProfileExtras, maskEmail, getProfileRoleLabel } from './useProfile';
 
 describe('parseProfileExtras', () => {
   it('returns empty object for blank input', () => {
@@ -59,9 +54,3 @@ describe('getProfileRoleLabel', () => {
   });
 });
 
-describe('PROFILE_MODEL_OPTIONS', () => {
-  it('provides three default model choices', () => {
-    expect(PROFILE_MODEL_OPTIONS).toHaveLength(3);
-    expect(PROFILE_MODEL_OPTIONS[0].value).toBe('DeepSeek-V3');
-  });
-});

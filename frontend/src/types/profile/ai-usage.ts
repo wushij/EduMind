@@ -9,6 +9,20 @@ export interface PersonalAiUsageLogVO {
 
 export interface PersonalAiUsageVO {
   todayTokensUsed: number;
+  weekTokensUsed?: number;
+  monthTokensUsed?: number;
+  totalTokensUsed?: number;
+
+  todayCalls?: number;
+  weekCalls?: number;
+  monthCalls?: number;
+  totalCalls?: number;
+
+  todayCostRMB?: number;
+  weekCostRMB?: number;
+  monthCostRMB?: number;
+  totalCostRMB?: number;
+
   dailyTokenLimit: number;
   remainingPercent: number;
   quotaStatus: string;

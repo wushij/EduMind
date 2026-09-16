@@ -81,7 +81,7 @@ defineExpose({ reload: load });
 </script>
 
 <style scoped lang="scss">
-@import './course-overview-shared.scss';
+@use './course-overview-shared.scss' as *;
 
 .announcement-drawer-body {
   min-height: 200px;

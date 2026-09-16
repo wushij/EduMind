@@ -1,5 +1,5 @@
 <template>
-  <el-card v-loading="loading" shadow="never" class="ai-teaching-advice">
+  <el-card shadow="never" class="ai-teaching-advice">
     <template #header>
       <div class="advice-header">
         <div class="header-left">
@@ -12,8 +12,9 @@
           <button
             v-if="loading"
             type="button"
-            class="capsule-btn capsule-btn--warning"
-            @click="emit('stop')"
+            class="capsule-btn capsule-btn--warning is-stop-btn"
+            title="停止本次 AI 推演"
+            @click.stop="emit('stop')"
           >
             <el-icon class="is-loading"><Loading /></el-icon>
             <span>停止推演</span>
@@ -42,23 +43,29 @@
       </div>
     </template>
 
-    <div v-if="advice" class="advice-body">
-      <div class="summary-box">
-        <div class="bot-avatar">
-          <el-icon><Cpu /></el-icon>
+    <div
+      class="advice-content-wrapper"
+      v-loading="loading"
+      element-loading-text="AI 深度教学策略推演中..."
+    >
+      <div v-if="advice" class="advice-body">
+        <div class="summary-box">
+          <div class="bot-avatar">
+            <el-icon><Cpu /></el-icon>
+          </div>
+          <p class="summary-text">{{ advice.summary }}</p>
         </div>
-        <p class="summary-text">{{ advice.summary }}</p>
+
+        <ul v-if="advice.actions.length" class="action-list">
+          <li v-for="(action, index) in advice.actions" :key="index">
+            <span class="action-index">{{ index + 1 }}</span>
+            <span>{{ action }}</span>
+          </li>
+        </ul>
       </div>
 
-      <ul v-if="advice.actions.length" class="action-list">
-        <li v-for="(action, index) in advice.actions" :key="index">
-          <span class="action-index">{{ index + 1 }}</span>
-          <span>{{ action }}</span>
-        </li>
-      </ul>
+      <el-empty v-else description="暂无教学建议，点击右上角「生成建议」获取 AI 深度策略推演" :image-size="80" />
     </div>
-
-    <el-empty v-else description="暂无教学建议，点击右上角「生成建议」获取 AI 深度策略推演" :image-size="80" />
   </el-card>
 </template>
 
@@ -102,6 +109,12 @@ function handleClear() {
   border-radius: 14px;
   background: linear-gradient(135deg, #FAF5FF 0%, #FFFFFF 100%);
   border-color: #E9D5FF;
+  position: relative;
+
+  :deep(.el-card__header) {
+    position: relative;
+    z-index: 10;
+  }
 
   .advice-header {
     display: flex;
@@ -109,6 +122,9 @@ function handleClear() {
     justify-content: space-between;
     gap: 12px;
     flex-wrap: wrap;
+    position: relative;
+    z-index: 10;
+    pointer-events: auto;
 
     .header-left {
       display: flex;
@@ -120,6 +136,9 @@ function handleClear() {
       display: flex;
       align-items: center;
       gap: 10px;
+      position: relative;
+      z-index: 15;
+      pointer-events: auto;
     }
 
     .advice-icon {
@@ -155,12 +174,16 @@ function handleClear() {
       transition: all 0.2s ease;
       outline: none;
       box-sizing: border-box;
+      position: relative;
+      z-index: 20;
+      pointer-events: auto !important;
 
       &--warning {
         background: #FFFBEB;
         color: #D97706;
         border: 1px solid #FCD34D;
         gap: 6px;
+        cursor: pointer !important;
 
         &:hover {
           background: #FEF3C7;
@@ -206,6 +229,11 @@ function handleClear() {
         }
       }
     }
+  }
+
+  .advice-content-wrapper {
+    position: relative;
+    min-height: 120px;
   }
 
   .advice-body {

@@ -61,6 +61,7 @@
     />
 
     <CourseAnnouncementListDrawer
+      ref="announcementDrawerRef"
       v-model="showAnnouncementDrawer"
       :course-id="courseId"
       :editable="overview?.editable"
@@ -117,6 +118,7 @@ const showEditDrawer = ref(false);
 const showObjectiveDialog = ref(false);
 const showAnnouncementDialog = ref(false);
 const showAnnouncementDrawer = ref(false);
+const announcementDrawerRef = ref<{ reload: () => Promise<void> } | null>(null);
 const showInstructorDialog = ref(false);
 const actionSaving = ref(false);
 
@@ -174,6 +176,7 @@ async function handleWithdrawAnnouncement(id: number) {
   try {
     await ElMessageBox.confirm('确定撤回该公告吗？', '撤回确认', { type: 'warning' });
     await withdrawAnnouncement(id);
+    await announcementDrawerRef.value?.reload();
     ElMessage.success('公告已撤回');
   } catch {
     // cancelled

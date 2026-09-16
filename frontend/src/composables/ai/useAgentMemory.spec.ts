@@ -39,12 +39,12 @@ describe('filterMemoryItems', () => {
 
 describe('memory type helpers', () => {
   it('maps memory type labels', () => {
-    expect(getMemoryTypeLabel('PREFERENCE')).toBe('学习偏好');
-    expect(getMemoryTypeLabel('UNKNOWN')).toBe('记忆');
+    expect(getMemoryTypeLabel('PREFERENCE')).toBe('学习风格与偏好');
+    expect(getMemoryTypeLabel('UNKNOWN')).toBe('长效记忆');
   });
 
   it('maps memory type tag types', () => {
-    expect(getMemoryTypeTagType('PROFILE')).toBe('danger');
+    expect(getMemoryTypeTagType('PROFILE')).toBe('primary');
     expect(getMemoryTypeTagType('UNKNOWN')).toBe('info');
   });
 });

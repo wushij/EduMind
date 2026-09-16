@@ -1,4 +1,4 @@
-import { nextTick, type ComputedRef, type Ref } from 'vue';
+import { nextTick, ref, type ComputedRef, type Ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { SSEClient } from '@/core/sse/client';
 import {
@@ -63,6 +63,7 @@ export type AIStreamOperationsDeps = {
 
 export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
   const getInitialReasoningFolded = getDefaultReasoningFolded;
+  const currentStreamingMemories = ref<Array<{ id: number; summary: string; memoryType?: string }>>([]);
 
   function finalizeAssistantMessage(
     promptText: string,
@@ -90,8 +91,10 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
       reasoningContent: finalReasoning,
       createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       citations: [...deps.streamingCitations.value],
+      recalledMemories: [...currentStreamingMemories.value],
       followUpPrompts: generateSmartFollowUps(promptText)
     });
+    currentStreamingMemories.value = [];
 
     deps.followUpPrompts.value = generateSmartFollowUps(promptText);
     deps.resetStreamingState();
@@ -146,6 +149,9 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
         },
         onCitations: (citations) => {
           deps.streamingCitations.value = citations;
+        },
+        onMemory: (memories) => {
+          currentStreamingMemories.value = memories;
         },
         onDone: (d) => {
           if (d.conversationId) {

@@ -71,12 +71,8 @@ export function usePreferences() {
   const modelsLoading = ref(false);
   const dynamicModels = ref<ModelProviderConfig[]>([]);
 
-  const availableModels = computed(() => {
-    if (dynamicModels.value.length > 0) {
-      return dynamicModels.value;
-    }
-    return FALLBACK_MODELS;
-  });
+  /** 仅展示网关返回的已启用模型，不使用本地假数据兜底 */
+  const availableModels = computed(() => dynamicModels.value);
 
   const fetchDynamicModels = async (options?: { notify?: boolean }) => {
     const notify = options?.notify ?? false;

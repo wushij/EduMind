@@ -15,6 +15,7 @@ export type CopilotSseHandlers = {
   onReasoningChunk?: (chunk: string) => void;
   onDeltaChunk?: (chunk: string, answerDelta: string) => void;
   onCitations?: (citations: CitationItem[]) => void;
+  onMemory?: (memories: Array<{ id: number; summary: string; memoryType?: string }>) => void;
   onDone?: (data: unknown) => void;
   onFollowOutput?: () => void;
   defaultErrorMessage?: string;
@@ -68,6 +69,11 @@ export function handleCopilotSseEvent(
   } else if (event === 'citation' || event === 'citations') {
     const cits = extractCitations(data);
     if (cits.length > 0) handlers.onCitations?.(cits);
+  } else if (event === 'memory') {
+    const mems = (data as { memories?: Array<{ id: number; summary: string; memoryType?: string }> })?.memories || [];
+    if (Array.isArray(mems) && mems.length > 0) {
+      handlers.onMemory?.(mems);
+    }
   } else if (event === 'done') {
     handlers.onDone?.(data);
   } else if (event === 'error') {

@@ -1,47 +1,39 @@
 <template>
   <div class="app-container module-page config-page">
-    <!-- 顶部 Hero 统计与定位横幅 (对齐 wu-admin) -->
-    <el-card class="search-card module-hero-card" shadow="never">
-      <div class="module-hero-row">
-        <div class="module-hero-text">
-          <div class="module-hero-title">
-            <el-icon :size="22"><Setting /></el-icon>
-            <span>系统配置</span>
-          </div>
-          <p class="module-hero-desc">
-            平台运行参数集中维护与安全管控，修改后请点击底部「保存全部」生效
-          </p>
-        </div>
-        <div class="module-hero-stats">
-          <div class="stat-num">12</div>
-          <div class="stat-label">配置分组</div>
-        </div>
-      </div>
-    </el-card>
+    <!-- 顶部 Hero 统计与定位横幅 (模仿 AI 消耗明细精美设计) -->
+    <SystemConfigHeroCard
+      :loading="loading"
+      :is-dirty="isDirty"
+      :last-updated-text="lastUpdatedText"
+      @refresh="handleRefreshAll"
+    />
 
-    <!-- 主配置卡片 (对齐 wu-admin) -->
+    <!-- 主配置卡片 -->
     <el-card v-loading="loading" class="config-main-card" shadow="never">
       <template #header>
         <div class="card-header">
           <div class="header-left-title">
             <span class="card-title-text">配置详情</span>
-            <span v-if="isDirty" class="dirty-badge">
-              <span class="dot"></span>有未保存的修改
-            </span>
-            <span v-else class="synced-badge">
-              <el-icon><Check /></el-icon>所有配置已同步
-            </span>
           </div>
           <div class="header-right-actions">
             <el-button
               round
               size="small"
-              class="btn-refresh"
-              :icon="Refresh"
-              :loading="loading"
-              @click="handleRefreshAll"
+              class="btn-reset-head"
+              :disabled="!isDirty"
+              @click="handleReset"
             >
-              重新加载
+              撤销修改
+            </el-button>
+            <el-button
+              round
+              size="small"
+              type="primary"
+              class="btn-save-head"
+              :loading="saving"
+              @click="handleSaveAll"
+            >
+              保存全部配置
             </el-button>
           </div>
         </div>
@@ -129,15 +121,17 @@
         </el-tab-pane>
       </el-tabs>
 
-      <!-- 底部操作按钮栏 (对齐 wu-admin: 重置 / 保存全部) -->
+      <!-- 底部操作按钮栏 -->
       <div class="footer-actions">
-        <el-button :disabled="!isDirty" @click="handleReset">重置</el-button>
+        <el-button round :disabled="!isDirty" @click="handleReset">撤销修改</el-button>
         <el-button
           type="primary"
+          round
+          class="btn-footer-save"
           :loading="saving"
           @click="handleSaveAll"
         >
-          保存全部
+          保存全部配置
         </el-button>
       </div>
     </el-card>
@@ -349,10 +343,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Setting, Refresh, Check, Search } from '@element-plus/icons-vue';
+import { Check, Search, Refresh } from '@element-plus/icons-vue';
 
+import SystemConfigHeroCard from '@/components/system/config/SystemConfigHeroCard.vue';
 import SiteConfigPane from '@/components/system/config/SiteConfigPane.vue';
 import SessionConfigPane from '@/components/system/config/SessionConfigPane.vue';
 import StorageConfigPane from '@/components/system/config/StorageConfigPane.vue';
@@ -381,7 +376,7 @@ const {
   hasSavedSecret,
   loadAll,
   handleReset,
-  handleSaveAll,
+  handleSaveAll: origHandleSaveAll,
   paymentTesting,
   smsTesting,
   emailTesting,
@@ -432,6 +427,14 @@ const {
 });
 
 const storagePaneRef = ref<InstanceType<typeof StorageConfigPane> | null>(null);
+const lastUpdatedText = ref('');
+
+function updateLastUpdatedTime() {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  lastUpdatedText.value = `同步时间 ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+}
+
 
 function onTabChange(name: string | number) {
   if (name === 'sms') {
@@ -441,6 +444,10 @@ function onTabChange(name: string | number) {
   }
 }
 
+watch(currentTab, (newTab) => {
+  onTabChange(newTab);
+});
+
 async function handleRefreshAll() {
   await loadAll();
   storagePaneRef.value?.loadStorageConfig();
@@ -449,13 +456,20 @@ async function handleRefreshAll() {
   } else if (currentTab.value === 'email') {
     fetchRecentEmailLogs();
   }
+  updateLastUpdatedTime();
   ElMessage.success('已刷新加载最新配置');
+}
+
+async function handleSaveAll() {
+  await origHandleSaveAll();
+  updateLastUpdatedTime();
 }
 
 onMounted(() => {
   loadAll();
   fetchRecentSmsLogs();
   fetchRecentEmailLogs();
+  updateLastUpdatedTime();
 });
 </script>
 
@@ -466,80 +480,25 @@ onMounted(() => {
   gap: 16px;
   width: 100%;
 
-  // 1. 顶部 Hero Banner (对齐 wu-admin)
-  .module-hero-card {
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-    border: none !important;
-    color: #FFFFFF;
-    border-radius: 12px;
-
-    :deep(.el-card__body) {
-      padding: 18px 24px;
-    }
-
-    .module-hero-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-
-      .module-hero-title {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-size: 18px;
-        font-weight: 700;
-        margin-bottom: 4px;
-        color: #FFFFFF;
-      }
-
-      .module-hero-desc {
-        margin: 0;
-        font-size: 13px;
-        opacity: 0.85;
-        color: #CBD5E1;
-      }
-
-      .module-hero-stats {
-        text-align: center;
-        min-width: 88px;
-        background: rgba(255, 255, 255, 0.08);
-        padding: 8px 18px;
-        border-radius: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-
-        .stat-num {
-          font-size: 26px;
-          font-weight: 700;
-          line-height: 1.2;
-          color: #38BDF8;
-        }
-
-        .stat-label {
-          margin-top: 2px;
-          font-size: 12px;
-          opacity: 0.8;
-          color: #E2E8F0;
-        }
-      }
-    }
-  }
-
-  // 2. 主配置详情卡片 (对齐 wu-admin)
+  // 主配置详情卡片
   .config-main-card {
     background: #FFFFFF;
-    border-radius: 12px;
+    border-radius: 16px;
     border: 1px solid #E2E8F0;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
 
     .card-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
 
       .header-left-title {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
+        flex-wrap: wrap;
 
         .card-title-text {
           font-size: 16px;
@@ -547,38 +506,27 @@ onMounted(() => {
           color: #0F172A;
         }
 
-        .dirty-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 2px 10px;
-          border-radius: 9999px;
-          background: #FFFBEB;
-          border: 1px solid #FDE68A;
-          color: #D97706;
-          font-size: 12px;
-          font-weight: 600;
+      }
 
-          .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #F59E0B;
-            box-shadow: 0 0 6px #F59E0B;
-          }
+      .header-right-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .btn-reset-head {
+          font-weight: 600;
         }
 
-        .synced-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          padding: 2px 10px;
-          border-radius: 9999px;
-          background: #F0FDF4;
-          border: 1px solid #BBF7D0;
-          color: #16A34A;
-          font-size: 12px;
+        .btn-save-head {
           font-weight: 600;
+          background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+          border: none;
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+          transition: all 0.2s ease;
+
+          &:hover {
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+          }
         }
       }
     }
@@ -606,13 +554,28 @@ onMounted(() => {
       }
     }
 
-    // 底部统一保存操作栏 (对齐 wu-admin)
+    // 底部统一保存操作栏
     .footer-actions {
       margin-top: 24px;
       padding-top: 16px;
       border-top: 1px solid #F1F5F9;
       display: flex;
+      justify-content: flex-end;
       gap: 12px;
+
+      .btn-footer-save {
+        padding: 8px 24px;
+        font-weight: 600;
+        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+        border: none;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+        transition: all 0.2s ease;
+
+        &:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 6px 18px rgba(37, 99, 235, 0.4);
+        }
+      }
     }
   }
 

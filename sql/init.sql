@@ -1436,7 +1436,7 @@ WHERE permission_code IN (
 
 -- 5. 系统全局配置（V2.0.1 十二大分组 + 邮件 SMTP）
 INSERT IGNORE INTO sys_config (config_key, config_value, config_name, config_group, remark) VALUES
-('sys.site.config', '{"platformName":"智教云 · EduMind","platformSubtitle":"AI 智能教学赋能平台","loginWelcome":"欢迎登录智教云平台","registerTitle":"开启智教未来之旅","copyright":"Copyright © 2026 EduMind. All rights reserved.","icpEnabled":true,"icpNumber":"京ICP备20260001号-1","icpUrl":"https://beian.miit.gov.cn"}', '平台基础与品牌信息', 'site', '系统网站名称、副标题、版权与工信部ICP备案信息'),
+('sys.site.config', '{"platformName":"EduMind","platformSubtitle":"智教云 · EduMind","loginWelcome":"欢迎使用 EduMind AI 智能教学赋能平台","registerTitle":"欢迎注册 EduMind 账号","copyright":"Copyright © 2026 EduMind. All rights reserved.","icpEnabled":true,"icpNumber":"京ICP备20260001号-1","icpUrl":"https://beian.miit.gov.cn"}', '平台基础与品牌信息', 'site', '系统网站名称、副标题、版权与工信部ICP备案信息'),
 ('sys.session.config', '{"tokenExpireHours":24,"sessionSignExpireHours":24}', '会话令牌与安全凭据', 'session', 'Sa-Token 令牌时效与临时签名/传输密钥生命周期配置'),
 ('sys.storage.policy', '{"maxSizeMb":50,"allowedExtensions":"jpg,jpeg,png,gif,webp,bmp,svg,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,md,json,xml,zip,rar,mp4,mp3,wav,avi,mov"}', '文件上传限制与扩展名白名单', 'storage', '全平台单文件最大体积与允许上传格式白名单'),
 ('sys.rateLimit.config', '{"captchaPerIpMinute":40,"loginPerIpMinute":30,"registerPerIpMinute":10,"smsPerIpMinute":5,"smsSendIntervalSeconds":60,"smsPerPhoneDaily":10,"smsPerIpDaily":30,"aiChatPerUserMinute":8}', '全站敏感接口防刷限流矩阵', 'rateLimit', '登录、注册、人机校验、短信发送与AI对话速率限制'),

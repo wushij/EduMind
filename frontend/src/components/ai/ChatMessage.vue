@@ -26,6 +26,25 @@
         <span class="msg-time">{{ message.createdAt }}</span>
       </div>
 
+      <!-- 长期记忆激活胶囊指示条 -->
+      <div
+        v-if="message.role === 'assistant' && message.recalledMemories && message.recalledMemories.length > 0"
+        class="recalled-memory-chip-row"
+      >
+        <div class="mem-pill-badge">
+          <el-icon class="mem-icon"><Cpu /></el-icon>
+          <span class="mem-text">已唤醒 {{ message.recalledMemories.length }} 条长效记忆：</span>
+          <span
+            v-for="mem in message.recalledMemories"
+            :key="mem.id"
+            class="mem-tag"
+            :title="mem.summary"
+          >
+            {{ mem.summary.length > 22 ? mem.summary.substring(0, 20) + '...' : mem.summary }}
+          </span>
+        </div>
+      </div>
+
       <AIThinking
         v-if="message.role === 'assistant' && showThinkingPanel && (thinkingDisplay || (message.isStreaming && !answerContent))"
         :content="thinkingDisplay"
@@ -122,7 +141,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
-import { DocumentCopy, Star, RefreshRight, Delete } from '@element-plus/icons-vue';
+import { DocumentCopy, Star, RefreshRight, Delete, Cpu } from '@element-plus/icons-vue';
 import type { ChatMessage } from '@/composables/ai/useAIStream';
 import CitationList from '@/components/knowledge/CitationList.vue';
 import AIThinking from '@/components/ai/AIChat/AIThinking.vue';
@@ -782,6 +801,43 @@ function handleCopy() {
       font-size: 12px;
       margin-left: 8px;
       flex-shrink: 0;
+    }
+  }
+
+  .recalled-memory-chip-row {
+    margin-bottom: 8px;
+
+    .mem-pill-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      border-radius: 9999px;
+      padding: 4px 12px;
+      font-size: 11px;
+      max-width: 100%;
+      flex-wrap: wrap;
+
+      .mem-icon {
+        color: #16A34A;
+        font-size: 13px;
+        flex-shrink: 0;
+      }
+
+      .mem-text {
+        color: #15803D;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      .mem-tag {
+        background: #DCFCE7;
+        color: #166534;
+        padding: 1px 8px;
+        border-radius: 9999px;
+        font-weight: 500;
+      }
     }
   }
 }

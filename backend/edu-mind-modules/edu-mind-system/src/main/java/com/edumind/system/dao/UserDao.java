@@ -67,15 +67,13 @@ public class UserDao {
     }
 
     public java.util.List<UserEntity> listAllActive() {
-        return userMapper.selectList(new LambdaQueryWrapper<UserEntity>()
-                .eq(UserEntity::getStatus, "1")
+        return userMapper.selectList(activeUserWrapper()
                 .orderByAsc(UserEntity::getId)
                 .last("LIMIT 100"));
     }
 
     public java.util.List<Long> listAllActiveUserIds() {
-        return userMapper.selectList(new LambdaQueryWrapper<UserEntity>()
-                        .eq(UserEntity::getStatus, "1")
+        return userMapper.selectList(activeUserWrapper()
                         .select(UserEntity::getId)
                         .orderByAsc(UserEntity::getId))
                 .stream()
@@ -84,8 +82,13 @@ public class UserDao {
     }
 
     public long countActiveUsers() {
-        return userMapper.selectCount(new LambdaQueryWrapper<UserEntity>()
-                .eq(UserEntity::getStatus, "1"));
+        return userMapper.selectCount(activeUserWrapper());
+    }
+
+    /** sys_user.status 为 ENABLE/DISABLE；兼容历史数据中的 "1" */
+    private LambdaQueryWrapper<UserEntity> activeUserWrapper() {
+        return new LambdaQueryWrapper<UserEntity>()
+                .in(UserEntity::getStatus, "ENABLE", "1");
     }
 
     public java.util.List<Long> findUserIdsByKeyword(String keyword) {

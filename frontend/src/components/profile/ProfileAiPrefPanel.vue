@@ -1,98 +1,130 @@
 <template>
   <div class="profile-side-column">
-    <!-- A. AI 助教偏好配置 -->
-    <div class="profile-panel-card">
+    <div class="profile-panel-card ai-pref-card">
       <div class="panel-header-line">
-        <el-icon class="panel-icon"><Cpu /></el-icon>
-        <h3 class="panel-title">AI 大模型推理与答疑偏好</h3>
+        <div class="header-icon-wrap">
+          <el-icon class="panel-icon"><Cpu /></el-icon>
+        </div>
+        <div class="header-text">
+          <h3 class="panel-title">AI 大模型推理与答疑偏好</h3>
+          <p class="panel-subtitle">仅展示当前租户已启用的推理模型，与智能网关配置一致</p>
+        </div>
+        <button
+          type="button"
+          class="icon-refresh-btn"
+          :disabled="modelsLoading"
+          title="刷新模型列表"
+          @click="emit('refresh-models')"
+        >
+          <el-icon :class="{ 'is-loading': modelsLoading }"><Refresh /></el-icon>
+        </button>
       </div>
 
-      <div class="preference-section">
+      <div v-loading="prefLoading" class="preference-section">
         <div class="pref-item">
-          <span class="pref-label">默认教学大模型引擎：</span>
-          <div class="pill-radio-group">
+          <span class="pref-label">默认教学大模型引擎</span>
+          <div v-if="modelsLoading && modelOptions.length === 0" class="pref-hint">正在同步可用模型…</div>
+          <div v-else-if="modelOptions.length === 0" class="empty-models-box">
+            <p>当前没有可用的对话模型。请在「系统管理 → 模型配置」中启用至少一个模型，或检查 API Key 是否已配置。</p>
+            <router-link to="/system/models" class="text-link">前往模型配置</router-link>
+          </div>
+          <div v-else class="pill-radio-group">
             <span
               v-for="model in modelOptions"
-              :key="model.value"
+              :key="model.modelKey"
               class="pill-radio-opt"
-              :class="{ active: aiPref.model === model.value }"
-              @click="aiPref.model = model.value"
+              :class="{ active: selectedModelKey === model.modelKey }"
+              @click="selectedModelKey = model.modelKey"
             >
-              {{ model.label }}
+              <span class="pill-label">{{ model.name }}</span>
+              <span v-if="model.isDefault" class="pill-badge">推荐</span>
             </span>
           </div>
         </div>
 
         <div class="pref-item">
-          <span class="pref-label">生成推导创造性（Temperature 温度）：</span>
+          <span class="pref-label">生成创造性（Temperature）</span>
           <div class="pill-radio-group">
             <span
+              v-for="opt in tempOptions"
+              :key="opt.value"
               class="pill-radio-opt"
-              :class="{ active: aiPref.temp === 0.2 }"
-              @click="aiPref.temp = 0.2"
+              :class="{ active: inferenceTemperature === opt.value }"
+              @click="inferenceTemperature = opt.value"
             >
-              严谨学术 (0.2)
-            </span>
-            <span
-              class="pill-radio-opt"
-              :class="{ active: aiPref.temp === 0.5 }"
-              @click="aiPref.temp = 0.5"
-            >
-              平衡教学 (0.5)
-            </span>
-            <span
-              class="pill-radio-opt"
-              :class="{ active: aiPref.temp === 0.8 }"
-              @click="aiPref.temp = 0.8"
-            >
-              启发发散 (0.8)
+              {{ opt.label }}
             </span>
           </div>
         </div>
 
         <div class="pref-item">
-          <span class="pref-label">RAG 知识库召回切片数量 (TopK)：</span>
+          <span class="pref-label">RAG 知识库召回数量（TopK）</span>
           <div class="pill-radio-group">
             <span
-              v-for="k in [3, 5, 8]"
+              v-for="k in topKOptions"
               :key="k"
               class="pill-radio-opt"
-              :class="{ active: aiPref.topK === k }"
-              @click="aiPref.topK = k"
+              :class="{ active: ragTopK === k }"
+              @click="ragTopK = k"
             >
               Top {{ k }} 片段
             </span>
           </div>
         </div>
 
-        <button
-          type="button"
-          class="capsule-ai-pref-btn"
-          @click="handleSaveAiPref"
-        >
-          <span>保存 AI 推理偏好</span>
-        </button>
+        <div class="action-row">
+          <button
+            type="button"
+            class="capsule-ai-pref-btn"
+            :disabled="saving || modelOptions.length === 0"
+            @click="emit('save')"
+          >
+            <span>{{ saving ? '保存中…' : '保存 AI 推理偏好' }}</span>
+          </button>
+          <router-link to="/profile/preferences" class="secondary-link">完整偏好设置</router-link>
+        </div>
       </div>
     </div>
 
-    <!-- B. 个人 Token 额度消耗 -->
-    <div class="profile-panel-card">
+    <div class="profile-panel-card quota-card">
       <div class="panel-header-line">
-        <el-icon class="panel-icon"><Lightning /></el-icon>
-        <h3 class="panel-title">本学期个人 AI 算力额度</h3>
+        <div class="header-icon-wrap quota-icon">
+          <el-icon class="panel-icon"><Lightning /></el-icon>
+        </div>
+        <div class="header-text">
+          <h3 class="panel-title">今日个人 AI 算力额度</h3>
+          <p class="panel-subtitle">按自然日统计 Token 消耗，与「AI 消耗明细」数据同源</p>
+        </div>
+        <button
+          type="button"
+          class="icon-refresh-btn"
+          :disabled="usageLoading"
+          title="刷新额度"
+          @click="emit('refresh-usage')"
+        >
+          <el-icon :class="{ 'is-loading': usageLoading }"><Refresh /></el-icon>
+        </button>
       </div>
 
-      <div class="quota-meter-box">
+      <div v-loading="usageLoading" class="quota-meter-box">
         <div class="quota-top">
-          <span class="quota-label">Token 消耗情况</span>
-          <span class="quota-val"><strong>1,842,000</strong> / 5,000,000</span>
+          <span class="quota-label">今日 Token 消耗</span>
+          <span class="quota-val">
+            <strong>{{ formatNumber(usage.todayTokensUsed) }}</strong>
+            <span class="quota-sep">/</span>
+            {{ formatNumber(usage.dailyTokenLimit) }}
+          </span>
         </div>
         <div class="capsule-progress-track">
-          <div class="capsule-progress-fill" style="width: 36.8%"></div>
+          <div
+            class="capsule-progress-fill"
+            :class="quotaBarClass"
+            :style="{ width: `${todayUsagePercent}%` }"
+          />
         </div>
         <div class="quota-sub">
-          <span>剩余 3,158,000 Tokens (已用 36.8%)</span>
-          <span class="quota-status">高校校园网无限制支持</span>
+          <span>{{ usage.quotaStatus }} · 剩余约 {{ usage.remainingPercent }}%</span>
+          <router-link to="/profile/ai-usage" class="quota-link">查看消耗明细</router-link>
         </div>
       </div>
     </div>
@@ -100,161 +132,367 @@
 </template>
 
 <script setup lang="ts">
-import { Cpu, Lightning } from '@element-plus/icons-vue';
-import { PROFILE_MODEL_OPTIONS } from '@/composables/profile/useProfile';
+import { computed } from 'vue';
+import { Cpu, Lightning, Refresh } from '@element-plus/icons-vue';
+import type { ModelProviderConfig } from '@/types/system/model';
+import { calcTodayUsagePercent, formatUsageNumber } from '@/composables/profile/useAIUsage';
 
-defineProps<{
-  modelOptions: typeof PROFILE_MODEL_OPTIONS;
-  aiPref: {
-    model: string;
-    temp: number;
-    topK: number;
+const props = defineProps<{
+  modelOptions: ModelProviderConfig[];
+  modelsLoading: boolean;
+  prefLoading: boolean;
+  saving: boolean;
+  selectedModelKey: string;
+  inferenceTemperature: number;
+  ragTopK: number;
+  usageLoading: boolean;
+  usage: {
+    todayTokensUsed: number;
+    dailyTokenLimit: number;
+    remainingPercent: number;
+    quotaStatus: string;
   };
-  handleSaveAiPref: () => void;
 }>();
+
+const emit = defineEmits<{
+  'update:selectedModelKey': [value: string];
+  'update:inferenceTemperature': [value: number];
+  'update:ragTopK': [value: number];
+  save: [];
+  'refresh-models': [];
+  'refresh-usage': [];
+}>();
+
+const selectedModelKey = computed({
+  get: () => props.selectedModelKey,
+  set: (v: string) => emit('update:selectedModelKey', v)
+});
+
+const inferenceTemperature = computed({
+  get: () => props.inferenceTemperature,
+  set: (v: number) => emit('update:inferenceTemperature', v)
+});
+
+const ragTopK = computed({
+  get: () => props.ragTopK,
+  set: (v: number) => emit('update:ragTopK', v)
+});
+
+const tempOptions = [
+  { label: '严谨学术 (0.2)', value: 0.2 },
+  { label: '平衡教学 (0.5)', value: 0.5 },
+  { label: '启发发散 (0.8)', value: 0.8 }
+];
+
+const topKOptions = [3, 5, 8];
+
+const todayUsagePercent = computed(() =>
+  calcTodayUsagePercent(props.usage.todayTokensUsed, props.usage.dailyTokenLimit)
+);
+
+const quotaBarClass = computed(() => {
+  const p = props.usage.remainingPercent;
+  if (p >= 50) return 'is-healthy';
+  if (p >= 20) return 'is-warning';
+  return 'is-danger';
+});
+
+const formatNumber = formatUsageNumber;
 </script>
 
 <style scoped lang="scss">
 .profile-side-column {
-  .profile-panel-card {
-    background: #FFFFFF;
-    border-radius: 18px;
-    border: 1px solid #E2E8F0;
-    padding: 24px 28px;
-    box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
-    margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 
-    .panel-header-line {
-      display: flex;
+.profile-panel-card {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  padding: 22px 24px;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.04);
+
+  .panel-header-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .header-icon-wrap {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    &.quota-icon {
+      background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+    }
+
+    .panel-icon {
+      font-size: 20px;
+      color: #2563eb;
+    }
+  }
+
+  .quota-icon .panel-icon {
+    color: #7c3aed;
+  }
+
+  .header-text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .panel-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.35;
+  }
+
+  .panel-subtitle {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.45;
+  }
+
+  .icon-refresh-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 9999px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #64748b;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+
+    &:hover:not(:disabled) {
+      color: #2563eb;
+      border-color: #93c5fd;
+      background: #eff6ff;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.preference-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 80px;
+
+  .pref-item .pref-label {
+    display: block;
+    font-size: 13px;
+    color: #475569;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  .pref-hint {
+    font-size: 13px;
+    color: #94a3b8;
+  }
+
+  .empty-models-box {
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.55;
+
+    p {
+      margin: 0 0 8px;
+    }
+
+    .text-link {
+      color: #2563eb;
+      font-weight: 600;
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+
+  .pill-radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    .pill-radio-opt {
+      display: inline-flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 20px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid #F1F5F9;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 9999px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: #475569;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
 
-      .panel-icon {
-        font-size: 18px;
-        color: #1677FF;
-        display: inline-flex;
-        align-items: center;
+      &:hover {
+        border-color: #93c5fd;
+        color: #2563eb;
       }
 
-      .panel-title {
-        margin: 0;
-        font-size: 16px;
-        font-weight: 700;
-        color: #0F172A;
-      }
-    }
-
-    // AI 偏好
-    .preference-section {
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-
-      .pref-item {
-        .pref-label {
-          display: block;
-          font-size: 13px;
-          color: #64748B;
-          font-weight: 500;
-          margin-bottom: 8px;
-        }
-
-        .pill-radio-group {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-wrap: wrap;
-
-          .pill-radio-opt {
-            padding: 6px 16px;
-            border-radius: 9999px; // 纯正长圆单选
-            background: #F8FAFC;
-            border: 1px solid #E2E8F0;
-            color: #475569;
-            font-size: 12.5px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-
-            &:hover {
-              color: #1677FF;
-              border-color: #93C5FD;
-            }
-
-            &.active {
-              background: #EFF6FF;
-              border-color: #1677FF;
-              color: #1677FF;
-              font-weight: 600;
-            }
-          }
-        }
-      }
-
-      .capsule-ai-pref-btn {
-        margin-top: 6px;
-        height: 38px;
-        border-radius: 9999px;
-        background: #722ED1;
-        color: #FFFFFF;
-        border: none;
-        font-size: 13px;
+      &.active {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        border-color: #2563eb;
+        color: #1d4ed8;
         font-weight: 600;
-        cursor: pointer;
-        box-shadow: 0 2px 8px rgba(114, 46, 209, 0.25);
-        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12);
+      }
 
-        &:hover {
-          background: #531DAB;
-        }
+      .pill-badge {
+        font-size: 10px;
+        padding: 1px 6px;
+        border-radius: 9999px;
+        background: #fef2f2;
+        color: #dc2626;
+        font-weight: 700;
       }
     }
+  }
 
-    // 配额条
-    .quota-meter-box {
-      .quota-top {
-        display: flex;
-        justify-content: space-between;
-        font-size: 13px;
-        margin-bottom: 8px;
+  .action-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
 
-        .quota-label {
-          color: #64748B;
-        }
+  .capsule-ai-pref-btn {
+    height: 40px;
+    padding: 0 22px;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+    color: #ffffff;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(109, 40, 217, 0.28);
+    transition: all 0.2s ease;
 
-        .quota-val {
-          color: #1E293B;
-        }
+    &:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(109, 40, 217, 0.35);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+
+  .secondary-link {
+    font-size: 13px;
+    color: #64748b;
+    text-decoration: none;
+    font-weight: 500;
+
+    &:hover {
+      color: #2563eb;
+    }
+  }
+}
+
+.quota-meter-box {
+  .quota-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 13px;
+    margin-bottom: 10px;
+    gap: 12px;
+    flex-wrap: wrap;
+
+    .quota-label {
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .quota-val {
+      color: #1e293b;
+      font-variant-numeric: tabular-nums;
+
+      .quota-sep {
+        margin: 0 4px;
+        color: #94a3b8;
+        font-weight: 400;
+      }
+    }
+  }
+
+  .capsule-progress-track {
+    width: 100%;
+    height: 10px;
+    background: #e2e8f0;
+    border-radius: 9999px;
+    overflow: hidden;
+    margin-bottom: 10px;
+
+    .capsule-progress-fill {
+      height: 100%;
+      border-radius: 9999px;
+      transition: width 0.35s ease;
+
+      &.is-healthy {
+        background: linear-gradient(90deg, #2563eb 0%, #38bdf8 100%);
       }
 
-      .capsule-progress-track {
-        width: 100%;
-        height: 8px;
-        background: #E2E8F0;
-        border-radius: 9999px;
-        overflow: hidden;
-        margin-bottom: 8px;
-
-        .capsule-progress-fill {
-          height: 100%;
-          background: linear-gradient(90deg, #1677FF 0%, #38BDF8 100%);
-          border-radius: 9999px;
-        }
+      &.is-warning {
+        background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
       }
 
-      .quota-sub {
-        display: flex;
-        justify-content: space-between;
-        font-size: 11.5px;
-        color: #94A3B8;
+      &.is-danger {
+        background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
+      }
+    }
+  }
 
-        .quota-status {
-          color: #059669;
-          font-weight: 600;
-        }
+  .quota-sub {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: #64748b;
+
+    .quota-link {
+      color: #2563eb;
+      font-weight: 600;
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
       }
     }
   }

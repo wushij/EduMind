@@ -45,7 +45,7 @@ const emit = defineEmits<{ manage: []; 'ai-lesson': [] }>();
 </script>
 
 <style scoped lang="scss">
-@import './course-overview-shared.scss';
+@use './course-overview-shared.scss' as *;
 
 .header-actions {
   display: flex;

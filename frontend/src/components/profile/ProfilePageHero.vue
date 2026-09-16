@@ -5,7 +5,9 @@
     <div class="hero-content">
       <div class="hero-left">
         <span v-if="eyebrow" class="hero-eyebrow">{{ eyebrow }}</span>
-        <h2>{{ title }}</h2>
+        <slot name="title">
+          <h2>{{ title }}</h2>
+        </slot>
         <p v-if="subtitle">{{ subtitle }}</p>
       </div>
       <div v-if="$slots.actions" class="hero-right">
@@ -21,7 +23,7 @@
 <script setup lang="ts">
 defineProps<{
   eyebrow?: string;
-  title: string;
+  title?: string;
   subtitle?: string;
 }>();
 </script>

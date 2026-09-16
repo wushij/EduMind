@@ -72,7 +72,7 @@ function submit() {
 </script>
 
 <style scoped lang="scss">
-@import './course-overview-shared.scss';
+@use './course-overview-shared.scss' as *;
 
 .toolbar {
   margin-bottom: 12px;

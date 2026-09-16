@@ -118,6 +118,9 @@ axiosInstance.interceptors.response.use(
     return res;
   },
   (error) => {
+    if (axios.isCancel(error) || error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
+      return Promise.reject(error);
+    }
     const status = error.response?.status;
     const apiBody = error.response?.data;
     const silent = (error.config as HttpRequestConfig | undefined)?.silent;

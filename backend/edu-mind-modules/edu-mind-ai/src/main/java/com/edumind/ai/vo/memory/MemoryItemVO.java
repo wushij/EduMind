@@ -17,5 +17,9 @@ public class MemoryItemVO {
     private Boolean encrypted;
     private Integer keyVersion;
     private Integer accessCount;
+    private String sourceChannel;
+    private String sourceRef;
+    private String reasoning;
+    private Boolean isNewlyCreated;
     private LocalDateTime createTime;
 }

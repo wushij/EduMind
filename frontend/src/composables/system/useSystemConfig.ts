@@ -44,10 +44,10 @@ export const GROUP_CODES: readonly ConfigGroupCode[] = [
 
 export const DEFAULTS: ConfigGroupMap = {
   site: {
-    platformName: '智教云 · EduMind',
-    platformSubtitle: 'AI 智能教学赋能平台',
-    loginWelcome: '欢迎登录智教云平台',
-    registerTitle: '开启智教未来之旅',
+    platformName: 'EduMind',
+    platformSubtitle: '智教云 · EduMind',
+    loginWelcome: '欢迎使用 EduMind AI 智能教学赋能平台',
+    registerTitle: '欢迎注册 EduMind 账号',
     copyright: 'Copyright © 2026 EduMind. All rights reserved.',
     icpEnabled: true,
     icpNumber: '京ICP备20260001号-1',
@@ -324,6 +324,15 @@ export function useSystemConfig() {
 
       savedSnapshot[code] = cloneConfig(merged) as any;
 
+      // 同步缓存 AI 每日配额，确保各页面无感即时感知
+      if (code === 'ai' && merged.tokensPerUserDaily) {
+        try {
+          localStorage.setItem('edumind_sys_ai_tokens_per_user_daily', String(merged.tokensPerUserDaily));
+        } catch {
+          // ignore
+        }
+      }
+
       // 对齐 AI 模型的 API 密钥机制：已配置密钥默认不回显至前端输入框，避免明文泄露
       const draftVal = cloneConfig(merged);
       const secretPaths = SECRET_FIELDS[code];
@@ -418,6 +427,17 @@ export function useSystemConfig() {
       const json = JSON.stringify(payload);
       await updateConfigGroup(code, json);
       savedSnapshot[code] = cloneConfig(payload) as any;
+      if (code === 'ai') {
+        const aiCfg = payload as any;
+        if (aiCfg?.tokensPerUserDaily) {
+          try {
+            localStorage.setItem('edumind_sys_ai_tokens_per_user_daily', String(aiCfg.tokensPerUserDaily));
+            window.dispatchEvent(new CustomEvent('edumind:ai-config-changed', { detail: aiCfg }));
+          } catch {
+            // ignore
+          }
+        }
+      }
       checkDirty();
       ElMessage.success('配置已保存并即时生效');
     } catch (err: any) {
@@ -440,6 +460,17 @@ export function useSystemConfig() {
         const json = JSON.stringify(payload);
         await updateConfigGroup(code, json);
         savedSnapshot[code] = cloneConfig(payload) as any;
+        if (code === 'ai') {
+          const aiCfg = payload as any;
+          if (aiCfg?.tokensPerUserDaily) {
+            try {
+              localStorage.setItem('edumind_sys_ai_tokens_per_user_daily', String(aiCfg.tokensPerUserDaily));
+              window.dispatchEvent(new CustomEvent('edumind:ai-config-changed', { detail: aiCfg }));
+            } catch {
+              // ignore
+            }
+          }
+        }
       }
       checkDirty();
       ElMessage.success('全部系统配置已成功保存并即时生效');

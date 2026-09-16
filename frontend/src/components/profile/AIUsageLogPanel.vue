@@ -7,12 +7,28 @@
         </div>
         <div>
           <h3 class="panel-title">近期个人 AI 交互记录</h3>
-          <span class="panel-sub">近 7 天调用明细</span>
+          <span class="panel-sub">{{ currentPeriodSubText }}</span>
         </div>
       </div>
-      <span v-if="logTotal > 0" class="record-count-pill">
-        近 7 天共 {{ logTotal }} 条
-      </span>
+
+      <div class="panel-header-right">
+        <div class="log-filter-pills">
+          <button
+            v-for="opt in filterOptions"
+            :key="opt.days"
+            type="button"
+            class="filter-pill-btn"
+            :class="{ 'is-active': selectedDays === opt.days }"
+            @click="handleFilterChange(opt.days)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <span v-if="logTotal > 0" class="record-count-pill">
+          {{ currentPeriodCountText }}
+        </span>
+      </div>
     </div>
 
     <div v-loading="logLoading" class="log-table-wrap">
@@ -64,14 +80,16 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { Clock } from '@element-plus/icons-vue';
 import AppPagination from '@/components/common/AppPagination.vue';
 import type { PersonalAiUsageVO } from '@/types/profile/ai-usage';
 
 const pageNum = defineModel<number>('pageNum', { required: true });
 const pageSize = defineModel<number>('pageSize', { required: true });
+const selectedDays = defineModel<number>('selectedDays', { default: 7 });
 
-defineProps<{
+const props = defineProps<{
   loading: boolean;
   logLoading: boolean;
   usage: PersonalAiUsageVO;
@@ -83,7 +101,34 @@ defineProps<{
 
 const emit = defineEmits<{
   'page-change': [];
+  'days-change': [days: number];
 }>();
+
+const filterOptions = [
+  { label: '全部', days: 0 },
+  { label: '今日 (1日)', days: 1 },
+  { label: '近 7 天 (一周)', days: 7 },
+  { label: '近 30 天 (一个月)', days: 30 }
+];
+
+const currentPeriodSubText = computed(() => {
+  if (selectedDays.value === 0) return '全部历史调用明细';
+  if (selectedDays.value === 1) return '今日调用明细';
+  if (selectedDays.value === 30) return '近 30 天调用明细';
+  return '近 7 天调用明细';
+});
+
+const currentPeriodCountText = computed(() => {
+  if (selectedDays.value === 0) return `全部累计共 ${props.logTotal} 条`;
+  if (selectedDays.value === 1) return `今日共 ${props.logTotal} 条`;
+  if (selectedDays.value === 30) return `近 30 天共 ${props.logTotal} 条`;
+  return `近 7 天共 ${props.logTotal} 条`;
+});
+
+function handleFilterChange(days: number) {
+  selectedDays.value = days;
+  emit('days-change', days);
+}
 </script>
 
 <style scoped lang="scss">
@@ -135,6 +180,46 @@ const emit = defineEmits<{
       font-size: 12px;
       color: #94A3B8;
       margin-top: 2px;
+    }
+
+    .panel-header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .log-filter-pills {
+      display: inline-flex;
+      align-items: center;
+      background: #F1F5F9;
+      padding: 3px;
+      border-radius: 9999px;
+      border: 1px solid #E2E8F0;
+      gap: 2px;
+
+      .filter-pill-btn {
+        border: none;
+        background: transparent;
+        padding: 5px 12px;
+        border-radius: 9999px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #64748B;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        outline: none;
+
+        &:hover:not(.is-active) {
+          color: #1E293B;
+        }
+
+        &.is-active {
+          background: #FFFFFF;
+          color: #2563EB;
+          box-shadow: 0 2px 6px rgba(37, 99, 235, 0.12);
+        }
+      }
     }
 
     .record-count-pill {

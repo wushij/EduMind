@@ -154,7 +154,7 @@ public class CourseAnnouncementServiceImpl implements CourseAnnouncementService 
                 entity.getTitle(),
                 entity.getContent(),
                 NOTIFY_TYPE_COURSE,
-                entity.getId());
+                course.getId());
     }
 
     private CourseEntity requireCourse(Long courseId) {

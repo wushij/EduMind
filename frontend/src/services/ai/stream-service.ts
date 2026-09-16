@@ -26,6 +26,7 @@ export interface ChatMessage {
   createdAt: string;
   isStreaming?: boolean;
   citations?: CitationItem[];
+  recalledMemories?: Array<{ id: number; summary: string; memoryType?: string }>;
   followUpPrompts?: string[];
 }
 
@@ -63,6 +64,7 @@ export interface StreamEventHandlers {
   onReasoningChunk?: (chunk: string) => void;
   onDeltaChunk?: (chunk: string, answerDelta: string) => void;
   onCitations?: (citations: CitationItem[]) => void;
+  onMemory?: (memories: Array<{ id: number; summary: string; memoryType?: string }>) => void;
   onDone?: (payload: StreamDonePayload) => void;
   onFollowOutput?: () => void;
   isStopped?: () => boolean;
@@ -409,6 +411,7 @@ export async function streamAssistantChat(
       onReasoningChunk: handlers.onReasoningChunk,
       onDeltaChunk: handlers.onDeltaChunk,
       onCitations: handlers.onCitations,
+      onMemory: handlers.onMemory,
       onDone: (data) => handlers.onDone?.(data as StreamDonePayload),
       onFollowOutput: handlers.onFollowOutput,
       defaultErrorMessage: '流式输出服务异常'

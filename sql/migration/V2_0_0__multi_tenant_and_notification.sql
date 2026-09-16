@@ -338,7 +338,7 @@ CREATE TABLE IF NOT EXISTS `sys_email_log` (
 INSERT IGNORE INTO `sys_config` (`config_key`, `config_name`, `config_group`, `config_value`, `remark`)
 VALUES
 ('sys.site.config', '平台基础与品牌信息', 'site',
- '{"platformName":"智教云 · EduMind","platformSubtitle":"AI 智能教学赋能平台","loginWelcome":"欢迎登录智教云平台","registerTitle":"开启智教未来之旅","copyright":"Copyright © 2026 EduMind. All rights reserved.","icpEnabled":true,"icpNumber":"京ICP备20260001号-1","icpUrl":"https://beian.miit.gov.cn"}',
+ '{"platformName":"EduMind","platformSubtitle":"智教云 · EduMind","loginWelcome":"欢迎使用 EduMind AI 智能教学赋能平台","registerTitle":"欢迎注册 EduMind 账号","copyright":"Copyright © 2026 EduMind. All rights reserved.","icpEnabled":true,"icpNumber":"京ICP备20260001号-1","icpUrl":"https://beian.miit.gov.cn"}',
  '系统网站名称、副标题、版权与工信部ICP备案信息'),
 
 ('sys.session.config', '会话令牌与安全凭据', 'session',

@@ -1,8 +1,10 @@
 <template>
   <div v-loading="loading" class="user-ai-usage-page profile-page-shell">
     <AIUsageHeroCard
+      v-model:selected-period="selectedPeriod"
       :loading="loading"
       :usage="usage"
+      :active-period-info="activePeriodInfo"
       :quota-pill-class="quotaPillClass"
       :today-usage-percent="todayUsagePercent"
       :last-updated-text="lastUpdatedText"
@@ -10,11 +12,24 @@
       @refresh="loadUsage(true)"
     />
 
-    <AIUsageMetricsGrid :usage="usage" :format-number="formatNumber" />
+    <AIUsageMetricsGrid
+      :usage="usage"
+      :format-number="formatNumber"
+      :week-tokens-used="weekTokensUsed"
+      :month-tokens-used="monthTokensUsed"
+      :total-tokens-used="totalTokensUsed"
+      :today-calls="todayCalls"
+      :week-calls="weekCalls"
+      :month-calls="monthCalls"
+      :total-calls="totalCalls"
+      :month-cost-r-m-b="monthCostRMB"
+      :total-cost-r-m-b="totalCostRMB"
+    />
 
     <AIUsageLogPanel
       v-model:page-num="pageNum"
       v-model:page-size="pageSize"
+      v-model:selected-days="selectedLogDays"
       :loading="loading"
       :log-loading="logLoading"
       :usage="usage"
@@ -23,6 +38,7 @@
       :format-number="formatNumber"
       :format-date-time="formatDateTime"
       @page-change="loadUsage(false, { tableOnly: true })"
+      @days-change="changeLogDays"
     />
   </div>
 </template>
@@ -40,13 +56,26 @@ const {
   pageNum,
   pageSize,
   logTotal,
+  selectedPeriod,
+  selectedLogDays,
   todayUsagePercent,
   quotaPillClass,
+  weekTokensUsed,
+  monthTokensUsed,
+  totalTokensUsed,
+  todayCalls,
+  weekCalls,
+  monthCalls,
+  totalCalls,
+  monthCostRMB,
+  totalCostRMB,
+  activePeriodInfo,
   lastUpdatedText,
   tableHeaderStyle,
   formatNumber,
   formatDateTime,
-  loadUsage
+  loadUsage,
+  changeLogDays
 } = useAIUsage();
 </script>
 

@@ -27,9 +27,18 @@
       />
 
       <ProfileAiPrefPanel
-        :model-options="modelOptions"
-        :ai-pref="aiPref"
-        :handle-save-ai-pref="handleSaveAiPref"
+        v-model:selected-model-key="preferences.defaultModel"
+        v-model:inference-temperature="preferences.inferenceTemperature"
+        v-model:rag-top-k="preferences.ragTopK"
+        :model-options="availableModels"
+        :models-loading="modelsLoading"
+        :pref-loading="prefLoading"
+        :saving="prefSaving"
+        :usage-loading="usageLoading"
+        :usage="usageSnapshot"
+        @save="handleSaveAiPref"
+        @refresh-models="fetchDynamicModels({ notify: true })"
+        @refresh-usage="loadUsageSnapshot"
       />
     </div>
   </div>
@@ -48,8 +57,15 @@ const {
   displayAvatar,
   roleLabel,
   profileForm,
-  modelOptions,
-  aiPref,
+  availableModels,
+  modelsLoading,
+  prefLoading,
+  prefSaving,
+  preferences,
+  usageSnapshot,
+  usageLoading,
+  fetchDynamicModels,
+  loadUsageSnapshot,
   bindDialogVisible,
   bindingLoading,
   bindForm,

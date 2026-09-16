@@ -16,7 +16,7 @@
             name="platform_title_name"
             autocomplete="off"
             class="capsule-input"
-            placeholder="例如：智教云 · EduMind"
+            placeholder="例如：EduMind"
           />
         </el-form-item>
 
@@ -27,7 +27,7 @@
             name="platform_sub_title"
             autocomplete="off"
             class="capsule-input"
-            placeholder="例如：AI 智能教学赋能平台"
+            placeholder="例如：智教云 · EduMind"
           />
         </el-form-item>
 
@@ -49,7 +49,7 @@
             name="platform_copyright_text"
             autocomplete="off"
             class="capsule-input"
-            placeholder="例如：© 2026 EduMind. All rights reserved."
+            placeholder="例如：Copyright © 2026 EduMind. All rights reserved."
           />
         </el-form-item>
 
@@ -69,9 +69,9 @@ import { Monitor, Check } from '@element-plus/icons-vue';
 import { fetchBaseInfo } from '@/composables/system/useSystemConfig';
 
 const baseInfo = reactive({
-  platformName: '智教云 · EduMind',
-  subTitle: 'AI 智能教学赋能平台',
-  copyright: '© 2026 EduMind. All rights reserved.',
+  platformName: 'EduMind',
+  subTitle: '智教云 · EduMind',
+  copyright: 'Copyright © 2026 EduMind. All rights reserved.',
   icp: '京ICP备20260001号-1'
 });
 

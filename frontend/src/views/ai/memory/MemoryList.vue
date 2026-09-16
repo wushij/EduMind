@@ -1,281 +1,302 @@
 <template>
-  <div class="agent-memory-page" v-loading="loading">
+  <div class="agent-memory-page" v-loading="loading && !memoryItems.length">
+    <!-- 顶部大视觉 Hero Banner 与长圆微光统计看板 -->
     <PageHeroBanner
       title="Agent 长期记忆与隐私治理 · 个性化认知沉淀"
-      subtitle="赋予教学智能体跨会话的持续进化记忆，用户享有 100% 透明可控的记忆查看、单条遗忘与知情同意权"
+      subtitle="赋予教学智能体跨会话的持续进化记忆，用户享有 100% 透明可控的记忆查看、单条微调遗忘与知情同意权"
       background-variant="ai"
     >
       <template #extra>
-        <div class="hero-stats-row">
-          <div class="hero-stat-card">
-            <span class="stat-num text-primary">{{ memoryItems.length }}</span>
-            <span class="stat-label">已沉淀认知记忆</span>
-          </div>
-          <div class="hero-stat-card">
-            <span class="stat-num text-success">{{ preferenceCount }}</span>
-            <span class="stat-label">学习风格与偏好</span>
-          </div>
-          <div class="hero-stat-card">
-            <span class="stat-num text-warning">{{ episodicCount }}</span>
-            <span class="stat-label">历史攻坚情境</span>
-          </div>
-          <div class="hero-stat-card">
-            <span class="stat-num text-info">已受保护</span>
-            <span class="stat-label">零知识隐私加密</span>
-          </div>
-        </div>
+        <MemoryHeroStats
+          :total-count="memoryItems.length"
+          :preference-count="preferenceCount"
+          :profile-count="profileCount"
+          :episodic-count="episodicCount"
+          :encrypted-count="encryptedCount"
+          :consent-granted="consentGranted"
+        />
       </template>
     </PageHeroBanner>
 
     <div class="main-content-layout">
-      <!-- 隐私授权与合规保护看板 -->
-      <div class="privacy-consent-card">
-        <div class="consent-left">
-          <div class="shield-icon-box">
-            <el-icon><Lock /></el-icon>
-          </div>
-          <div class="consent-text">
-            <div class="consent-title-row">
-              <h3>Agent 记忆与用户隐私保护知情同意</h3>
-              <el-tag :type="consentGranted ? 'success' : 'danger'" effect="dark" round>
-                {{ consentGranted ? '已开启记忆沉淀' : '已暂停记忆沉淀' }}
-              </el-tag>
-            </div>
-            <p>EduMind 遵循个人信息保护法与可解释 AI 标准，所有记忆仅限用于个性化教学辅导，绝不用于模型二次训练或跨机构共享。</p>
-          </div>
-        </div>
-
-        <div class="consent-right">
-          <div class="retention-selector">
-            <span class="label">记忆留存周期：</span>
-            <el-select v-model="retentionDays" size="small" style="width: 120px;" @change="handleConsentChange">
-              <el-option label="30 天" :value="30" />
-              <el-option label="90 天" :value="90" />
-              <el-option label="180 天" :value="180" />
-              <el-option label="长期有效" :value="365" />
-            </el-select>
-          </div>
-          <el-switch
-            v-model="consentGranted"
-            active-text="授权"
-            inactive-text="关闭"
-            @change="handleConsentChange"
-          />
-          <el-button type="danger" plain size="small" @click="handleForgetAll">
-            一键被遗忘 (清空)
-          </el-button>
-        </div>
+      <!-- 1. 认知命名空间长圆分段控制器 (全局与课程多空间互联互通) -->
+      <div class="scope-navigation-section">
+        <MemoryScopeTabs
+          :spaces="spaces"
+          :selected-course-id="selectedCourseId"
+          @switch-course="handleSwitchCourse"
+        />
       </div>
 
-      <!-- 检索与测试工作台 -->
-      <div class="memory-search-card">
-        <div class="search-left">
+      <!-- 2. 隐私授权与合规保护盾牌拟态看板 -->
+      <MemoryGovernanceCard
+        v-model:consent-granted="consentGranted"
+        v-model:retention-days="retentionDays"
+        @change="handleConsentChange"
+        @forget-all="handleForgetAll"
+      />
+
+      <!-- 3. 长圆操作栏与维度胶囊过滤器 -->
+      <div class="memory-action-toolbar">
+        <div class="toolbar-left">
           <el-input
             v-model="searchKeyword"
-            placeholder="检索记忆关键词或学习特征..."
-            prefix-icon="Search"
+            placeholder="检索记忆关键词、学术考点或偏好特征..."
+            :prefix-icon="Search"
             clearable
-            style="width: 280px;"
+            class="capsule-search-input"
           />
-          <el-select v-model="typeFilter" placeholder="记忆类型" clearable style="width: 140px;">
-            <el-option label="全部类型" :value="undefined" />
-            <el-option label="学习偏好 (PREFERENCE)" value="PREFERENCE" />
-            <el-option label="认知画像 (PROFILE)" value="PROFILE" />
-            <el-option label="情境片段 (EPISODIC)" value="EPISODIC" />
-            <el-option label="交互反馈 (FEEDBACK)" value="FEEDBACK" />
-          </el-select>
+
+          <div class="category-pill-filters">
+            <button
+              type="button"
+              class="filter-pill-btn"
+              :class="{ active: typeFilter === undefined }"
+              @click="typeFilter = undefined"
+            >
+              全部 ({{ memoryItems.length }})
+            </button>
+            <button
+              type="button"
+              class="filter-pill-btn success"
+              :class="{ active: typeFilter === 'PREFERENCE' }"
+              @click="typeFilter = 'PREFERENCE'"
+            >
+              学习偏好 ({{ preferenceCount }})
+            </button>
+            <button
+              type="button"
+              class="filter-pill-btn violet"
+              :class="{ active: typeFilter === 'PROFILE' }"
+              @click="typeFilter = 'PROFILE'"
+            >
+              学术画像 ({{ profileCount }})
+            </button>
+            <button
+              type="button"
+              class="filter-pill-btn warning"
+              :class="{ active: typeFilter === 'EPISODIC' }"
+              @click="typeFilter = 'EPISODIC'"
+            >
+              攻坚情境 ({{ episodicCount }})
+            </button>
+            <button
+              type="button"
+              class="filter-pill-btn cyan"
+              :class="{ active: typeFilter === 'FEEDBACK' }"
+              @click="typeFilter = 'FEEDBACK'"
+            >
+              调优反馈 ({{ feedbackCount }})
+            </button>
+          </div>
         </div>
 
-        <div class="search-right">
-          <el-button type="primary" plain @click="openRecallTester">
+        <div class="toolbar-right">
+          <el-button
+            v-if="hasDuplicates"
+            type="warning"
+            plain
+            class="pill-action-btn deduplicate-btn"
+            :loading="cleaningDuplicates"
+            @click="handleCleanupDuplicates"
+          >
+            <el-icon><Brush /></el-icon>
+            <span>一键语义去重</span>
+          </el-button>
+
+          <el-button
+            type="primary"
+            class="pill-action-btn gradient-create-btn"
+            :loading="extracting"
+            @click="handleExtractMemories"
+          >
             <el-icon><MagicStick /></el-icon>
-            <span>Agent 语义召回测试</span>
+            <span>AI 学情智能萃取</span>
           </el-button>
-          <el-button type="primary" class="gradient-btn" @click="openCreateDialog">
+
+          <el-button
+            type="primary"
+            plain
+            class="pill-action-btn"
+            @click="openRecallTester"
+          >
+            <el-icon><Search /></el-icon>
+            <span>语义召回沙盒</span>
+          </el-button>
+
+          <el-button
+            type="primary"
+            class="pill-action-btn gradient-create-btn"
+            @click="openCreateDialog"
+          >
             <el-icon><Plus /></el-icon>
-            <span>注入教学先验记忆</span>
+            <span>注入先验记忆</span>
           </el-button>
         </div>
       </div>
 
-      <!-- 记忆条目卡片流 -->
-      <div class="memory-grid" v-if="filteredMemories.length > 0">
-        <div v-for="item in filteredMemories" :key="item.id" class="memory-card">
-          <div class="card-header">
-            <div class="header-type">
-              <el-tag :type="getTypeTagType(item.memoryType)" effect="light">
-                {{ getTypeLabel(item.memoryType) }}
-              </el-tag>
-              <el-tag v-if="item.encrypted" type="warning" size="small" effect="plain" round>
-                国密SM4加密
-              </el-tag>
-              <span class="memory-key font-mono">{{ item.memoryKey || '#' + item.id }}</span>
-            </div>
-            <div class="header-score">
-              <span class="score-label">置信度:</span>
-              <span class="score-val">{{ ((item.confidenceScore || 0.95) * 100).toFixed(0) }}%</span>
-            </div>
-          </div>
-
-          <div class="card-body">
-            <p class="memory-content">{{ item.summary || item.memoryValue }}</p>
-            <div class="memory-meta">
-              <span>敏感级别：{{ item.sensitivityLevel || 'NORMAL' }}</span>
-              <span>记录时间：{{ item.createTime || '刚刚' }}</span>
-            </div>
-          </div>
-
-          <div class="card-footer">
-            <div class="feedback-actions">
-              <el-button link size="small" type="primary" @click="giveFeedback(item, 5)">
-                <el-icon><Check /></el-icon> 准确
-              </el-button>
-              <el-button link size="small" type="info" @click="giveFeedback(item, 1)">
-                <el-icon><Close /></el-icon> 不准
-              </el-button>
-            </div>
-            <el-button link size="small" type="danger" @click="forgetSingle(item)">
-              <el-icon><Delete /></el-icon> 遗忘
-            </el-button>
-          </div>
-        </div>
+      <!-- 4. 记忆卡片流矩阵 -->
+      <div v-if="filteredMemories.length > 0" class="memory-cards-grid">
+        <MemoryItemCard
+          v-for="item in filteredMemories"
+          :key="item.id"
+          :item="item"
+          @feedback="giveFeedback"
+          @edit="openEditDialog"
+          @forget="forgetSingle"
+          @decrypt="handleDecryptItem"
+        />
       </div>
 
-      <el-empty v-else description="暂无符合条件的记忆条目" />
+      <!-- 5. 优雅拟态空状态 (带真实行动指引) -->
+      <div v-else class="memory-empty-capsule">
+        <div class="empty-icon-circle">
+          <el-icon><FolderOpened /></el-icon>
+        </div>
+        <h4 class="empty-title">
+          {{ !consentGranted ? '当前空间已开启零知识隐私保护' : '当前空间暂无匹配的长效记忆条目' }}
+        </h4>
+        <p class="empty-sub">
+          {{ !consentGranted
+            ? '请点击上方看板的“授权”开关赋予 Agent 跨会话认知演化能力；授权后系统将严格在本地为您服务，保障数据安全。'
+            : '长期记忆将随日常师生问答、阶段小测与错题诊断自动沉淀。您也可以立即启动 AI 智能推演萃取，或手动注入先验规则：'
+          }}
+        </p>
+
+        <div class="empty-actions-row">
+          <el-button
+            v-if="!consentGranted"
+            type="success"
+            class="empty-pill-btn"
+            @click="consentGranted = true; handleConsentChange()"
+          >
+            <el-icon><Check /></el-icon>
+            <span>立即开启记忆沉淀授权</span>
+          </el-button>
+
+          <template v-else>
+            <el-button
+              type="primary"
+              class="empty-pill-btn gradient-btn"
+              :loading="extracting"
+              @click="handleExtractMemories"
+            >
+              <el-icon><MagicStick /></el-icon>
+              <span>从近期学情萃取认知特征 (AI 研判)</span>
+            </el-button>
+            <el-button
+              class="empty-pill-btn"
+              @click="openCreateDialog"
+            >
+              <el-icon><Plus /></el-icon>
+              <span>手动添加先验记忆</span>
+            </el-button>
+          </template>
+        </div>
+      </div>
     </div>
 
-    <!-- 注入先验记忆对话框 -->
-    <el-dialog v-model="createDialogVisible" title="注入教学先验特征记忆" width="520px">
-      <el-form :model="createForm" label-position="top">
-        <el-form-item label="记忆类别" required>
-          <el-select v-model="createForm.memoryType" style="width: 100%;">
-            <el-option label="学习风格与偏好 (PREFERENCE)" value="PREFERENCE" />
-            <el-option label="能力画像与薄弱点 (PROFILE)" value="PROFILE" />
-            <el-option label="教学交互情境 (EPISODIC)" value="EPISODIC" />
-            <el-option label="交互纠错反馈 (FEEDBACK)" value="FEEDBACK" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="敏感级别 (安全合规)">
-          <el-select v-model="createForm.sensitivityLevel" style="width: 100%;">
-            <el-option label="普通 (NORMAL)" value="NORMAL" />
-            <el-option label="学术特征 (ACADEMIC)" value="ACADEMIC" />
-            <el-option label="高敏感 (HIGH_RISK - 启用国密 SM4 加密)" value="HIGH_RISK" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="记忆摘要/事实描述" required>
-          <el-input
-            v-model="createForm.memoryValue"
-            type="textarea"
-            :rows="3"
-            placeholder="如：该学生对复合函数求导的链式法则极度敏感，但极易遗忘定义域约束，建议提问时多加前置检查。"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="createDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitCreateMemory">沉淀入库</el-button>
-      </template>
-    </el-dialog>
+    <!-- 弹窗与测试沙盒抽屉 -->
+    <MemorySandboxDrawer
+      v-model:visible="recallDrawerVisible"
+      v-model:query-prompt="queryPrompt"
+      :recalled-items="recalledItems"
+      @retrieve="doRetrieve"
+    />
 
-    <!-- 语义召回测试抽屉 -->
-    <el-drawer v-model="recallDrawerVisible" title="Agent 语义记忆召回沙盒测试" size="520px">
-      <div class="recall-sandbox">
-        <p class="sandbox-desc">输入当前对话场景 Prompt，模拟 Agent 在生成回答前实时检索长期记忆库的 Top-K 相关上下文片段：</p>
-        <el-input
-          v-model="queryPrompt"
-          type="textarea"
-          :rows="3"
-          placeholder="例如：我准备做 3 道导数综合大题，帮我按照我平时的做题节奏安排题目。"
-        />
-        <el-button type="primary" class="gradient-btn mt-3" style="width: 100%; margin-top: 14px;" @click="doRetrieve">
-          <el-icon><Search /></el-icon>
-          <span>执行向量语义召回匹配</span>
-        </el-button>
+    <MemoryExtractDialog
+      v-model:visible="extractDialogVisible"
+      :candidates="extractedCandidates"
+      :loading="extracting"
+      :confirming="confirmingCandidates"
+      @cancel="handleCancelExtract"
+      @confirm="handleConfirmExtract"
+    />
 
-        <div class="recalled-results" v-if="recalledItems.length > 0">
-          <el-divider content-position="left">召回命中的记忆片段 (Top-{{ recalledItems.length }})</el-divider>
-          <div v-for="(rec, idx) in recalledItems" :key="rec.id" class="recalled-item">
-            <div class="recalled-top">
-              <span class="rank">#{{ idx + 1 }} 相似度得分：{{ ((rec.confidenceScore || 0.95) * 100).toFixed(0) }}%</span>
-              <el-tag size="small" :type="getTypeTagType(rec.memoryType)">{{ getTypeLabel(rec.memoryType) }}</el-tag>
-            </div>
-            <p class="rec-val">{{ rec.summary || rec.memoryValue }}</p>
-          </div>
-        </div>
-      </div>
-    </el-drawer>
+    <MemoryCreateDialog
+      v-model:visible="createDialogVisible"
+      :form="createForm"
+      @submit="submitCreateMemory"
+    />
+
+    <MemoryEditDialog
+      v-model:visible="editDialogVisible"
+      :form="editForm"
+      @submit="submitEditMemory"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { Lock, Search, MagicStick, Plus, Check, Close, Delete } from '@element-plus/icons-vue';
+import {
+  Search,
+  MagicStick,
+  Plus,
+  Brush,
+  FolderOpened,
+  Check
+} from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
+import MemoryHeroStats from '@/components/ai/memory/MemoryHeroStats.vue';
+import MemoryScopeTabs from '@/components/ai/memory/MemoryScopeTabs.vue';
+import MemoryGovernanceCard from '@/components/ai/memory/MemoryGovernanceCard.vue';
+import MemoryItemCard from '@/components/ai/memory/MemoryItemCard.vue';
+import MemorySandboxDrawer from '@/components/ai/memory/MemorySandboxDrawer.vue';
+import MemoryExtractDialog from '@/components/ai/memory/MemoryExtractDialog.vue';
+import MemoryCreateDialog from '@/components/ai/memory/MemoryCreateDialog.vue';
+import MemoryEditDialog from '@/components/ai/memory/MemoryEditDialog.vue';
 import { useAgentMemory } from '@/composables/ai/useAgentMemory';
 
 const {
   loading,
+  extracting,
+  cleaningDuplicates,
+  hasDuplicates,
+  selectedCourseId,
+  spaces,
   consentGranted,
   retentionDays,
   searchKeyword,
   typeFilter,
   memoryItems,
   preferenceCount,
+  profileCount,
   episodicCount,
+  feedbackCount,
+  encryptedCount,
   filteredMemories,
   createDialogVisible,
   createForm,
+  editDialogVisible,
+  editForm,
   recallDrawerVisible,
   queryPrompt,
   recalledItems,
+  extractDialogVisible,
+  extractedCandidates,
+  handleSwitchCourse,
   handleConsentChange,
   handleForgetAll,
+  handleExtractMemories,
+  handleConfirmExtract,
+  confirmingCandidates,
+  handleCancelExtract,
+  handleCleanupDuplicates,
+  handleDecryptItem,
   openCreateDialog,
   submitCreateMemory,
+  openEditDialog,
+  submitEditMemory,
   forgetSingle,
   giveFeedback,
   openRecallTester,
-  doRetrieve,
-  getTypeLabel,
-  getTypeTagType
+  doRetrieve
 } = useAgentMemory();
 </script>
 
 <style scoped lang="scss">
 .agent-memory-page {
-  padding-bottom: 40px;
-
-  .hero-stats-row {
-    display: flex;
-    gap: 16px;
-
-    .hero-stat-card {
-      background: rgba(255, 255, 255, 0.9);
-      backdrop-filter: blur(8px);
-      padding: 10px 18px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-
-      .stat-num {
-        font-size: 20px;
-        font-weight: 700;
-        line-height: 1.2;
-
-        &.text-primary { color: #2563EB; }
-        &.text-success { color: #16A34A; }
-        &.text-warning { color: #D97706; }
-        &.text-info { color: #0284C7; }
-      }
-
-      .stat-label {
-        font-size: 11px;
-        color: #64748B;
-        margin-top: 4px;
-      }
-    }
-  }
+  padding-bottom: 50px;
 
   .main-content-layout {
     width: 100%;
@@ -284,214 +305,189 @@ const {
     gap: 20px;
   }
 
-  .privacy-consent-card {
+  .scope-navigation-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     background: #FFFFFF;
-    border-radius: 16px;
+    border-radius: 20px;
+    padding: 12px 20px;
     border: 1px solid #E2E8F0;
-    padding: 18px 22px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+  }
+
+  .memory-action-toolbar {
+    background: #FFFFFF;
+    border-radius: 20px;
+    border: 1px solid #E2E8F0;
+    padding: 14px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
-    margin-bottom: 22px;
+    gap: 16px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+    flex-wrap: wrap;
 
-    .consent-left {
+    .toolbar-left {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 14px;
+      flex-wrap: wrap;
 
-      .shield-icon-box {
-        width: 46px;
-        height: 46px;
-        border-radius: 12px;
-        background: #ECFDF5;
-        color: #10B981;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 22px;
-      }
-
-      .consent-text {
-        .consent-title-row {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-
-          h3 {
-            font-size: 16px;
-            font-weight: 600;
-            color: #0F172A;
-            margin: 0;
-          }
-        }
-
-        p {
-          font-size: 12px;
-          color: #64748B;
-          margin: 4px 0 0;
+      .capsule-search-input {
+        width: 290px;
+        :deep(.el-input__wrapper) {
+          border-radius: 9999px;
+          padding-left: 14px;
+          padding-right: 14px;
         }
       }
-    }
 
-    .consent-right {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-
-      .retention-selector {
-        display: flex;
+      .category-pill-filters {
+        display: inline-flex;
         align-items: center;
         gap: 6px;
-        font-size: 13px;
-        color: #475569;
-      }
-    }
-  }
-
-  .memory-search-card {
-    background: #FFFFFF;
-    border-radius: 14px;
-    padding: 16px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
-    margin-bottom: 22px;
-
-    .search-left {
-      display: flex;
-      gap: 14px;
-      align-items: center;
-    }
-
-    .search-right {
-      display: flex;
-      gap: 12px;
-
-      .gradient-btn {
-        background: linear-gradient(135deg, #2563EB 0%, #4F46E5 100%);
-        border: none;
-        border-radius: 10px;
-      }
-    }
-  }
-
-  .memory-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-    gap: 20px;
-
-    .memory-card {
-      background: #FFFFFF;
-      border-radius: 16px;
-      border: 1px solid #E2E8F0;
-      padding: 20px;
-      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03);
-      display: flex;
-      flex-direction: column;
-      transition: all 0.2s ease;
-
-      &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.07);
-        border-color: #BFDBFE;
-      }
-
-      .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 12px;
-
-        .header-type {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-
-          .memory-key {
-            font-size: 13px;
-            font-weight: 600;
-            color: #1E293B;
-          }
-        }
-
-        .header-score {
-          font-size: 12px;
-          color: #64748B;
-          .score-val {
-            font-weight: 700;
-            color: #2563EB;
-            margin-left: 4px;
-          }
-        }
-      }
-
-      .card-body {
-        flex: 1;
-
-        .memory-content {
-          font-size: 14px;
-          line-height: 1.6;
-          color: #334155;
-          margin: 0 0 12px;
-        }
-
-        .memory-meta {
-          display: flex;
-          justify-content: space-between;
-          font-size: 11px;
-          color: #94A3B8;
-        }
-      }
-
-      .card-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-top: 1px solid #F1F5F9;
-        padding-top: 12px;
-        margin-top: 8px;
-      }
-    }
-  }
-
-  .recall-sandbox {
-    .sandbox-desc {
-      font-size: 13px;
-      color: #475569;
-      line-height: 1.5;
-      margin-bottom: 14px;
-    }
-
-    .recalled-results {
-      margin-top: 20px;
-
-      .recalled-item {
         background: #F8FAFC;
         border: 1px solid #E2E8F0;
-        border-radius: 12px;
-        padding: 12px 14px;
-        margin-bottom: 12px;
+        border-radius: 9999px;
+        padding: 3px;
 
-        .recalled-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 6px;
+        .filter-pill-btn {
+          border: none;
+          background: transparent;
+          font-size: 12px;
+          font-weight: 500;
+          color: #64748B;
+          padding: 5px 12px;
+          border-radius: 9999px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          white-space: nowrap;
 
-          .rank {
-            font-size: 12px;
-            font-weight: 600;
+          &:hover {
+            color: #1E293B;
+            background: rgba(255, 255, 255, 0.7);
+          }
+
+          &.active {
+            background: #FFFFFF;
             color: #2563EB;
+            font-weight: 600;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+          }
+
+          &.success.active {
+            color: #059669;
+          }
+          &.violet.active {
+            color: #7C3AED;
+          }
+          &.warning.active {
+            color: #D97706;
+          }
+          &.cyan.active {
+            color: #0891B2;
           }
         }
+      }
+    }
 
-        .rec-val {
-          font-size: 13px;
-          color: #334155;
-          margin: 0;
-          line-height: 1.5;
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+
+      .pill-action-btn {
+        border-radius: 9999px;
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+
+        &.gradient-create-btn {
+          background: linear-gradient(135deg, #2563EB 0%, #4F46E5 100%);
+          border: none;
+          color: #FFFFFF;
+          font-weight: 600;
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+
+          &:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+          }
+        }
+      }
+    }
+  }
+
+  .memory-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 20px;
+
+    @media (max-width: 640px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .memory-empty-capsule {
+    background: #FFFFFF;
+    border-radius: 24px;
+    border: 1px dashed #CBD5E1;
+    padding: 48px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.02);
+
+    .empty-icon-circle {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: #EFF6FF;
+      color: #2563EB;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin-bottom: 16px;
+    }
+
+    .empty-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #0F172A;
+      margin: 0 0 8px;
+    }
+
+    .empty-sub {
+      font-size: 13px;
+      color: #64748B;
+      max-width: 580px;
+      line-height: 1.6;
+      margin: 0 0 24px;
+    }
+
+    .empty-actions-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+
+      .empty-pill-btn {
+        border-radius: 9999px;
+        padding: 9px 20px;
+        font-size: 13px;
+        font-weight: 600;
+
+        &.gradient-btn {
+          background: linear-gradient(135deg, #2563EB 0%, #4F46E5 100%);
+          border: none;
+          color: #FFFFFF;
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
         }
       }
     }

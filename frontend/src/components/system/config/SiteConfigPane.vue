@@ -7,16 +7,16 @@
     </div>
 
     <el-form-item label="平台名称">
-      <el-input v-model="draft.platformName" name="edumind_site_platform_name" maxlength="50" placeholder="例如：智教云 · EduMind" :disabled="!canEdit" />
+      <el-input v-model="draft.platformName" name="edumind_site_platform_name" maxlength="50" placeholder="例如：EduMind" :disabled="!canEdit" />
     </el-form-item>
     <el-form-item label="平台副标题">
-      <el-input v-model="draft.platformSubtitle" name="edumind_site_platform_sub" maxlength="80" placeholder="例如：AI 智能教学赋能平台" :disabled="!canEdit" />
+      <el-input v-model="draft.platformSubtitle" name="edumind_site_platform_sub" maxlength="80" placeholder="例如：智教云 · EduMind" :disabled="!canEdit" />
     </el-form-item>
     <el-form-item label="登录页标题">
-      <el-input v-model="draft.loginWelcome" name="edumind_site_login_welcome" maxlength="30" placeholder="例如：欢迎登录智教云平台" :disabled="!canEdit" />
+      <el-input v-model="draft.loginWelcome" name="edumind_site_login_welcome" maxlength="60" placeholder="例如：欢迎使用 EduMind AI 智能教学赋能平台" :disabled="!canEdit" />
     </el-form-item>
     <el-form-item label="注册页标题">
-      <el-input v-model="draft.registerTitle" name="edumind_site_register_title" maxlength="30" placeholder="例如：开启智教未来之旅" :disabled="!canEdit" />
+      <el-input v-model="draft.registerTitle" name="edumind_site_register_title" maxlength="60" placeholder="例如：欢迎注册 EduMind 账号" :disabled="!canEdit" />
     </el-form-item>
     <el-form-item label="页脚版权">
       <el-input v-model="draft.copyright" name="edumind_site_copyright" maxlength="120" placeholder="例如：Copyright © 2026 EduMind. All rights reserved." :disabled="!canEdit" />

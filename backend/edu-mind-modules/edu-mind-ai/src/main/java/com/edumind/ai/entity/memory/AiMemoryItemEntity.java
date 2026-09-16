@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 public class AiMemoryItemEntity implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private Long namespaceId;
     private String memoryType;
     private String summary;

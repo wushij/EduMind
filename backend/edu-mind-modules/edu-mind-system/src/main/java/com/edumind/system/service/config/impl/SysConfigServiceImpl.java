@@ -440,7 +440,7 @@ public class SysConfigServiceImpl implements SysConfigService {
     private String getDefaultConfigJson(String groupCode) {
         if (groupCode == null) return "{}";
         return switch (groupCode.trim()) {
-            case "site" -> "{\"platformName\":\"智教云 · EduMind\",\"platformSubtitle\":\"AI 智能教学赋能平台\",\"loginWelcome\":\"欢迎登录智教云平台\",\"registerTitle\":\"开启智教未来之旅\",\"copyright\":\"Copyright © 2026 EduMind. All rights reserved.\",\"icpEnabled\":true,\"icpNumber\":\"京ICP备20260001号-1\",\"icpUrl\":\"https://beian.miit.gov.cn\"}";
+            case "site" -> "{\"platformName\":\"EduMind\",\"platformSubtitle\":\"智教云 · EduMind\",\"loginWelcome\":\"欢迎使用 EduMind AI 智能教学赋能平台\",\"registerTitle\":\"欢迎注册 EduMind 账号\",\"copyright\":\"Copyright © 2026 EduMind. All rights reserved.\",\"icpEnabled\":true,\"icpNumber\":\"京ICP备20260001号-1\",\"icpUrl\":\"https://beian.miit.gov.cn\"}";
             case "session" -> "{\"tokenExpireHours\":24,\"sessionSignExpireHours\":24}";
             case "file", "storage" -> "{\"maxSizeMb\":50,\"allowedExtensions\":\"jpg,jpeg,png,gif,webp,bmp,svg,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,md,json,xml,zip,rar,mp4,mp3,wav,avi,mov\"}";
             case "rateLimit" -> "{\"captchaPerIpMinute\":40,\"loginPerIpMinute\":30,\"registerPerIpMinute\":10,\"smsPerIpMinute\":5,\"smsSendIntervalSeconds\":60,\"smsPerPhoneDaily\":10,\"smsPerIpDaily\":30,\"aiChatPerUserMinute\":8}";

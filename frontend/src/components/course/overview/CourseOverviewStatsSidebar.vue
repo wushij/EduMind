@@ -92,7 +92,7 @@ function go(path: string) {
 </script>
 
 <style scoped lang="scss">
-@import './course-overview-shared.scss';
+@use './course-overview-shared.scss' as *;
 
 .stats-summary-card {
   .card-sub-header {

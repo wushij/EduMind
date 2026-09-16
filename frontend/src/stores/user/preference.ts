@@ -20,6 +20,8 @@ export interface UserPreferencesState {
   notifyGrading: boolean;
   notifyVector: boolean;
   compactMode: boolean;
+  inferenceTemperature: number;
+  ragTopK: number;
 }
 
 export const PREFERENCE_STORAGE_KEY = 'edumind_user_preferences';
@@ -38,7 +40,9 @@ const DEFAULT_PREFERENCES: UserPreferencesState = {
   notifySubmission: true,
   notifyGrading: true,
   notifyVector: true,
-  compactMode: false
+  compactMode: false,
+  inferenceTemperature: 0.5,
+  ragTopK: 5
 };
 
 export const usePreferenceStore = defineStore('preference', () => {
@@ -128,6 +132,12 @@ export const usePreferenceStore = defineStore('preference', () => {
             if (ext.notifyGrading !== undefined) preferences.notifyGrading = ext.notifyGrading;
             if (ext.notifyVector !== undefined) preferences.notifyVector = ext.notifyVector;
             if (ext.compactMode !== undefined) preferences.compactMode = ext.compactMode;
+            if (typeof ext.inferenceTemperature === 'number') {
+              preferences.inferenceTemperature = ext.inferenceTemperature;
+            }
+            if (typeof ext.ragTopK === 'number') {
+              preferences.ragTopK = ext.ragTopK;
+            }
           } catch {
             // ignore malformed json
           }
@@ -163,7 +173,9 @@ export const usePreferenceStore = defineStore('preference', () => {
         notifySubmission: preferences.notifySubmission,
         notifyGrading: preferences.notifyGrading,
         notifyVector: preferences.notifyVector,
-        compactMode: preferences.compactMode
+        compactMode: preferences.compactMode,
+        inferenceTemperature: preferences.inferenceTemperature,
+        ragTopK: preferences.ragTopK
       });
 
       const payload: Partial<UserPreferenceVO> = {

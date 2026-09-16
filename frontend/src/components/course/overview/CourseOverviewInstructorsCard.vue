@@ -88,7 +88,7 @@ function avatarUrl(i: CourseInstructorCardVO) {
 </script>
 
 <style scoped lang="scss">
-@import './course-overview-shared.scss';
+@use './course-overview-shared.scss' as *;
 
 .teacher-header {
   display: flex;

@@ -9,7 +9,7 @@ export function getNotificationNavigatePath(type: NotificationType, refId?: numb
     case 'KNOWLEDGE_INDEX':
       return `/knowledge/${refId}`;
     case 'COURSE':
-      return `/course/${refId}`;
+      return `/course/${refId}/overview`;
     case 'ASSIGNMENT':
       return `/question/assignments/${refId}`;
     case 'EXAM':

@@ -119,9 +119,9 @@ public class SysConfigController {
             return ApiResult.success(JSON.parseObject(group.getConfigValue()));
         }
         return ApiResult.success(Map.of(
-                "platformName", "智教云 · EduMind",
-                "subTitle", "AI 智能教学赋能平台",
-                "copyright", "© 2026 EduMind. All rights reserved.",
+                "platformName", "EduMind",
+                "subTitle", "智教云 · EduMind",
+                "copyright", "Copyright © 2026 EduMind. All rights reserved.",
                 "icp", "京ICP备20260001号-1"
         ));
     }

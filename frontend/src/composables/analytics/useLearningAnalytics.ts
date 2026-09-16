@@ -87,10 +87,16 @@ export function useLearningAnalytics() {
   const selectedStudentId = ref<number | null>(null);
   const adviceLoading = ref(false);
   let currentAbortController: AbortController | null = null;
+  let isManualStopped = false;
 
   function stopTeachingAdvice() {
+    isManualStopped = true;
     if (currentAbortController) {
-      currentAbortController.abort();
+      try {
+        currentAbortController.abort();
+      } catch {
+        // 忽略
+      }
       currentAbortController = null;
     }
     adviceLoading.value = false;
@@ -269,7 +275,9 @@ export function useLearningAnalytics() {
   }
 
   async function fetchTeachingAdvice(request: TeachingAdviceRequest): Promise<TeachingAdviceVO | null> {
+    isManualStopped = false;
     stopTeachingAdvice();
+    isManualStopped = false;
     currentAbortController = new AbortController();
     adviceLoading.value = true;
     usedMockFallback.value = false;
@@ -277,14 +285,25 @@ export function useLearningAnalytics() {
       const res = await generateTeachingAdvice(request, {
         signal: currentAbortController.signal
       });
+      if (isManualStopped) {
+        adviceLoading.value = false;
+        return null;
+      }
       if (res?.data) {
         teachingAdvice.value = res.data;
         saveStoredTeachingAdvice(request.courseId, request.studentId, res.data);
       }
       return res?.data ?? null;
     } catch (err: any) {
-      if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message === 'canceled') {
+      if (
+        isManualStopped ||
+        err?.name === 'CanceledError' ||
+        err?.name === 'AbortError' ||
+        err?.code === 'ERR_CANCELED' ||
+        err?.message === 'canceled'
+      ) {
         // 用户手动暂停/停止推演
+        adviceLoading.value = false;
         return null;
       }
       if (USE_MOCK) {

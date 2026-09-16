@@ -3,21 +3,19 @@ import { ElMessage } from 'element-plus';
 import { useAuthStore } from '@/stores/auth/auth';
 import { getProfile, updateProfile, bindEmail as bindEmailApi, uploadAvatar } from '@/api/system/user';
 import { getUserPreferences, saveUserPreferences } from '@/api/profile/preferences';
+import { getMyAiUsage } from '@/api/profile/ai-usage';
+import { usePreferenceStore } from '@/stores/user/preference';
+import { usePreferences } from '@/composables/profile/usePreferences';
 import type { UserInfo } from '@/types/auth/auth';
 import { USE_MOCK } from '@/config/mock';
 import { DEFAULT_AVATAR } from '@/constants/auth';
 import type { UploadRequestOptions } from 'element-plus';
+import { storeToRefs } from 'pinia';
 
 export interface ProfileExtras {
   department?: string;
   bio?: string;
 }
-
-export const PROFILE_MODEL_OPTIONS = [
-  { label: 'DeepSeek-V3 (首推)', value: 'DeepSeek-V3' },
-  { label: 'Qwen-2.5-72B', value: 'Qwen-2.5-72B' },
-  { label: 'Claude-3.5-Sonnet', value: 'Claude-3.5-Sonnet' }
-] as const;
 
 export function parseProfileExtras(preferencesJson?: string): ProfileExtras {
   if (!preferencesJson) {
@@ -56,9 +54,19 @@ export function getProfileRoleLabel(role: string | null | undefined) {
 
 export function useProfile() {
   const authStore = useAuthStore();
+  const preferenceStore = usePreferenceStore();
+  const { preferences, loading: prefLoading, saving: prefSaving } = storeToRefs(preferenceStore);
+  const { availableModels, modelsLoading, fetchDynamicModels } = usePreferences();
   const isDev = import.meta.env.DEV;
   const avatarUploading = ref(false);
   const avatarLoadFailed = ref(false);
+  const usageLoading = ref(false);
+  const usageSnapshot = reactive({
+    todayTokensUsed: 0,
+    dailyTokenLimit: 100000,
+    remainingPercent: 100,
+    quotaStatus: '今日额度充足'
+  });
 
   const currentUser = computed(() => authStore.currentUser);
   const currentRole = computed(() => authStore.currentRole || 'ADMIN');
@@ -76,12 +84,6 @@ export function useProfile() {
     department: '',
     phone: '',
     bio: ''
-  });
-
-  const aiPref = reactive({
-    model: 'DeepSeek-V3',
-    temp: 0.5,
-    topK: 5
   });
 
   const bindDialogVisible = ref(false);
@@ -205,8 +207,35 @@ export function useProfile() {
     }
   }
 
-  function handleSaveAiPref() {
-    ElMessage.success(`AI 推理偏好已保存：默认使用 ${aiPref.model}，温度 ${aiPref.temp}`);
+  async function loadUsageSnapshot() {
+    usageLoading.value = true;
+    try {
+      const res = await getMyAiUsage({ logDays: 7, pageNum: 1, pageSize: 1 });
+      if (res?.data) {
+        usageSnapshot.todayTokensUsed = res.data.todayTokensUsed ?? 0;
+        usageSnapshot.dailyTokenLimit = res.data.dailyTokenLimit ?? 100000;
+        usageSnapshot.remainingPercent = res.data.remainingPercent ?? 100;
+        usageSnapshot.quotaStatus = res.data.quotaStatus ?? '今日额度充足';
+      }
+    } catch {
+      // 额度接口失败时保持默认 0，不展示假数据
+    } finally {
+      usageLoading.value = false;
+    }
+  }
+
+  async function handleSaveAiPref() {
+    if (availableModels.value.length === 0) {
+      ElMessage.warning('暂无可用模型，无法保存偏好');
+      return;
+    }
+    const modelExists = availableModels.value.some((m) => m.modelKey === preferences.value.defaultModel);
+    if (!modelExists) {
+      ElMessage.warning('请选择列表中的有效模型');
+      return;
+    }
+    await preferenceStore.savePreferences();
+    window.dispatchEvent(new CustomEvent('edumind:ai-usage-changed'));
   }
 
   function openBindDialog() {
@@ -249,8 +278,22 @@ export function useProfile() {
     }
   }
 
-  onMounted(() => {
-    loadProfile();
+  onMounted(async () => {
+    await Promise.all([
+      loadProfile(),
+      preferenceStore.loadPreferences(),
+      fetchDynamicModels(),
+      loadUsageSnapshot()
+    ]);
+    if (
+      availableModels.value.length > 0
+      && !availableModels.value.some((m) => m.modelKey === preferences.value.defaultModel)
+    ) {
+      const def = availableModels.value.find((m) => m.isDefault) || availableModels.value[0];
+      if (def) {
+        preferences.value.defaultModel = def.modelKey;
+      }
+    }
   });
 
   return {
@@ -262,8 +305,15 @@ export function useProfile() {
     displayAvatar,
     roleLabel,
     profileForm,
-    modelOptions: PROFILE_MODEL_OPTIONS,
-    aiPref,
+    availableModels,
+    modelsLoading,
+    prefLoading,
+    prefSaving,
+    preferences,
+    usageSnapshot,
+    usageLoading,
+    fetchDynamicModels,
+    loadUsageSnapshot,
     bindDialogVisible,
     bindingLoading,
     bindForm,

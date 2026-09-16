@@ -66,8 +66,27 @@ public class AiMemoryDao {
         return itemMapper.deleteById(id);
     }
 
+    public int deleteItemsByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        return itemMapper.deleteBatchIds(ids);
+    }
+
     public int deleteItemsByNamespaceId(Long namespaceId) {
         return itemMapper.delete(new LambdaQueryWrapper<AiMemoryItemEntity>()
+                .eq(AiMemoryItemEntity::getNamespaceId, namespaceId));
+    }
+
+    public List<AiMemoryNamespaceEntity> listNamespacesByUser(Long tenantId, Long userId) {
+        return namespaceMapper.selectList(new LambdaQueryWrapper<AiMemoryNamespaceEntity>()
+                .eq(AiMemoryNamespaceEntity::getTenantId, tenantId)
+                .eq(AiMemoryNamespaceEntity::getUserId, userId)
+                .orderByAsc(AiMemoryNamespaceEntity::getCourseId));
+    }
+
+    public long countItemsByNamespace(Long namespaceId) {
+        return itemMapper.selectCount(new LambdaQueryWrapper<AiMemoryItemEntity>()
                 .eq(AiMemoryItemEntity::getNamespaceId, namespaceId));
     }
 

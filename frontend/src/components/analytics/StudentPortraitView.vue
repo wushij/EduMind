@@ -260,7 +260,8 @@
             v-if="adviceLoading"
             type="button"
             class="ai-action-capsule-btn ai-action-capsule-btn--warning"
-            @click="emit('stop-advice')"
+            title="停止本次 AI 推演"
+            @click.stop="emit('stop-advice')"
           >
             <svg viewBox="0 0 24 24" class="btn-svg is-spin" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="6" y="6" width="12" height="12" rx="2"></rect>
@@ -306,7 +307,11 @@
         </div>
       </div>
 
-      <div class="ai-feedback-content">
+      <div
+        class="ai-feedback-content"
+        v-loading="adviceLoading"
+        element-loading-text="AI 深度学情诊断推演中..."
+      >
         <p>{{ portrait?.aiDiagnosis || '暂无该学员的 AI 诊断建议，点击上方「生成精准诊断建议」获取基于 DeepSeek 大模型的深度推演分析。' }}</p>
       </div>
     </div>
@@ -1068,6 +1073,8 @@ function formatErrorTypes(types?: string) {
     border-radius: 14px;
     padding: 16px 20px;
     border: 1px solid rgba(255, 255, 255, 0.9);
+    position: relative;
+    min-height: 80px;
 
     p {
       margin: 0;
