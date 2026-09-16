@@ -69,10 +69,14 @@
 
           <div class="card-footer">
             <span class="date-text">更新于 {{ b.updateTime ? b.updateTime.slice(0, 10) : '近期' }}</span>
-            <el-button type="primary" link size="small">
-              <span>进入题库维护</span>
-              <el-icon class="ml-1"><ArrowRight /></el-icon>
-            </el-button>
+            <div class="action-pill-group" @click.stop>
+              <button type="button" class="table-action-pill table-action-pill--primary" @click="router.push(`/question/banks/${b.id}`)">
+                进入维护
+              </button>
+              <button type="button" class="table-action-pill table-action-pill--danger" @click="handleDeleteBank(b)">
+                删除
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -158,7 +162,8 @@ const {
   handleCourseFilter,
   getCourseName,
   loadBanks,
-  handleCreateBank
+  handleCreateBank,
+  handleDeleteBank
 } = useBankList();
 </script>
 

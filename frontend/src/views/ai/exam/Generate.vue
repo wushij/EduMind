@@ -1,7 +1,6 @@
 <template>
   <div class="exam-generate-page">
     <ExamGenerateWizard
-      :banner-img="examBannerImg"
       v-model:compose-mode="composeMode"
       v-model:quick-count="quickCount"
       v-model:quick-total-score="quickTotalScore"
@@ -29,7 +28,6 @@ import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useExamGenerate } from '@/composables/ai/useExamGenerate';
 import ExamGenerateWizard from '@/components/ai/generation/ExamGenerateWizard.vue';
-import examBannerImg from '@/assets/images/ai组卷.png';
 
 const router = useRouter();
 
@@ -62,8 +60,6 @@ onMounted(() => {
 <style scoped lang="scss">
 .exam-generate-page {
   width: 100%;
-  padding: 24px;
-  background: #f8fafc;
   box-sizing: border-box;
 }
 </style>

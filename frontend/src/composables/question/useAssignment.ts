@@ -1,11 +1,12 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import {
   getAssignments,
   getAssignmentDetail,
   createAssignment,
   publishAssignment,
+  deleteAssignment,
   submitAssignment,
   getAssignmentSubmissions
 } from '@/api/question/assignment';
@@ -101,6 +102,28 @@ export function useAssignment() {
     return pendingSubs.length;
   }
 
+  async function removeAssignment(id: number, title?: string) {
+    try {
+      await ElMessageBox.confirm(
+        `确定删除草稿作业「${title || '当前作业'}」吗？删除后不可恢复。`,
+        '删除确认',
+        {
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      );
+      await deleteAssignment(id);
+      assignments.value = assignments.value.filter(a => a.id !== id);
+      total.value = Math.max(0, total.value - 1);
+      ElMessage.success('作业已删除');
+    } catch (err: unknown) {
+      if (err === 'cancel' || err === 'close') return;
+      ElMessage.error(err instanceof Error ? err.message : '删除作业失败');
+      throw err;
+    }
+  }
+
   return {
     assignments,
     currentAssignment,
@@ -113,7 +136,8 @@ export function useAssignment() {
     submit,
     fetchSubmissions,
     loadCourses,
-    gradePendingSubmissions
+    gradePendingSubmissions,
+    removeAssignment
   };
 }
 
@@ -506,6 +530,27 @@ export function useAssignmentDetail() {
     router.push('/question/assignments');
   }
 
+  async function handleDeleteDraft() {
+    const title = assignmentInfo.value?.title || '当前作业';
+    try {
+      await ElMessageBox.confirm(
+        `确定删除草稿作业「${title}」吗？删除后不可恢复。`,
+        '删除确认',
+        {
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      );
+      await deleteAssignment(assignmentId.value);
+      ElMessage.success('作业已删除');
+      router.push('/question/assignments');
+    } catch (err: unknown) {
+      if (err === 'cancel' || err === 'close') return;
+      ElMessage.error(err instanceof Error ? err.message : '删除作业失败');
+    }
+  }
+
   onMounted(async () => {
     await loadAssignmentData();
     await loadSubmissions();
@@ -532,6 +577,7 @@ export function useAssignmentDetail() {
     handleBatchAIGrade,
     handleRemindUnsubmitted,
     handleBack,
+    handleDeleteDraft,
     getSubmissionStatusLabel,
     getSubmissionStatusType,
     getTypeLabel: getAssignmentDetailTypeLabel,

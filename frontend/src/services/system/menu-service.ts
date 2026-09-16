@@ -23,19 +23,7 @@ export async function getMenuTree(params?: MenuQueryParams): Promise<ApiResponse
     return { code: 200, message: 'success', data, timestamp: Date.now() };
   }
 
-  try {
-    const res = await menuApi.fetchMenuTree(params);
-    if (res && res.data && res.data.length > 0) {
-      return res;
-    }
-    const stored = getStoredMenuTree();
-    const data = filterMenuTree(stored, params?.keyword);
-    return { code: 200, message: 'success', data, timestamp: Date.now() };
-  } catch {
-    const stored = getStoredMenuTree();
-    const data = filterMenuTree(stored, params?.keyword);
-    return { code: 200, message: 'success', data, timestamp: Date.now() };
-  }
+  return menuApi.fetchMenuTree(params);
 }
 
 export async function createMenu(data: MenuCreateRequest): Promise<ApiResponse<SysMenu>> {
@@ -44,14 +32,7 @@ export async function createMenu(data: MenuCreateRequest): Promise<ApiResponse<S
     return { code: 200, message: '创建成功', data: created, timestamp: Date.now() };
   }
 
-  try {
-    const res = await menuApi.createMenuHttp(data);
-    mockCreateMenu(data);
-    return res;
-  } catch {
-    const created = mockCreateMenu(data);
-    return { code: 200, message: '创建成功', data: created, timestamp: Date.now() };
-  }
+  return menuApi.createMenuHttp(data);
 }
 
 export async function updateMenu(
@@ -63,14 +44,7 @@ export async function updateMenu(
     return { code: 200, message: '保存成功', data: ok, timestamp: Date.now() };
   }
 
-  try {
-    const res = await menuApi.updateMenuHttp(id, data);
-    mockUpdateMenu(id, data);
-    return res;
-  } catch {
-    const ok = mockUpdateMenu(id, data);
-    return { code: 200, message: '保存成功', data: ok, timestamp: Date.now() };
-  }
+  return menuApi.updateMenuHttp(id, data);
 }
 
 export async function deleteMenu(id: number): Promise<ApiResponse<boolean>> {
@@ -79,14 +53,7 @@ export async function deleteMenu(id: number): Promise<ApiResponse<boolean>> {
     return { code: 200, message: '删除成功', data: ok, timestamp: Date.now() };
   }
 
-  try {
-    const res = await menuApi.deleteMenuHttp(id);
-    mockDeleteMenu(id);
-    return res;
-  } catch {
-    const ok = mockDeleteMenu(id);
-    return { code: 200, message: '删除成功', data: ok, timestamp: Date.now() };
-  }
+  return menuApi.deleteMenuHttp(id);
 }
 
 export async function resetDefaultMenus(): Promise<ApiResponse<SysMenu[]>> {

@@ -106,6 +106,14 @@
             >
               编辑
             </el-button>
+            <button
+              v-if="item.status !== 'PUBLISHED'"
+              type="button"
+              class="table-action-pill table-action-pill--danger"
+              @click.stop="$emit('delete', item)"
+            >
+              删除
+            </button>
           </div>
         </div>
       </div>
@@ -156,6 +164,7 @@ defineEmits<{
   'copy-text': [text: string, msg: string];
   'open-drawer': [item: PromptTemplate, tab: 'preview' | 'test'];
   edit: [id: number];
+  delete: [item: PromptTemplate];
   'reset-filters': [];
   create: [];
 }>();

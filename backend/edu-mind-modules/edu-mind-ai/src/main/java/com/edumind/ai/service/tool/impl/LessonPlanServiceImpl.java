@@ -3,8 +3,15 @@ package com.edumind.ai.service.tool.impl;
 import com.edumind.ai.dto.tool.LessonPlanDTO;
 import com.edumind.ai.integration.llm.LlmClient;
 import com.edumind.ai.service.tool.LessonPlanService;
+import com.edumind.course.api.CourseQueryApi;
+import com.edumind.course.vo.chapter.ChapterTreeVO;
+import com.edumind.course.vo.course.CourseDetailVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -16,6 +23,7 @@ import java.util.concurrent.Executors;
 public class LessonPlanServiceImpl implements LessonPlanService {
 
     private final LlmClient llmClient;
+    private final CourseQueryApi courseQueryApi;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     @Override
@@ -65,11 +73,47 @@ public class LessonPlanServiceImpl implements LessonPlanService {
     }
 
     private String buildUserPrompt(LessonPlanDTO dto) {
-        return "课程ID：" + dto.getCourseId() + "\n"
-                + "授课主题：" + dto.getTopic() + "\n"
-                + "学时：" + (dto.getHours() != null ? dto.getHours() : 2) + "\n"
-                + "教学目标：" + (dto.getObjectives() != null ? dto.getObjectives() : "掌握核心概念") + "\n"
-                + "请生成：教学大纲、课堂流程、互动提问、作业建议。";
+        StringBuilder sb = new StringBuilder();
+        sb.append("课程ID：").append(dto.getCourseId()).append('\n');
+        CourseDetailVO course = dto.getCourseId() != null ? courseQueryApi.getCourseById(dto.getCourseId()) : null;
+        if (course != null) {
+            sb.append("课程名称：").append(course.getName()).append('\n');
+            if (StringUtils.hasText(course.getDescription())) {
+                sb.append("课程简介：").append(course.getDescription()).append('\n');
+            }
+            if (course.getPlannedHours() != null) {
+                sb.append("计划学时：").append(course.getPlannedHours()).append('\n');
+            }
+            List<String> chapterTitles = flattenChapterTitles(
+                    courseQueryApi.listChaptersByCourseId(dto.getCourseId()));
+            if (!chapterTitles.isEmpty()) {
+                sb.append("章节大纲：").append(String.join("；", chapterTitles)).append('\n');
+            }
+        }
+        sb.append("授课主题：").append(dto.getTopic()).append('\n');
+        sb.append("本节学时：").append(dto.getHours() != null ? dto.getHours() : 2).append('\n');
+        sb.append("教学目标：")
+                .append(dto.getObjectives() != null ? dto.getObjectives() : "掌握核心概念")
+                .append('\n');
+        sb.append("请结合上述真实课程信息生成：教学大纲、课堂流程、互动提问、作业建议。");
+        return sb.toString();
+    }
+
+    private List<String> flattenChapterTitles(List<ChapterTreeVO> nodes) {
+        List<String> titles = new ArrayList<>();
+        if (nodes == null) {
+            return titles;
+        }
+        for (ChapterTreeVO node : nodes) {
+            if (node == null) {
+                continue;
+            }
+            if (StringUtils.hasText(node.getTitle())) {
+                titles.add(node.getTitle());
+            }
+            titles.addAll(flattenChapterTitles(node.getChildren()));
+        }
+        return titles;
     }
 
     private String escape(String token) {

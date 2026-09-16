@@ -104,6 +104,24 @@ public class ExportTaskServiceImpl implements ExportTaskService {
     }
 
     @Override
+    public void deleteMyTask(Long taskId) {
+        ExportTaskEntity task = requireAccessibleTask(taskId);
+        if ("PROCESSING".equalsIgnoreCase(task.getStatus()) || "PENDING".equalsIgnoreCase(task.getStatus())) {
+            throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "任务生成中，请稍后再删除");
+        }
+        if (StringUtils.hasText(task.getObjectKey())) {
+            try {
+                if (TenantObjectKeyBuilder.validateTenantOwnership(task.getTenantId(), task.getObjectKey())) {
+                    fileStorageService.deleteFile(bucketName, task.getObjectKey());
+                }
+            } catch (Exception e) {
+                log.warn("[试卷导出] 删除存储文件失败 taskId={}: {}", taskId, e.getMessage());
+            }
+        }
+        exportTaskDao.deleteById(taskId);
+    }
+
+    @Override
     public void download(Long taskId, String token, HttpServletResponse response) {
         ExportTaskEntity task = requireAccessibleTask(taskId);
 

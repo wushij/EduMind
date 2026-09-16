@@ -1,5 +1,11 @@
-import { renderMarkdownForChat, renderMarkdownForReasoning, normalizeCodeFences } from '@/utils/markdown';
+import {
+  renderMarkdownForChat,
+  renderMarkdownForReasoning,
+  normalizeCodeFences,
+  looksLikeMermaid
+} from '@/utils/markdown';
 import { cleanReasoningText } from './copilot-stream-split';
+import { expandAsciiTreeToMultiline, looksLikeAsciiKnowledgeTree } from './ascii-tree-graph';
 
 const FENCED_CODE_BLOCK_RE = /(```[\s\S]*?```)/g;
 
@@ -112,6 +118,91 @@ function normalizeInlineBulletLists(text: string): string {
     .join('');
 }
 
+/** 代码块内的字符画知识树：拆行便于阅读与 Mermaid 转换 */
+function normalizeAsciiTreeInCodeFences(text: string): string {
+  return text.replace(/```[^\n]*\n([\s\S]*?)```/g, (full, body: string) => {
+    if (!looksLikeAsciiKnowledgeTree(body)) return full;
+    const expanded = expandAsciiTreeToMultiline(body);
+    return full.replace(body, expanded);
+  });
+}
+
+/** 围栏未声明 mermaid 但内容是流程图时，强制 ```mermaid（与侧边栏 AI 同源渲染） */
+function normalizeMermaidInCodeFences(text: string): string {
+  return text.replace(/```([^\n]*)\n([\s\S]*?)```/g, (full, langLine: string, body: string) => {
+    const trimmedBody = body.trim();
+    if (!looksLikeMermaid(trimmedBody)) return full;
+    const lang = (langLine.trim().split(/\s+/)[0] || '').toLowerCase();
+    if (lang === 'mermaid' || lang === 'graph' || lang === 'flowchart') return full;
+    return `\`\`\`mermaid\n${trimmedBody}\n\`\`\``;
+  });
+}
+
+/** 正文里裸露的字符树包进代码围栏，避免被 Markdown 渲染成 <p> 后逐字竖排 */
+function wrapBareAsciiTreeBlocks(text: string): string {
+  return text
+    .split(FENCED_CODE_BLOCK_RE)
+    .map((segment) => {
+      if (segment.startsWith('```')) return segment;
+
+      const lines = segment.split('\n');
+      const out: string[] = [];
+      let i = 0;
+
+      while (i < lines.length) {
+        const line = lines[i];
+        if (!/[├└]/.test(line)) {
+          out.push(line);
+          i += 1;
+          continue;
+        }
+
+        const blockLines: string[] = [];
+        while (i < lines.length) {
+          const ln = lines[i];
+          const trimmed = ln.trim();
+          if (blockLines.length > 0 && trimmed === '') {
+            i += 1;
+            break;
+          }
+          if (
+            blockLines.length === 0
+            || /[├└│]/.test(ln)
+            || /^[ \t│]/.test(ln)
+            || (trimmed.startsWith('│') && blockLines.length > 0)
+          ) {
+            blockLines.push(ln);
+            i += 1;
+          } else {
+            break;
+          }
+        }
+
+        const joined = blockLines.join('\n').trim();
+        if (joined && looksLikeAsciiKnowledgeTree(joined)) {
+          out.push('```\n' + expandAsciiTreeToMultiline(joined) + '\n```');
+        } else if (blockLines.length) {
+          out.push(blockLines.join('\n'));
+        }
+      }
+
+      return out.join('\n');
+    })
+    .join('');
+}
+
+/** 正文里粘连的字符树（非代码块）拆行 */
+function normalizeInlineAsciiTree(text: string): string {
+  return text
+    .split(FENCED_CODE_BLOCK_RE)
+    .map((segment) => {
+      if (segment.startsWith('```')) return segment;
+      if (!/[├└]/.test(segment)) return segment;
+      return expandAsciiTreeToMultiline(segment);
+    })
+    .join('');
+}
+
 /** 粘连的中文关键词引号 "" 拆行（表格行内跳过） */
 function normalizeQuotedKeywordLines(text: string): string {
   return text
@@ -185,12 +276,62 @@ export function repairChatBoldMarkers(text: string): string {
 }
 
 /**
+ * 深度思考区：不展示 Mermaid/大段 graph 源码，避免黑色 CODE 块；保留字符树并拆行
+ */
+function stripHeavyDiagramsFromReasoning(text: string): string {
+  return text.replace(/```([^\n]*)\n([\s\S]*?)```/g, (full, _langLine: string, body: string) => {
+    const trimmed = body.trim();
+    if (!trimmed) return full;
+    if (looksLikeMermaid(trimmed)) {
+      return '\n\n> 流程图与拓扑图谱已在下方正文中展示，思考过程不再重复铺陈源码。\n\n';
+    }
+    if (looksLikeAsciiKnowledgeTree(trimmed)) {
+      return full;
+    }
+    if (trimmed.length > 280 && /(?:-->|flowchart|graph\s+(?:TD|LR|TB))/i.test(trimmed)) {
+      return '\n\n> 流程图与拓扑图谱已在下方正文中展示，思考过程不再重复铺陈源码。\n\n';
+    }
+    return full;
+  });
+}
+
+/** 深度思考专用预处理：不走 Mermaid 围栏转换，避免思考区出现大段 CODE */
+export function normalizeReasoningMarkdown(raw: string): string {
+  if (!raw) return '';
+
+  let text = normalizeCodeFences(raw);
+  text = stripHeavyDiagramsFromReasoning(text);
+  text = normalizeAsciiTreeInCodeFences(text);
+  text = wrapBareAsciiTreeBlocks(text);
+  text = normalizeInlineAsciiTree(text);
+
+  text = text.replace(/^\s*#{1,3}\s*(?:回答|答案|解决方案)[:：]?\s*\n+/gi, '');
+  text = text.replace(/(^|\n)(#{1,6})([^\s#\n])/g, '$1$2 $3');
+
+  text = normalizeInlineNumberedLists(text);
+  text = normalizeInlineBulletLists(text);
+  text = normalizeQuotedKeywordLines(text);
+  text = normalizeTeachingHeaders(text);
+
+  const fenceMatches = text.match(/```/g);
+  if (fenceMatches && fenceMatches.length % 2 !== 0) {
+    text += '\n```';
+  }
+
+  return text;
+}
+
+/**
  * 针对大模型流式输出与中文混排的专用 Markdown 预处理器（Code Compass 同款）
  */
 export function normalizeChatMarkdown(raw: string): string {
   if (!raw) return '';
 
   let text = normalizeCodeFences(raw);
+  text = normalizeMermaidInCodeFences(text);
+  text = normalizeAsciiTreeInCodeFences(text);
+  text = wrapBareAsciiTreeBlocks(text);
+  text = normalizeInlineAsciiTree(text);
 
   text = text.replace(/^\s*#{1,3}\s*(?:回答|答案|解决方案)[:：]?\s*\n+/gi, '');
   text = text.replace(/^\s*#{1,3}\s*((?:针对)?您关于)/, '$1');
@@ -252,7 +393,7 @@ export function renderChatMarkdown(raw: string): string {
 /** 深度思考区专用：不走正文表格容错，避免 {x | ...} 被误拆成表格 */
 export function renderReasoningMarkdown(raw: string): string {
   if (!raw?.trim()) return '';
-  const normalized = normalizeChatMarkdown(cleanReasoningText(raw));
+  const normalized = normalizeReasoningMarkdown(cleanReasoningText(raw));
   const withBold = repairChatBoldMarkers(normalized);
   let html = renderMarkdownForReasoning(withBold);
   html = unwrapChatInlineCode(html);

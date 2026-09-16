@@ -979,6 +979,7 @@ export const DEFAULT_SYSTEM_PERMISSIONS: PermissionVO[] = [
   { id: 12, permissionCode: 'assignment:view', permissionName: '作业查看' },
   { id: 13, permissionCode: 'assignment:create', permissionName: '作业创建' },
   { id: 14, permissionCode: 'assignment:grade', permissionName: '作业批改' },
+  { id: 141, permissionCode: 'assignment:delete', permissionName: '作业删除' },
 
   // 学习中心
   { id: 84, permissionCode: 'learning:view', permissionName: '学习总览查看' },

@@ -42,6 +42,7 @@
         :refresh-history="refreshHistory"
         :download-file="downloadFile"
         :handle-print-direct="handlePrintDirect"
+        :handle-delete-export-task="handleDeleteExportTask"
       />
     </div>
   </div>
@@ -73,7 +74,8 @@ const {
   handleExportWord,
   handlePrintDirect,
   refreshHistory,
-  downloadFile
+  downloadFile,
+  handleDeleteExportTask
 } = useExport();
 </script>
 

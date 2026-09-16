@@ -110,10 +110,8 @@ export function createAIStreamSessionActions(deps: AIStreamSessionsDeps) {
   }
 
   async function loadMessages(conversationId: string, courseId?: number) {
-    const localDraft =
-      messages.value.length > 0 && currentSessionId.value === conversationId
-        ? [...messages.value]
-        : readMessageCache(courseId, conversationId);
+    // 仅以 sessionStorage 草稿合并（含手动停止生成）；勿用内存 messages，避免切会话/刷新时串会话导致重复气泡
+    const localDraft = readMessageCache(courseId, conversationId);
     try {
       const serverMsgs = await fetchMessageList(conversationId);
       messages.value = mergeServerWithLocalDrafts(serverMsgs, localDraft);

@@ -81,6 +81,14 @@
             <el-icon><Promotion /></el-icon>
             <span>发布为在线测验</span>
           </button>
+
+          <button
+            type="button"
+            class="table-action-pill table-action-pill--danger"
+            @click="emit('delete', exam)"
+          >
+            删除
+          </button>
         </div>
       </div>
     </div>
@@ -142,6 +150,7 @@ const emit = defineEmits<{
   preview: [exam: ExamPaper];
   'export-pdf': [exam: ExamPaper];
   publish: [exam: ExamPaper];
+  delete: [exam: ExamPaper];
 }>();
 </script>
 

@@ -94,25 +94,17 @@
       <el-table-column label="操作" width="160" fixed="right" align="center">
         <template #default="{ row }">
           <div class="action-pill-group">
-            <el-button
-              size="small"
-              round
-              class="action-pill-btn action-pill-btn-detail"
-              :icon="View"
-              @click="$emit('open-detail', row)"
-            >
+            <button type="button" class="table-action-pill table-action-pill--primary" @click="$emit('open-detail', row)">
               详情
-            </el-button>
-            <el-button
+            </button>
+            <button
               v-if="canDelete"
-              size="small"
-              round
-              class="action-pill-btn action-pill-btn-delete"
-              :icon="Delete"
+              type="button"
+              class="table-action-pill table-action-pill--danger"
               @click="$emit('delete', row)"
             >
               删除
-            </el-button>
+            </button>
           </div>
         </template>
       </el-table-column>
@@ -135,7 +127,7 @@
 </template>
 
 <script setup lang="ts">
-import { View, Delete, Clock, UserFilled, ArrowRight } from '@element-plus/icons-vue';
+import { Clock, UserFilled, ArrowRight } from '@element-plus/icons-vue';
 import { formatDateTime } from '@/utils/format/date';
 import type { NotificationBroadcastVO } from '@/types/notification/broadcast';
 

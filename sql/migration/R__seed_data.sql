@@ -84,7 +84,8 @@ INSERT IGNORE INTO sys_permission (id, permission_code, permission_name, parent_
 (98, 'system:menu:delete',          '菜单管理删除', 0),
 (99, 'profile:view',                '个人资料查看', 0),
 (100, 'profile:security',            '账号安全设置', 0),
-(101, 'profile:preferences',         '偏好设置管理', 0);
+(101, 'profile:preferences',         '偏好设置管理', 0),
+(141, 'assignment:delete',           '作业删除', 0);
 
 -- 管理员具备所有权限
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)

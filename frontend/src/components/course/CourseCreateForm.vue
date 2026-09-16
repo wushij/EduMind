@@ -71,20 +71,47 @@
 
         <div class="form-row-two-cols">
           <el-form-item label="建议学分">
-            <el-select v-model="form.credits" size="large" class="w-100 capsule-select">
-              <el-option label="2.0 学分 (基础选修)" :value="2.0" />
-              <el-option label="3.0 学分 (专业核心)" :value="3.0" />
-              <el-option label="4.0 学分 (综合必修)" :value="4.0" />
+            <el-select
+              v-model="form.credits"
+              size="large"
+              class="w-100 capsule-select"
+              filterable
+              allow-create
+              default-first-option
+              placeholder="请选择或输入学分"
+              @change="(val: any) => form.credits = Number(val) || 3.0"
+            >
+              <el-option label="1.0 学分 (通识微课)" :value="1.0" />
               <el-option label="1.5 学分 (实训实践)" :value="1.5" />
+              <el-option label="2.0 学分 (基础选修)" :value="2.0" />
+              <el-option label="2.5 学分 (拓展选修)" :value="2.5" />
+              <el-option label="3.0 学分 (专业核心)" :value="3.0" />
+              <el-option label="3.5 学分 (实践综合)" :value="3.5" />
+              <el-option label="4.0 学分 (综合必修)" :value="4.0" />
+              <el-option label="4.5 学分 (进阶核心)" :value="4.5" />
+              <el-option label="5.0 学分 (重难点必修 / 基础大课)" :value="5.0" />
+              <el-option label="6.0 学分 (卓越实训 / 综合大课)" :value="6.0" />
             </el-select>
           </el-form-item>
 
           <el-form-item label="规划总学时">
-            <el-select v-model="form.plannedHours" size="large" class="w-100 capsule-select">
+            <el-select
+              v-model="form.plannedHours"
+              size="large"
+              class="w-100 capsule-select"
+              filterable
+              allow-create
+              default-first-option
+              placeholder="请选择或输入学时"
+              @change="(val: any) => form.plannedHours = Number(val) || 48"
+            >
+              <el-option label="16 学时 (短学期/微课)" :value="16" />
+              <el-option label="24 学时 (集中强化课)" :value="24" />
               <el-option label="32 学时 (理论讲授为主)" :value="32" />
               <el-option label="48 学时 (理论+上机实验)" :value="48" />
               <el-option label="64 学时 (重点深度课程)" :value="64" />
-              <el-option label="24 学时 (集中强化课)" :value="24" />
+              <el-option label="80 学时 (重难点深度大课)" :value="80" />
+              <el-option label="96 学时 (学年/双学期大课)" :value="96" />
             </el-select>
           </el-form-item>
         </div>

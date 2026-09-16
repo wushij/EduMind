@@ -66,22 +66,21 @@
 
         <el-table-column label="操作" width="220" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="action-btns">
-              <el-button link type="primary" size="small" @click="openEditDialog(row)">
+            <div class="action-pill-group">
+              <button type="button" class="table-action-pill table-action-pill--primary" @click="openEditDialog(row)">
                 编辑
-              </el-button>
-              <el-button link type="primary" size="small" @click="openPermissionDrawer(row)">
+              </button>
+              <button type="button" class="table-action-pill table-action-pill--primary" @click="openPermissionDrawer(row)">
                 分配权限
-              </el-button>
-              <el-button
-                link
-                type="danger"
-                size="small"
+              </button>
+              <button
+                type="button"
+                class="table-action-pill table-action-pill--danger"
                 :disabled="row.roleCode === 'ADMIN'"
                 @click="handleDelete(row)"
               >
                 删除
-              </el-button>
+              </button>
             </div>
           </template>
         </el-table-column>

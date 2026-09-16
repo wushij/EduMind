@@ -1,0 +1,84 @@
+/* 表格行内长圆药丸操作按钮（与操作日志列表一致） */
+.action-pill-group,
+.table-action-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.table-action-pill {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  background: transparent;
+  font-family: inherit;
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  &--primary {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #2563eb;
+
+    &:hover:not(:disabled) {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+  }
+
+  &--danger {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #dc2626;
+
+    &:hover:not(:disabled) {
+      background: #dc2626;
+      border-color: #dc2626;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+  }
+
+  &--warning {
+    background: #fff7ed;
+    border-color: #fed7aa;
+    color: #ea580c;
+
+    &:hover:not(:disabled) {
+      background: #ea580c;
+      border-color: #ea580c;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+  }
+
+  &--success {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+    color: #059669;
+
+    &:hover:not(:disabled) {
+      background: #059669;
+      border-color: #059669;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+  }
+}

@@ -23,7 +23,7 @@
               size="small"
               :icon="Refresh"
               :loading="modelsLoading"
-              @click="fetchDynamicModels"
+              @click="fetchDynamicModels({ notify: true })"
               class="refresh-models-btn"
             >
               刷新模型池
@@ -145,17 +145,17 @@ defineProps<{
   modelsLoading: boolean;
   availableModels: ModelProviderConfig[];
   resolveProviderTagType: (provider: string) => string;
-  fetchDynamicModels: () => void;
+  fetchDynamicModels: (options?: { notify?: boolean }) => void | Promise<void>;
 }>();
 </script>
 
 <style scoped lang="scss">
 .pref-card {
   background: var(--el-bg-color, #ffffff);
-  border-radius: 20px;
+  border-radius: 24px;
   border: 1px solid var(--el-border-color-lighter, #e2e8f0);
-  padding: 22px 26px;
-  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.03);
+  padding: 24px 28px;
+  box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
   transition: all 0.3s ease;
 
   &:hover {

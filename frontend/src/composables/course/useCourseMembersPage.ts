@@ -37,9 +37,10 @@ export function useCourseMembersPage(courseId: number) {
   const staffMembers = computed(() => members.value.filter(m => m.memberRole === 'TEACHER' || m.memberRole === 'ASSISTANT'));
 
   const averageProgress = computed(() => {
-    if (studentMembers.value.length === 0) return 100;
-    const sum = studentMembers.value.reduce((acc, cur) => acc + (cur.progress ?? 65), 0);
-    return Math.round(sum / studentMembers.value.length);
+    const withProgress = studentMembers.value.filter(m => m.progress != null && !Number.isNaN(m.progress));
+    if (withProgress.length === 0) return 0;
+    const sum = withProgress.reduce((acc, cur) => acc + (cur.progress as number), 0);
+    return Math.round(sum / withProgress.length);
   });
 
   const roleTabs = computed(() => [

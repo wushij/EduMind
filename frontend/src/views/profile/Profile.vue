@@ -1,5 +1,5 @@
 <template>
-  <div class="profile-page-container">
+  <div class="profile-page-container profile-page-shell">
     <ProfileHeaderCard
       :is-dev="isDev"
       :current-user="currentUser"
@@ -66,12 +66,7 @@ const {
 </script>
 
 <style scoped lang="scss">
-.profile-page-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  width: 100%;
-}
+@use '@/styles/profile-page-shell.scss';
 
 .profile-main-grid {
   display: grid;

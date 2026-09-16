@@ -42,15 +42,7 @@
 
     <modules>
         <module>edu-mind-common</module>
-        <module>edu-mind-system-api</module>
-        <module>edu-mind-course-api</module>
-        <module>edu-mind-question-api</module>
-        <module>edu-mind-knowledge-api</module>
-        <module>edu-mind-teaching-api</module>
-        <module>edu-mind-resource-api</module>
-        <module>edu-mind-notification-api</module>
-        <module>edu-mind-statistics-api</module>
-        <module>edu-mind-ai-api</module>
+        <module>edu-mind-api</module>
         <module>edu-mind-security</module>
         <module>edu-mind-infrastructure</module>
         <module>edu-mind-modules</module>

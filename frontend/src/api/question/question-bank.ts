@@ -14,3 +14,5 @@ export const addQuestionsToBank = (bankId: number, questionIds: number[]) =>
 export const removeQuestionFromBank = (bankId: number, questionId: number) =>
   del<void>(`/question-banks/${bankId}/questions/${questionId}`);
 
+export const deleteQuestionBank = (id: number) => del<void>(`/question-banks/${id}`);
+

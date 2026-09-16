@@ -53,6 +53,9 @@
         <el-button class="action-btn" @click="emit('export')">
           <el-icon class="mr-1"><Download /></el-icon> 导出试卷 (JSON / 打印)
         </el-button>
+        <button type="button" class="table-action-pill table-action-pill--danger" @click="emit('delete')">
+          删除试卷
+        </button>
       </div>
     </div>
 </div>
@@ -74,6 +77,7 @@ defineProps<{
 const emit = defineEmits<{
   publish: [];
   export: [];
+  delete: [];
 }>();
 </script>
 

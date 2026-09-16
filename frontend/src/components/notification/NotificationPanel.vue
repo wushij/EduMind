@@ -1,7 +1,7 @@
 <template>
   <div class="notification-panel" :class="[`is-${variant}`]">
-    <div v-if="showHeader" class="notify-panel-head" :class="{ 'is-compact': variant === 'drawer' }">
-      <div v-if="variant === 'page'">
+    <div v-if="showHeader || showHeadActionsOnly" class="notify-panel-head" :class="{ 'is-compact': variant === 'drawer' }">
+      <div v-if="showHeader && variant === 'page'">
         <h2 class="notify-panel-title">
           <el-icon><Bell /></el-icon>
           消息通知
@@ -13,10 +13,10 @@
           查看系统、教学、知识库与 AI 相关的全部通知
         </p>
       </div>
-      <div v-else-if="unreadCount > 0" class="drawer-unread-tip">
+      <div v-else-if="showHeader && unreadCount > 0" class="drawer-unread-tip">
         {{ unreadCount }} 条未读消息
       </div>
-      <div class="notify-head-actions">
+      <div v-if="showHeader || showHeadActionsOnly" class="notify-head-actions">
         <button
           type="button"
           class="notify-head-btn is-primary"
@@ -118,6 +118,7 @@ const props = withDefaults(
   defineProps<{
     variant?: 'page' | 'drawer';
     showHeader?: boolean;
+    showHeadActionsOnly?: boolean;
     showPagination?: boolean;
     pageSize?: number;
     enableRealtime?: boolean;
@@ -127,6 +128,7 @@ const props = withDefaults(
   {
     variant: 'page',
     showHeader: true,
+    showHeadActionsOnly: false,
     showPagination: true,
     pageSize: 20,
     enableRealtime: true,

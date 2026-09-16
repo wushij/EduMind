@@ -8,6 +8,7 @@
       :get-status-tag-type="getStatusTagType"
       @publish="handlePublishAsAssignment"
       @export="handleExportPaper"
+      @delete="handleDeleteExam"
     />
 
     <div class="main-content-layout">
@@ -76,7 +77,8 @@ const {
   printPaper,
   getChineseNumber,
   getStatusLabel,
-  getStatusTagType
+  getStatusTagType,
+  handleDeleteExam
 } = useExamDetail();
 </script>
 

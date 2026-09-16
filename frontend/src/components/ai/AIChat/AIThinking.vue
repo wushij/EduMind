@@ -30,7 +30,7 @@
       <div
         v-if="displayText"
         ref="reasoningContentRef"
-        class="reasoning-content reasoning-md chat-md-content"
+        class="reasoning-content reasoning-md reasoning-markdown-body"
         v-html="renderedHtml"
       />
       <div v-else-if="active && !hasAnswerBody" class="thinking-inline-status">
@@ -229,9 +229,8 @@ function toggleFold() {
   position: relative;
   padding: 10px 14px 30px 16px;
   border-top: 1px dashed rgba(22, 119, 255, 0.15);
-  font-size: 12.5px;
-  line-height: 1.68;
-  color: #334155;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .reasoning-collapse-btn {
@@ -267,179 +266,7 @@ function toggleFold() {
 }
 
 .reasoning-content {
-  font-size: 12.5px;
-  color: #334155;
   min-width: 0;
-
-  :deep(p) {
-    margin: 6px 0;
-  }
-
-  :deep(p:last-child) {
-    margin-bottom: 0;
-  }
-
-  :deep(h1),
-  :deep(h2),
-  :deep(h3),
-  :deep(h4) {
-    margin: 10px 0 6px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #0f172a;
-  }
-
-  :deep(ul),
-  :deep(ol) {
-    margin: 6px 0 10px;
-    padding-left: 1.45em;
-    list-style-position: outside;
-  }
-
-  :deep(ul) {
-    list-style-type: disc;
-  }
-
-  :deep(ol) {
-    list-style-type: decimal;
-  }
-
-  :deep(li) {
-    margin: 4px 0;
-    padding-left: 0.2em;
-  }
-
-  :deep(blockquote) {
-    margin: 8px 0;
-    padding: 6px 10px;
-    border-left: 3px solid rgba(22, 119, 255, 0.35);
-    background: rgba(255, 255, 255, 0.55);
-    color: #64748b;
-    border-radius: 4px;
-  }
-
-  :deep(strong) {
-    color: #0f172a;
-    font-weight: 600;
-  }
-
-  :deep(code) {
-    background: rgba(15, 23, 42, 0.06);
-    padding: 1px 4px;
-    border-radius: 4px;
-    font-size: 11.5px;
-  }
-
-  :deep(.katex) {
-    word-break: normal;
-    overflow-wrap: normal;
-  }
-
-  :deep(.table-wrap) {
-    width: 100%;
-    max-width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    margin: 10px 0 12px;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-    background: #fafbfc;
-  }
-
-  :deep(.table-wrap::-webkit-scrollbar) {
-    height: 4px;
-  }
-
-  :deep(.table-wrap::-webkit-scrollbar-button) {
-    display: none;
-  }
-
-  :deep(table) {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-    line-height: 1.55;
-  }
-
-  :deep(th),
-  :deep(td) {
-    border: 1px solid #e2e8f0;
-    padding: 6px 10px;
-    text-align: left;
-    vertical-align: top;
-    word-break: break-word;
-    min-width: 72px;
-  }
-
-  :deep(th) {
-    background: #f8fafc;
-    font-weight: 600;
-    color: #1677ff;
-  }
-
-  :deep(.math-fallback) {
-    font-family: 'Fira Code', Consolas, monospace;
-    font-size: 11.5px;
-    color: #64748b;
-  }
-
-  :deep(.mermaid-diagram-wrapper) {
-    display: none;
-  }
-
-  :deep(.code-block-wrapper) {
-    margin: 10px 0;
-    border-radius: 8px;
-    background: #1e1e1e;
-    overflow: hidden;
-    border: 1px solid #333333;
-
-    .code-header {
-      background: #252526;
-      padding: 6px 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-
-      .code-lang {
-        font-size: 11px;
-        color: #9cdcfe;
-        font-weight: 700;
-        text-transform: uppercase;
-      }
-
-      .code-copy-btn {
-        flex-shrink: 0;
-        background: #3c3c3c;
-        color: #cccccc;
-        border: none;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: 10.5px;
-        cursor: pointer;
-        transition: all 0.2s;
-
-        &:hover {
-          background: #505050;
-          color: #ffffff;
-        }
-
-        &.is-copied {
-          background: #52c41a;
-          color: #ffffff;
-        }
-      }
-    }
-
-    pre {
-      margin: 0;
-      padding: 10px 12px;
-      overflow-x: auto;
-      font-size: 12px;
-      line-height: 1.55;
-    }
-  }
 }
 
 .thinking-inline-status {

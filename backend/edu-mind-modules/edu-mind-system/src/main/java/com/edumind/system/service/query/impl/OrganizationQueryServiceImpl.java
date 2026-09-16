@@ -82,6 +82,50 @@ public class OrganizationQueryServiceImpl implements OrganizationQueryService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public MemberOrgBriefVO getPrimaryClassByUserId(Long tenantId, Long userId) {
+        if (userId == null) {
+            return null;
+        }
+        Long resolvedTenantId = null;
+        try {
+            resolvedTenantId = resolveAndVerifyTenantId(tenantId);
+        } catch (Exception e) {
+            // fallback: find member across user's active tenant memberships
+        }
+        SysTenantMemberEntity member = resolvedTenantId != null
+                ? sysTenantMemberDao.findByTenantAndUser(resolvedTenantId, userId) : null;
+        if (member == null) {
+            List<SysTenantMemberEntity> list = sysTenantMemberDao.listByUserId(userId);
+            member = list.isEmpty() ? null : list.get(0);
+        }
+        if (member == null) {
+            return null;
+        }
+        Long effectiveTenantId = member.getTenantId();
+        List<SysMemberOrgEntity> relations = sysMemberOrgDao.listByMemberId(effectiveTenantId, member.getId());
+        SysOrganizationEntity classOrg = null;
+        for (SysMemberOrgEntity rel : relations) {
+            SysOrganizationEntity org = sysOrganizationDao.findByIdAndTenantId(rel.getOrganizationId(), effectiveTenantId);
+            if (org != null) {
+                if ("CLASS".equalsIgnoreCase(org.getOrgType())) {
+                    classOrg = org;
+                    break;
+                }
+                if (classOrg == null) {
+                    classOrg = org;
+                }
+            }
+        }
+        return MemberOrgBriefVO.builder()
+                .id(classOrg != null ? classOrg.getId() : null)
+                .name(classOrg != null ? classOrg.getName() : null)
+                .type(classOrg != null ? classOrg.getOrgType() : null)
+                .memberNo(member.getMemberNo())
+                .roleType(member.getStatus() != null ? String.valueOf(member.getStatus()) : null)
+                .build();
+    }
+
     private Long resolveAndVerifyTenantId(Long explicitTenantId) {
         Long currentTenantId = TenantContext.getTenantId();
         boolean isGlobalAdmin = StpUtil.isLogin() && (

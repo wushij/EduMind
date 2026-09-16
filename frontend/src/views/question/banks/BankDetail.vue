@@ -8,6 +8,7 @@
       :total-score="totalScore"
       :on-open-add-drawer="openAddDrawer"
       :on-fast-compose-exam="handleFastComposeExam"
+      :on-delete-bank="handleDeleteBank"
     />
 
     <BankQuestionTable
@@ -82,6 +83,7 @@ const {
   toggleCandidateSelect,
   confirmAddQuestions,
   handleFastComposeExam,
+  handleDeleteBank,
   getTypeLabel,
   getTypeTagType,
   getDifficultyLabel,

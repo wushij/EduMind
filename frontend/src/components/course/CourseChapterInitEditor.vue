@@ -10,57 +10,111 @@
       </div>
     </div>
 
-    <div class="block-card-body">
+    <div
+      class="block-card-body"
+      v-loading="isAiGeneratingOutline"
+      element-loading-text="DeepSeek AI 正在深度理解课程学科知识体系，推演生成高标准教学大纲..."
+      element-loading-background="rgba(255, 255, 255, 0.85)"
+    >
       <div class="syllabus-generator-toolbar">
-        <button
-          type="button"
-          class="ai-generate-capsule-btn"
-          :disabled="isAiGeneratingOutline"
-          @click="$emit('ai-generate')"
-        >
-          <el-icon class="ai-btn-icon"><MagicStick /></el-icon>
-          <span>{{ isAiGeneratingOutline ? 'AI 正在智能编排大纲...' : 'AI 智能推荐课程大纲' }}</span>
-        </button>
-
         <div class="template-pill-group">
           <span class="template-label">标准模板导入：</span>
-          <button type="button" class="template-pill-btn" @click="$emit('apply-template', 'core')">
+          <button
+            type="button"
+            class="template-pill-btn"
+            :disabled="isAiGeneratingOutline"
+            @click="$emit('apply-template', 'core')"
+          >
             高校核心课 (6章)
           </button>
-          <button type="button" class="template-pill-btn" @click="$emit('apply-template', 'practical')">
+          <button
+            type="button"
+            class="template-pill-btn"
+            :disabled="isAiGeneratingOutline"
+            @click="$emit('apply-template', 'practical')"
+          >
             前沿实训课 (4阶段)
           </button>
-          <button type="button" class="template-pill-btn" @click="$emit('apply-template', 'general')">
+          <button
+            type="button"
+            class="template-pill-btn"
+            :disabled="isAiGeneratingOutline"
+            @click="$emit('apply-template', 'general')"
+          >
             通识导论课 (4章)
           </button>
         </div>
+
+        <button
+          type="button"
+          class="ai-generate-capsule-btn"
+          :class="{ 'is-loading': isAiGeneratingOutline }"
+          :disabled="isAiGeneratingOutline"
+          @click="$emit('ai-generate')"
+        >
+          <el-icon v-if="isAiGeneratingOutline" class="is-loading"><Loading /></el-icon>
+          <el-icon v-else class="ai-btn-icon"><MagicStick /></el-icon>
+          <span>{{ isAiGeneratingOutline ? 'AI 正在智能推导大纲...' : 'AI 智能推荐课程大纲' }}</span>
+        </button>
       </div>
 
       <div class="chapters-dynamic-list">
-        <div
-          v-for="(chapter, idx) in initialChapters"
-          :key="idx"
-          class="chapter-pill-item-row"
-        >
-          <div class="chapter-seq-badge">第 {{ idx + 1 }} 章</div>
-          <el-input
-            :model-value="chapter"
-            placeholder="输入章节主标题..."
-            size="default"
-            class="chapter-title-input"
-            @update:model-value="(value: string) => $emit('update-chapter', idx, String(value ?? ''))"
-          />
-          <button
-            type="button"
-            class="chapter-del-btn"
-            title="移除本章"
-            @click="$emit('remove-chapter', idx)"
-          >
-            <el-icon><Close /></el-icon>
-          </button>
+        <!-- AI 生成中微动效卡片 (与学情分析推演保持一致的 AI 认知推导动画) -->
+        <div v-if="isAiGeneratingOutline" class="ai-generating-banner">
+          <div class="bot-avatar is-breathing">
+            <el-icon class="is-spin"><Cpu /></el-icon>
+          </div>
+          <div class="generating-info">
+            <div class="generating-title-row">
+              <span class="generating-badge">DeepSeek AI 认知推演中</span>
+              <span class="generating-hint">正在基于课程学科体系，推导演进结构化章节大纲目录...</span>
+            </div>
+            <div class="generating-shimmer-bar">
+              <div class="shimmer-progress"></div>
+            </div>
+          </div>
         </div>
 
-        <button type="button" class="add-chapter-dashed-btn" @click="$emit('add-chapter')">
+        <template v-else-if="initialChapters.length > 0">
+          <div
+            v-for="(chapter, idx) in initialChapters"
+            :key="idx"
+            class="chapter-pill-item-row"
+          >
+            <div class="chapter-seq-badge">第 {{ idx + 1 }} 章</div>
+            <el-input
+              :model-value="chapter"
+              placeholder="输入章节主标题..."
+              size="default"
+              class="chapter-title-input"
+              @update:model-value="(value: string) => $emit('update-chapter', idx, String(value ?? ''))"
+            />
+            <button
+              type="button"
+              class="chapter-del-btn"
+              title="移除本章"
+              @click="$emit('remove-chapter', idx)"
+            >
+              <el-icon><Close /></el-icon>
+            </button>
+          </div>
+        </template>
+
+        <!-- 默认为空时的优雅提示 -->
+        <div v-else class="chapters-empty-placeholder">
+          <div class="empty-icon-circle">
+            <el-icon><List /></el-icon>
+          </div>
+          <p class="empty-main-text">暂未添加教学大纲章节</p>
+          <p class="empty-sub-text">可点击右上角「AI 智能推荐课程大纲」一键智能生成，选用左侧标准模板快速导入，或点击下方手动添加章节</p>
+        </div>
+
+        <button
+          type="button"
+          class="add-chapter-dashed-btn"
+          :disabled="isAiGeneratingOutline"
+          @click="$emit('add-chapter')"
+        >
           <el-icon><Plus /></el-icon>
           <span>添加新大纲章节</span>
         </button>
@@ -70,7 +124,7 @@
 </template>
 
 <script setup lang="ts">
-import { List, MagicStick, Plus, Close } from '@element-plus/icons-vue';
+import { List, MagicStick, Plus, Close, Loading, Cpu } from '@element-plus/icons-vue';
 import type { SyllabusTemplateType } from '@/composables/course/useCourseCreate';
 
 defineProps<{
@@ -158,6 +212,7 @@ defineEmits<{
     padding: 12px 16px;
 
     .ai-generate-capsule-btn {
+      margin-left: auto;
       display: inline-flex;
       align-items: center;
       gap: 7px;
@@ -183,8 +238,13 @@ defineEmits<{
       }
 
       &:disabled {
-        opacity: 0.65;
+        opacity: 0.85;
         cursor: not-allowed;
+      }
+
+      &.is-loading {
+        background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+        box-shadow: 0 3px 12px rgba(99, 102, 241, 0.35);
       }
     }
 
@@ -287,6 +347,126 @@ defineEmits<{
       }
     }
 
+    .ai-generating-banner {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 20px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 50%, #EFF6FF 100%);
+      border: 1px solid #E9D5FF;
+      box-shadow: 0 4px 14px rgba(124, 58, 237, 0.08);
+
+      .bot-avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #722ED1 0%, #9333EA 100%);
+        color: #FFFFFF;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        flex-shrink: 0;
+        box-shadow: 0 3px 10px rgba(114, 46, 209, 0.3);
+
+        &.is-breathing {
+          animation: botPulse 2s infinite ease-in-out;
+        }
+
+        .is-spin {
+          animation: spin 3s linear infinite;
+        }
+      }
+
+      .generating-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .generating-title-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+
+        .generating-badge {
+          font-size: 11px;
+          padding: 2px 8px;
+          border-radius: 9999px;
+          background: #F3E8FF;
+          color: #7E22CE;
+          font-weight: 700;
+        }
+
+        .generating-hint {
+          font-size: 13px;
+          color: #475569;
+          font-weight: 500;
+        }
+      }
+
+      .generating-shimmer-bar {
+        width: 100%;
+        height: 5px;
+        background: #E2E8F0;
+        border-radius: 9999px;
+        overflow: hidden;
+        position: relative;
+
+        .shimmer-progress {
+          width: 35%;
+          height: 100%;
+          background: linear-gradient(90deg, #7C3AED 0%, #2563EB 50%, #7C3AED 100%);
+          border-radius: 9999px;
+          animation: shimmerSlide 1.5s infinite ease-in-out;
+        }
+      }
+    }
+
+    .chapters-empty-placeholder {
+      padding: 26px 20px;
+      text-align: center;
+      background: #F8FAFC;
+      border: 1px dashed #CBD5E1;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+
+      .empty-icon-circle {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #F1F5F9;
+        color: #94A3B8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+        margin-bottom: 2px;
+      }
+
+      .empty-main-text {
+        margin: 0;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: #475569;
+      }
+
+      .empty-sub-text {
+        margin: 0;
+        font-size: 12px;
+        color: #94A3B8;
+        max-width: 460px;
+        line-height: 1.5;
+      }
+    }
+
     .add-chapter-dashed-btn {
       display: flex;
       align-items: center;
@@ -302,12 +482,46 @@ defineEmits<{
       cursor: pointer;
       transition: all 0.2s;
 
-      &:hover {
+      &:hover:not(:disabled) {
         border-color: #1677FF;
         color: #1677FF;
         background: #F0F7FF;
       }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
     }
+  }
+}
+
+@keyframes botPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 3px 10px rgba(114, 46, 209, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 5px 16px rgba(114, 46, 209, 0.5);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmerSlide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
   }
 }
 </style>

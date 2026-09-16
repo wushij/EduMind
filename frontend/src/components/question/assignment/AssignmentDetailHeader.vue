@@ -27,6 +27,15 @@
           <el-icon><Bell /></el-icon>
           <span>一键催交未交学生</span>
         </el-button>
+        <button
+          v-if="assignmentInfo?.status === 'DRAFT'"
+          v-permission="'assignment:delete'"
+          type="button"
+          class="table-action-pill table-action-pill--danger"
+          @click="$emit('delete')"
+        >
+          删除草稿
+        </button>
       </div>
     </div>
 
@@ -76,6 +85,7 @@ defineProps<{
 defineEmits<{
   'batch-ai-grade': [];
   'remind-unsubmitted': [];
+  delete: [];
 }>();
 </script>
 

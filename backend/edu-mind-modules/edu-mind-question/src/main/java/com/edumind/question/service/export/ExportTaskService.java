@@ -31,4 +31,6 @@ public interface ExportTaskService {
      * 安全鉴权下载试卷导出文件
      */
     void download(Long taskId, String token, HttpServletResponse response);
+
+    void deleteMyTask(Long taskId);
 }

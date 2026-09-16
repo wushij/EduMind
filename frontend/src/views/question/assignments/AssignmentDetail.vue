@@ -23,6 +23,7 @@
       :average-score="averageScore"
       @batch-ai-grade="handleBatchAIGrade"
       @remind-unsubmitted="handleRemindUnsubmitted"
+      @delete="handleDeleteDraft"
     />
 
     <!-- 主体双标签页：学生答卷管理 vs 作业试题清单 -->
@@ -112,6 +113,7 @@ const {
   handleBatchAIGrade,
   handleRemindUnsubmitted,
   handleBack,
+  handleDeleteDraft,
   getSubmissionStatusLabel,
   getSubmissionStatusType,
   getTypeLabel,

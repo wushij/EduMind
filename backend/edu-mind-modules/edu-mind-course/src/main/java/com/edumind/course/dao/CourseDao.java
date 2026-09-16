@@ -65,8 +65,9 @@ public class CourseDao {
         if (StringUtils.hasText(query.getStatus())) {
             if ("ACTIVE".equalsIgnoreCase(query.getStatus())) {
                 wrapper.eq(CourseEntity::getStatus, 1);
-            } else if ("INACTIVE".equalsIgnoreCase(query.getStatus())) {
-                wrapper.ne(CourseEntity::getStatus, 1);
+            } else if ("INACTIVE".equalsIgnoreCase(query.getStatus())
+                    || "ARCHIVED".equalsIgnoreCase(query.getStatus())) {
+                wrapper.and(w -> w.eq(CourseEntity::getStatus, 0).or().isNull(CourseEntity::getStatus));
             }
         }
         wrapper.orderByDesc(CourseEntity::getCreateTime);

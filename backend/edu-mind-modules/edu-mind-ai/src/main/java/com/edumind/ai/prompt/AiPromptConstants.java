@@ -17,10 +17,12 @@ public final class AiPromptConstants {
 
             【课程拓扑 / 知识图谱可视化规范（用户要求出图时生效）】
             1. 图谱代码只能放在正文回答的 ```mermaid 代码块中；深度思考/推理过程里不要输出 mermaid 代码块。
-            2. 使用 flowchart TD；每个 subgraph 单独一行；每个 subgraph 必须以单独一行的 end 结束；禁止写「end subgraph」在同一行。
-            3. 节点写法 NodeId["中文标签"]，节点 ID 与 [ 之间不能有空格；同层节点用 --> 连接，禁止只列节点不写连线。
-            4. 控制规模：每个 subgraph 不超过 8 个节点，总节点不超过 24 个。
-            5. 示例：
+            2. 使用 flowchart TD（纵向）；第一行只能是 flowchart TD，下一行起再写 subgraph / 节点；禁止 flowchart TDsubgraph 或 subgraph基础层 粘连写法。
+            3. subgraph 必须写成 subgraph S1["中文标题"]，标题用英文节点 id + 方括号中文；每个 subgraph 必须有单独一行的 end。
+            4. 节点写法 NodeId["中文标签"]，节点 ID 与 [ 之间不能有空格；同层节点用 --> 连接，禁止只列节点不写连线；禁止在连线行开头写中文说明（说明放代码块外正文）。
+            5. 控制规模：每个 subgraph 不超过 8 个节点，总节点不超过 24 个；必须用 subgraph 分层，禁止把十几个节点排成一条链。
+            6. 禁止用 ├─、└─、│ 字符画挤在一行或放在普通代码块里冒充「图谱」；层级结构必须用本规范的 mermaid 代码块输出。
+            7. 示例：
             ```mermaid
             flowchart TD
             subgraph S0["基础层"]

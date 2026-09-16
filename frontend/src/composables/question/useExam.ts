@@ -1,6 +1,6 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { getExams, getExamDetail, createExam, updateExam, deleteExam, exportExam } from '@/api/question/exam';
 import { getCourseList } from '@/api/course/course';
 import { getQuestions } from '@/api/question/question';
@@ -592,6 +592,7 @@ export function useExamCreate() {
 export function useExamDetail() {
   const route = useRoute();
   const router = useRouter();
+  const { removeExam } = useExam();
 
   const examId = computed(() => Number(route.params.id) || 1);
   const loading = ref(false);
@@ -671,6 +672,27 @@ export function useExamDetail() {
     window.print();
   }
 
+  async function handleDeleteExam() {
+    const title = examData.value?.title || '当前试卷';
+    try {
+      await ElMessageBox.confirm(
+        `确定删除试卷「${title}」吗？删除后不可恢复。`,
+        '删除确认',
+        {
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      );
+      await removeExam(examId.value);
+      ElMessage.success('试卷已删除');
+      router.push('/question/exams');
+    } catch (err: unknown) {
+      if (err === 'cancel' || err === 'close') return;
+      ElMessage.error(err instanceof Error ? err.message : '删除试卷失败');
+    }
+  }
+
   onMounted(async () => {
     await loadExam();
   });
@@ -694,6 +716,7 @@ export function useExamDetail() {
     handleExportPaper,
     handleCopyExportJson,
     printPaper,
+    handleDeleteExam,
     getChineseNumber,
     getStatusLabel: getExamStatusLabel,
     getStatusTagType: getExamStatusTagType

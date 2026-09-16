@@ -18,6 +18,7 @@
 
         <div class="toolbar-right-actions">
           <button
+            v-if="courseEditable"
             type="button"
             class="capsule-btn capsule-btn--default edit-btn"
             title="编辑当前课程档案与AI人设"
@@ -25,6 +26,16 @@
           >
             <el-icon class="btn-icon-svg text-primary"><EditPen /></el-icon>
             <span>编辑课程信息</span>
+          </button>
+
+          <button
+            v-if="courseEditable"
+            type="button"
+            class="table-action-pill table-action-pill--danger"
+            title="归档当前课程"
+            @click="handleArchiveCourse"
+          >
+            归档课程
           </button>
 
           <button
@@ -125,9 +136,13 @@
           <span class="stat-num text-warning">{{ currentCourse?.studentCount || 0 }} 人</span>
           <span class="stat-label">已选修读学生</span>
         </div>
-        <div class="hero-stat-card">
-          <span class="stat-num text-info">7×24h 在线</span>
-          <span class="stat-label">AI 专属助教已就绪</span>
+        <div v-if="currentCourse?.aiUsageCount != null && currentCourse.aiUsageCount > 0" class="hero-stat-card">
+          <span class="stat-num text-info">{{ currentCourse.aiUsageCount }}</span>
+          <span class="stat-label">AI 助教累计问答</span>
+        </div>
+        <div v-else-if="currentCourse?.knowledgeBaseId" class="hero-stat-card">
+          <span class="stat-num text-info">RAG</span>
+          <span class="stat-label">知识库已挂载</span>
         </div>
       </div>
     </div>
@@ -172,7 +187,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, provide } from 'vue';
+import { useCourseEditable, courseDetailInjectionKey } from '@/composables/course/useCourseEditable';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { useCourse } from '@/composables/course/useCourse';
@@ -189,7 +205,17 @@ import {
 
 const route = useRoute();
 const router = useRouter();
-const { currentCourse, fetchCourseDetail } = useCourse();
+const { currentCourse, fetchCourseDetail, confirmArchiveCourse } = useCourse();
+provide(courseDetailInjectionKey, currentCourse);
+const courseEditable = useCourseEditable(currentCourse);
+
+async function handleArchiveCourse() {
+  if (!currentCourse.value?.id) return;
+  await confirmArchiveCourse(
+    { id: currentCourse.value.id, title: currentCourse.value.title },
+    () => router.push('/course')
+  );
+}
 const showEditDrawer = ref(false);
 
 function handleCourseSaved(updated: any) {
@@ -202,14 +228,24 @@ const courseId = computed(() => (route.params.id ? String(route.params.id) : '')
 const isAiRoute = computed(() => route.path.endsWith('/ai'));
 
 const statusText = computed(() => {
-  if (currentCourse.value?.status === 'ARCHIVED' || currentCourse.value?.status === 2) {
+  if (
+    currentCourse.value?.status === 'ARCHIVED'
+    || currentCourse.value?.status === 'INACTIVE'
+    || currentCourse.value?.status === 0
+    || currentCourse.value?.status === 2
+  ) {
     return '已结课';
   }
   return '进行中';
 });
 
 const statusClass = computed(() => {
-  if (currentCourse.value?.status === 'ARCHIVED' || currentCourse.value?.status === 2) {
+  if (
+    currentCourse.value?.status === 'ARCHIVED'
+    || currentCourse.value?.status === 'INACTIVE'
+    || currentCourse.value?.status === 0
+    || currentCourse.value?.status === 2
+  ) {
     return 'status--archived';
   }
   return 'status--active';

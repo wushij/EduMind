@@ -27,6 +27,7 @@
       @preview="handlePreview"
       @export-pdf="handleExportPdf"
       @publish="handlePublish"
+      @delete="handleDelete"
     />
   </div>
 </template>
@@ -54,7 +55,8 @@ const {
   clearKeyword,
   handlePreview,
   handleExportPdf,
-  handlePublish
+  handlePublish,
+  handleDelete
 } = useExamListPage();
 </script>
 

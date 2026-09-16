@@ -512,25 +512,12 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
   watch(
     () => resolveCourseId(),
     (courseId) => {
-      if (courseId) {
-        void loadSessions(courseId, { restoreLastSession: false });
-        void loadChapters();
-        void loadCourseResources();
-      }
+      if (!courseId) return;
+      void loadSessions(courseId, { restoreLastSession: true });
+      void loadChapters();
+      void loadCourseResources();
     },
     { immediate: true }
-  );
-
-  watch(
-    course,
-    (c) => {
-      if (c && c.id) {
-        const cid = Number(c.id);
-        void loadSessions(cid, { restoreLastSession: false });
-        void loadChapters();
-        void loadCourseResources();
-      }
-    }
   );
 
   return {

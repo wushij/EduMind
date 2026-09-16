@@ -78,16 +78,24 @@ export function usePreferences() {
     return FALLBACK_MODELS;
   });
 
-  const fetchDynamicModels = async () => {
+  const fetchDynamicModels = async (options?: { notify?: boolean }) => {
+    const notify = options?.notify ?? false;
     try {
       modelsLoading.value = true;
       const list = await resolveChatModels();
       if (list && list.length > 0) {
         dynamicModels.value = list.filter((m) => m.enabled !== false);
-        ElMessage.success(`已从智能网关同步 ${dynamicModels.value.length} 个可用模型`);
+        if (notify) {
+          ElMessage.success(`已从智能网关同步 ${dynamicModels.value.length} 个可用模型`);
+        }
+      } else if (notify) {
+        ElMessage.warning('当前暂无可用模型，请稍后重试或联系管理员');
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.warn('获取动态模型列表失败:', e);
+      if (notify) {
+        ElMessage.error('模型列表同步失败，请检查网络或稍后重试');
+      }
     } finally {
       modelsLoading.value = false;
     }

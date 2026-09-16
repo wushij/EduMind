@@ -562,7 +562,8 @@
                 border-radius: 4px 18px 18px 18px;
                 box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
                 color: #1E293B;
-                overflow: hidden;
+                overflow-x: auto;
+                overflow-y: visible;
 
                 .stream-cursor {
                   display: inline-block;
@@ -586,55 +587,6 @@
 
         :deep(.chat-input-dock) {
           flex-shrink: 0;
-        }
-
-        .scroll-bottom-btn {
-          position: absolute;
-          bottom: 88px;
-          right: 20px;
-          z-index: 20;
-          width: 34px;
-          height: 34px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(255, 255, 255, 0.96);
-          border: 1px solid rgba(22, 119, 255, 0.35);
-          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
-          cursor: pointer;
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-
-          &:hover {
-            transform: translateY(-2px);
-            background: #1677ff;
-            box-shadow: 0 6px 18px rgba(22, 119, 255, 0.35);
-
-            .scroll-bottom-svg__bg {
-              fill: #1677ff;
-            }
-
-            .scroll-bottom-svg__shaft,
-            .scroll-bottom-svg__head {
-              stroke: #ffffff;
-            }
-          }
-
-          .scroll-bottom-svg {
-            width: 20px;
-            height: 20px;
-
-            &__bg {
-              fill: #ffffff;
-            }
-
-            &__shaft,
-            &__head {
-              stroke: #1677ff;
-              stroke-width: 2.2;
-              fill: none;
-            }
-          }
         }
       }
     }

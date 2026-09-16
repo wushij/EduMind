@@ -11,6 +11,7 @@
       v-model:current-role-tab="currentRoleTab"
       v-model:search-keyword="searchKeyword"
       :role-tabs="roleTabs"
+      :show-add="courseEditable"
       @add="showAddDialog = true"
     />
 
@@ -23,6 +24,7 @@
       :get-role-label="getRoleLabel"
       :get-role-class="getRoleClass"
       :get-avatar-class="getAvatarClass"
+      :manageable="courseEditable"
       @view-portrait="handleViewPortrait"
       @remove="handleRemove"
     />
@@ -39,14 +41,21 @@
 
 <script setup lang="ts">
 import { useRoute } from 'vue-router';
+import type { Course } from '@/types/course/course';
 import MembersStatOverview from '@/components/course/MembersStatOverview.vue';
 import MembersToolbar from '@/components/course/MembersToolbar.vue';
 import MembersTable from '@/components/course/MembersTable.vue';
 import MembersAddDialog from '@/components/course/MembersAddDialog.vue';
 import { useCourseMembersPage } from '@/composables/course/useCourseMembersPage';
+import { useCourseEditable } from '@/composables/course/useCourseEditable';
+
+const props = defineProps<{
+  course?: Course | null;
+}>();
 
 const route = useRoute();
-const courseId = Number(route.params.id) || 101;
+const courseId = Number(route.params.id) || props.course?.id || 0;
+const courseEditable = useCourseEditable(() => props.course);
 
 const {
   members,

@@ -6,6 +6,11 @@ import mermaid from 'mermaid';
 import 'highlight.js/styles/atom-one-dark.css';
 import 'katex/dist/katex.min.css';
 import { normalizeChatTables } from './ai/chat-table-normalize';
+import {
+  asciiTreeToMermaid,
+  expandAsciiTreeToMultiline,
+  looksLikeAsciiKnowledgeTree
+} from './ai/ascii-tree-graph';
 
 const FENCED_CODE_BLOCK_RE = /(```[\s\S]*?```)/g;
 
@@ -355,7 +360,7 @@ mermaid.initialize({
   },
   flowchart: {
     htmlLabels: true,
-    useMaxWidth: true,
+    useMaxWidth: false,
     curve: 'basis'
   }
 });
@@ -410,7 +415,7 @@ function formatLangLabel(lang: string): string {
 const MERMAID_HINT =
   /^(?:graph |flowchart |sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie |gitGraph|journey|mindmap|timeline)/m;
 
-function looksLikeMermaid(code: string): boolean {
+export function looksLikeMermaid(code: string): boolean {
   const trimmed = code.trim();
   if (MERMAID_HINT.test(trimmed)) return true;
   if (/^\s*(?:graph|flowchart)\s+(?:TD|TB|BT|RL|LR)\b/im.test(trimmed)) return true;
@@ -451,7 +456,10 @@ async function renderMermaidSvg(id: string, code: string) {
 }
 
 function quoteMermaidLabel(label: string): string {
-  const trimmed = label.trim();
+  let trimmed = label.trim();
+  if (trimmed.length > 44) {
+    trimmed = `${trimmed.slice(0, 43)}…`;
+  }
   if (!trimmed) return '""';
   if (trimmed.startsWith('"') && trimmed.endsWith('"')) return trimmed;
   return `"${trimmed.replace(/"/g, '\\"')}"`;
@@ -463,12 +471,12 @@ function normalizeMermaidNodeLine(line: string, anonymousSubgraphSeq: { value: n
   if (/^\s*subgraph\b/i.test(line)) {
     const withId = line.replace(
       /subgraph\s+([A-Za-z][\w-]*)\s*\[([^\]]+)\]/i,
-      (_m, id: string, label: string) => `subgraph ${id} [${quoteMermaidLabel(label)}]`
+      (_m, id: string, label: string) => `subgraph ${id}[${quoteMermaidLabel(label)}]`
     );
     if (withId !== line) return withId;
     return line.replace(/subgraph\s+\[([^\]]+)\]/i, (_m, label: string) => {
       anonymousSubgraphSeq.value += 1;
-      return `subgraph sg${anonymousSubgraphSeq.value} [${quoteMermaidLabel(label)}]`;
+      return `subgraph sg${anonymousSubgraphSeq.value}[${quoteMermaidLabel(label)}]`;
     });
   }
 
@@ -499,9 +507,16 @@ function autoLinkMermaidNodes(text: string): string {
     if (pending.length === 0) return;
     if (pending.length === 1) {
       out.push(pending[0]);
-    } else {
+    } else if (pending.length <= 6) {
       for (let i = 0; i < pending.length - 1; i++) {
         out.push(`${pending[i]} --> ${pending[i + 1]}`);
+      }
+    } else {
+      // 大量孤立节点：以首个为锚点放射连接，避免 LR 下排成超长横条
+      const hub = pending[0];
+      out.push(hub);
+      for (let i = 1; i < pending.length; i++) {
+        out.push(`${hub} --> ${pending[i]}`);
       }
     }
     pending = [];
@@ -543,8 +558,122 @@ function autoLinkMermaidNodes(text: string): string {
   return out.join('\n');
 }
 
-function normalizeMermaidCode(raw: string): string {
-  let text = raw.trim().replace(/\r\n/g, '\n');
+/** 课程知识图谱节点较多时，LR 易被压成「一字长蛇」；统一改为纵向 TD */
+function preferVerticalCourseFlowchart(text: string): string {
+  const nodeCount = (text.match(/\[[^\]]+\]/g) || []).length;
+  const edgeCount = (text.match(/-->/g) || []).length;
+  const isWideLayout = /^flowchart\s+(?:LR|RL)\b/im.test(text) || /^graph\s+(?:LR|RL)\b/im.test(text);
+
+  if (isWideLayout && (nodeCount > 6 || edgeCount > 8)) {
+    return text
+      .replace(/^flowchart\s+(?:LR|RL)\b/im, 'flowchart TD')
+      .replace(/^graph\s+(?:LR|RL)\b/im, 'flowchart TD');
+  }
+
+  return text;
+}
+
+let mermaidSubgraphRepairSeq = 0;
+
+/** 修复模型常输出的粘连语法：flowchart TDsubgraph基础层、-.推广.-> 等 */
+function repairMermaidGluedSyntax(text: string): string {
+  mermaidSubgraphRepairSeq = 0;
+  let s = text.replace(/\r\n/g, '\n');
+
+  s = s.replace(/\b((?:flowchart|graph)\s+(?:TD|TB|BT|RL|LR))(\s*)(subgraph\b)/gi, '$1\n$3 ');
+  s = s.replace(/\bend(\s*)(subgraph\b)/gi, 'end\n$2 ');
+
+  s = s.replace(/\bsubgraph([\u4e00-\u9fa5][\u4e00-\u9fa5A-Za-z0-9_]*)(?=[ \t]|$)/g, (_m, title: string) => {
+    mermaidSubgraphRepairSeq += 1;
+    return `subgraph SG${mermaidSubgraphRepairSeq}["${title}"]`;
+  });
+
+  s = s
+    .split('\n')
+    .map((line) => {
+      const onlyTitle = line.match(/^(\s*)subgraph\s+([\u4e00-\u9fa5][^\[\n"]+)\s*$/);
+      if (onlyTitle) {
+        mermaidSubgraphRepairSeq += 1;
+        return `${onlyTitle[1]}subgraph SG${mermaidSubgraphRepairSeq}["${onlyTitle[2].trim()}"]`;
+      }
+      return line;
+    })
+    .join('\n');
+
+  s = s.replace(/(subgraph\s+SG\d+\[[^\]]+\])\s+([A-Za-z_])/g, '$1\n  $2');
+  s = s.replace(/(subgraph\s+"[^"]+")\s+([A-Za-z_])/g, '$1\n  $2');
+
+  s = s.replace(/-\.([^.\n>-]+)\.-?>/g, '-.->|$1|');
+  s = s.replace(/([^\s])-->/g, '$1 -->');
+  s = s.replace(/-->([^\s|\[])/g, '--> $1');
+  s = s.replace(/([^\n])\s+(subgraph\s+)/gi, '$1\n$2');
+  s = s.replace(/([^\n])\s+\b(end\b)\s*$/gim, '$1\n$2');
+
+  return s;
+}
+
+/** 去掉行首中文说明、注释化纯文案行、修正链式边与边标签写法 */
+function sanitizeMermaidContentLines(text: string): string {
+  const out: string[] = [];
+  for (const line of text.split('\n')) {
+    let s = line.trimEnd();
+    const trimmed = s.trim();
+    if (!trimmed) {
+      out.push(s);
+      continue;
+    }
+
+    if (/^(flowchart|graph)\s/i.test(trimmed) || /^%%/.test(trimmed)) {
+      out.push(s);
+      continue;
+    }
+    if (/^(subgraph|end|classDef|class|style)\b/i.test(trimmed)) {
+      out.push(s);
+      continue;
+    }
+
+    s = s.replace(/--\|([^|\n]+)\|>/g, '-->|$1|');
+    s = s.replace(/==\|([^|\n]+)\|>/g, '==>|$1|');
+
+    const nodeStart = trimmed.search(/\b[A-Za-z][\w-]*(\s*\[|-->|-\.->|$)/);
+    if (nodeStart > 0 && /[\u4e00-\u9fa5（）、：；。]/.test(trimmed.slice(0, nodeStart))) {
+      s = trimmed.slice(nodeStart);
+    }
+
+    if (!/\b[A-Za-z][\w-]*(\[|-->|-\.->)/.test(s.trim()) && /[\u4e00-\u9fa5]/.test(s)) {
+      out.push(`%% ${s.trim()}`);
+      continue;
+    }
+
+    const chainParts = s.trim().split(/\s*-->\s*/);
+    if (chainParts.length > 2) {
+      for (let i = 0; i < chainParts.length - 1; i++) {
+        out.push(`${chainParts[i].trim()} --> ${chainParts[i + 1].trim()}`);
+      }
+      continue;
+    }
+
+    out.push(s);
+  }
+  return out.join('\n');
+}
+
+function repairMermaidAggressive(code: string): string {
+  const normalized = normalizeMermaidCode(code);
+  const filtered = normalized
+    .split('\n')
+    .filter((line) => {
+      const tr = line.trim();
+      if (!tr) return true;
+      if (/^(flowchart|graph|subgraph|end|%%|classDef|class|style)/i.test(tr)) return true;
+      return /\b[A-Za-z][\w-]*(\[|-->|==>|-\.->)/.test(tr);
+    })
+    .join('\n');
+  return normalizeMermaidCode(filtered);
+}
+
+export function normalizeMermaidCode(raw: string): string {
+  let text = repairMermaidGluedSyntax(raw.trim().replace(/\r\n/g, '\n'));
   if (!text) return text;
 
   text = text.replace(
@@ -567,7 +696,9 @@ function normalizeMermaidCode(raw: string): string {
     .map((line) => normalizeMermaidNodeLine(line, anonymousSubgraphSeq))
     .join('\n');
 
+  text = sanitizeMermaidContentLines(text);
   text = autoLinkMermaidNodes(text);
+  text = preferVerticalCourseFlowchart(text);
 
   // 模型常漏写 subgraph 的 end，导致永远无法通过完整性校验
   const subgraphCount = (text.match(/\bsubgraph\b/gi) || []).length;
@@ -596,18 +727,47 @@ function readMermaidSource(wrapper: HTMLElement): string {
   return '';
 }
 
+function buildMermaidOutlineFallback(rawCode: string): string {
+  const labels: string[] = [];
+  const seen = new Set<string>();
+  const re = /\["((?:\\.|[^"\\])*)"\]|\[([^\]"]+)\]/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(rawCode)) !== null) {
+    const label = (match[1] ?? match[2] ?? '').replace(/\\"/g, '"').trim();
+    if (!label || seen.has(label)) continue;
+    seen.add(label);
+    labels.push(label);
+  }
+  if (labels.length === 0) {
+    return `<div class="mermaid-fallback-box"><pre><code>${md.utils.escapeHtml(rawCode)}</code></pre></div>`;
+  }
+  const items = labels.map((l) => `<li>${md.utils.escapeHtml(l)}</li>`).join('');
+  return `<div class="mermaid-outline-fallback"><p class="mermaid-outline-title">图谱结构概要（流程图渲染失败时的可读版）</p><ul>${items}</ul></div>`;
+}
+
+const MERMAID_ZOOM_BTN =
+  '<button type="button" class="mermaid-btn mermaid-btn--zoom" disabled title="图谱渲染完成后可放大" aria-label="全屏放大查看" onclick="window.__openMermaidViewer && window.__openMermaidViewer(this)">' +
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">' +
+  '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>';
+
 function buildMermaidWrapper(code: string): string {
-  const escaped = md.utils.escapeHtml(code.trim());
+  const trimmed = code.trim();
+  const escaped = md.utils.escapeHtml(trimmed);
+  const safeCode = encodeURIComponent(trimmed);
   return [
     '<div class="mermaid-diagram-wrapper">',
-    '<div class="mermaid-header"><span>✦ 课程拓扑知识图谱</span></div>',
-    `<pre class="mermaid-source" hidden>${escaped}</pre>`,
-    '<div class="mermaid-diagram"><span class="mermaid-loading">图谱渲染中…</span></div>',
+    '<div class="mermaid-header">',
+    '<span class="mermaid-header-title">课程拓扑知识图谱</span>',
+    `<div class="mermaid-toolbar">${MERMAID_ZOOM_BTN}</div>`,
+    '</div>',
+    `<pre class="mermaid-source" hidden aria-hidden="true">${escaped}</pre>`,
+    `<div class="mermaid-diagram" data-mermaid-code="${safeCode}"><span class="mermaid-loading">图谱渲染中…</span></div>`,
     '</div>'
   ].join('');
 }
 
 function inferOrphanCodeLang(code: string): string {
+  if (looksLikeAsciiKnowledgeTree(code)) return 'ascii-tree';
   if (looksLikeMermaid(code)) return 'mermaid';
   if (/<!DOCTYPE html>|<html\b|<\/?(?:head|body|form|table|div|p|h[1-6])\b/i.test(code)) {
     return 'html';
@@ -648,6 +808,19 @@ function getStoredPreference<T>(key: string, defaultValue: T): T {
   return defaultValue;
 }
 
+function renderAsciiTreeBlock(code: string): string {
+  const expanded = expandAsciiTreeToMultiline(code);
+  const escaped = md.utils.escapeHtml(expanded);
+  const copyBtn = `<button type="button" class="code-copy-btn" title="复制结构">复制</button>`;
+  const langLabel = `<span class="code-lang">知识图谱</span>`;
+  return [
+    '<div class="code-block-wrapper ascii-tree-wrapper">',
+    `<div class="code-header">${langLabel}${copyBtn}</div>`,
+    `<pre class="ascii-tree-pre"><code>${escaped}</code></pre>`,
+    '</div>'
+  ].join('');
+}
+
 function renderCodeBlock(code: string, declaredLang: string, enableMermaid = true): string {
   if (!code?.trim()) return '';
 
@@ -655,6 +828,14 @@ function renderCodeBlock(code: string, declaredLang: string, enableMermaid = tru
   let lang = inferCodeFenceLanguage(code, declaredLang);
   if (!mermaidAllowed && lang === 'mermaid') {
     lang = 'text';
+  }
+
+  if (looksLikeAsciiKnowledgeTree(code)) {
+    const mermaidSource = asciiTreeToMermaid(code);
+    if (mermaidSource && mermaidAllowed) {
+      return buildMermaidWrapper(mermaidSource);
+    }
+    return renderAsciiTreeBlock(code);
   }
 
   if (lang === 'mermaid' && mermaidAllowed) {
@@ -811,6 +992,8 @@ export async function renderMermaidInElement(root: HTMLElement | null) {
   );
 
   for (const wrapper of Array.from(wrappers)) {
+    if (wrapper.dataset.mermaidRendering === '1') continue;
+
     // 深度思考区、流式输出中：不渲染图谱（避免半截语法反复失败并污染 body）
     if (
       wrapper.closest('.reasoning-card')
@@ -833,6 +1016,7 @@ export async function renderMermaidInElement(root: HTMLElement | null) {
       continue;
     }
 
+    wrapper.dataset.mermaidRendering = '1';
     const codeToRender = normalizeMermaidCode(rawCode);
     const id = `mermaid-graph-${Date.now()}-${mermaidCounter++}`;
 
@@ -841,6 +1025,16 @@ export async function renderMermaidInElement(root: HTMLElement | null) {
       el.innerHTML = svg;
       bindFunctions?.(el);
       wrapper.setAttribute('data-mermaid-done', 'true');
+      const zoomBtn = wrapper.querySelector<HTMLButtonElement>('.mermaid-btn--zoom');
+      if (zoomBtn) {
+        zoomBtn.disabled = false;
+        zoomBtn.title = '全屏放大查看';
+      }
+      const svgEl = el.querySelector('svg');
+      if (svgEl?.viewBox?.baseVal?.height) {
+        const h = svgEl.viewBox.baseVal.height;
+        el.style.minHeight = `${Math.min(Math.max(h * 0.35, 120), 360)}px`;
+      }
     } catch (firstErr) {
       const simplified = codeToRender
         .split('\n')
@@ -852,15 +1046,31 @@ export async function renderMermaidInElement(root: HTMLElement | null) {
         el.innerHTML = svg;
         bindFunctions?.(el);
         wrapper.setAttribute('data-mermaid-done', 'true');
+        const zoomBtn = wrapper.querySelector<HTMLButtonElement>('.mermaid-btn--zoom');
+        if (zoomBtn) zoomBtn.disabled = false;
       } catch {
-        const logKey = codeToRender.slice(0, 160);
-        if (!mermaidFailureLogged.has(logKey)) {
-          mermaidFailureLogged.add(logKey);
-          console.warn('[Mermaid] render failed:', firstErr);
+        try {
+          const aggressive = repairMermaidAggressive(rawCode);
+          const retryId2 = `${id}-retry2`;
+          const { svg, bindFunctions } = await renderMermaidSvg(retryId2, aggressive);
+          el.innerHTML = svg;
+          bindFunctions?.(el);
+          wrapper.setAttribute('data-mermaid-done', 'true');
+          const zoomBtn = wrapper.querySelector<HTMLButtonElement>('.mermaid-btn--zoom');
+          if (zoomBtn) zoomBtn.disabled = false;
+        } catch {
+          const logKey = codeToRender.slice(0, 160);
+          if (!mermaidFailureLogged.has(logKey)) {
+            mermaidFailureLogged.add(logKey);
+            console.warn('[Mermaid] render failed:', firstErr);
+            console.warn('[Mermaid] normalized snippet:', codeToRender.slice(0, 400));
+          }
+          el.innerHTML = buildMermaidOutlineFallback(rawCode);
+          wrapper.setAttribute('data-mermaid-done', 'true');
         }
-        el.innerHTML = `<div class="mermaid-fallback-box"><pre><code>${md.utils.escapeHtml(rawCode)}</code></pre></div>`;
-        wrapper.setAttribute('data-mermaid-done', 'true');
       }
+    } finally {
+      delete wrapper.dataset.mermaidRendering;
     }
   }
 

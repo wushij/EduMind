@@ -1,7 +1,11 @@
 <template>
-  <div class="summary-page">
-    <h2>AI 课程总结</h2>
-    <el-card shadow="never">
+  <div class="summary-page ai-teaching-page-shell">
+    <ProfilePageHero
+      title="AI 课程总结"
+      subtitle="基于文档或粘贴文本，自动生成课程要点与结构化摘要。"
+    />
+
+    <div class="ai-teaching-surface-card">
       <el-form label-width="100px">
         <el-form-item label="文档 ID">
           <el-input-number v-model="documentId" :min="1" />
@@ -13,35 +17,27 @@
           <el-button type="primary" :loading="loading" @click="handleSummarize">生成总结</el-button>
         </el-form-item>
       </el-form>
-    </el-card>
-    <el-card v-if="result" class="result-card" shadow="never">
+    </div>
+
+    <div v-if="result" class="ai-teaching-surface-card result-card">
       <pre class="summary-output">{{ result }}</pre>
-    </el-card>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import ProfilePageHero from '@/components/profile/ProfilePageHero.vue';
 import { useLessonSummary } from '@/composables/ai/useLessonSummary';
 
 const { documentId, content, loading, result, handleSummarize } = useLessonSummary();
 </script>
 
 <style scoped lang="scss">
-.summary-page {
-  padding: 24px;
+@use '@/styles/ai-teaching-page-shell.scss';
 
-  h2 {
-    margin: 0 0 16px;
-  }
-
-  .result-card {
-    margin-top: 16px;
-  }
-
-  .summary-output {
-    white-space: pre-wrap;
-    line-height: 1.7;
-    margin: 0;
-  }
+.summary-output {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  margin: 0;
 }
 </style>

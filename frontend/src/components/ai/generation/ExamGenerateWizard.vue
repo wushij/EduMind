@@ -1,52 +1,54 @@
 <template>
-  <ExamGenerateBanner :banner-img="bannerImg" @back="$emit('back')" />
+  <div class="ai-teaching-page-shell">
+    <ExamGenerateBanner @back="$emit('back')" />
 
-  <div class="mode-switch-bar">
-    <el-radio-group v-model="composeMode">
-      <el-radio-button label="quick">快速智能组卷</el-radio-button>
-      <el-radio-button label="full">完整试卷编排</el-radio-button>
-    </el-radio-group>
-  </div>
+    <div class="mode-switch-bar ai-teaching-surface-card mode-switch-surface">
+      <el-radio-group v-model="composeMode">
+        <el-radio-button label="quick">快速智能组卷</el-radio-button>
+        <el-radio-button label="full">完整试卷编排</el-radio-button>
+      </el-radio-group>
+    </div>
 
-  <ExamQuickComposePanel
-    v-if="composeMode === 'quick'"
-    :exam-form="examForm"
-    :display-courses="displayCourses"
-    v-model:quick-count="quickCount"
-    v-model:quick-total-score="quickTotalScore"
-    v-model:difficulty-model="difficultyModel"
-    :composing="composing"
-    :compose-preview="composePreview"
-    @quick-compose="$emit('quick-compose')"
-    @proceed-preview="$emit('proceed-preview')"
-  />
-
-  <template v-else>
-    <ExamFullComposeBasicInfo
+    <ExamQuickComposePanel
+      v-if="composeMode === 'quick'"
       :exam-form="examForm"
       :display-courses="displayCourses"
+      v-model:quick-count="quickCount"
+      v-model:quick-total-score="quickTotalScore"
+      v-model:difficulty-model="difficultyModel"
+      :composing="composing"
+      :compose-preview="composePreview"
+      @quick-compose="$emit('quick-compose')"
+      @proceed-preview="$emit('proceed-preview')"
     />
 
-    <ExamFullComposeCognitiveLevels
-      :cognitive-level-options="cognitiveLevelOptions"
-      :cognitive-levels="cognitiveLevels"
-      :cognitive-level-total="cognitiveLevelTotal"
-    />
+    <template v-else>
+      <ExamFullComposeBasicInfo
+        :exam-form="examForm"
+        :display-courses="displayCourses"
+      />
 
-    <ExamFullComposeQuestionRules
-      :exam-form="examForm"
-      :calculated-total-score="calculatedTotalScore"
-      :is-score-matched="isScoreMatched"
-    />
+      <ExamFullComposeCognitiveLevels
+        :cognitive-level-options="cognitiveLevelOptions"
+        :cognitive-levels="cognitiveLevels"
+        :cognitive-level-total="cognitiveLevelTotal"
+      />
 
-    <ExamGenerateFooter
-      :exam-form="examForm"
-      :calculated-total-score="calculatedTotalScore"
-      :is-score-matched="isScoreMatched"
-      :generating="generating"
-      @generate="$emit('generate')"
-    />
-  </template>
+      <ExamFullComposeQuestionRules
+        :exam-form="examForm"
+        :calculated-total-score="calculatedTotalScore"
+        :is-score-matched="isScoreMatched"
+      />
+
+      <ExamGenerateFooter
+        :exam-form="examForm"
+        :calculated-total-score="calculatedTotalScore"
+        :is-score-matched="isScoreMatched"
+        :generating="generating"
+        @generate="$emit('generate')"
+      />
+    </template>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -65,7 +67,6 @@ const quickTotalScore = defineModel<number>('quickTotalScore', { required: true 
 const difficultyModel = defineModel<'FOUNDATION' | 'NORMAL' | 'ADVANCED'>('difficultyModel', { required: true });
 
 defineProps<{
-  bannerImg: string;
   examForm: ExamFormState;
   displayCourses: any[];
   composing: boolean;
@@ -87,7 +88,10 @@ defineEmits<{
 </script>
 
 <style scoped lang="scss">
-.mode-switch-bar {
-  margin-bottom: 16px;
+@use '@/styles/ai-teaching-page-shell.scss';
+
+.mode-switch-surface {
+  padding: 16px 24px;
+  margin-bottom: 0;
 }
 </style>

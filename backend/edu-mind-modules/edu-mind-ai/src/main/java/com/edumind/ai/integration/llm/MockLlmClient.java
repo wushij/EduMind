@@ -29,6 +29,12 @@ public class MockLlmClient implements LlmClient {
         if (systemPrompt != null && systemPrompt.contains("总结助手")) {
             return "基于工具观察结果，已生成教学推进建议。";
         }
+        if (systemPrompt != null && (systemPrompt.contains("教学目标") || systemPrompt.contains("\"objectives\""))) {
+            return mockCourseObjectivesJson(userPrompt);
+        }
+        if (systemPrompt != null && systemPrompt.contains("课程简介与修读要求")) {
+            return mockCourseDescription(userPrompt);
+        }
         return "[" + modelKey + "] 这是 Mock LLM 的回复。您的问题是：" + userPrompt;
     }
 
@@ -56,6 +62,37 @@ public class MockLlmClient implements LlmClient {
             return course + " " + question;
         }
         return question;
+    }
+
+    private String mockCourseObjectivesJson(String userPrompt) {
+        String courseName = extractLineValue(userPrompt, "课程名称：");
+        if (!org.springframework.util.StringUtils.hasText(courseName)) {
+            courseName = "本课程";
+        }
+        List<Map<String, Object>> objectives = new ArrayList<>();
+        objectives.add(Map.of(
+                "title", "理解" + courseName + "核心概念",
+                "description", "能够准确表述课程关键知识点及其相互关系。"));
+        objectives.add(Map.of(
+                "title", "完成章节实践任务",
+                "description", "能够依据教学大纲完成实验、作业与阶段性测验。"));
+        objectives.add(Map.of(
+                "title", "应用知识解决实际问题",
+                "description", "能够将所学方法用于案例分析或小规模项目实践。"));
+        objectives.add(Map.of(
+                "title", "提升自主学习能力",
+                "description", "能够利用课程资源与 AI 助教进行预习、复习与拓展。"));
+        return JSON.toJSONString(Map.of("objectives", objectives));
+    }
+
+    private String mockCourseDescription(String userPrompt) {
+        String courseName = extractLineValue(userPrompt, "课程名称：");
+        if (!org.springframework.util.StringUtils.hasText(courseName)) {
+            courseName = "本课程";
+        }
+        return "《" + courseName + "》面向相关专业学习者，强调理论与实践结合。"
+                + "课程将围绕教学大纲系统讲解核心知识，并通过实验与作业巩固理解。"
+                + "建议具备相应学科基础，按周完成预习与复盘；可结合知识库与 AI 助教进行拓展学习。";
     }
 
     private String extractLineValue(String text, String label) {

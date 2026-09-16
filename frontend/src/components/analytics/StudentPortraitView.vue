@@ -18,7 +18,7 @@
           </div>
 
           <div class="meta-inline-row">
-            <span class="meta-item">班级：<strong>{{ portrait?.studentInfo.className || '2026级 卓越先锋班' }}</strong></span>
+            <span class="meta-item">班级：<strong>{{ portrait?.studentInfo.className || '未分配行政班' }}</strong></span>
             <span class="divider">/</span>
             <span class="meta-item">用户名：<strong>{{ portrait?.studentInfo.username }}</strong></span>
             <span class="divider">/</span>
@@ -243,19 +243,71 @@
     <!-- AI 综合学情导师评语卡片 -->
     <div class="content-panel ai-feedback-panel">
       <div class="ai-feedback-header">
-        <div class="ai-avatar-circle">
-          <svg viewBox="0 0 24 24" class="ai-svg" fill="currentColor">
-            <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"></path>
-          </svg>
+        <div class="ai-header-left">
+          <div class="ai-avatar-circle">
+            <svg viewBox="0 0 24 24" class="ai-svg" fill="currentColor">
+              <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"></path>
+            </svg>
+          </div>
+          <div class="ai-header-title">
+            <h4>AI 智教学情导师综合评价与导学建议</h4>
+            <p>基于大模型深度融合该生的在线打卡、错题归因与考点雷达多维数据生成</p>
+          </div>
         </div>
-        <div class="ai-header-title">
-          <h4>AI 智教学情导师综合评价与导学建议</h4>
-          <p>基于大模型深度融合该生的在线打卡、错题归因与考点雷达多维数据生成</p>
+
+        <div class="ai-header-actions">
+          <button
+            v-if="adviceLoading"
+            type="button"
+            class="ai-action-capsule-btn ai-action-capsule-btn--warning"
+            @click="emit('stop-advice')"
+          >
+            <svg viewBox="0 0 24 24" class="btn-svg is-spin" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+            </svg>
+            <span>停止推演</span>
+          </button>
+
+          <template v-else>
+            <button
+              type="button"
+              class="ai-action-capsule-btn ai-action-capsule-btn--primary"
+              @click="emit('generate-advice')"
+            >
+              <svg viewBox="0 0 24 24" class="btn-svg" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"></path>
+              </svg>
+              <span>{{ portrait?.aiDiagnosis ? '重新推演' : '生成精准诊断建议' }}</span>
+            </button>
+
+            <button
+              type="button"
+              class="ai-action-capsule-btn ai-action-capsule-btn--outline"
+              @click="emit('open-diagnosis-drawer')"
+            >
+              <svg viewBox="0 0 24 24" class="btn-svg" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+              <span>深度干预处方</span>
+            </button>
+
+            <button
+              v-if="portrait?.aiDiagnosis"
+              type="button"
+              class="ai-action-capsule-btn ai-action-capsule-btn--danger"
+              title="删除当前建议"
+              @click="handleClearAdvice"
+            >
+              <span>删除建议</span>
+            </button>
+          </template>
         </div>
       </div>
 
       <div class="ai-feedback-content">
-        <p>{{ portrait?.aiDiagnosis || '正在生成该学生的综合学情分析评语...' }}</p>
+        <p>{{ portrait?.aiDiagnosis || '暂无该学员的 AI 诊断建议，点击上方「生成精准诊断建议」获取基于 DeepSeek 大模型的深度推演分析。' }}</p>
       </div>
     </div>
   </div>
@@ -263,6 +315,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { ElMessageBox } from 'element-plus';
 import KnowledgeRadar from '@/components/analytics/KnowledgeRadar.vue';
 import type { StudentPortraitVO, StudentLearningItemVO } from '@/types/analytics/learning';
 import type { KnowledgeMasteryVO } from '@/types/analytics/mastery';
@@ -270,12 +323,27 @@ import type { KnowledgeMasteryVO } from '@/types/analytics/mastery';
 const props = defineProps<{
   portrait: StudentPortraitVO | null;
   studentOptions: StudentLearningItemVO[];
+  adviceLoading?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: 'switch-student', studentId: number): void;
   (e: 'back-overall'): void;
+  (e: 'generate-advice'): void;
+  (e: 'clear-advice'): void;
+  (e: 'open-diagnosis-drawer'): void;
+  (e: 'stop-advice'): void;
 }>();
+
+function handleClearAdvice() {
+  ElMessageBox.confirm('确定清空该学员当前生成的 AI 诊断建议吗？', '清空建议确认', {
+    confirmButtonText: '确定清空',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(() => {
+    emit('clear-advice');
+  }).catch(() => {});
+}
 
 function handleStudentSelect(val: any) {
   if (val != null) {
@@ -872,8 +940,94 @@ function formatErrorTypes(types?: string) {
   .ai-feedback-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 14px;
     margin-bottom: 14px;
+    flex-wrap: wrap;
+
+    .ai-header-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .ai-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ai-action-capsule-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+
+      .btn-svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      &--primary {
+        background: linear-gradient(135deg, #2563EB 0%, #4F46E5 100%);
+        color: #FFFFFF;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+
+        &:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+        }
+
+        &:disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
+        }
+      }
+
+      &--outline {
+        background: #FFFFFF;
+        color: #4F46E5;
+        border-color: #C7D2FE;
+
+        &:hover {
+          background: #EEF2FF;
+          border-color: #818CF8;
+          transform: translateY(-1px);
+        }
+      }
+
+      &--warning {
+        background: #FFFBEB;
+        color: #D97706;
+        border-color: #FCD34D;
+
+        &:hover {
+          background: #FEF3C7;
+          color: #B45309;
+          border-color: #F59E0B;
+          transform: translateY(-1px);
+        }
+      }
+
+      &--danger {
+        background: #FFF1F0;
+        color: #FF4D4F;
+        border-color: #FFA39E;
+
+        &:hover {
+          background: #FFCCC7;
+          color: #CF1322;
+          border-color: #F5222D;
+          transform: translateY(-1px);
+        }
+      }
+    }
 
     .ai-avatar-circle {
       width: 44px;

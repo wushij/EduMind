@@ -60,7 +60,7 @@
             <span>{{ m.memberRole === 'TEACHER' ? '课程学情' : '学情画像' }}</span>
           </button>
           <el-popconfirm
-            v-if="m.memberRole !== 'TEACHER'"
+            v-if="manageable && m.memberRole !== 'TEACHER'"
             title="确定将该成员移出此课程空间吗？"
             confirm-button-text="确定"
             cancel-button-text="取消"
@@ -90,16 +90,20 @@
 import { User, TrendCharts, Delete } from '@element-plus/icons-vue';
 import type { CourseMemberItem } from '@/types/course/member';
 
-defineProps<{
-  members: CourseMemberItem[];
-  loading: boolean;
-  brokenAvatars: Record<number, boolean>;
-  resolveMemberAvatar: (member: CourseMemberItem) => string | undefined;
-  markAvatarBroken: (userId: number) => void;
-  getRoleLabel: (role: string) => string;
-  getRoleClass: (role: string) => string;
-  getAvatarClass: (role: string) => string;
-}>();
+withDefaults(
+  defineProps<{
+    members: CourseMemberItem[];
+    loading: boolean;
+    brokenAvatars: Record<number, boolean>;
+    resolveMemberAvatar: (member: CourseMemberItem) => string | undefined;
+    markAvatarBroken: (userId: number) => void;
+    getRoleLabel: (role: string) => string;
+    getRoleClass: (role: string) => string;
+    getAvatarClass: (role: string) => string;
+    manageable?: boolean;
+  }>(),
+  { manageable: false }
+);
 
 const emit = defineEmits<{
   'view-portrait': [member: CourseMemberItem];

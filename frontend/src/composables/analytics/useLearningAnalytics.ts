@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { ElMessage } from 'element-plus';
 import { getLearningAnalytics, getAiUsageAnalytics, getStudentPortrait } from '@/api/analytics/learning';
 import { diagnoseWrongQuestion, getKnowledgeMastery, getWrongQuestions } from '@/api/analytics/knowledge';
 import { getTeachingReport } from '@/api/analytics/report';
@@ -33,6 +34,44 @@ export interface WrongQuestionDiagnoseResult {
   variantQuestionIds: number[];
 }
 
+const STORAGE_PREFIX = 'edumind_advice_';
+
+function getStorageKey(courseId: number, studentId?: number | null): string {
+  return studentId
+    ? `${STORAGE_PREFIX}${courseId}_student_${studentId}`
+    : `${STORAGE_PREFIX}${courseId}_overall`;
+}
+
+export function getStoredTeachingAdvice(courseId: number, studentId?: number | null): TeachingAdviceVO | null {
+  try {
+    const raw = localStorage.getItem(getStorageKey(courseId, studentId));
+    if (!raw) return null;
+    return JSON.parse(raw) as TeachingAdviceVO;
+  } catch {
+    return null;
+  }
+}
+
+export function saveStoredTeachingAdvice(
+  courseId: number,
+  studentId: number | null | undefined,
+  advice: TeachingAdviceVO
+): void {
+  try {
+    localStorage.setItem(getStorageKey(courseId, studentId), JSON.stringify(advice));
+  } catch {
+    // 忽略存储超限异常
+  }
+}
+
+export function removeStoredTeachingAdvice(courseId: number, studentId?: number | null): void {
+  try {
+    localStorage.removeItem(getStorageKey(courseId, studentId));
+  } catch {
+    // 忽略异常
+  }
+}
+
 export function useLearningAnalytics() {
   const loading = ref(false);
   const usedMockFallback = ref(false);
@@ -46,6 +85,30 @@ export function useLearningAnalytics() {
 
   const activeTab = ref<'overall' | 'personal'>('overall');
   const selectedStudentId = ref<number | null>(null);
+  const adviceLoading = ref(false);
+  let currentAbortController: AbortController | null = null;
+
+  function stopTeachingAdvice() {
+    if (currentAbortController) {
+      currentAbortController.abort();
+      currentAbortController = null;
+    }
+    adviceLoading.value = false;
+  }
+
+  function clearTeachingAdvice(courseId?: number, studentId?: number | null) {
+    stopTeachingAdvice();
+    teachingAdvice.value = null;
+    if (courseId) {
+      removeStoredTeachingAdvice(courseId, studentId);
+    }
+  }
+
+  function loadStoredAdvice(courseId: number, studentId?: number | null): TeachingAdviceVO | null {
+    const stored = getStoredTeachingAdvice(courseId, studentId);
+    teachingAdvice.value = stored;
+    return stored;
+  }
 
   async function fetchLearning(courseId: number, range = '7d') {
     loading.value = true;
@@ -66,6 +129,13 @@ export function useLearningAnalytics() {
     } finally {
       loading.value = false;
     }
+
+    if (activeTab.value === 'overall') {
+      const savedAdvice = getStoredTeachingAdvice(courseId, null);
+      if (savedAdvice) {
+        teachingAdvice.value = savedAdvice;
+      }
+    }
   }
 
   async function fetchStudentPortrait(courseId: number, studentId: number) {
@@ -75,7 +145,8 @@ export function useLearningAnalytics() {
     try {
       const res = await getStudentPortrait({ courseId, studentId });
       portraitData.value = res.data;
-    } catch {
+    } catch (err: unknown) {
+      portraitData.value = null;
       if (USE_MOCK) {
         usedMockFallback.value = true;
         portraitData.value = {
@@ -89,10 +160,26 @@ export function useLearningAnalytics() {
           }
         };
       } else {
-        portraitData.value = null;
+        const msg = err instanceof Error ? err.message : '加载学员学情画像失败';
+        ElMessage.warning(msg);
       }
     } finally {
       loading.value = false;
+    }
+
+    const savedAdvice = getStoredTeachingAdvice(courseId, studentId);
+    if (savedAdvice) {
+      teachingAdvice.value = savedAdvice;
+      if (portraitData.value && !portraitData.value.aiDiagnosis) {
+        portraitData.value.aiDiagnosis = savedAdvice.summary;
+      }
+    } else if (portraitData.value?.aiDiagnosis) {
+      teachingAdvice.value = {
+        summary: portraitData.value.aiDiagnosis,
+        actions: ['依据诊断评语安排针对性考点加固', '安排错题定向回溯与针对性微练']
+      };
+    } else {
+      teachingAdvice.value = null;
     }
   }
 
@@ -181,26 +268,56 @@ export function useLearningAnalytics() {
     }
   }
 
-  async function fetchTeachingAdvice(request: TeachingAdviceRequest) {
-    loading.value = true;
+  async function fetchTeachingAdvice(request: TeachingAdviceRequest): Promise<TeachingAdviceVO | null> {
+    stopTeachingAdvice();
+    currentAbortController = new AbortController();
+    adviceLoading.value = true;
     usedMockFallback.value = false;
     try {
-      const res = await generateTeachingAdvice(request);
-      teachingAdvice.value = res.data;
-    } catch {
+      const res = await generateTeachingAdvice(request, {
+        signal: currentAbortController.signal
+      });
+      if (res?.data) {
+        teachingAdvice.value = res.data;
+        saveStoredTeachingAdvice(request.courseId, request.studentId, res.data);
+      }
+      return res?.data ?? null;
+    } catch (err: any) {
+      if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message === 'canceled') {
+        // 用户手动暂停/停止推演
+        return null;
+      }
       if (USE_MOCK) {
         usedMockFallback.value = true;
-        teachingAdvice.value = MOCK_TEACHING_ADVICE;
+        let mockRes: TeachingAdviceVO;
+        if (request.studentId) {
+          mockRes = {
+            summary: `针对学员 #${request.studentId} 的学情诊断：知识点整体掌握度良好，但部分进阶推演环节存在思维定式，需强化变式应用。`,
+            actions: [
+              '推送关联薄弱考点的 5 题定向自适应靶向微练',
+              '安排参与课后答疑互助或重温考点精讲短视频',
+              '要求完成最近错题的归因重做与反思笔记'
+            ]
+          };
+        } else {
+          mockRes = MOCK_TEACHING_ADVICE;
+        }
+        teachingAdvice.value = mockRes;
+        saveStoredTeachingAdvice(request.courseId, request.studentId, mockRes);
+        return mockRes;
       } else {
         teachingAdvice.value = null;
+        return null;
       }
     } finally {
-      loading.value = false;
+      adviceLoading.value = false;
+      currentAbortController = null;
     }
   }
 
   return {
     loading,
+    adviceLoading,
     usedMockFallback,
     isAggregated,
     learningData,
@@ -219,6 +336,9 @@ export function useLearningAnalytics() {
     fetchOverview,
     diagnoseWrong,
     fetchTeachingReport,
-    fetchTeachingAdvice
+    fetchTeachingAdvice,
+    clearTeachingAdvice,
+    stopTeachingAdvice,
+    loadStoredAdvice
   };
 }

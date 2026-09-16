@@ -39,6 +39,10 @@ public class AssignmentDao {
         return assignmentMapper.updateById(entity);
     }
 
+    public int deleteById(Long id) {
+        return assignmentMapper.deleteById(id);
+    }
+
     public long countAll() {
         return assignmentMapper.selectCount(new LambdaQueryWrapper<>());
     }

@@ -11,6 +11,7 @@ import com.edumind.teaching.vo.assignment.AssignmentVO;
 import com.edumind.teaching.vo.submission.SubmissionVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -50,6 +51,13 @@ public class AssignmentController {
     public ApiResult<Void> publish(@PathVariable("id") Long id) {
         assignmentService.publish(id);
         return ApiResult.success();
+    }
+
+    @SaCheckPermission("assignment:delete")
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable("id") Long id) {
+        assignmentService.delete(id);
     }
 
     @SaCheckPermission("assignment:view")

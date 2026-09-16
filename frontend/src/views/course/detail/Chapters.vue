@@ -26,23 +26,25 @@
           <span>{{ isAllExpanded ? '全部折叠' : '全部展开' }}</span>
         </button>
 
-        <button
-          type="button"
-          class="capsule-tool-btn capsule-tool-btn--primary"
-          @click="openAddChapterDrawer"
-        >
-          <el-icon><Plus /></el-icon>
-          <span>新增章节</span>
-        </button>
+        <template v-if="courseEditable">
+          <button
+            type="button"
+            class="capsule-tool-btn capsule-tool-btn--primary"
+            @click="openAddChapterDrawer"
+          >
+            <el-icon><Plus /></el-icon>
+            <span>新增章节</span>
+          </button>
 
-        <button
-          type="button"
-          class="capsule-tool-btn capsule-tool-btn--ai"
-          @click="handleChapterAiQuiz"
-        >
-          <el-icon><MagicStick /></el-icon>
-          <span>针对本大纲 AI 出题</span>
-        </button>
+          <button
+            type="button"
+            class="capsule-tool-btn capsule-tool-btn--ai"
+            @click="handleChapterAiQuiz"
+          >
+            <el-icon><MagicStick /></el-icon>
+            <span>针对本大纲 AI 出题</span>
+          </button>
+        </template>
       </div>
     </div>
 
@@ -73,36 +75,38 @@
               {{ chapter.sections?.length || 0 }} 个微课节
             </span>
 
-            <button
-              type="button"
-              class="capsule-ch-action-btn"
-              title="手工录入微课节"
-              @click.stop="openAddSectionModal(chapter)"
-            >
-              <el-icon><Plus /></el-icon>
-              <span>加课节</span>
-            </button>
-
-            <button
-              type="button"
-              class="capsule-ch-action-btn capsule-ch-action-btn--ai"
-              title="AI 智能生成微课大纲"
-              @click.stop="openAiGenerateModal(chapter)"
-            >
-              <span>AI规划</span>
-            </button>
-
-            <el-dropdown trigger="click" @command="(cmd: string) => handleChapterCommand(cmd, chapter)">
-              <button type="button" class="capsule-ch-action-btn ch-more-btn" @click.stop>
-                <el-icon><MoreFilled /></el-icon>
+            <template v-if="courseEditable">
+              <button
+                type="button"
+                class="capsule-ch-action-btn"
+                title="手工录入微课节"
+                @click.stop="openAddSectionModal(chapter)"
+              >
+                <el-icon><Plus /></el-icon>
+                <span>加课节</span>
               </button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="edit">编辑章节信息</el-dropdown-item>
-                  <el-dropdown-item command="delete" divided style="color: #EF4444;">删除本大纲章节</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+
+              <button
+                type="button"
+                class="capsule-ch-action-btn capsule-ch-action-btn--ai"
+                title="AI 智能生成微课大纲"
+                @click.stop="openAiGenerateModal(chapter)"
+              >
+                <span>AI规划</span>
+              </button>
+
+              <el-dropdown trigger="click" @command="(cmd: string) => handleChapterCommand(cmd, chapter)">
+                <button type="button" class="capsule-ch-action-btn ch-more-btn" @click.stop>
+                  <el-icon><MoreFilled /></el-icon>
+                </button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="edit">编辑章节信息</el-dropdown-item>
+                    <el-dropdown-item command="delete" divided style="color: #EF4444;">删除本大纲章节</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </template>
 
             <div class="expand-arrow-circle">
               <svg
@@ -172,6 +176,7 @@
                   <span>{{ sec.completed ? '重新复习' : '开始学习' }}</span>
                 </button>
                 <button
+                  v-if="courseEditable"
                   type="button"
                   class="capsule-sec-btn capsule-sec-btn--del"
                   title="删除微课节"
@@ -183,7 +188,7 @@
             </div>
 
             <!-- 底部微课节快捷追加栏 -->
-            <div class="sections-bottom-bar">
+            <div v-if="courseEditable" class="sections-bottom-bar">
               <button
                 type="button"
                 class="capsule-mini-add-btn"
@@ -212,7 +217,7 @@
               <h4>本章暂无微课节与课时安排</h4>
               <p>您可以手动录入课时微课节，或直接调用 AI 助教一键生成体系化微课时。</p>
             </div>
-            <div class="empty-action-group">
+            <div v-if="courseEditable" class="empty-action-group">
               <button
                 type="button"
                 class="capsule-empty-btn capsule-empty-btn--primary"
@@ -296,13 +301,24 @@ import {
   Delete,
   Opportunity
 } from '@element-plus/icons-vue';
+import type { Course } from '@/types/course/course';
 import { useCourse } from '@/composables/course/useCourse';
+import { useCourseEditable } from '@/composables/course/useCourseEditable';
 import ChapterSectionDialog from '@/components/course/ChapterSectionDialog.vue';
 import ChapterAiGenerateModal from '@/components/course/ChapterAiGenerateModal.vue';
 
+const props = defineProps<{
+  course?: Course | null;
+}>();
+
 const route = useRoute();
 const router = useRouter();
-const courseId = computed(() => route.params.id || '101');
+const courseEditable = useCourseEditable(() => props.course);
+const courseId = computed(() => {
+  if (route.params.id) return String(route.params.id);
+  if (props.course?.id) return String(props.course.id);
+  return '';
+});
 
 const {
   chapters,

@@ -1,0 +1,17 @@
+.ai-teaching-page-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  min-width: 0;
+  padding-bottom: 8px;
+  box-sizing: border-box;
+}
+
+.ai-teaching-surface-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  padding: 28px 32px;
+  box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
+}

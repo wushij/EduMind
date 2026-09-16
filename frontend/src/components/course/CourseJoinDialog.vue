@@ -154,14 +154,17 @@
       <!-- 模式二：全校公开课程速选 -->
       <div v-else class="tab-pane-browse">
         <div class="browse-header-row">
-          <span class="browse-title">全校精选示范公开课</span>
+          <span class="browse-title">全校开放选修课程</span>
           <span class="browse-badge">无需邀请码一键加入</span>
         </div>
 
-        <div class="public-course-list">
+        <div v-if="publicCoursesList.length === 0" class="public-empty">
+          <p>暂无可加入的开放课程，请使用课程代号选课，或联系任课教师开通。</p>
+        </div>
+        <div v-else class="public-course-list">
           <div
             v-for="item in publicCoursesList"
-            :key="item.code"
+            :key="item.id ?? item.code"
             class="public-course-card"
           >
             <div class="course-avatar-box">
@@ -177,7 +180,7 @@
                 <span class="dot-sep">·</span>
                 <span class="semester-text">{{ item.semester || '2026秋季' }}</span>
                 <span class="dot-sep">·</span>
-                <span class="student-text">{{ item.studentCount || 10 }} 人在学</span>
+                <span class="student-text">{{ item.studentCount ?? 0 }} 人在学</span>
               </div>
             </div>
             <button
@@ -541,6 +544,20 @@ const emit = defineEmits<{
         border-radius: 9999px;
         background: #DCFCE7;
         color: #15803D;
+      }
+    }
+
+    .public-empty {
+      padding: 24px 16px;
+      text-align: center;
+      border-radius: 12px;
+      background: #f8fafc;
+      border: 1px dashed #e2e8f0;
+      p {
+        margin: 0;
+        font-size: 13px;
+        color: #64748b;
+        line-height: 1.6;
       }
     }
 

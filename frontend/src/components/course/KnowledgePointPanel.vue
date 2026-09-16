@@ -39,11 +39,13 @@
           <el-icon><Connection /></el-icon>
           <span>查看课程全景拓扑</span>
         </el-button>
-        <el-button class="capsule-btn capsule-btn--ai" @click="openAiSuggestModal">
+        <el-button v-if="editable" class="capsule-btn capsule-btn--ai" @click="openAiSuggestModal">
+          <el-icon><MagicStick /></el-icon>
           <span>AI 提炼考点</span>
         </el-button>
-        <el-button type="primary" :icon="Plus" class="capsule-btn capsule-btn--primary" @click="showCreateDrawer = true">
-          新增知识点
+        <el-button v-if="editable" class="capsule-btn capsule-btn--primary" @click="showCreateDrawer = true">
+          <el-icon><Plus /></el-icon>
+          <span>新增知识点</span>
         </el-button>
       </div>
     </div>
@@ -80,17 +82,43 @@
             </div>
           </div>
 
-          <div class="card-footer">
-            <span class="chapter-hint">所属：{{ getChapterTitle(kp.chapterId) }}</span>
-            <div class="actions">
-              <el-button type="primary" link size="small" @click="openGraphDrawer(kp)">
-                关联图谱
+          <!-- 所属章节独立展示行 -->
+          <div class="card-chapter-row">
+            <el-icon class="chapter-icon"><Reading /></el-icon>
+            <span class="chapter-label">所属章节：</span>
+            <span class="chapter-title" :title="getChapterTitle(kp.chapterId)">
+              {{ getChapterTitle(kp.chapterId) }}
+            </span>
+          </div>
+
+          <!-- 底部专属操作按钮栏：独立新排整洁展示 -->
+          <div class="card-actions-bar">
+            <div class="actions-left">
+              <el-button
+                size="small"
+                class="card-action-btn card-action-btn--graph"
+                @click="openGraphDrawer(kp)"
+              >
+                <el-icon><Connection /></el-icon>
+                <span>关联图谱</span>
               </el-button>
-              <el-button type="primary" link size="small" @click="handleAskAi(kp)">
-                AI解析
+              <el-button
+                size="small"
+                class="card-action-btn card-action-btn--ai"
+                @click="handleAskAi(kp)"
+              >
+                <el-icon><Cpu /></el-icon>
+                <span>AI解析</span>
               </el-button>
-              <el-button type="danger" link size="small" @click="confirmDeleteKp(kp)">
-                删除
+            </div>
+            <div v-if="editable" class="actions-right">
+              <el-button
+                size="small"
+                class="card-action-btn card-action-btn--danger"
+                @click="confirmDeleteKp(kp)"
+              >
+                <el-icon><Delete /></el-icon>
+                <span>删除</span>
               </el-button>
             </div>
           </div>
@@ -274,15 +302,18 @@
 
       <template #footer>
         <div class="drawer-footer-actions">
-          <button type="button" class="capsule-btn-cancel" @click="showCreateDrawer = false">取消</button>
-          <button
-            type="button"
-            class="capsule-btn-confirm"
+          <el-button class="capsule-btn capsule-btn--secondary" @click="showCreateDrawer = false">
+            取消
+          </el-button>
+          <el-button
+            type="primary"
+            class="capsule-btn capsule-btn--primary"
+            :loading="creating"
             :disabled="creating || !newKp.title.trim()"
             @click="handleSaveNewKp"
           >
             <span>{{ creating ? '保存入库中...' : '确认添加知识点' }}</span>
-          </button>
+          </el-button>
         </div>
       </template>
     </el-drawer>
@@ -337,38 +368,41 @@
           </div>
 
           <div class="card-apply-action">
-            <button
-              type="button"
-              class="capsule-mini-btn"
+            <el-button
+              size="small"
+              class="point-apply-btn"
               @click="applyAiSuggestedPoint(p)"
             >
-              带入表单细化
-            </button>
+              <el-icon><EditPen /></el-icon>
+              <span>采纳并编辑</span>
+            </el-button>
           </div>
         </div>
       </div>
 
       <template #footer>
         <div class="ai-modal-footer">
-          <button
-            type="button"
-            class="capsule-btn-cancel"
+          <el-button
+            class="capsule-btn capsule-btn--secondary"
+            :loading="aiExtracting"
             :disabled="aiExtracting"
             @click="generateAiSuggestedPoints"
           >
             <el-icon><Refresh /></el-icon>
             <span>换一批考点</span>
-          </button>
+          </el-button>
           <div class="right-group">
-            <button type="button" class="capsule-btn-cancel" @click="showAiSuggestModal = false">关闭</button>
-            <button
-              type="button"
-              class="capsule-btn-confirm"
+            <el-button class="capsule-btn capsule-btn--secondary" @click="showAiSuggestModal = false">
+              关闭
+            </el-button>
+            <el-button
+              type="primary"
+              class="capsule-btn capsule-btn--ai"
               :disabled="aiExtracting || aiSuggestedPoints.length === 0"
               @click="batchImportAiPoints(aiSuggestedPoints)"
             >
               <span>一键批量导入所有考点 ({{ aiSuggestedPoints.length }})</span>
-            </button>
+            </el-button>
           </div>
         </div>
       </template>
@@ -385,9 +419,20 @@ import {
   Connection,
   MagicStick,
   Loading,
-  Refresh
+  Refresh,
+  Reading,
+  Cpu,
+  Delete,
+  EditPen
 } from '@element-plus/icons-vue';
 import { useKnowledgePoint } from '@/composables/course/useKnowledgePoint';
+
+const props = withDefaults(
+  defineProps<{
+    editable?: boolean;
+  }>(),
+  { editable: false }
+);
 
 const {
   loading,
@@ -468,6 +513,57 @@ const {
       align-items: center;
       gap: 12px;
       flex-shrink: 0;
+
+      .capsule-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 38px;
+        padding: 0 18px;
+        border-radius: 9999px;
+        font-size: 13.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+
+        &--secondary {
+          background: #ffffff !important;
+          color: #334155 !important;
+          border: 1.5px solid #cbd5e1 !important;
+
+          &:hover {
+            background: #f8fafc !important;
+            color: #2563eb !important;
+            border-color: #93c5fd !important;
+            transform: translateY(-1px);
+          }
+        }
+
+        &--ai {
+          background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%) !important;
+          color: #ffffff !important;
+          border: none !important;
+          box-shadow: 0 4px 14px rgba(124, 58, 237, 0.25);
+
+          &:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(124, 58, 237, 0.35);
+          }
+        }
+
+        &--primary {
+          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+          color: #ffffff !important;
+          border: none !important;
+          box-shadow: 0 4px 14px rgba(37, 99, 235, 0.22);
+
+          &:hover {
+            background: #1d4ed8 !important;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.32);
+          }
+        }
+      }
     }
   }
 
@@ -561,16 +657,106 @@ const {
           }
         }
 
-        .card-footer {
+        .card-chapter-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding-top: 12px;
+          margin-top: auto;
+          border-top: 1px solid #f1f5f9;
+          min-width: 0;
+
+          .chapter-icon {
+            font-size: 14px;
+            color: #64748b;
+            flex-shrink: 0;
+          }
+
+          .chapter-label {
+            font-size: 12px;
+            color: #94a3b8;
+            flex-shrink: 0;
+          }
+
+          .chapter-title {
+            font-size: 12px;
+            color: #475569;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+          }
+        }
+
+        .card-actions-bar {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding-top: 12px;
-          border-top: 1px solid #f1f5f9;
+          gap: 8px;
+          margin-top: 10px;
+          padding-top: 10px;
+          border-top: 1px dashed #f1f5f9;
 
-          .chapter-hint {
+          .actions-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+
+          .actions-right {
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+          }
+
+          .card-action-btn {
+            height: 28px;
+            padding: 0 10px;
+            border-radius: 6px;
             font-size: 12px;
-            color: #94a3b8;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+
+            &--graph {
+              background: #eff6ff;
+              border-color: #bfdbfe;
+              color: #1d4ed8;
+
+              &:hover {
+                background: #dbeafe;
+                border-color: #93c5fd;
+                color: #1e40af;
+              }
+            }
+
+            &--ai {
+              background: #faf5ff;
+              border-color: #e9d5ff;
+              color: #7c3aed;
+
+              &:hover {
+                background: #f3e8ff;
+                border-color: #d8b4fe;
+                color: #6d28d9;
+              }
+            }
+
+            &--danger {
+              background: #fff1f2;
+              border-color: #fecdd3;
+              color: #e11d48;
+
+              &:hover {
+                background: #ffe4e6;
+                border-color: #fda4af;
+                color: #be123c;
+              }
+            }
           }
         }
       }
@@ -966,33 +1152,37 @@ const {
     justify-content: flex-end;
     gap: 10px;
 
-    .capsule-btn-cancel {
-      height: 36px;
-      padding: 0 18px;
-      border-radius: 9999px;
-      background: #F1F5F9;
-      border: 1px solid #CBD5E1;
-      color: #475569;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-    }
-
-    .capsule-btn-confirm {
-      height: 36px;
+    .capsule-btn {
+      height: 38px;
       padding: 0 20px;
       border-radius: 9999px;
-      background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
-      border: none;
-      color: #FFFFFF;
-      font-size: 13px;
+      font-size: 13.5px;
       font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+      transition: all 0.2s ease;
 
-      &:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
+      &--secondary {
+        background: #ffffff !important;
+        border: 1.5px solid #cbd5e1 !important;
+        color: #475569 !important;
+
+        &:hover {
+          background: #f8fafc !important;
+          color: #2563eb !important;
+          border-color: #93c5fd !important;
+        }
+      }
+
+      &--primary {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+        border: none !important;
+        color: #ffffff !important;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+
+        &:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+        }
       }
     }
   }
@@ -1110,21 +1300,21 @@ const {
       justify-content: flex-end;
       margin-top: 4px;
 
-      .capsule-mini-btn {
-        height: 26px;
+      .point-apply-btn {
+        height: 28px;
         padding: 0 12px;
         border-radius: 9999px;
-        background: #EFF6FF;
-        border: 1px solid #BFDBFE;
-        color: #2563EB;
-        font-size: 11.5px;
+        background: #eff6ff !important;
+        border: 1px solid #bfdbfe !important;
+        color: #2563eb !important;
+        font-size: 12px;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
 
         &:hover {
-          background: #2563EB;
-          color: #FFFFFF;
+          background: #2563eb !important;
+          color: #ffffff !important;
         }
       }
     }
@@ -1141,6 +1331,40 @@ const {
     display: flex;
     align-items: center;
     gap: 10px;
+  }
+
+  .capsule-btn {
+    height: 38px;
+    padding: 0 18px;
+    border-radius: 9999px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &--secondary {
+      background: #ffffff !important;
+      border: 1.5px solid #cbd5e1 !important;
+      color: #475569 !important;
+
+      &:hover {
+        background: #f8fafc !important;
+        color: #2563eb !important;
+        border-color: #93c5fd !important;
+      }
+    }
+
+    &--ai {
+      background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%) !important;
+      border: none !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 14px rgba(124, 58, 237, 0.25);
+
+      &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(124, 58, 237, 0.35);
+      }
+    }
   }
 }
 </style>

@@ -2,7 +2,6 @@ package com.edumind.statistics.service.analytics.impl;
 
 import com.edumind.ai.api.AiAuditQueryApi;
 import com.edumind.course.api.CourseQueryApi;
-import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.course.vo.knowledge.KnowledgePointVO;
 import com.edumind.knowledge.api.KnowledgeQueryApi;
 import com.edumind.knowledge.vo.knowledge.KnowledgeBaseVO;
@@ -23,7 +22,10 @@ import com.edumind.statistics.vo.analytics.LearningAnalyticsVO;
 import com.edumind.statistics.vo.analytics.StudentLearningItemVO;
 import com.edumind.statistics.vo.analytics.StudentPortraitVO;
 import com.edumind.statistics.vo.learning.LearningPathVO;
+import com.edumind.common.exception.BusinessException;
+import com.edumind.system.api.OrganizationQueryApi;
 import com.edumind.system.api.UserQueryApi;
+import com.edumind.system.vo.tenant.MemberOrgBriefVO;
 import com.edumind.system.vo.user.UserBriefVO;
 import com.edumind.teaching.api.SubmissionQueryApi;
 import com.edumind.teaching.vo.submission.SubmissionStatsVO;
@@ -52,6 +54,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
     private final KnowledgeQueryApi knowledgeQueryApi;
     private final CourseQueryApi courseQueryApi;
     private final UserQueryApi userQueryApi;
+    private final OrganizationQueryApi organizationQueryApi;
     private final QuestionQueryApi questionQueryApi;
     private final KnowledgeMasteryService knowledgeMasteryService;
     private final AdaptivePathService adaptivePathService;
@@ -73,21 +76,23 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
                 .collect(Collectors.toMap(com.edumind.statistics.entity.CourseStatisticsEntity::getStatDate, e -> e, (a, b) -> a));
 
         List<LearningRecordEntity> records = courseId != null ? learningRecordDao.listByCourseSince(courseId, since) : Collections.emptyList();
-        Set<Long> students = records.stream().map(LearningRecordEntity::getStudentId).collect(Collectors.toCollection(HashSet::new));
-        vo.setStudentCount(students.size());
+        List<Long> enrolledStudentIds = courseId != null
+                ? courseQueryApi.listStudentUserIdsByCourseId(courseId)
+                : Collections.emptyList();
+        vo.setStudentCount(enrolledStudentIds.size());
 
         SubmissionStatsVO submissionStats = courseId != null ? submissionQueryApi.getCourseSubmissionStats(courseId) : new SubmissionStatsVO();
         vo.setCompletionRate(submissionStats.getAvgSubmissionRate() != null
                 ? submissionStats.getAvgSubmissionRate() / 100.0 : 0);
-        vo.setAvgScore(submissionStats.getAvgScore() != null ? submissionStats.getAvgScore() : 82.5);
+        vo.setAvgScore(submissionStats.getAvgScore() != null ? submissionStats.getAvgScore() : 0);
 
         int totalMinutes = records.stream()
                 .mapToInt(r -> r.getDurationMinutes() != null ? r.getDurationMinutes() : 0).sum();
-        vo.setAvgStudyMinutes(students.isEmpty() ? 75 : totalMinutes / Math.max(1, students.size()));
+        vo.setAvgStudyMinutes(enrolledStudentIds.isEmpty() ? 0 : totalMinutes / Math.max(1, enrolledStudentIds.size()));
 
         List<KnowledgeMasteryEntity> masteries = courseId != null ? knowledgeMasteryDao.listByCourse(courseId) : Collections.emptyList();
-        double masteryAvg = masteries.isEmpty() ? 0.78
-                : masteries.stream().mapToDouble(m -> m.getMasteryScore().doubleValue()).average().orElse(0.78);
+        double masteryAvg = masteries.isEmpty() ? 0
+                : masteries.stream().mapToDouble(m -> m.getMasteryScore().doubleValue()).average().orElse(0);
         vo.setKnowledgeMasteryAvg(masteryAvg);
 
         if (courseId != null) {
@@ -136,20 +141,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         }
         List<Long> studentIds = courseQueryApi.listStudentUserIdsByCourseId(courseId);
         if (studentIds.isEmpty()) {
-            // 回退到已有学习记录或掌握度记录的学生
-            Set<Long> fallbackIds = new HashSet<>();
-            for (LearningRecordEntity r : learningRecordDao.listByCourse(courseId)) {
-                fallbackIds.add(r.getStudentId());
-            }
-            for (KnowledgeMasteryEntity m : knowledgeMasteryDao.listByCourse(courseId)) {
-                fallbackIds.add(m.getStudentId());
-            }
-            studentIds = new ArrayList<>(fallbackIds);
-        }
-
-        // 若仍为空，提供种子学员 ID 便于展示
-        if (studentIds.isEmpty()) {
-            studentIds = List.of(3L, 4L);
+            return Collections.emptyList();
         }
 
         Map<Long, SubmissionStatsVO.StudentScoreVO> scoreMap = submissionStats.getStudentScores() != null
@@ -160,36 +152,45 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         List<StudentLearningItemVO> list = new ArrayList<>();
         for (Long sId : studentIds) {
             UserBriefVO user = userQueryApi.getUserById(sId);
+            MemberOrgBriefVO orgBrief = null;
+            try {
+                orgBrief = organizationQueryApi.getPrimaryClassByUserId(null, sId);
+            } catch (Exception ignored) {}
+
             StudentLearningItemVO item = new StudentLearningItemVO();
             item.setStudentId(sId);
             item.setUsername(user != null ? user.getUsername() : "student_" + sId);
             item.setRealName(user != null && user.getRealName() != null ? user.getRealName() : "学员 " + sId);
-            item.setStudentNo("STU-" + String.format("%04d", sId));
+            if (orgBrief != null && orgBrief.getMemberNo() != null && !orgBrief.getMemberNo().isBlank()) {
+                item.setStudentNo(orgBrief.getMemberNo());
+            } else {
+                item.setStudentNo("STU-" + String.format("%04d", sId));
+            }
             item.setAvatar(user != null ? user.getAvatar() : null);
 
-            int studyMins = learningRecordDao.getTotalDuration(courseId, sId);
-            item.setStudyMinutes(studyMins > 0 ? studyMins : (sId % 2 == 0 ? 95 : 120));
+            item.setStudyMinutes(learningRecordDao.getTotalDuration(courseId, sId));
 
             SubmissionStatsVO.StudentScoreVO sScore = scoreMap.get(sId);
-            double avgScore = sScore != null && sScore.getAvgScore() != null ? sScore.getAvgScore()
-                    : (vo.getAvgScore() != null ? vo.getAvgScore() + (sId % 3 == 0 ? -4.5 : 3.2) : 85.0);
+            double avgScore = sScore != null && sScore.getAvgScore() != null ? sScore.getAvgScore() : 0;
             item.setAvgScore(Math.round(avgScore * 10.0) / 10.0);
 
-            double subRate = sScore != null && sScore.getSubmissionCount() != null && submissionStats.getTotalAssignments() != null && submissionStats.getTotalAssignments() > 0
-                    ? Math.min(1.0, (double) sScore.getSubmissionCount() / submissionStats.getTotalAssignments()) * 100
-                    : (vo.getCompletionRate() != null && vo.getCompletionRate() > 0 ? vo.getCompletionRate() * 100 : 90.0);
+            double subRate = 0;
+            if (sScore != null && sScore.getSubmissionCount() != null
+                    && submissionStats.getTotalAssignments() != null && submissionStats.getTotalAssignments() > 0) {
+                subRate = Math.min(1.0, (double) sScore.getSubmissionCount() / submissionStats.getTotalAssignments()) * 100;
+            }
             item.setSubmissionRate(Math.round(subRate * 10.0) / 10.0);
 
             List<KnowledgeMasteryEntity> sMastery = knowledgeMasteryDao.listByCourseAndStudent(courseId, sId);
             double mAvg = sMastery.isEmpty()
-                    ? (vo.getKnowledgeMasteryAvg() != null ? vo.getKnowledgeMasteryAvg() : 0.78)
-                    : sMastery.stream().mapToDouble(m -> m.getMasteryScore().doubleValue()).average().orElse(0.78);
+                    ? 0
+                    : sMastery.stream().mapToDouble(m -> m.getMasteryScore().doubleValue()).average().orElse(0);
             item.setMasteryScore(Math.round(mAvg * 1000.0) / 10.0);
 
             long wrongCount = wrongQuestionRecordDao.countByStudentAndCourse(sId, courseId);
             item.setWrongCount((int) wrongCount);
 
-            item.setAiUsageCount(sId % 2 == 0 ? 14 : 22);
+            item.setAiUsageCount(0);
 
             if (item.getAvgScore() >= 85 && item.getMasteryScore() >= 80) {
                 item.setStatus("EXCELLENT");
@@ -207,7 +208,15 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
 
     @Override
     public StudentPortraitVO getStudentPortrait(Long courseId, Long studentId) {
+        if (courseId == null || studentId == null) {
+            throw new BusinessException("课程或学员参数无效");
+        }
+        if (!courseQueryApi.isCourseMember(courseId, studentId)) {
+            throw new BusinessException("该学员未加入本课程，无法查看学情画像");
+        }
+
         StudentPortraitVO vo = new StudentPortraitVO();
+        List<Long> enrolledIds = courseQueryApi.listStudentUserIdsByCourseId(courseId);
 
         // 1. 学生基本资料与上下文
         StudentPortraitVO.StudentInfoVO info = vo.getStudentInfo();
@@ -216,37 +225,63 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         info.setUsername(user != null ? user.getUsername() : "student_" + studentId);
         info.setRealName(user != null && user.getRealName() != null ? user.getRealName() : "学员 " + studentId);
         info.setAvatar(user != null ? user.getAvatar() : null);
-        info.setStudentNo("STU-" + String.format("%04d", studentId));
-        info.setClassName("2026级 卓越先锋班");
-        info.setRole("在册学员");
-        info.setLastActiveTime(LocalDateTime.now().minusHours(2).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+
+        MemberOrgBriefVO orgBrief = null;
+        try {
+            orgBrief = organizationQueryApi.getPrimaryClassByUserId(null, studentId);
+        } catch (Exception e) {
+            log.warn("Failed to retrieve primary class for student {}: {}", studentId, e.getMessage());
+        }
+
+        if (orgBrief != null && orgBrief.getMemberNo() != null && !orgBrief.getMemberNo().isBlank()) {
+            info.setStudentNo(orgBrief.getMemberNo());
+        } else {
+            info.setStudentNo("STU-" + String.format("%04d", studentId));
+        }
+
+        if (orgBrief != null && orgBrief.getName() != null && !orgBrief.getName().isBlank()) {
+            info.setClassName(orgBrief.getName());
+        } else {
+            info.setClassName("未分配行政班");
+        }
+        info.setRole("选课学员");
+        learningRecordDao.listByCourseAndStudent(courseId, studentId).stream()
+                .map(LearningRecordEntity::getCreateTime)
+                .filter(Objects::nonNull)
+                .max(LocalDateTime::compareTo)
+                .ifPresent(t -> info.setLastActiveTime(t.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))));
 
         // 2. 核心 KPI 汇总
         StudentPortraitVO.PortraitSummaryVO summary = vo.getSummary();
-        int totalStudyMinutes = learningRecordDao.getTotalDuration(courseId, studentId);
-        summary.setTotalStudyMinutes(totalStudyMinutes > 0 ? totalStudyMinutes : 110);
-        summary.setClassAvgStudyMinutes(84.0);
+        summary.setTotalStudyMinutes(learningRecordDao.getTotalDuration(courseId, studentId));
+        summary.setClassAvgStudyMinutes(computeClassAvgStudyMinutes(courseId, enrolledIds));
 
-        SubmissionStatsVO submissionStats = courseQueryApi.isCourseMember(courseId, studentId) || courseId != null
-                ? submissionQueryApi.getCourseSubmissionStats(courseId) : new SubmissionStatsVO();
-        double classAvgScore = submissionStats.getAvgScore() != null ? submissionStats.getAvgScore() : 82.5;
+        SubmissionStatsVO submissionStats = submissionQueryApi.getCourseSubmissionStats(courseId);
+        double classAvgScore = submissionStats.getAvgScore() != null ? submissionStats.getAvgScore() : 0;
         summary.setClassAvgScore(classAvgScore);
 
-        SubmissionStatsVO.StudentScoreVO studentScore = submissionStats.getStudentScores().stream()
+        SubmissionStatsVO.StudentScoreVO studentScore = submissionStats.getStudentScores() != null
+                ? submissionStats.getStudentScores().stream()
                 .filter(s -> Objects.equals(s.getStudentId(), studentId))
-                .findFirst().orElse(null);
+                .findFirst().orElse(null)
+                : null;
         double personalAvgScore = studentScore != null && studentScore.getAvgScore() != null
-                ? studentScore.getAvgScore() : Math.min(98.0, classAvgScore + 5.5);
+                ? studentScore.getAvgScore() : 0;
         summary.setAvgScore(personalAvgScore);
 
-        double subRate = studentScore != null && studentScore.getSubmissionCount() != null && submissionStats.getTotalAssignments() != null && submissionStats.getTotalAssignments() > 0
-                ? ((double) studentScore.getSubmissionCount() / submissionStats.getTotalAssignments()) * 100.0 : 92.0;
+        double subRate = 0;
+        if (studentScore != null && studentScore.getSubmissionCount() != null
+                && submissionStats.getTotalAssignments() != null && submissionStats.getTotalAssignments() > 0) {
+            subRate = ((double) studentScore.getSubmissionCount() / submissionStats.getTotalAssignments()) * 100.0;
+        }
         summary.setSubmissionRate(subRate);
 
         long wrongCount = wrongQuestionRecordDao.countByStudentAndCourse(studentId, courseId);
         summary.setWrongQuestionCount((int) wrongCount);
-        summary.setAiUsageCount(18);
-        summary.setLearningPace(personalAvgScore >= 85 ? "FAST" : (personalAvgScore >= 70 ? "STEADY" : "LAGGING"));
+        summary.setAiUsageCount(0);
+        if (personalAvgScore > 0) {
+            summary.setLearningPace(personalAvgScore >= 85 ? "FAST" : (personalAvgScore >= 70 ? "STEADY" : "LAGGING"));
+        }
 
         // 3. 知识点雷达图与知识体系画像
         KnowledgeMasteryVO masteryVO = knowledgeMasteryService.getMastery(courseId, studentId);
@@ -257,10 +292,10 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
 
         // 计算整体掌握度
         if (!masteryVO.getPersonal().isEmpty()) {
-            double personalAvg = masteryVO.getPersonal().stream().mapToInt(Integer::intValue).average().orElse(78.0);
+            double personalAvg = masteryVO.getPersonal().stream().mapToInt(Integer::intValue).average().orElse(0);
             summary.setOverallMastery(Math.round(personalAvg * 10.0) / 10.0);
         } else {
-            summary.setOverallMastery(78.5);
+            summary.setOverallMastery(0.0);
         }
 
         // 4. 知识点列表与薄弱/已掌握考点
@@ -274,13 +309,15 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
 
         for (KnowledgePointVO pt : points) {
             BigDecimal scoreDec = studentMasteries.get(pt.getId());
-            double score = scoreDec != null ? scoreDec.doubleValue() : 0.72;
+            if (scoreDec == null) {
+                continue;
+            }
+            double score = scoreDec.doubleValue();
             StudentPortraitVO.KnowledgePointMasteryItemVO item = new StudentPortraitVO.KnowledgePointMasteryItemVO();
             item.setKnowledgePointId(pt.getId());
             item.setTitle(pt.getTitle());
             item.setMasteryScore(Math.round(score * 1000.0) / 10.0);
-            item.setSampleCount(4);
-            item.setLastAssessedAt(LocalDate.now().minusDays(1).toString());
+            item.setSampleCount(0);
 
             if (score < 0.70) {
                 item.setStatus("WEAK");
@@ -321,7 +358,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
             wi.setKnowledgePointId(wr.getKnowledgePointId());
             wi.setKnowledgePointTitle(kpTitleMap.getOrDefault(wr.getKnowledgePointId(), "核心考点 #" + wr.getKnowledgePointId()));
             wi.setErrorTypes(wr.getErrorTypes() != null ? wr.getErrorTypes() : "CONCEPT");
-            wi.setDiagnosis(wr.getDiagnosis() != null ? wr.getDiagnosis() : "对边界条件与核心概念理解存在轻微混淆");
+            wi.setDiagnosis(wr.getDiagnosis());
             wi.setWrongCount(wr.getWrongCount() != null ? wr.getWrongCount() : 1);
             wi.setCreateTime(wr.getCreateTime() != null ? wr.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) : LocalDate.now().toString());
 
@@ -339,20 +376,20 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         LearningPathVO adaptivePath = adaptivePathService.buildAdaptivePath(courseId, studentId);
         vo.setAdaptiveWeeks(adaptivePath.getWeeks());
 
-        // 7. AI 认知学情诊断评语生成
-        CourseDetailVO course = courseQueryApi.getCourseById(courseId);
-        String courseTitle = course != null && course.getName() != null ? course.getName() : "当前课程";
-        String weakNames = weakPoints.isEmpty() ? "各核心考点" : weakPoints.stream().map(StudentPortraitVO.WeakPointVO::getTitle).collect(Collectors.joining("、"));
-        String aiFeedback = String.format(
-                "【AI 导师学情综合评价】学员 %s 在《%s》中的总体学习投入度较高，平均分达 %.1f 分（高于班级均值 %.1f 分），知识图谱达成度为 %.1f%%。" +
-                (weakPoints.isEmpty()
-                        ? "各项知识点掌握较为均衡，具备优秀的自主拓展与迁移探究能力，建议开启拔高题型演练。"
-                        : "目前在【%s】考点上掌握相对薄弱（低于70分预警线），存在概念细节辨析不清晰的情况。已自动为您定制自适应周计划，推荐通过 AI 专属助教进行 1 对 1 针对性变式巩固。"),
-                info.getRealName(), courseTitle, summary.getAvgScore(), summary.getClassAvgScore(), summary.getOverallMastery(), weakNames
-        );
-        vo.setAiDiagnosis(aiFeedback);
+        vo.setAiDiagnosis(null);
 
         return vo;
+    }
+
+    private double computeClassAvgStudyMinutes(Long courseId, List<Long> studentIds) {
+        if (courseId == null || studentIds == null || studentIds.isEmpty()) {
+            return 0;
+        }
+        int total = 0;
+        for (Long sid : studentIds) {
+            total += learningRecordDao.getTotalDuration(courseId, sid);
+        }
+        return total / (double) studentIds.size();
     }
 
     private void buildTrends(LearningAnalyticsVO vo,

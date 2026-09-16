@@ -1,7 +1,11 @@
 <template>
-  <div class="lesson-plan-page">
-    <h2>AI 教案生成</h2>
-    <el-card shadow="never">
+  <div class="lesson-plan-page ai-teaching-page-shell">
+    <ProfilePageHero
+      title="AI 教案生成"
+      subtitle="根据课程主题、学时与教学目标，快速生成结构化教案草案。"
+    />
+
+    <div class="ai-teaching-surface-card">
       <el-form :model="form" label-width="100px">
         <el-form-item label="课程 ID">
           <el-input-number v-model="form.courseId" :min="1" />
@@ -20,34 +24,30 @@
           <el-button @click="copyResult" :disabled="!result">复制结果</el-button>
         </el-form-item>
       </el-form>
-    </el-card>
-    <el-card v-if="result" class="result-card" shadow="never">
+    </div>
+
+    <div v-if="result" class="ai-teaching-surface-card result-card">
       <div class="markdown-body" v-html="renderedHtml"></div>
-    </el-card>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import ProfilePageHero from '@/components/profile/ProfilePageHero.vue';
 import { useLessonPlan } from '@/composables/ai/useLessonPlan';
 
 const { form, loading, result, renderedHtml, handleGenerate, copyResult } = useLessonPlan();
 </script>
 
 <style scoped lang="scss">
-.lesson-plan-page {
-  padding: 24px;
+@use '@/styles/ai-teaching-page-shell.scss';
 
-  h2 {
-    margin: 0 0 16px;
-  }
+.result-card {
+  margin-top: 0;
+}
 
-  .result-card {
-    margin-top: 16px;
-  }
-
-  .markdown-body {
-    line-height: 1.7;
-    color: #334155;
-  }
+.markdown-body {
+  line-height: 1.7;
+  color: #334155;
 }
 </style>

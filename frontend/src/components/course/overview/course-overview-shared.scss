@@ -1,0 +1,140 @@
+.content-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 24px 28px;
+  border: 1px solid #ebf1f7;
+  box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
+  margin-bottom: 20px;
+}
+
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+
+  .card-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .card-icon {
+    font-size: 20px;
+    &--blue { color: #1677ff; }
+    &--emerald { color: #10b981; }
+    &--amber { color: #f59e0b; }
+    &--purple { color: #722ed1; }
+  }
+
+  .card-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+}
+
+.course-full-desc {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: #334155;
+  margin: 0 0 16px;
+}
+
+.key-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  .pill-badge--tag {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 12.5px;
+    font-weight: 500;
+
+    &.is-highlight {
+      background: #eaf3ff;
+      color: #1677ff;
+      font-weight: 600;
+      border: 1px solid #bae0ff;
+    }
+
+    &.is-ai {
+      background: #f5eefd;
+      color: #722ed1;
+      font-weight: 600;
+      border: 1px solid #e8d0ff;
+    }
+
+    &.is-kb {
+      background: #e6fffb;
+      color: #13c2c2;
+      font-weight: 600;
+      border: 1px solid #b5f5ec;
+    }
+  }
+}
+
+.empty-block {
+  text-align: center;
+  padding: 20px 12px;
+  margin-bottom: 16px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px dashed #e2e8f0;
+
+  .empty-icon {
+    font-size: 28px;
+    color: #94a3b8;
+    margin-bottom: 8px;
+  }
+
+  .empty-text {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: #64748b;
+  }
+}
+
+.capsule-mini-btn {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 9999px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    background: #2563eb;
+    color: #fff;
+  }
+}
+
+.table-action-pill {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &--primary {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #2563eb;
+    &:hover {
+      background: #2563eb;
+      color: #fff;
+    }
+  }
+}

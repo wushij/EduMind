@@ -94,77 +94,6 @@ export function useKnowledgePoint() {
     }
   }
 
-  function deriveFallbackKnowledgePoints(chapTitle: string, chapterId: number) {
-    const isJava = /java/i.test(chapTitle);
-    if (isJava) {
-      return [
-        {
-          title: `${chapTitle} - JVM运行架构与类加载生命周期`,
-          chapterId,
-          code: `KP-${Math.floor(1000 + Math.random() * 9000)}`,
-          cognitiveDimension: 'UNDERSTAND',
-          importance: 5,
-          description: '系统掌握JVM内存模型划定、类加载双亲委派机制及GC垃圾收集原理。',
-          prerequisites: ['计算机体系结构', '操作系统基础'],
-          examFocus: '双亲委派破坏场景、堆内存溢出排查'
-        },
-        {
-          title: `${chapTitle} - 核心面向对象与接口抽象契约`,
-          chapterId,
-          code: `KP-${Math.floor(1000 + Math.random() * 9000)}`,
-          cognitiveDimension: 'APPLY',
-          importance: 4,
-          description: '运用抽象类、接口与多态机制，遵循SOLID原则设计松耦合高质量代码。',
-          prerequisites: ['Java基础语法', '面向对象基本概念'],
-          examFocus: '重载与重写底层区别、深浅拷贝边界'
-        },
-        {
-          title: `${chapTitle} - 高性能并发与线程安全模型`,
-          chapterId,
-          code: `KP-${Math.floor(1000 + Math.random() * 9000)}`,
-          cognitiveDimension: 'ANALYZE',
-          importance: 5,
-          description: '基于JMM内存模型、CAS与AQS机制，深入剖析高并发多线程同步保障。',
-          prerequisites: ['进程与线程调度', '临界区同步'],
-          examFocus: 'volatile可见性原理、线程池参数调优'
-        }
-      ];
-    }
-
-    return [
-      {
-        title: `${chapTitle} - 核心基本概念与理论体系`,
-        chapterId,
-        code: `KP-${Math.floor(1000 + Math.random() * 9000)}`,
-        cognitiveDimension: 'REMEMBER',
-        importance: 4,
-        description: `掌握${chapTitle}中的核心术语界定、定理系统与基础理论基石。`,
-        prerequisites: ['前置基础学科知识'],
-        examFocus: '基本概念客观选择题、综合辨析'
-      },
-      {
-        title: `${chapTitle} - 关键方法论与实战工程范式`,
-        chapterId,
-        code: `KP-${Math.floor(1000 + Math.random() * 9000)}`,
-        cognitiveDimension: 'APPLY',
-        importance: 5,
-        description: `结合${chapTitle}具体场景，熟练应用核心算法与设计范式解决工程问题。`,
-        prerequisites: ['核心基本概念'],
-        examFocus: '综合实战编程或工程设计题'
-      },
-      {
-        title: `${chapTitle} - 边界约束防御与系统综合诊断`,
-        chapterId,
-        code: `KP-${Math.floor(1000 + Math.random() * 9000)}`,
-        cognitiveDimension: 'ANALYZE',
-        importance: 5,
-        description: `深度剖析${chapTitle}中的极值边界、异常退化与鲁棒性优化机制。`,
-        prerequisites: ['关键方法论'],
-        examFocus: '性能瓶颈分析与极端情况防御'
-      }
-    ];
-  }
-
   async function generateAiSuggestedPoints() {
     aiExtracting.value = true;
     aiSuggestedPoints.value = [];
@@ -212,9 +141,9 @@ export function useKnowledgePoint() {
         throw new Error('未解析到结构化知识点数据');
       }
     } catch (err: any) {
-      console.warn('AI 提炼考点异常，转为学科语义派生:', err);
-      aiSuggestedPoints.value = deriveFallbackKnowledgePoints(chapTitle, targetChap?.id || chapters.value[0]?.id || 1);
-      ElMessage.info(`已基于《${chapTitle}》专业学科大纲推导生成核心考点`);
+      console.warn('AI 提炼考点失败:', err);
+      aiSuggestedPoints.value = [];
+      ElMessage.error(err?.message || 'AI 考点提炼失败，请稍后重试');
     } finally {
       aiExtracting.value = false;
     }
@@ -231,7 +160,7 @@ export function useKnowledgePoint() {
     newKp.prerequisites = [...(point.prerequisites || [])];
     showAiSuggestModal.value = false;
     showCreateDrawer.value = true;
-    ElMessage.success('已自动填充 AI 推荐考点配置！');
+    ElMessage.success('已采纳推荐考点，可直接在表单中继续编辑细化！');
   }
 
   async function batchImportAiPoints(points: any[]) {

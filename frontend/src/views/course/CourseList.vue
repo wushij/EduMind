@@ -1,7 +1,7 @@
 <template>
   <div class="course-list-page">
     <CourseListHero
-      :total="total"
+      :total="allCoursesTotal"
       :active-course-count="activeCourseCount"
       :archived-course-count="archivedCourseCount"
       @join-course="handleJoinCourse"
@@ -54,6 +54,7 @@ const {
   courses,
   loading,
   total,
+  allCoursesTotal,
   searchKeyword,
   currentStatusTab,
   selectedSemester,

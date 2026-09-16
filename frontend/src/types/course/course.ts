@@ -1,4 +1,4 @@
-export type CourseStatus = 'ACTIVE' | 'ARCHIVED' | 'DRAFT' | number;
+export type CourseStatus = 'ACTIVE' | 'INACTIVE' | 'ARCHIVED' | 'DRAFT' | number;
 
 export interface Course {
   id: number;
@@ -25,6 +25,8 @@ export interface Course {
   description?: string;
   createdAt?: string;
   knowledgeBaseId?: number;
+  /** 当前用户是否可维护本课程（主讲或本课助教） */
+  editable?: boolean;
 }
 
 export type CourseVO = Course;

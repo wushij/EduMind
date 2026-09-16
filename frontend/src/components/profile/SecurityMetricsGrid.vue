@@ -1,29 +1,4 @@
 <template>
-    <div class="security-hero-dock">
-      <div class="hero-left">
-        <div class="title-with-badge">
-          <div class="hero-icon-box">
-            <el-icon class="hero-icon"><Lock /></el-icon>
-          </div>
-          <div class="hero-text">
-            <div class="title-row">
-              <h1 class="main-title">账号安全与密码中心</h1>
-              <span class="capsule-tag">全方位防御 · 双模重置</span>
-            </div>
-            <p class="sub-desc">
-              守护您的教学资产与个人数据安全。支持原密码快速更新与密保邮箱免密验证重置，时刻护航您的数字化教学。
-            </p>
-          </div>
-        </div>
-      </div>
-      <div class="hero-right">
-        <button type="button" class="hero-aux-btn" @click="emit('forgot-password')">
-          <el-icon><Promotion /></el-icon>
-          <span>外部找回密码通道</span>
-        </button>
-      </div>
-    </div>
-
     <div class="security-metrics-grid">
     <div class="metric-card score-card">
       <div class="metric-header">
@@ -102,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { Lock, Promotion, CircleCheckFilled, WarningFilled } from '@element-plus/icons-vue';
+import { CircleCheckFilled, WarningFilled } from '@element-plus/icons-vue';
 import type { SecurityLevel } from '@/composables/profile/useSecurity';
 import type { UserInfo } from '@/types/auth/auth';
 
@@ -126,98 +101,6 @@ const emit = defineEmits<{
 </script>
 
 <style scoped lang="scss">
-.security-hero-dock {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 24px 28px;
-  margin-bottom: 24px;
-  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.03);
-
-  .hero-left {
-    .title-with-badge {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-
-      .hero-icon-box {
-        width: 48px;
-        height: 48px;
-        border-radius: 14px;
-        background: linear-gradient(135deg, #2563eb, #3b82f6);
-        color: #ffffff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 24px;
-        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
-      }
-
-      .hero-text {
-        .title-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 4px;
-
-          .main-title {
-            font-size: 22px;
-            font-weight: 700;
-            color: #0f172a;
-            letter-spacing: -0.02em;
-            margin: 0;
-          }
-
-          .capsule-tag {
-            padding: 3px 12px;
-            border-radius: 9999px;
-            font-size: 12px;
-            font-weight: 600;
-            background: #eff6ff;
-            color: #2563eb;
-            border: 1px solid #dbeafe;
-          }
-        }
-
-        .sub-desc {
-          margin: 0;
-          font-size: 13px;
-          color: #64748b;
-          line-height: 1.5;
-        }
-      }
-    }
-  }
-
-  .hero-right {
-    .hero-aux-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 18px;
-      border-radius: 9999px;
-      border: 1px solid #cbd5e1;
-      background: #ffffff;
-      color: #334155;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s ease;
-
-      &:hover {
-        border-color: #2563eb;
-        color: #2563eb;
-        background: #f8fafc;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
-      }
-    }
-  }
-}
-
 .security-metrics-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -227,8 +110,8 @@ const emit = defineEmits<{
   .metric-card {
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    padding: 20px;
+    border-radius: 22px;
+    padding: 22px 24px;
     box-shadow: 0 2px 10px rgba(15, 23, 42, 0.02);
     display: flex;
     flex-direction: column;
@@ -413,12 +296,6 @@ const emit = defineEmits<{
 @media (max-width: 992px) {
   .security-metrics-grid {
     grid-template-columns: 1fr;
-  }
-
-  .security-hero-dock {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
   }
 }
 </style>

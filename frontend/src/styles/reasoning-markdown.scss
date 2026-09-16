@@ -1,0 +1,190 @@
+/* 深度思考区 Markdown：侧边栏 GlobalAssistant / 课程 AI 共用（勿挂 chat-md-content） */
+
+.reasoning-card .reasoning-markdown-body {
+  font-size: 12.5px;
+  line-height: 1.68;
+  color: #334155;
+  word-break: normal;
+  overflow-wrap: break-word;
+  min-width: 0;
+
+  p {
+    margin: 6px 0;
+
+    &:first-child {
+      margin-top: 0;
+    }
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  strong {
+    color: #0f172a;
+    font-weight: 600;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    margin: 10px 0 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  ul,
+  ol {
+    margin: 6px 0 10px;
+    padding-left: 1.45em;
+  }
+
+  li {
+    margin: 4px 0;
+  }
+
+  blockquote {
+    margin: 8px 0;
+    padding: 6px 10px;
+    border-left: 3px solid rgba(22, 119, 255, 0.35);
+    background: rgba(255, 255, 255, 0.55);
+    color: #64748b;
+    border-radius: 4px;
+  }
+
+  a.chat-link {
+    color: #1677ff;
+  }
+
+  .mermaid-diagram-wrapper {
+    display: none;
+  }
+
+  /* 知识树：与侧边栏 AI 深度思考一致 */
+  .ascii-tree-wrapper.code-block-wrapper {
+    margin: 10px 0;
+    border-radius: 8px;
+    border: 1px solid #dbeafe;
+    background: #f8fafc;
+    overflow: hidden;
+    max-width: 100%;
+
+    .code-header {
+      background: #eff6ff;
+      padding: 6px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .code-lang {
+      font-size: 11px;
+      font-weight: 700;
+      color: #1d4ed8;
+      letter-spacing: 0.02em;
+      text-transform: none;
+    }
+
+    .code-copy-btn {
+      flex-shrink: 0;
+      background: #1677ff;
+      color: #ffffff;
+      border: none;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 10.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s ease;
+
+      &:hover {
+        background: #0958d9;
+      }
+
+      &.is-copied {
+        background: #52c41a;
+      }
+    }
+
+    .ascii-tree-pre,
+    .ascii-tree-pre code {
+      display: block;
+      margin: 0;
+      padding: 14px 16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.55;
+      color: #0f172a;
+      background: transparent;
+      white-space: pre;
+      word-break: normal;
+      overflow-wrap: normal;
+      overflow-x: auto;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+      pointer-events: none;
+    }
+  }
+
+  /* 思考区其它代码块：浅底可读，不用正文黑色 IDE 块 */
+  .code-block-wrapper:not(.ascii-tree-wrapper) {
+    margin: 10px 0;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    overflow: hidden;
+
+    .code-header {
+      background: #f1f5f9;
+      padding: 6px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .code-lang {
+        font-size: 11px;
+        font-weight: 600;
+        color: #475569;
+        text-transform: none;
+      }
+
+      .code-copy-btn {
+        background: #e2e8f0;
+        color: #334155;
+        border: none;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 10.5px;
+        cursor: pointer;
+
+        &:hover {
+          background: #cbd5e1;
+        }
+      }
+    }
+
+    pre,
+    pre.hljs {
+      margin: 0;
+      padding: 10px 12px;
+      overflow-x: auto;
+      font-size: 12px;
+      line-height: 1.55;
+      background: #fafbfc;
+    }
+
+    pre.hljs,
+    pre.hljs code {
+      color: #0f172a;
+      background: transparent;
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { get, post, put } from '@/core/http/request';
+import { get, post, put, del } from '@/core/http/request';
 import type { PromptTestRequest, PromptVersionItem } from '@/types/system/prompt';
 
 export const listPromptTemplates = (category?: string) => {
@@ -17,6 +17,8 @@ export const updatePromptTemplate = (id: number, payload: Record<string, unknown
 
 export const publishPromptTemplate = (id: number) =>
   post(`/system/prompts/${id}/publish`);
+
+export const deletePromptTemplate = (id: number) => del<void>(`/system/prompts/${id}`);
 
 export const listPromptVersions = (id: number) =>
   get<PromptVersionItem[]>(`/system/prompts/${id}/versions`);

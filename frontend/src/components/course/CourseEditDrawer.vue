@@ -100,14 +100,31 @@
           </el-radio-group>
         </el-form-item>
 
-        <el-form-item label="课程简介与修读要求" prop="description">
+        <el-form-item prop="description">
+          <template #label>
+            <div class="label-with-ai">
+              <span>课程简介与修读要求</span>
+              <button
+                type="button"
+                class="ai-inline-pill"
+                :disabled="!course?.id || descAiLoading"
+                @click="handleAiDescription"
+              >
+                <el-icon v-if="descAiLoading" class="is-loading"><Loading /></el-icon>
+                <el-icon v-else><MagicStick /></el-icon>
+                AI 帮写
+              </button>
+            </div>
+          </template>
           <el-input
             v-model="formData.description"
+            v-loading="descAiLoading"
             type="textarea"
             :rows="4"
             placeholder="说明课程重点培养目标、前置学科要求与学习建议..."
             maxlength="500"
             show-word-limit
+            element-loading-text="AI 正在根据课程大纲撰写简介…"
           />
         </el-form-item>
       </div>
@@ -171,8 +188,9 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue';
-import { ElMessage, FormInstance, FormRules } from 'element-plus';
-import { EditPen, Reading, Service, Loading, Opportunity, Tools, Sunny } from '@element-plus/icons-vue';
+import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus';
+import { EditPen, Reading, Service, Loading, Opportunity, Tools, Sunny, MagicStick } from '@element-plus/icons-vue';
+import { suggestCourseDescription } from '@/api/ai/course-profile';
 import type { Course } from '@/types/course/course';
 import { useCourse } from '@/composables/course/useCourse';
 
@@ -189,6 +207,7 @@ const emit = defineEmits<{
 const { saveCourse } = useCourse();
 const formRef = ref<FormInstance>();
 const saving = ref(false);
+const descAiLoading = ref(false);
 
 const visible = computed({
   get: () => props.modelValue,
@@ -257,6 +276,46 @@ watch(
   { immediate: true }
 );
 
+async function handleAiDescription() {
+  if (!props.course?.id) return;
+  if (formData.description.trim()) {
+    try {
+      await ElMessageBox.confirm('将用 AI 生成内容替换当前简介，是否继续？', 'AI 帮写', {
+        type: 'info',
+        confirmButtonText: '继续生成',
+        cancelButtonText: '取消'
+      });
+    } catch {
+      return;
+    }
+  }
+  descAiLoading.value = true;
+  try {
+    const res = await suggestCourseDescription(props.course.id);
+    const payload = res?.data;
+    const text = payload?.text?.trim();
+    if (!text) {
+      ElMessage.warning('未生成有效简介，请稍后重试');
+      return;
+    }
+    formData.description = text.slice(0, 500);
+    ElMessage.success(
+      payload?.aiGenerated
+        ? 'AI 模型已生成课程简介，可继续编辑后保存'
+        : '模型暂不可用，已使用课程上下文兜底生成简介'
+    );
+  } catch (err: unknown) {
+    const msg =
+      (err as { message?: string })?.message ||
+      (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+    if (msg) {
+      ElMessage.error(msg);
+    }
+  } finally {
+    descAiLoading.value = false;
+  }
+}
+
 async function handleSaveCourse() {
   if (!props.course?.id) return;
   if (!formRef.value) return;
@@ -304,6 +363,34 @@ async function handleSaveCourse() {
 </script>
 
 <style scoped lang="scss">
+.label-with-ai {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+}
+
+.ai-inline-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  border: 1px solid #d8b4fe;
+  background: #faf5ff;
+  color: #7c3aed;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
 .drawer-custom-header {
   display: flex;
   align-items: center;

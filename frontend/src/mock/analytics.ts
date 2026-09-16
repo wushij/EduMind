@@ -89,7 +89,7 @@ export const MOCK_STUDENT_PORTRAIT: StudentPortraitVO = {
     realName: '李同学',
     avatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
     studentNo: 'STU-0003',
-    className: '2026级 卓越先锋班',
+    className: '高三(1)班 [理科实验班]',
     role: '在册学员',
     lastActiveTime: '2026-09-16 10:45'
   },

@@ -1,7 +1,6 @@
 <template>
   <div class="question-generate-page">
     <QuestionGenerateWizard
-      :banner-img="questionBannerImg"
       :steps="steps"
       :current-step="currentStep"
       :generating="generating"
@@ -26,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, markRaw } from 'vue';
+import { onMounted, markRaw } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   CircleCheck,
@@ -41,7 +40,6 @@ import {
 } from '@/composables/ai/useQuestionGenerate';
 import QuestionGenerateWizard from '@/components/ai/generation/QuestionGenerateWizard.vue';
 import type { QuestionType, Difficulty } from '@/types/question/question';
-import questionBannerImg from '@/assets/images/ai智能出题.png';
 
 const router = useRouter();
 const {
@@ -94,8 +92,6 @@ const difficultyOptions: { val: Difficulty; label: string; desc: string; colorCl
 <style scoped lang="scss">
 .question-generate-page {
   width: 100%;
-  padding: 24px;
-  background: #f8fafc;
   box-sizing: border-box;
 }
 </style>

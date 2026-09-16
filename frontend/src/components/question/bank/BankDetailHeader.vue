@@ -50,6 +50,9 @@
           <el-button class="capsule-btn-sub" @click="onFastComposeExam">
             <el-icon class="mr-1"><DocumentCopy /></el-icon> 基于此题库组卷
           </el-button>
+          <button type="button" class="table-action-pill table-action-pill--danger" @click="onDeleteBank">
+            删除题库
+          </button>
         </div>
       </div>
     </div>
@@ -68,6 +71,7 @@ defineProps<{
   totalScore: number;
   onOpenAddDrawer: () => void;
   onFastComposeExam: () => void;
+  onDeleteBank: () => void;
 }>();
 </script>
 

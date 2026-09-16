@@ -1,5 +1,6 @@
 package com.edumind.resource.service.course.impl;
 
+import com.edumind.course.api.CourseAccessApi;
 import com.edumind.resource.dao.CourseResourceDao;
 import com.edumind.resource.entity.CourseResourceEntity;
 import com.edumind.resource.service.course.CourseResourceService;
@@ -15,9 +16,11 @@ import java.util.stream.Collectors;
 public class CourseResourceServiceImpl implements CourseResourceService {
 
     private final CourseResourceDao courseResourceDao;
+    private final CourseAccessApi courseAccessApi;
 
     @Override
     public List<CourseResourceVO> listByCourseId(Long courseId) {
+        courseAccessApi.assertCanView(courseId);
         return courseResourceDao.findByCourseId(courseId).stream()
                 .map(this::toVO)
                 .collect(Collectors.toList());
@@ -25,6 +28,7 @@ public class CourseResourceServiceImpl implements CourseResourceService {
 
     @Override
     public Long addResource(Long courseId, com.edumind.resource.dto.course.CourseResourceCreateDTO dto) {
+        courseAccessApi.assertCanEdit(courseId);
         CourseResourceEntity entity = new CourseResourceEntity();
         entity.setCourseId(courseId);
         entity.setResourceId(dto.getResourceId());
@@ -47,6 +51,10 @@ public class CourseResourceServiceImpl implements CourseResourceService {
 
     @Override
     public void deleteResource(Long resourceId) {
+        CourseResourceEntity existing = courseResourceDao.findById(resourceId);
+        if (existing != null) {
+            courseAccessApi.assertCanEdit(existing.getCourseId());
+        }
         courseResourceDao.deleteById(resourceId);
     }
 

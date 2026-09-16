@@ -16,3 +16,7 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
+interface Window {
+  __openMermaidViewer?: (btnEl: HTMLElement) => void;
+}
+

@@ -25,5 +25,9 @@
             <groupId>com.edumind</groupId>
             <artifactId>edu-mind-resource</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-notification-api</artifactId>
+        </dependency>
     </dependencies>
 </project>

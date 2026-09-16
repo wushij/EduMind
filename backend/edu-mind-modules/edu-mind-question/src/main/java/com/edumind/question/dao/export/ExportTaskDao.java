@@ -45,4 +45,8 @@ public class ExportTaskDao {
     public int updateById(ExportTaskEntity entity) {
         return exportTaskMapper.updateById(entity);
     }
+
+    public int deleteById(Long id) {
+        return exportTaskMapper.deleteById(id);
+    }
 }

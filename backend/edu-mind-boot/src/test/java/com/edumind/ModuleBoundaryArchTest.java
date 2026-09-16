@@ -81,4 +81,55 @@ class ModuleBoundaryArchTest {
                 violating.isEmpty(),
                 () -> "Business facade APIs must not live in edu-mind-common: " + violating);
     }
+
+    private static final String[] API_CONTRACT_PACKAGES = {
+            "com.edumind.system.api..",
+            "com.edumind.system.vo..",
+            "com.edumind.course.api..",
+            "com.edumind.course.vo..",
+            "com.edumind.question.api..",
+            "com.edumind.question.vo..",
+            "com.edumind.question.dto..",
+            "com.edumind.resource.api..",
+            "com.edumind.resource.vo..",
+            "com.edumind.notification.api..",
+            "com.edumind.statistics.api..",
+            "com.edumind.knowledge.api..",
+            "com.edumind.knowledge.vo..",
+            "com.edumind.teaching.api..",
+            "com.edumind.teaching.vo..",
+            "com.edumind.ai.api..",
+            "com.edumind.ai.vo..",
+            "com.edumind.ai.dto.."
+    };
+
+    @Test
+    void apiContractArtifactsMustNotDependOnSpring() {
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage(API_CONTRACT_PACKAGES)
+                .and().resideOutsideOfPackages("..api.impl..")
+                .should().dependOnClassesThat().resideInAnyPackage("org.springframework..");
+        rule.check(classes);
+    }
+
+    @Test
+    void businessModulesMustNotDeclarePublicApiInterfaces() {
+        var violating = classes.stream()
+                .filter(jc -> jc.isInterface())
+                .filter(jc -> jc.getSimpleName().endsWith("Api"))
+                .filter(jc -> {
+                    String pkg = jc.getPackageName();
+                    if (!pkg.matches("com\\.edumind\\.[a-z]+\\.api(\\..+)?")) {
+                        return false;
+                    }
+                    return !pkg.contains(".api.impl.");
+                })
+                .filter(jc -> jc.getSource()
+                        .map(s -> s.toString().contains("edu-mind-modules"))
+                        .orElse(false))
+                .toList();
+        Assertions.assertTrue(
+                violating.isEmpty(),
+                () -> "Cross-module API interfaces belong in edu-mind-api jars, not business modules: " + violating);
+    }
 }

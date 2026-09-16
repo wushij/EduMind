@@ -559,7 +559,43 @@ function handleCopy() {
     white-space: nowrap;
   }
 
-  :deep(.code-block-wrapper) {
+  :deep(.ascii-tree-wrapper) {
+    background: #f8fafc;
+    border-color: #dbeafe;
+
+    .code-header {
+      background: #eff6ff;
+    }
+
+    .code-lang {
+      color: #1d4ed8;
+    }
+
+    .code-copy-btn {
+      background: #dbeafe;
+      color: #1e40af;
+
+      &:hover {
+        background: #bfdbfe;
+        color: #1e3a8a;
+      }
+    }
+
+    .ascii-tree-pre {
+      margin: 0;
+      padding: 14px 16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.55;
+      color: #0f172a;
+      white-space: pre;
+      word-break: normal;
+      overflow-wrap: normal;
+      overflow-x: auto;
+    }
+  }
+
+  :deep(.code-block-wrapper:not(.ascii-tree-wrapper)) {
     margin: 12px 0;
     border-radius: 8px;
     background: #1e1e1e;
@@ -609,6 +645,12 @@ function handleCopy() {
       font-size: 12px;
       line-height: 1.55;
     }
+
+    pre.hljs,
+    pre.hljs code {
+      background: transparent;
+      color: #abb2bf;
+    }
   }
 
   /* Mermaid 图谱容器排版 */
@@ -617,7 +659,7 @@ function handleCopy() {
     border-radius: 10px;
     border: 1px solid rgba(22, 119, 255, 0.22);
     background: #fdfdfd;
-    overflow: hidden;
+    overflow: visible;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
 
     .mermaid-header {
@@ -627,16 +669,23 @@ function handleCopy() {
       font-weight: 600;
       color: #1677ff;
       border-bottom: 1px solid rgba(22, 119, 255, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
     }
 
     .mermaid-diagram {
       padding: 14px 10px;
-      display: flex;
-      justify-content: center;
+      display: block;
       overflow-x: auto;
+      overflow-y: visible;
+      max-width: 100%;
 
       svg {
-        max-width: 100%;
+        display: block;
+        max-width: none;
+        width: auto;
         height: auto;
       }
 

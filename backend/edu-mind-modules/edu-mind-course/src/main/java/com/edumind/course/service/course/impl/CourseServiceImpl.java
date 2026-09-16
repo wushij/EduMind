@@ -17,6 +17,7 @@ import com.edumind.course.entity.ChapterEntity;
 import com.edumind.course.entity.CourseEntity;
 import com.edumind.course.entity.CourseMemberEntity;
 import com.edumind.course.entity.KnowledgePointEntity;
+import com.edumind.course.service.access.CourseAccessService;
 import com.edumind.course.service.course.CourseService;
 import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.course.vo.course.CourseVO;
@@ -51,6 +52,7 @@ public class CourseServiceImpl implements CourseService {
     private final UserQueryApi userQueryApi;
     private final TenantDataScopeApi tenantDataScopeApi;
     private final OrganizationQueryApi organizationQueryApi;
+    private final CourseAccessService courseAccessService;
 
     @Override
     public PageResult<CourseVO> listCourses(CourseQueryDTO query) {
@@ -129,13 +131,15 @@ public class CourseServiceImpl implements CourseService {
         Long chapterCount = chapterDao.countByCourseId(entity.getId());
         Long kpCount = knowledgePointDao.countByCourseId(entity.getId());
         Long resourceCount = resourceQueryApi != null ? resourceQueryApi.countResourcesByCourseId(entity.getId()) : 0L;
-        return courseConverter.toDetailVO(
+        CourseDetailVO detail = courseConverter.toDetailVO(
                 entity,
                 resolveTeacherName(entity.getTeacherId()),
                 studentCount,
                 chapterCount,
                 kpCount,
                 resourceCount);
+        detail.setEditable(courseAccessService.canEdit(entity));
+        return detail;
     }
 
     @Override
@@ -298,33 +302,11 @@ public class CourseServiceImpl implements CourseService {
     }
 
     private void assertCourseEditable(CourseEntity course) {
-        Long currentUserId = StpUtil.getLoginIdAsLong();
-        List<String> roles = userQueryApi.getRolesByUserId(currentUserId);
-        if (roles.contains(RoleCode.ADMIN.getCode())) {
-            return;
-        }
-        if (roles.contains(RoleCode.TEACHER.getCode()) && currentUserId.equals(course.getTeacherId())) {
-            return;
-        }
-        throw new BusinessException("无权限编辑该课程");
+        courseAccessService.assertCanEdit(course);
     }
 
     private void assertCourseAccessible(CourseEntity course) {
-        Long currentUserId = StpUtil.getLoginIdAsLong();
-        List<String> roles = userQueryApi.getRolesByUserId(currentUserId);
-        if (roles.contains(RoleCode.ADMIN.getCode())) {
-            return;
-        }
-        if (roles.contains(RoleCode.TEACHER.getCode()) && currentUserId.equals(course.getTeacherId())) {
-            return;
-        }
-        if (roles.contains(RoleCode.STUDENT.getCode())) {
-            List<Long> enrolledCourseIds = courseMemberDao.findCourseIdsByUserId(currentUserId);
-            if (enrolledCourseIds.contains(course.getId())) {
-                return;
-            }
-        }
-        throw new BusinessException("无权限访问该课程");
+        courseAccessService.assertCanView(course);
     }
 
     private String resolveTeacherName(Long teacherId) {

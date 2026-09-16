@@ -299,6 +299,8 @@
       :advice="teachingAdvice"
       :loading="adviceLoading"
       @generate="emit('generate-advice')"
+      @clear="emit('clear-advice')"
+      @stop="emit('stop-advice')"
     />
   </div>
 </template>
@@ -320,6 +322,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'view-portrait', studentId: number): void;
   (e: 'generate-advice'): void;
+  (e: 'clear-advice'): void;
+  (e: 'stop-advice'): void;
 }>();
 
 const searchKeyword = ref('');

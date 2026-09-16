@@ -120,6 +120,23 @@ export function isStoppedAssistantMessage(msg: ChatMessage): boolean {
   return msg.role === 'assistant' && !!msg.content?.includes(STOPPED_GENERATION_MARKER);
 }
 
+/** 合并去重时忽略课程助教注入的前缀标签，避免本地/服务端文案细微差异导致重复气泡 */
+export function normalizePromptForDedup(content: string): string {
+  return content
+    .replace(/^\[助教风格:[^\]]+\]\s*/g, '')
+    .replace(/^\[针对课时:[^\]]+\]\s*/g, '')
+    .replace(/^\[当前章节:[^\]]+\]\s*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function userPromptsEquivalent(a: string, b: string): boolean {
+  if (a === b) return true;
+  const na = normalizePromptForDedup(a);
+  const nb = normalizePromptForDedup(b);
+  return na.length > 0 && na === nb;
+}
+
 export function mergeServerWithLocalDrafts(server: ChatMessage[], local: ChatMessage[]): ChatMessage[] {
   if (!local.length) return server;
   if (!server.length) return local;
@@ -127,7 +144,7 @@ export function mergeServerWithLocalDrafts(server: ChatMessage[], local: ChatMes
   const result = [...server];
 
   const hasUserContent = (content: string) =>
-    result.some((m) => m.role === 'user' && m.content === content);
+    result.some((m) => m.role === 'user' && userPromptsEquivalent(m.content, content));
 
   const hasAssistantContent = (content: string) =>
     result.some((m) => m.role === 'assistant' && m.content === content);
@@ -146,7 +163,9 @@ export function mergeServerWithLocalDrafts(server: ChatMessage[], local: ChatMes
       continue;
     }
 
-    const userIdx = result.findIndex((m) => m.role === 'user' && m.content === userContent);
+    const userIdx = result.findIndex(
+      (m) => m.role === 'user' && userPromptsEquivalent(m.content, userContent)
+    );
     const next = result[userIdx + 1];
     if (!next || next.role !== 'assistant') {
       if (!hasAssistantContent(draftAssistant.content)) {

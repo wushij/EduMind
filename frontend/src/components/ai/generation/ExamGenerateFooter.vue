@@ -44,7 +44,7 @@ defineEmits<{
 
   .capsule-generate-btn {
     width: 100%;
-    max-width: 520px;
+    max-width: 720px;
     height: 48px;
     border-radius: 9999px; // 长圆跑道
     background: linear-gradient(135deg, #1677FF 0%, #722ED1 100%);

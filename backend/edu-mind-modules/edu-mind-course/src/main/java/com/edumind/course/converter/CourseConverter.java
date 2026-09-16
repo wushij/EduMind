@@ -200,6 +200,6 @@ public class CourseConverter {
     }
 
     private String mapStatus(Integer status) {
-        return status != null && status == 1 ? "ACTIVE" : "INACTIVE";
+        return status != null && status == 1 ? "ACTIVE" : "ARCHIVED";
     }
 }

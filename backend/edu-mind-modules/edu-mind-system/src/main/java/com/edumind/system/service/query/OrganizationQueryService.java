@@ -14,4 +14,6 @@ public interface OrganizationQueryService {
     List<Long> listMemberIdsByOrgId(Long tenantId, Long organizationId);
 
     List<Long> listUserIdsByOrgId(Long tenantId, Long organizationId);
+
+    MemberOrgBriefVO getPrimaryClassByUserId(Long tenantId, Long userId);
 }

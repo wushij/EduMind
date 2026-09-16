@@ -1,27 +1,26 @@
 <template>
-  <div class="ai-grading-container">
-    <!-- 1. 顶部专属 3D 视觉大 Banner (批改.png，比例 2508×627) -->
-    <div class="grading-banner-stage">
-      <div class="banner-ratio-box">
-        <img
-          class="banner-image"
-          :src="gradingBannerImg"
-          alt="AI 智能批改"
-          draggable="false"
-        />
-        <div class="banner-float-actions">
+  <div class="ai-grading-container ai-teaching-page-shell">
+    <ProfilePageHero
+      title="AI 智能批改"
+      subtitle="统一管理作业批改队列，支持并发预评、严格度策略与结果复核。"
+    >
+      <template #actions>
+        <div class="hero-action-row">
+          <button type="button" class="hero-pill-btn is-outline" @click="router.push('/ai/marketplace')">
+            返回 AI 广场
+          </button>
           <el-button
             type="primary"
-            class="capsule-btn-primary"
+            class="grading-run-btn"
             :icon="Lightning"
             :loading="batchRunning || gradingLoading"
             @click="handleRunAllPending"
           >
-            立即启动全队列并发批改
+            启动全队列并发批改
           </el-button>
         </div>
-      </div>
-    </div>
+      </template>
+    </ProfilePageHero>
 
     <!-- 顶栏指标卡 -->
     <div class="metrics-row">
@@ -183,7 +182,7 @@ import {
   ArrowRight
 } from '@element-plus/icons-vue';
 import { useGrading, type GradingTaskRow } from '@/composables/ai/useGrading';
-import gradingBannerImg from '@/assets/images/批改.png';
+import ProfilePageHero from '@/components/profile/ProfilePageHero.vue';
 
 const router = useRouter();
 const { startGrading, batchGrade, loadGradingTasks, loading: gradingLoading } = useGrading();
@@ -286,55 +285,14 @@ function viewGradingResults(row: GradingTaskRow) {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/ai-teaching-page-shell.scss';
+
 .ai-grading-container {
-  padding: 24px;
-  background: #f8fafc;
-  // 顶部专属 3D 视觉大 Banner (比例 2508×627)
-  .grading-banner-stage {
-    width: 100%;
-    margin-bottom: 22px;
-
-    .banner-ratio-box {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 2508 / 627;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 6px 24px rgba(22, 119, 255, 0.08);
-      border: 1px solid #E2E8F0;
-
-      .banner-image {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
-        user-select: none;
-      }
-
-      .banner-float-actions {
-        position: absolute;
-        top: 20px;
-        right: 24px;
-        z-index: 2;
-
-        .capsule-btn-primary {
-          background: #1677FF;
-          border-color: #1677FF;
-          border-radius: 9999px;
-          font-weight: 600;
-          padding: 10px 22px;
-          box-shadow: 0 4px 16px rgba(22, 119, 255, 0.3);
-          transition: all 0.2s;
-
-          &:hover {
-            background: #0958d9;
-            border-color: #0958d9;
-          }
-        }
-      }
-    }
+  .grading-run-btn {
+    border-radius: 9999px;
+    font-weight: 600;
+    padding: 10px 22px;
+    box-shadow: 0 4px 16px rgba(22, 119, 255, 0.3);
   }
 
   .metrics-row {
@@ -346,8 +304,8 @@ function viewGradingResults(row: GradingTaskRow) {
     .metric-card {
       background: #ffffff;
       border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 16px 20px;
+      border-radius: 22px;
+      padding: 20px 24px;
       display: flex;
       align-items: center;
       gap: 16px;
@@ -385,10 +343,11 @@ function viewGradingResults(row: GradingTaskRow) {
 
   .settings-card {
     background: #ffffff;
-    border-radius: 12px;
+    border-radius: 24px;
     border: 1px solid #e2e8f0;
     padding: 6px 14px;
     margin-bottom: 20px;
+    box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
 
     .settings-grid {
       display: flex;
@@ -412,10 +371,10 @@ function viewGradingResults(row: GradingTaskRow) {
 
   .tasks-table-card {
     background: #ffffff;
-    border-radius: 14px;
+    border-radius: 24px;
     border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
-    padding: 20px 24px;
+    box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
+    padding: 24px 28px;
 
     .table-header-line {
       display: flex;

@@ -1,4 +1,35 @@
-import { Course } from '@/types/course/course';
+import { Course, CourseStatus } from '@/types/course/course';
+
+export function normalizeCourseStatus(status: unknown): CourseStatus {
+  if (status === 1 || status === 'ACTIVE') {
+    return 'ACTIVE';
+  }
+  if (
+    status === 0
+    || status === 2
+    || status === 'ARCHIVED'
+    || status === 'INACTIVE'
+  ) {
+    return 'ARCHIVED';
+  }
+  if (status === 'DRAFT') {
+    return 'DRAFT';
+  }
+  return 'ACTIVE';
+}
+
+export function isActiveCourseStatus(status: CourseStatus | undefined): boolean {
+  return status === 'ACTIVE' || status === 1;
+}
+
+export function isArchivedCourseStatus(status: CourseStatus | undefined): boolean {
+  return (
+    status === 'ARCHIVED'
+    || status === 'INACTIVE'
+    || status === 0
+    || status === 2
+  );
+}
 
 export function mapCourse(raw: Record<string, any>): Course {
   return {
@@ -17,7 +48,7 @@ export function mapCourse(raw: Record<string, any>): Course {
     resourceCount: Number(raw.resourceCount ?? 0),
     progress: raw.progress,
     aiUsageCount: raw.aiUsageCount,
-    status: raw.status ?? 'ACTIVE',
+    status: normalizeCourseStatus(raw.status),
     category: raw.category || '计算机与软件',
     credits: raw.credits != null ? Number(raw.credits) : 3.0,
     plannedHours: raw.plannedHours != null ? Number(raw.plannedHours) : 48,
@@ -25,6 +56,7 @@ export function mapCourse(raw: Record<string, any>): Course {
     welcomeMessage: raw.welcomeMessage || '',
     description: raw.description,
     createdAt: raw.createdAt,
-    knowledgeBaseId: raw.knowledgeBaseId != null ? Number(raw.knowledgeBaseId) : undefined
+    knowledgeBaseId: raw.knowledgeBaseId != null ? Number(raw.knowledgeBaseId) : undefined,
+    editable: raw.editable === true || raw.editable === 1 || raw.editable === 'true'
   };
 }

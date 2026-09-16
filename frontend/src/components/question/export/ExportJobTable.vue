@@ -37,20 +37,28 @@
         </template>
       </el-table-column>
       <el-table-column prop="createTime" label="生成时间" width="170" />
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
-          <el-button
-            link
-            type="primary"
-            size="small"
-            :disabled="row.status !== 'SUCCESS' || !row.downloadUrl"
-            @click="downloadFile(row)"
-          >
-            <el-icon><Download /></el-icon> 下载文件
-          </el-button>
-          <el-button link type="success" size="small" @click="handlePrintDirect">
-            <el-icon><Printer /></el-icon> 立即打印
-          </el-button>
+          <div class="action-pill-group">
+            <button
+              type="button"
+              class="table-action-pill table-action-pill--primary"
+              :disabled="row.status !== 'SUCCESS' || !row.downloadUrl"
+              @click="downloadFile(row)"
+            >
+              下载
+            </button>
+            <button type="button" class="table-action-pill table-action-pill--success" @click="handlePrintDirect">
+              打印
+            </button>
+            <button
+              type="button"
+              class="table-action-pill table-action-pill--danger"
+              @click="handleDeleteExportTask(row)"
+            >
+              删除
+            </button>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -66,6 +74,7 @@ defineProps<{
   refreshHistory: () => void;
   downloadFile: (row: ExportHistoryItem) => void;
   handlePrintDirect: () => void;
+  handleDeleteExportTask: (row: ExportHistoryItem) => void;
 }>();
 </script>
 

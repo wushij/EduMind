@@ -1,4 +1,4 @@
-import { get, post } from '@/core/http/request';
+import { get, post, del } from '@/core/http/request';
 import { Assignment } from '@/types/question/assignment';
 import { PageResult } from '@/types/common/api';
 
@@ -10,6 +10,8 @@ export const getAssignmentDetail = (id: number) => get<Assignment>(`/assignments
 export const createAssignment = (data: Record<string, any>) => post<number>('/assignments', data);
 
 export const publishAssignment = (id: number) => post<void>(`/assignments/${id}/publish`);
+
+export const deleteAssignment = (id: number) => del<void>(`/assignments/${id}`);
 
 export const submitAssignment = (id: number, answers: Array<{ questionId: number; answer: string }>) =>
   post<number>(`/assignments/${id}/submit`, { answers });

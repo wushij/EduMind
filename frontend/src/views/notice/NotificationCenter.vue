@@ -1,29 +1,38 @@
 <template>
-  <div class="notification-center-page">
-    <el-card shadow="never" class="center-card">
-      <NotificationPanel variant="page" :page-size="20" :enable-realtime="true" />
-    </el-card>
+  <div class="notification-center-page profile-page-shell">
+    <ProfilePageHero
+      title="消息通知"
+      subtitle="查看系统、教学、知识库与 AI 相关的全部通知"
+    />
+
+    <div class="profile-surface-card notify-surface">
+      <NotificationPanel
+        variant="page"
+        :show-header="false"
+        :show-head-actions-only="true"
+        :page-size="20"
+        :enable-realtime="true"
+      />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import ProfilePageHero from '@/components/profile/ProfilePageHero.vue';
 import NotificationPanel from '@/components/notification/NotificationPanel.vue';
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/profile-page-shell.scss';
+
 .notification-center-page {
-  padding: 20px 24px;
   min-height: calc(100vh - 120px);
-  background: #f8fafc;
 }
 
-.center-card {
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
-
-  :deep(.el-card__body) {
-    padding: 24px;
+.notify-surface {
+  :deep(.notify-panel-head) {
+    margin-bottom: 4px;
+    justify-content: flex-end;
   }
 }
 </style>

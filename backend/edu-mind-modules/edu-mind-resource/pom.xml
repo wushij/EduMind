@@ -17,5 +17,9 @@
             <groupId>com.edumind</groupId>
             <artifactId>edu-mind-resource-api</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-course-api</artifactId>
+        </dependency>
     </dependencies>
 </project>

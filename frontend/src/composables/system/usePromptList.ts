@@ -2,7 +2,8 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { usePrompt } from '@/composables/system/usePrompt';
 import { PromptTemplate } from '@/types/system/prompt';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { deletePromptTemplate } from '@/api/system/prompt';
 import { resolveModels } from '@/composables/system/useAIModel';
 import { AIModelConfigItem } from '@/types/system/model';
 
@@ -586,6 +587,30 @@ export function usePromptList() {
     router.push(`/system/prompts/editor/${id}`);
   };
 
+  const handleDeletePrompt = async (item: PromptTemplate) => {
+    if (item.status === 'PUBLISHED') {
+      ElMessage.warning('已发布的模板不可删除');
+      return;
+    }
+    try {
+      await ElMessageBox.confirm(
+        `确定删除 Prompt 模板「${item.name}」吗？删除后不可恢复。`,
+        '删除确认',
+        {
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      );
+      await deletePromptTemplate(item.id);
+      ElMessage.success('模板已删除');
+      await fetchPrompts();
+    } catch (err: unknown) {
+      if (err === 'cancel' || err === 'close') return;
+      ElMessage.error(err instanceof Error ? err.message : '删除模板失败');
+    }
+  };
+
   const updateTestVariable = (name: string, value: string) => {
     testVariables.value[name] = value;
   };
@@ -630,6 +655,7 @@ export function usePromptList() {
     isBoundModelUnset,
     goToEditor,
     goToEditorById,
-    updateTestVariable
+    updateTestVariable,
+    handleDeletePrompt
   };
 }

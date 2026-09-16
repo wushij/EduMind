@@ -23,4 +23,6 @@ public interface PromptManageService {
     void rollback(Long id, Integer targetVersion);
 
     String test(Long id, PromptTestDTO dto);
+
+    void delete(Long id);
 }

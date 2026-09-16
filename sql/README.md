@@ -26,6 +26,10 @@ sql/
 │   ├── V2_1_0__ai_tool_admin.sql               # V2.1.0 AI 工具管理端字段与 system:tool:edit 权限
 │   ├── V2_2_0__tenant_wave1.sql                # GA Wave1：19 张高泄漏风险子表 tenant_id
 │   ├── V2_2_1__tenant_wave2.sql                # GA Wave2：16 张剩余业务表 tenant_id
+│   ├── V2_2_2__expand_permission_catalog.sql   # V2.2.2 权限目录补全（与前端 DEFAULT 对齐）
+│   ├── V2_2_3__course_ai_and_attributes_expansion.sql # V2.2.3 课程学分/学时/AI 人设等字段
+│   ├── V2_2_4__course_overview_portal.sql      # V2.2.4 课程概览：教学目标/公告/教学团队
+│   ├── V2_2_5__sys_menu.sql                    # V2.2.5 系统菜单表 + assignment:delete 权限
 │   ├── R__seed_data.sql                        # V0 增量路径演示种子（用户/课程/题库/AI 等，幂等）
 │   ├── R__seed_legacy.sql                      # 旧库升级补丁（租户角色/组织成员/权限乱码修复，幂等）
 │   └── R__gate_e2e_seeds.sql                   # Gate F/G/H 集成测试种子（幂等，init 不含 Gate F）
@@ -49,7 +53,7 @@ mysql -u root -p < sql/init.sql
 
 > 已有业务数据的库 **禁止** 执行 `init.sql`；补表、改结构、版本升级请走 `sql/migration/V*.sql`（执行前 `mysqldump` 备份）。
 
-`init.sql` 已包含 **V0.1 ~ V2.0.23** 与 **V1.2.x** 的全部 `V*.sql` 迁移最终状态（含 RAG 提示词、国密 KMS、组织配额、操作日志审计等），**全新空库跑 init 后无需再跑 migration**（Gate E2E 可选种子除外）。
+`init.sql` 已包含 **V0.1 ~ V2.2.5** 迁移最终状态（含多租户 Wave1/2、权限补全、课程 AI 字段、课程概览门户表、`sys_menu`、RAG/国密 KMS/组织配额/操作日志等），**全新空库跑 init 后无需再跑 `V*.sql` migration**（Gate E2E 可选种子除外）。
 
 ### 方式二：按版本增量迁移（已有空库分步升级）
 
@@ -70,9 +74,15 @@ mysql -u root -p < sql/init.sql
 12. V2_0_5__sys_org_quota.sql                 # V2.0.22 组织院系算力配额
 13. V2_0_6__oper_log_tenant_hardening.sql     # V2.0.23 操作日志多租户加固 (Gate I11)
 14. V2_1_0__ai_tool_admin.sql                 # V2.1.0 AI 工具 sort_order/update_time + 编辑权限
-14. R__seed_data.sql          # 可选，V0 增量路径补充演示数据
-15. R__seed_legacy.sql        # 可选，旧库升级补丁（租户 RBAC / 组织成员）
-16. R__gate_e2e_seeds.sql     # 可选，Gate F/G/H 集成测试专用
+15. V2_2_0__tenant_wave1.sql                 # V2.2.0 GA Wave1 tenant_id
+16. V2_2_1__tenant_wave2.sql                 # V2.2.1 GA Wave2 tenant_id
+17. V2_2_2__expand_permission_catalog.sql    # V2.2.2 权限补全
+18. V2_2_3__course_ai_and_attributes_expansion.sql
+19. V2_2_4__course_overview_portal.sql
+20. V2_2_5__sys_menu.sql
+21. R__seed_data.sql          # 可选，V0 增量路径补充演示数据
+22. R__seed_legacy.sql        # 可选，旧库升级补丁（租户 RBAC / 组织成员）
+23. R__gate_e2e_seeds.sql     # 可选，Gate F/G/H 集成测试专用
 ```
 
 > **执行顺序说明：** V1.2 依赖 V2.0 多租户表结构，因此 `V1_1__*` 插在 `V2_0_0__*` 与 `V2_0_1__*` 之间，与历史细粒度脚本顺序一致。

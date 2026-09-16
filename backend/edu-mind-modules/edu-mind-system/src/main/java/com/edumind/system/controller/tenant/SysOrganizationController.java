@@ -74,6 +74,13 @@ public class SysOrganizationController {
         return ApiResult.success();
     }
 
+    @DeleteMapping("/{id}")
+    @SaCheckPermission(value = {"system:organization:delete", "system:organization:edit"}, mode = SaMode.OR)
+    public ApiResult<Void> deleteNode(@PathVariable("id") Long id) {
+        sysOrganizationService.deleteNode(id);
+        return ApiResult.success();
+    }
+
     @GetMapping("/stats")
     @SaCheckPermission(value = {"system:organization:list", "system:organization:view", "system:user:view"}, mode = SaMode.OR)
     public ApiResult<com.edumind.system.vo.tenant.SysOrgStatsVO> getTenantOrgStats(@RequestParam(required = false) Long tenantId) {

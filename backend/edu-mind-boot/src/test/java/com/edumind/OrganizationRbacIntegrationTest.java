@@ -198,4 +198,41 @@ public class OrganizationRbacIntegrationTest {
         Assertions.assertTrue(scope.getOrgIds().contains(class1), "可见范围应递归展开包含下级班级");
         Assertions.assertFalse(scope.getOrgIds().contains(campus2), "可见范围不得包含无关的东校区");
     }
+
+    @Test
+    @DisplayName("测试组织叶子节点删除与子节点/成员占用拦截")
+    void testDeleteOrgNode() {
+        TenantContext.setTenantId(TENANT_A);
+
+        Long parentId = sysOrganizationService.createNode(TENANT_A, "可删叶子部门", "DEPT", 0L, 1);
+        Long childId = sysOrganizationService.createNode(TENANT_A, "子部门", "DEPT", parentId, 1);
+        Long leafId = sysOrganizationService.createNode(TENANT_A, "独立叶子", "DEPT", 0L, 2);
+
+        Assertions.assertThrows(BusinessException.class, () -> sysOrganizationService.deleteNode(parentId),
+                "存在子组织时不应允许删除");
+
+        sysOrganizationService.deleteNode(leafId);
+        Assertions.assertNull(sysOrganizationDao.findByIdAndTenantId(leafId, TENANT_A), "叶子节点删除后应不存在");
+
+        SysTenantMemberEntity member = new SysTenantMemberEntity();
+        member.setTenantId(TENANT_A);
+        member.setUserId(993L);
+        member.setMemberNo("T993");
+        member.setRealName("占用成员");
+        member.setStatus(1);
+        member.setIsDefault(1);
+        sysTenantMemberDao.insert(member);
+
+        OrgMemberAssignDTO assignDTO = new OrgMemberAssignDTO();
+        assignDTO.setMemberId(member.getId());
+        assignDTO.setRoleType("TEACHER");
+        sysOrganizationService.assignMember(TENANT_A, childId, assignDTO);
+
+        Assertions.assertThrows(BusinessException.class, () -> sysOrganizationService.deleteNode(childId),
+                "仍有关联成员时不应允许删除");
+
+        sysOrganizationService.removeMember(TENANT_A, childId, member.getId());
+        sysOrganizationService.deleteNode(childId);
+        sysOrganizationService.deleteNode(parentId);
+    }
 }

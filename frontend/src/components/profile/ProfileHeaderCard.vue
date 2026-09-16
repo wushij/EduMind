@@ -83,10 +83,10 @@ defineProps<{
 <style scoped lang="scss">
 .profile-header-card {
   background: #FFFFFF;
-  border-radius: 18px;
-  padding: 24px 28px;
+  border-radius: 24px;
+  padding: 28px 32px;
   border: 1px solid #E2E8F0;
-  box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
+  box-shadow: 0 8px 32px rgba(22, 119, 255, 0.06);
   display: flex;
   align-items: center;
   gap: 24px;

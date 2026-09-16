@@ -1,4 +1,4 @@
-import { get, post } from '@/core/http/request';
+import { get, post, del } from '@/core/http/request';
 import type { ApiResponse } from '@/types/common/api';
 import type { PaperExportRequest, ExportTaskVO } from '@/types/question/export';
 
@@ -12,4 +12,8 @@ export function getExportTaskStatus(taskId: string): Promise<ApiResponse<ExportT
 
 export function listMyExportTasks(): Promise<ApiResponse<ExportTaskVO[]>> {
   return get<ExportTaskVO[]>('/question/exports/my');
+}
+
+export function deleteExportTask(taskId: string): Promise<ApiResponse<void>> {
+  return del<void>(`/question/exports/${taskId}`);
 }

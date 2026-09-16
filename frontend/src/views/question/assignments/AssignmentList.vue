@@ -147,6 +147,15 @@
           </div>
 
           <div class="row-right-actions">
+            <button
+              v-if="a.status === 'DRAFT'"
+              v-permission="'assignment:delete'"
+              type="button"
+              class="table-action-pill table-action-pill--danger"
+              @click.stop="removeAssignment(a.id, a.title)"
+            >
+              删除
+            </button>
             <el-button
               type="primary"
               size="small"
@@ -209,7 +218,7 @@ import AppPagination from '@/components/common/AppPagination.vue';
 import type { Course } from '@/types/course/course';
 
 const router = useRouter();
-const { assignments, loading, total, fetchAssignments, loadCourses, gradePendingSubmissions } = useAssignment();
+const { assignments, loading, total, fetchAssignments, loadCourses, gradePendingSubmissions, removeAssignment } = useAssignment();
 
 const pageNum = ref(1);
 const pageSize = ref(10);

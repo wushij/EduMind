@@ -4,13 +4,7 @@ import { ElMessage } from 'element-plus';
 import { useCourse } from '@/composables/course/useCourse';
 import { getPublicCourses } from '@/api/course/course';
 import type { Course } from '@/types/course/course';
-
-export const DEFAULT_PUBLIC_COURSES = [
-  { id: 1, title: '数据结构与算法', code: 'CS201', teacherName: '张老师', semester: '2026秋季学期', studentCount: 38 },
-  { id: 2, title: 'Java企业级架构设计', code: 'CS101', teacherName: '李教授', semester: '2026秋季学期', studentCount: 45 },
-  { id: 3, title: '高等数学与工程代数', code: 'MATH101', teacherName: '王老师', semester: '2026秋季学期', studentCount: 62 },
-  { id: 4, title: '人工智能与知识图谱', code: 'AI102', teacherName: '陈博士', semester: '2026秋季学期', studentCount: 50 }
-] as const;
+import { isActiveCourseStatus, isArchivedCourseStatus } from '@/utils/course/map-course';
 
 export type PublicCourseItem = {
   id?: number;
@@ -22,11 +16,39 @@ export type PublicCourseItem = {
 };
 
 export function countActiveCourses(courses: Course[]): number {
-  return courses.filter(c => c.status === 'ACTIVE' || c.status === 1).length;
+  return courses.filter(c => isActiveCourseStatus(c.status)).length;
 }
 
 export function countArchivedCourses(courses: Course[]): number {
-  return courses.filter(c => c.status === 'ARCHIVED' || c.status === 2).length;
+  return courses.filter(c => isArchivedCourseStatus(c.status)).length;
+}
+
+export type CourseStatusSummary = {
+  total: number;
+  active: number;
+  archived: number;
+};
+
+/** 在「全部课程」列表加载完成后，根据分页 total 汇总 Tab 角标（避免随 Tab 筛选变化） */
+export function buildCourseStatusSummary(
+  courses: Course[],
+  total: number
+): CourseStatusSummary {
+  const safeTotal = Math.max(0, total);
+  if (courses.length === 0 && safeTotal === 0) {
+    return { total: 0, active: 0, archived: 0 };
+  }
+  if (courses.length >= safeTotal) {
+    const active = countActiveCourses(courses);
+    return { total: safeTotal, active, archived: safeTotal - active };
+  }
+  const activeOnPage = countActiveCourses(courses);
+  const archivedOnPage = countArchivedCourses(courses);
+  return {
+    total: safeTotal,
+    active: activeOnPage,
+    archived: Math.max(archivedOnPage, safeTotal - activeOnPage)
+  };
 }
 
 export function buildStatusTabs(total: number, activeCount: number, archivedCount: number) {
@@ -35,13 +57,6 @@ export function buildStatusTabs(total: number, activeCount: number, archivedCoun
     { label: '进行中', value: 'ACTIVE', count: activeCount },
     { label: '已结课', value: 'ARCHIVED', count: archivedCount }
   ];
-}
-
-export function resolvePublicCoursesList(courses: Course[]): PublicCourseItem[] {
-  if (courses && courses.length > 0) {
-    return courses.slice(0, 4);
-  }
-  return [...DEFAULT_PUBLIC_COURSES];
 }
 
 export function useCourseList() {
@@ -59,11 +74,18 @@ export function useCourseList() {
   const courseCodeInput = ref('');
   const joining = ref(false);
 
-  const activeCourseCount = computed(() => countActiveCourses(courses.value));
-  const archivedCourseCount = computed(() => countArchivedCourses(courses.value));
+  const courseStatusSummary = ref<CourseStatusSummary>({ total: 0, active: 0, archived: 0 });
+
+  const allCoursesTotal = computed(() => courseStatusSummary.value.total);
+  const activeCourseCount = computed(() => courseStatusSummary.value.active);
+  const archivedCourseCount = computed(() => courseStatusSummary.value.archived);
 
   const statusTabs = computed(() =>
-    buildStatusTabs(total.value, activeCourseCount.value, archivedCourseCount.value)
+    buildStatusTabs(
+      courseStatusSummary.value.total,
+      courseStatusSummary.value.active,
+      courseStatusSummary.value.archived
+    )
   );
 
   async function loadData() {
@@ -74,6 +96,9 @@ export function useCourseList() {
         page: currentPage.value,
         pageSize: pageSize.value
       });
+      if (currentStatusTab.value === 'ALL') {
+        courseStatusSummary.value = buildCourseStatusSummary(courses.value, total.value);
+      }
     } catch {
       // axios 拦截器已弹出错误提示
     }
@@ -108,18 +133,17 @@ export function useCourseList() {
   async function loadPublicCourses() {
     try {
       const res = await getPublicCourses();
-      if (res.data && res.data.length > 0) {
-        realPublicCourses.value = res.data.map(c => ({
-          id: c.id,
-          title: c.title || c.name || '',
-          code: c.code,
-          teacherName: c.teacherName,
-          semester: c.semester,
-          studentCount: c.studentCount
-        }));
-      }
+      realPublicCourses.value = (res.data ?? []).map(c => ({
+        id: c.id,
+        title: c.title || c.name || '',
+        code: c.code,
+        teacherName: c.teacherName,
+        semester: c.semester,
+        studentCount: c.studentCount
+      }));
     } catch {
-      // 保持降级
+      realPublicCourses.value = [];
+      ElMessage.warning('公开课程列表加载失败，请稍后重试');
     }
   }
 
@@ -129,12 +153,7 @@ export function useCourseList() {
     loadPublicCourses();
   }
 
-  const publicCoursesList = computed(() => {
-    if (realPublicCourses.value.length > 0) {
-      return realPublicCourses.value;
-    }
-    return resolvePublicCoursesList(courses.value);
-  });
+  const publicCoursesList = computed(() => realPublicCourses.value);
 
   async function handleQuickJoin(code?: string) {
     if (!code) return;
@@ -172,6 +191,7 @@ export function useCourseList() {
     courses,
     loading,
     total,
+    allCoursesTotal,
     searchKeyword,
     currentStatusTab,
     selectedSemester,

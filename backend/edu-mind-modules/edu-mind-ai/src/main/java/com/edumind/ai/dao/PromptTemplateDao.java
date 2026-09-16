@@ -48,4 +48,8 @@ public class PromptTemplateDao {
     public int updateById(PromptTemplateEntity entity) {
         return promptTemplateMapper.updateById(entity);
     }
+
+    public int deleteById(Long id) {
+        return promptTemplateMapper.deleteById(id);
+    }
 }

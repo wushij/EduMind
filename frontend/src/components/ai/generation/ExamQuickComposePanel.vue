@@ -91,10 +91,10 @@ defineEmits<{
 
 .config-section-card {
   background: #FFFFFF;
-  border-radius: 20px;
+  border-radius: 24px;
   padding: 28px 32px;
-  border: 1px solid #EBF1F7;
-  box-shadow: 0 4px 20px rgba(30, 80, 150, 0.05);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
   margin-bottom: 22px;
 
   .section-title {

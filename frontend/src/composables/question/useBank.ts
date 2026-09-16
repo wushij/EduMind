@@ -1,12 +1,13 @@
 import { ref, computed, onMounted, reactive } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import {
   getQuestionBanks,
   createQuestionBank,
   getQuestionBankDetail,
   addQuestionsToBank,
-  removeQuestionFromBank
+  removeQuestionFromBank,
+  deleteQuestionBank
 } from '@/api/question/question-bank';
 import { getCourseList } from '@/api/course/course';
 import { getQuestions } from '@/api/question/question';
@@ -208,6 +209,27 @@ export function useBankList() {
     });
   }
 
+  async function handleDeleteBank(bank: { id: number; name?: string }) {
+    try {
+      await ElMessageBox.confirm(
+        `确定删除题库「${bank.name || '当前题库'}」吗？删除后题库内关联将解除，且不可恢复。`,
+        '删除确认',
+        {
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      );
+      await deleteQuestionBank(bank.id);
+      ElMessage.success('题库已删除');
+      await loadBanks();
+    } catch (err: unknown) {
+      if (err === 'cancel' || err === 'close') return;
+      const message = err instanceof Error ? err.message : '删除题库失败';
+      ElMessage.error(message);
+    }
+  }
+
   onMounted(async () => {
     await Promise.all([loadCourses(), loadBanks()]);
   });
@@ -230,7 +252,8 @@ export function useBankList() {
     getCourseName,
     loadCourses,
     loadBanks,
-    handleCreateBank
+    handleCreateBank,
+    handleDeleteBank
   };
 }
 
@@ -381,6 +404,28 @@ export function useBank() {
     });
   }
 
+  async function handleDeleteBank() {
+    const name = bankInfo.value?.name || '当前题库';
+    try {
+      await ElMessageBox.confirm(
+        `确定删除题库「${name}」吗？删除后题库内关联将解除，且不可恢复。`,
+        '删除确认',
+        {
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      );
+      await deleteQuestionBank(bankId.value);
+      ElMessage.success('题库已删除');
+      router.push('/question/banks');
+    } catch (err: unknown) {
+      if (err === 'cancel' || err === 'close') return;
+      const message = err instanceof Error ? err.message : '删除题库失败';
+      ElMessage.error(message);
+    }
+  }
+
   onMounted(async () => {
     await loadBankDetail();
     await loadCandidatePool();
@@ -419,6 +464,7 @@ export function useBank() {
     toggleCandidateSelect,
     confirmAddQuestions,
     handleFastComposeExam,
+    handleDeleteBank,
     getTypeLabel,
     getTypeTagType,
     getDifficultyLabel,

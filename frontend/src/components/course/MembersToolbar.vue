@@ -33,6 +33,7 @@
       </div>
 
       <button
+        v-if="showAdd"
         type="button"
         class="capsule-primary-btn"
         @click="emit('add')"
@@ -47,11 +48,15 @@
 <script setup lang="ts">
 import { Plus, CircleClose } from '@element-plus/icons-vue';
 
-defineProps<{
-  roleTabs: Array<{ label: string; value: string; count: number }>;
-  currentRoleTab: string;
-  searchKeyword: string;
-}>();
+withDefaults(
+  defineProps<{
+    roleTabs: Array<{ label: string; value: string; count: number }>;
+    currentRoleTab: string;
+    searchKeyword: string;
+    showAdd?: boolean;
+  }>(),
+  { showAdd: true }
+);
 
 const emit = defineEmits<{
   'update:currentRoleTab': [value: string];

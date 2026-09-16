@@ -1,12 +1,12 @@
 import { ref, onMounted } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   Trophy,
   Lightning,
   Cpu,
   Reading
 } from '@element-plus/icons-vue';
-import { createPaperExportTask, getExportTaskStatus, listMyExportTasks } from '@/api/question/export';
+import { createPaperExportTask, getExportTaskStatus, listMyExportTasks, deleteExportTask } from '@/api/question/export';
 import { downloadByApiPath } from '@/utils/download/blob-download';
 import type { ExportTaskVO } from '@/types/question/export';
 
@@ -402,6 +402,26 @@ export function useExport() {
     }
   };
 
+  const handleDeleteExportTask = async (row: ExportHistoryItem) => {
+    try {
+      await ElMessageBox.confirm(
+        `确定删除导出任务「${row.title || row.taskId}」吗？删除后云端归档文件将一并移除，且不可恢复。`,
+        '删除确认',
+        {
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      );
+      await deleteExportTask(row.taskId);
+      ElMessage.success('导出任务已删除');
+      await refreshHistory();
+    } catch (err: unknown) {
+      if (err === 'cancel' || err === 'close') return;
+      ElMessage.error(err instanceof Error ? err.message : '删除导出任务失败');
+    }
+  };
+
   onMounted(() => {
     refreshHistory();
   });
@@ -423,6 +443,7 @@ export function useExport() {
     handleExportWord,
     handlePrintDirect,
     refreshHistory,
-    downloadFile
+    downloadFile,
+    handleDeleteExportTask
   };
 }

@@ -107,8 +107,52 @@
     white-space: nowrap;
   }
 
+  /* 字符知识树：浅底深字（与侧边栏 AI / 全局助手一致） */
+  .ascii-tree-wrapper {
+    background: #f8fafc;
+    border-color: #dbeafe;
+
+    .code-header {
+      background: #eff6ff;
+    }
+
+    .code-lang {
+      color: #1d4ed8;
+    }
+
+    .code-copy-btn {
+      background: #dbeafe;
+      color: #1e40af;
+
+      &:hover {
+        background: #bfdbfe;
+        color: #1e3a8a;
+      }
+
+      &.is-copied {
+        background: #52c41a;
+        color: #ffffff;
+      }
+    }
+
+    .ascii-tree-pre,
+    .ascii-tree-pre code {
+      margin: 0;
+      padding: 14px 16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.55;
+      color: #0f172a;
+      background: transparent;
+      white-space: pre;
+      word-break: normal;
+      overflow-wrap: normal;
+      overflow-x: auto;
+    }
+  }
+
   /* 代码块全站统一排版规范 (流式状态与结算状态完全一致) */
-  .code-block-wrapper {
+  .code-block-wrapper:not(.ascii-tree-wrapper) {
     margin: 12px 0;
     border-radius: 8px;
     background: #1e1e1e;
@@ -161,6 +205,12 @@
       line-height: 1.55;
       background: transparent;
     }
+
+    pre.hljs,
+    pre.hljs code {
+      background: transparent;
+      color: #abb2bf;
+    }
   }
 
   .mermaid-diagram-wrapper {
@@ -168,8 +218,12 @@
     border-radius: 10px;
     border: 1px solid rgba(22, 119, 255, 0.22);
     background: #fdfdfd;
-    overflow: hidden;
+    overflow: visible;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+
+    .mermaid-source {
+      display: none !important;
+    }
 
     .mermaid-header {
       background: #f0f7ff;
@@ -178,22 +232,105 @@
       font-weight: 600;
       color: #1677ff;
       border-bottom: 1px solid rgba(22, 119, 255, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .mermaid-header-title {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .mermaid-toolbar {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .mermaid-btn--zoom {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      border: 1px solid rgba(22, 119, 255, 0.28);
+      background: #ffffff;
+      color: #1677ff;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover:not(:disabled) {
+        background: #1677ff;
+        color: #ffffff;
+        box-shadow: 0 2px 8px rgba(22, 119, 255, 0.35);
+      }
+
+      &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+    }
+
+    &:not([data-mermaid-done='true']) .mermaid-btn--zoom {
+      opacity: 0.45;
+      pointer-events: none;
     }
 
     .mermaid-diagram {
       padding: 14px 10px;
-      display: flex;
-      justify-content: center;
+      display: block;
       overflow-x: auto;
+      overflow-y: visible;
+      max-width: 100%;
 
       svg {
-        max-width: 100%;
+        display: block;
+        max-width: none;
+        width: auto;
         height: auto;
+        min-width: min(100%, 320px);
       }
 
       .mermaid-loading {
         color: #8c8c8c;
         font-size: 12px;
+      }
+
+      .mermaid-outline-fallback {
+        padding: 4px 2px 8px;
+
+        .mermaid-outline-title {
+          margin: 0 0 8px;
+          font-size: 12px;
+          color: #64748b;
+        }
+
+        ul {
+          margin: 0;
+          padding-left: 20px;
+          font-size: 13px;
+          line-height: 1.65;
+          color: #0f172a;
+        }
+      }
+
+      .mermaid-fallback-box {
+        pre {
+          margin: 0;
+          padding: 10px 12px;
+          overflow-x: auto;
+          font-size: 12px;
+          line-height: 1.55;
+          background: #fafafa;
+          border-radius: 6px;
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
       }
     }
   }

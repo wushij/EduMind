@@ -79,6 +79,7 @@
         </div>
 
         <button
+          v-if="editable"
           type="button"
           class="capsule-primary-btn"
           @click="showUploadDialog = true"
@@ -148,6 +149,7 @@
               <span>AI导读</span>
             </button>
             <button
+              v-if="editable"
               type="button"
               class="action-pill-btn action-pill-btn--del"
               title="删除课件资料"
@@ -386,12 +388,21 @@ import {
   CircleClose,
   Loading
 } from '@element-plus/icons-vue';
+import type { Course } from '@/types/course/course';
 import { useCourseMember } from '@/composables/course/useCourseMember';
 import { useCourse } from '@/composables/course/useCourse';
 
+withDefaults(
+  defineProps<{
+    course?: Course | null;
+    editable?: boolean;
+  }>(),
+  { editable: false }
+);
+
 const route = useRoute();
 const router = useRouter();
-const courseId = Number(route.params.id) || 101;
+const courseId = Number(route.params.id) || 0;
 
 const {
   resources,

@@ -29,6 +29,7 @@
       @copy-text="copyText"
       @open-drawer="openDrawer"
       @edit="goToEditorById"
+      @delete="handleDeletePrompt"
       @reset-filters="resetFilters"
       @create="goToEditor"
     />
@@ -90,7 +91,8 @@ const {
   isBoundModelUnset,
   goToEditor,
   goToEditorById,
-  updateTestVariable
+  updateTestVariable,
+  handleDeletePrompt
 } = usePromptList();
 </script>
 

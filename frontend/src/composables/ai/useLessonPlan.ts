@@ -1,6 +1,8 @@
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { generateLessonPlan } from '@/api/ai/lesson';
+import { getCourseObjectives } from '@/api/course/overview';
 
 export function renderLessonPlanMarkdown(markdown: string): string {
   return markdown
@@ -11,11 +13,41 @@ export function renderLessonPlanMarkdown(markdown: string): string {
 }
 
 export function useLessonPlan() {
+  const route = useRoute();
   const form = ref({
     courseId: 1,
     topic: '',
     hours: 2,
     objectives: ''
+  });
+
+  onMounted(async () => {
+    const qCourseId = route.query.courseId;
+    const qTopic = route.query.topic;
+    let courseId: number | null = null;
+    if (qCourseId != null && String(qCourseId).trim()) {
+      const parsed = Number(qCourseId);
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        courseId = parsed;
+        form.value.courseId = parsed;
+      }
+    }
+    if (qTopic != null && String(qTopic).trim()) {
+      form.value.topic = String(qTopic);
+    }
+    if (courseId && !form.value.objectives.trim()) {
+      try {
+        const res = await getCourseObjectives(courseId);
+        const lines = (res?.data ?? [])
+          .map(o => (o.description ? `${o.title}：${o.description}` : o.title))
+          .filter(Boolean);
+        if (lines.length) {
+          form.value.objectives = lines.join('\n');
+        }
+      } catch {
+        // optional prefetch
+      }
+    }
   });
   const loading = ref(false);
   const result = ref('');

@@ -519,46 +519,6 @@ function onSelectionChange(rows: OperLogVO[]) {
   }
 }
 
-/* 药丸操作按钮（对齐 UserList.vue 的风格） */
-.table-action-pill {
-  height: 28px;
-  padding: 0 12px;
-  border-radius: 9999px;
-  border: 1px solid transparent;
-  font-size: 12px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-
-  &--primary {
-    background: #eff6ff;
-    border-color: #bfdbfe;
-    color: #2563eb;
-    &:hover {
-      background: #2563eb;
-      border-color: #2563eb;
-      color: #ffffff;
-      transform: translateY(-1px);
-    }
-  }
-
-  &--danger {
-    background: #fef2f2;
-    border-color: #fecaca;
-    color: #dc2626;
-    &:hover {
-      background: #dc2626;
-      border-color: #dc2626;
-      color: #ffffff;
-      transform: translateY(-1px);
-    }
-  }
-}
-
 /* 跑道药丸胶囊按钮通用样式 */
 .pill-btn {
   height: 36px;

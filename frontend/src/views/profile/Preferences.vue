@@ -1,5 +1,5 @@
 <template>
-  <div class="preferences-container" v-loading="preferenceStore.loading">
+  <div class="preferences-container profile-page-shell" v-loading="preferenceStore.loading">
     <PreferencesHeroDock
       :saving="preferenceStore.saving"
       :handle-reset="handleReset"
@@ -45,12 +45,9 @@ const {
 </script>
 
 <style scoped lang="scss">
-.preferences-container {
-  padding: 24px 28px 48px;
-  background: var(--el-bg-color-page, #f8fafc);
-  min-height: calc(100vh - 64px);
-  transition: background-color 0.3s ease;
+@use '@/styles/profile-page-shell.scss';
 
+.preferences-container {
   .pref-cards-stack {
     display: flex;
     flex-direction: column;

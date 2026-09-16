@@ -1,13 +1,12 @@
 package com.edumind.course.service.member.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
-import com.edumind.common.enums.RoleCode;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.course.dao.CourseDao;
 import com.edumind.course.dao.CourseMemberDao;
 import com.edumind.course.dto.member.CourseMemberAddDTO;
 import com.edumind.course.entity.CourseEntity;
 import com.edumind.course.entity.CourseMemberEntity;
+import com.edumind.course.service.access.CourseAccessService;
 import com.edumind.course.service.member.CourseMemberService;
 import com.edumind.course.vo.member.CourseMemberVO;
 import com.edumind.system.api.UserQueryApi;
@@ -25,6 +24,7 @@ public class CourseMemberServiceImpl implements CourseMemberService {
     private final CourseDao courseDao;
     private final CourseMemberDao courseMemberDao;
     private final UserQueryApi userQueryApi;
+    private final CourseAccessService courseAccessService;
 
     @Override
     public List<CourseMemberVO> listMembers(Long courseId) {
@@ -32,7 +32,7 @@ public class CourseMemberServiceImpl implements CourseMemberService {
         if (course == null) {
             throw new BusinessException("课程不存在");
         }
-        assertCourseManageable(course);
+        courseAccessService.assertCanView(course);
         return courseMemberDao.findByCourseId(courseId).stream()
                 .map(this::toMemberVO)
                 .collect(Collectors.toList());
@@ -44,7 +44,7 @@ public class CourseMemberServiceImpl implements CourseMemberService {
         if (course == null) {
             throw new BusinessException("课程不存在");
         }
-        assertCourseManageable(course);
+        courseAccessService.assertCanEdit(course);
         if (courseMemberDao.findByCourseIdAndUserId(courseId, dto.getUserId()) != null) {
             throw new BusinessException("该用户已是课程成员");
         }
@@ -66,7 +66,7 @@ public class CourseMemberServiceImpl implements CourseMemberService {
         if (course == null) {
             throw new BusinessException("课程不存在");
         }
-        assertCourseManageable(course);
+        courseAccessService.assertCanEdit(course);
         courseMemberDao.deleteByCourseIdAndUserId(courseId, userId);
     }
 
@@ -100,15 +100,4 @@ public class CourseMemberServiceImpl implements CourseMemberService {
                 .build();
     }
 
-    private void assertCourseManageable(CourseEntity course) {
-        Long currentUserId = StpUtil.getLoginIdAsLong();
-        List<String> roles = userQueryApi.getRolesByUserId(currentUserId);
-        if (roles.contains(RoleCode.ADMIN.getCode())) {
-            return;
-        }
-        if (roles.contains(RoleCode.TEACHER.getCode()) && currentUserId.equals(course.getTeacherId())) {
-            return;
-        }
-        throw new BusinessException("无权限管理课程成员");
-    }
 }

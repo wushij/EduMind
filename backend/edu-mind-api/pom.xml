@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.edumind</groupId>
+        <artifactId>edu-mind-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>edu-mind-api</artifactId>
+    <packaging>pom</packaging>
+    <name>edu-mind-api</name>
+    <description>跨模块公开 API 契约聚合工程（薄 jar，无 Spring 实现）</description>
+
+    <modules>
+        <module>edu-mind-system-api</module>
+        <module>edu-mind-course-api</module>
+        <module>edu-mind-question-api</module>
+        <module>edu-mind-resource-api</module>
+        <module>edu-mind-notification-api</module>
+        <module>edu-mind-statistics-api</module>
+        <module>edu-mind-knowledge-api</module>
+        <module>edu-mind-teaching-api</module>
+        <module>edu-mind-ai-api</module>
+    </modules>
+</project>

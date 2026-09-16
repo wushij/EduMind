@@ -13,4 +13,6 @@ public interface AssignmentService {
     Long create(AssignmentCreateDTO dto);
 
     void publish(Long id);
+
+    void delete(Long id);
 }

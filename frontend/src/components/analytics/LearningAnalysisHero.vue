@@ -68,14 +68,14 @@
         <button
           type="button"
           class="capsule-btn capsule-btn--primary ai-btn"
-          title="生成全班学情诊断与干预决策"
+          :title="adviceBtnTitle"
           :disabled="adviceLoading"
           @click="emit('generate-advice')"
         >
           <svg viewBox="0 0 24 24" class="btn-icon-svg" fill="currentColor">
             <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"></path>
           </svg>
-          <span>{{ adviceLoading ? 'AI 正在诊断分析中...' : '生成 AI 学情诊断建议' }}</span>
+          <span>{{ adviceBtnText }}</span>
         </button>
       </div>
     </div>
@@ -168,8 +168,10 @@
         <button
           type="button"
           class="pill-nav-item"
-          :class="{ active: activeTab === 'personal' }"
-          @click="emit('update:active-tab', 'personal')"
+          :class="{ active: activeTab === 'personal', disabled: !personalTabEnabled }"
+          :disabled="!personalTabEnabled"
+          :title="personalTabEnabled ? undefined : '当前课程暂无选课学员'"
+          @click="personalTabEnabled && emit('update:active-tab', 'personal')"
         >
           <svg viewBox="0 0 24 24" class="tab-icon-svg" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -186,7 +188,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 const props = defineProps<{
@@ -201,6 +203,7 @@ const props = defineProps<{
   avgScore?: number;
   aiUsageCount?: number;
   activeTab: 'overall' | 'personal';
+  personalTabEnabled?: boolean;
   selectedStudentName?: string;
   range: string;
   adviceLoading?: boolean;
@@ -223,6 +226,24 @@ watch(() => props.courseId, (val) => {
 
 watch(() => props.range, (val) => {
   currentRange.value = val;
+});
+
+const adviceBtnTitle = computed(() => {
+  return props.activeTab === 'personal'
+    ? '生成并调优该学生的个性化精准学情诊断建议'
+    : '生成全班学情诊断与教学干预决策报告';
+});
+
+const adviceBtnText = computed(() => {
+  if (props.adviceLoading) {
+    return 'AI 正在推演诊断中...';
+  }
+  if (props.activeTab === 'personal') {
+    return props.selectedStudentName
+      ? `生成个人诊断 (${props.selectedStudentName})`
+      : '生成个人学情诊断';
+  }
+  return '生成全班学情诊断建议';
 });
 
 function handleRangeChange(r: string) {
@@ -617,6 +638,13 @@ function formatPercent(value?: number) {
           .tab-icon-svg {
             color: #1677FF;
           }
+        }
+
+        &:disabled,
+        &.disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+          pointer-events: none;
         }
 
         &.active {

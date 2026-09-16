@@ -10,7 +10,7 @@ import {
   cleanReasoningText,
   buildStoppedGenerationContent
 } from '@/utils/ai/copilot-stream-split';
-import { bindMarkdownCodeCopy } from '@/utils/ai/chat-markdown';
+import { bindMarkdownCodeCopy, renderMermaidInElement } from '@/utils/ai/chat-markdown';
 import type { CitationItem } from '@/types/ai/assistant';
 import { getDefaultReasoningFolded } from '@/utils/ai/thinking-display';
 import {
@@ -104,7 +104,8 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
     deps.scrollToBottomInstant();
     nextTick(() => {
       if (deps.messagesScrollRef.value) {
-        bindMarkdownCodeCopy(deps.messagesScrollRef.value);
+        bindMarkdownCodeCopy(deps.messagesScrollRef.value, { renderMermaid: false });
+        void renderMermaidInElement(deps.messagesScrollRef.value);
       }
     });
   }
@@ -280,7 +281,7 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
           await deps.syncSessionTitleIfDefaultLocal(deps.currentSessionId.value, text, {
             tryLlmTitle: true
           });
-          await deps.loadSessions(courseId);
+          await deps.refreshSessionsMeta(courseId);
           persistMessageCache(courseId, deps.currentSessionId.value, deps.messages.value);
         }
       }

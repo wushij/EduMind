@@ -1,5 +1,5 @@
 <template>
-  <div v-loading="loading" class="user-ai-usage-page">
+  <div v-loading="loading" class="user-ai-usage-page profile-page-shell">
     <AIUsageHeroCard
       :loading="loading"
       :usage="usage"
@@ -51,10 +51,9 @@ const {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/profile-page-shell.scss';
+
 .user-ai-usage-page {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding-bottom: 8px;
+  /* shell gap handled by profile-page-shell */
 }
 </style>

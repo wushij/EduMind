@@ -738,9 +738,9 @@ onMounted(() => {
 
 /* 子菜单项内缩边距，形成舒适的卡片内部内嵌层级 */
 :deep(.el-menu--inline .el-menu-item) {
-  margin-left: 8px !important;
-  margin-right: 8px !important;
-  width: calc(100% - 16px);
+  margin-left: 4px !important;
+  margin-right: 4px !important;
+  width: calc(100% - 8px);
 }
 
 /* 悬停微动画 (柔和微光) */

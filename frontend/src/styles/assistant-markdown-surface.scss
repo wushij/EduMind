@@ -1,0 +1,51 @@
+/* 全局 AI 助手 / 课程 AI 正文：与侧边栏 GlobalAssistant 同一套 Markdown 表面样式 */
+
+.assistant-markdown-surface.chat-md-content {
+  word-break: normal;
+  overflow-wrap: break-word;
+
+  .ascii-tree-wrapper {
+    .ascii-tree-pre,
+    .ascii-tree-pre code {
+      white-space: pre;
+      overflow-x: auto;
+      word-break: normal;
+      overflow-wrap: normal;
+      color: #0f172a;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+      pointer-events: none;
+    }
+  }
+
+  .mermaid-diagram-wrapper {
+    margin: 14px 0;
+    border-radius: 10px;
+    border: 1px solid rgba(22, 119, 255, 0.22);
+    background: #fdfdfd;
+    overflow: visible;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+
+    .mermaid-header {
+      background: #f0f7ff;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #1677ff;
+      border-bottom: 1px solid rgba(22, 119, 255, 0.15);
+    }
+
+    .mermaid-diagram {
+      padding: 14px 10px;
+      overflow-x: auto;
+
+      .mermaid-loading {
+        color: #64748b;
+        font-size: 12px;
+      }
+    }
+  }
+}

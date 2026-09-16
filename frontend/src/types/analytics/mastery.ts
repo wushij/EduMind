@@ -40,6 +40,7 @@ export interface WrongQuestionQuery {
 
 export interface TeachingAdviceRequest {
   courseId: number;
+  studentId?: number;
   focusKnowledgePointIds?: number[];
 }
 

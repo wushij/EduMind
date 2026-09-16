@@ -1,5 +1,17 @@
 <template>
-  <div class="security-page-container">
+  <div class="security-page-container profile-page-shell">
+    <ProfilePageHero
+      title="账号安全与密码中心"
+      subtitle="守护您的教学资产与个人数据安全。支持原密码快速更新与密保邮箱免密验证重置，时刻护航您的数字化教学。"
+    >
+      <template #actions>
+        <button type="button" class="hero-pill-btn is-outline" @click="handleGoToForgotPassword">
+          <el-icon><Promotion /></el-icon>
+          <span>外部找回密码通道</span>
+        </button>
+      </template>
+    </ProfilePageHero>
+
     <SecurityMetricsGrid
       :security-score="securityScore"
       :security-level="securityLevel"
@@ -56,7 +68,9 @@
 </template>
 
 <script setup lang="ts">
+import { Promotion } from '@element-plus/icons-vue';
 import { useSecurity } from '@/composables/profile/useSecurity';
+import ProfilePageHero from '@/components/profile/ProfilePageHero.vue';
 import SecurityMetricsGrid from '@/components/profile/SecurityMetricsGrid.vue';
 import PasswordChangePanel from '@/components/profile/PasswordChangePanel.vue';
 import SecurityGuidelinesPanel from '@/components/profile/SecurityGuidelinesPanel.vue';
@@ -103,5 +117,6 @@ const {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/profile-page-shell.scss';
 @use '@/components/profile/security-layout';
 </style>

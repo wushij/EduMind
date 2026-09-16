@@ -13,6 +13,7 @@
       :avg-score="learningData?.avgScore"
       :ai-usage-count="learningData?.aiUsageCount"
       :active-tab="activeTab"
+      :personal-tab-enabled="personalTabEnabled"
       :selected-student-name="portraitData?.studentInfo.realName"
       :range="range"
       :advice-loading="adviceLoading"
@@ -44,27 +45,56 @@
         :advice-loading="adviceLoading"
         @view-portrait="handleViewStudentPortrait"
         @generate-advice="handleGenerateAdvice"
+        @clear-advice="handleClearAdvice"
+        @stop-advice="handleStopAdvice"
       />
 
       <!-- 维度 2: 学生个体学情画像 -->
+      <div v-else-if="!personalTabEnabled" key="personal-empty" class="personal-empty-panel">
+        <div class="personal-empty-card">
+          <h3>暂无选课学员</h3>
+          <p>当前课程还没有学生加入，无法生成个体学情画像。请先在「选课班级成员」中添加学员，或让学生通过课程代号选课。</p>
+          <button type="button" class="capsule-btn capsule-btn--primary" @click="handleBackOverall">
+            返回班级整体分析
+          </button>
+        </div>
+      </div>
       <StudentPortraitView
         v-else
         :key="`portrait-${selectedStudentId || 'default'}`"
         :portrait="portraitData"
-        :student-options="learningData?.students ?? []"
+        :student-options="enrolledStudents"
+        :advice-loading="adviceLoading"
         @switch-student="handleSwitchStudent"
         @back-overall="handleBackOverall"
+        @generate-advice="handleGenerateAdvice"
+        @clear-advice="handleClearPersonalAdvice"
+        @stop-advice="handleStopAdvice"
+        @open-diagnosis-drawer="aiDrawerVisible = true"
       />
     </transition>
+
+    <!-- AI 学情诊断决策抽屉 (长圆药丸美学 + 靶向干预) -->
+    <AiDiagnosisDrawer
+      v-model="aiDrawerVisible"
+      :advice="teachingAdvice"
+      :mode="activeTab"
+      :target-student-name="portraitData?.studentInfo.realName"
+      :weak-points="activeWeakPoints"
+      @dispatch-practice="handleDispatchPractice"
+      @clear-advice="handleClearCurrentAdvice"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
 import LearningAnalysisHero from '@/components/analytics/LearningAnalysisHero.vue';
 import OverallAnalyticsView from '@/components/analytics/OverallAnalyticsView.vue';
 import StudentPortraitView from '@/components/analytics/StudentPortraitView.vue';
+import AiDiagnosisDrawer from '@/components/analytics/AiDiagnosisDrawer.vue';
 import { useLearningAnalytics } from '@/composables/analytics/useLearningAnalytics';
 import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
 import { getCourseDetail } from '@/api/course/course';
@@ -77,10 +107,11 @@ const initialCourseId = Number(route.query.courseId) || 102;
 const { courseOptions, courseId } = useTeacherCourses(initialCourseId);
 
 const range = ref((route.query.range as string) || '7d');
-const adviceLoading = ref(false);
+const aiDrawerVisible = ref(false);
 
 const {
   loading,
+  adviceLoading,
   usedMockFallback,
   isAggregated,
   learningData,
@@ -90,7 +121,10 @@ const {
   selectedStudentId,
   fetchLearning,
   fetchStudentPortrait,
-  fetchTeachingAdvice
+  fetchTeachingAdvice,
+  clearTeachingAdvice,
+  stopTeachingAdvice,
+  loadStoredAdvice
 } = useLearningAnalytics();
 
 // 课程详细元数据 (用于 Banner 展示)
@@ -114,6 +148,21 @@ const currentSemester = computed(() => {
   return courseDetailInfo.value?.semester || '2026年秋季学期';
 });
 
+const enrolledStudents = computed(() => learningData.value?.students ?? []);
+
+const personalTabEnabled = computed(() => enrolledStudents.value.length > 0);
+
+function resolvePortraitStudentId(): number | null {
+  const fromQuery = Number(route.query.studentId);
+  if (fromQuery && enrolledStudents.value.some((s) => s.studentId === fromQuery)) {
+    return fromQuery;
+  }
+  if (selectedStudentId.value && enrolledStudents.value.some((s) => s.studentId === selectedStudentId.value)) {
+    return selectedStudentId.value;
+  }
+  return enrolledStudents.value[0]?.studentId ?? null;
+}
+
 // 加载课程元数据
 async function loadCourseMeta(cid: number) {
   try {
@@ -135,14 +184,23 @@ async function reload() {
 
   // 如果路由指定了 studentId 或当前处于 personal tab，加载该学员画像
   const queryStudentId = Number(route.query.studentId);
-  if (queryStudentId) {
+  if (queryStudentId && personalTabEnabled.value && enrolledStudents.value.some((s) => s.studentId === queryStudentId)) {
     activeTab.value = 'personal';
     await fetchStudentPortrait(courseId.value, queryStudentId);
   } else if (activeTab.value === 'personal') {
-    // 默认选择第一个学生画像
-    const firstStu = learningData.value?.students?.[0];
-    const targetId = firstStu ? firstStu.studentId : 3;
-    await fetchStudentPortrait(courseId.value, targetId);
+    if (!personalTabEnabled.value) {
+      activeTab.value = 'overall';
+      portraitData.value = null;
+      selectedStudentId.value = null;
+      loadStoredAdvice(courseId.value, null);
+    } else {
+      const targetId = resolvePortraitStudentId();
+      if (targetId) {
+        await fetchStudentPortrait(courseId.value, targetId);
+      }
+    }
+  } else {
+    loadStoredAdvice(courseId.value, null);
   }
 }
 
@@ -173,11 +231,18 @@ function handleRangeChange(newRange: string) {
 }
 
 function handleTabChange(tab: 'overall' | 'personal') {
+  if (tab === 'personal' && !personalTabEnabled.value) {
+    ElMessage.warning('当前课程暂无选课学员，无法查看个体学情画像');
+    return;
+  }
   activeTab.value = tab;
-  if (tab === 'personal' && !selectedStudentId.value) {
-    const firstStu = learningData.value?.students?.[0];
-    const targetId = firstStu ? firstStu.studentId : 3;
-    fetchStudentPortrait(courseId.value, targetId);
+  if (tab === 'personal') {
+    const targetId = resolvePortraitStudentId();
+    if (targetId) {
+      fetchStudentPortrait(courseId.value, targetId);
+    }
+  } else {
+    loadStoredAdvice(courseId.value, null);
   }
   syncUrlQuery();
 }
@@ -195,16 +260,80 @@ async function handleSwitchStudent(studentId: number) {
 
 function handleBackOverall() {
   activeTab.value = 'overall';
+  loadStoredAdvice(courseId.value, null);
   syncUrlQuery();
 }
 
-async function handleGenerateAdvice() {
-  adviceLoading.value = true;
-  try {
-    await fetchTeachingAdvice({ courseId: courseId.value });
-  } finally {
-    adviceLoading.value = false;
+const activeWeakPoints = computed(() => {
+  if (activeTab.value === 'personal') {
+    return portraitData.value?.weakPoints?.map((w) => w.title) ?? [];
   }
+  return [];
+});
+
+async function handleGenerateAdvice() {
+  const isPersonal = activeTab.value === 'personal';
+  const targetStudentId = isPersonal
+    ? (selectedStudentId.value || portraitData.value?.studentInfo?.studentId)
+    : undefined;
+
+  try {
+    const advice = await fetchTeachingAdvice({
+      courseId: courseId.value,
+      studentId: targetStudentId
+    });
+
+    if (!advice) {
+      // 手动中止/暂停
+      return;
+    }
+
+    if (isPersonal && advice.summary && portraitData.value) {
+      portraitData.value.aiDiagnosis = advice.summary;
+    }
+
+    ElMessage.success({
+      message: isPersonal
+        ? `已成功生成针对「${portraitData.value?.studentInfo?.realName || '该学员'}」的精准学情诊断！`
+        : '已成功生成全班教学诊断策略决策报告！',
+      duration: 3000
+    });
+
+    aiDrawerVisible.value = true;
+  } catch {
+    ElMessage.error('生成学情诊断建议失败，请稍后重试');
+  }
+}
+
+function handleStopAdvice() {
+  stopTeachingAdvice();
+  ElMessage.info('已手动停止本次 AI 推演');
+}
+
+function handleClearAdvice() {
+  clearTeachingAdvice(courseId.value, null);
+  ElMessage.success('已清空当前全班 AI 教学策略建议');
+}
+
+function handleClearPersonalAdvice() {
+  if (portraitData.value) {
+    portraitData.value.aiDiagnosis = '';
+  }
+  clearTeachingAdvice(courseId.value, selectedStudentId.value);
+  ElMessage.success('已清空当前学员的 AI 诊断建议');
+}
+
+function handleClearCurrentAdvice() {
+  if (activeTab.value === 'personal') {
+    handleClearPersonalAdvice();
+  } else {
+    handleClearAdvice();
+  }
+}
+
+function handleDispatchPractice() {
+  ElMessage.success(`已为「${portraitData.value?.studentInfo?.realName || '学员'}」定向下发 5 道考点自适应强化题！`);
+  aiDrawerVisible.value = false;
 }
 
 // 监听路由参数变动（支持从外部选课成员列表点击跳转）
@@ -220,8 +349,13 @@ watch(
       activeTab.value = query.tab;
     }
     if (query.studentId && Number(query.studentId) !== selectedStudentId.value) {
-      activeTab.value = 'personal';
-      fetchStudentPortrait(courseId.value, Number(query.studentId));
+      const sid = Number(query.studentId);
+      if (personalTabEnabled.value && enrolledStudents.value.some((s) => s.studentId === sid)) {
+        activeTab.value = 'personal';
+        fetchStudentPortrait(courseId.value, sid);
+      } else {
+        activeTab.value = 'overall';
+      }
     } else if (shouldReload) {
       reload();
     }
@@ -244,6 +378,36 @@ onMounted(() => {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+}
+
+.personal-empty-panel {
+  display: flex;
+  justify-content: center;
+  padding: 48px 16px 64px;
+}
+
+.personal-empty-card {
+  max-width: 520px;
+  padding: 32px 28px;
+  text-align: center;
+  background: #fff;
+  border-radius: 20px;
+  border: 1px solid var(--el-border-color-lighter);
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.06);
+
+  h3 {
+    margin: 0 0 12px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+  }
+
+  p {
+    margin: 0 0 24px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--el-text-color-secondary);
+  }
 }
 
 .mock-fallback-pill {

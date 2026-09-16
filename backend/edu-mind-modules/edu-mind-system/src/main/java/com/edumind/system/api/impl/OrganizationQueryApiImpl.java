@@ -34,4 +34,9 @@ public class OrganizationQueryApiImpl implements OrganizationQueryApi {
     public List<Long> listUserIdsByOrgId(Long tenantId, Long organizationId) {
         return organizationQueryService.listUserIdsByOrgId(tenantId, organizationId);
     }
+
+    @Override
+    public MemberOrgBriefVO getPrimaryClassByUserId(Long tenantId, Long userId) {
+        return organizationQueryService.getPrimaryClassByUserId(tenantId, userId);
+    }
 }

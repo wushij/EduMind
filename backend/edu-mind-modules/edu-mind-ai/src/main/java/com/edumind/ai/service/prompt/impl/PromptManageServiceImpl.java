@@ -278,6 +278,20 @@ public class PromptManageServiceImpl implements PromptManageService {
         return vo;
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long id) {
+        PromptTemplateEntity entity = promptTemplateDao.findById(id);
+        if (entity == null) {
+            throw new BusinessException("模板不存在");
+        }
+        if ("PUBLISHED".equalsIgnoreCase(entity.getStatus())) {
+            throw new BusinessException("已发布的 Prompt 模板不可删除，请先停用或创建新版本");
+        }
+        promptTemplateVersionDao.deleteByTemplateId(id);
+        promptTemplateDao.deleteById(id);
+    }
+
     private static String normalizeText(String text) {
         return text == null ? null : text.trim();
     }

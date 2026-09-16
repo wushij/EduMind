@@ -1,11 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { Course } from '@/types/course/course';
 import {
-  DEFAULT_PUBLIC_COURSES,
   buildStatusTabs,
   countActiveCourses,
-  countArchivedCourses,
-  resolvePublicCoursesList
+  countArchivedCourses
 } from './useCourseList';
 
 const sampleCourses: Course[] = [
@@ -65,6 +63,14 @@ describe('countArchivedCourses', () => {
   it('counts ARCHIVED string and numeric status 2 courses', () => {
     expect(countArchivedCourses(sampleCourses)).toBe(2);
   });
+
+  it('counts INACTIVE and status 0 as archived', () => {
+    const list: Course[] = [
+      { id: 10, title: '旧课', teacherName: 'A', studentCount: 0, chapterCount: 0, status: 'INACTIVE' },
+      { id: 11, title: '归档课', teacherName: 'B', studentCount: 0, chapterCount: 0, status: 0 }
+    ];
+    expect(countArchivedCourses(list)).toBe(2);
+  });
 });
 
 describe('buildStatusTabs', () => {
@@ -77,22 +83,3 @@ describe('buildStatusTabs', () => {
   });
 });
 
-describe('resolvePublicCoursesList', () => {
-  it('returns first four courses when list is non-empty', () => {
-    const result = resolvePublicCoursesList(sampleCourses);
-    expect(result).toHaveLength(4);
-    expect(result[0].title).toBe('数据结构');
-    expect(result[3].title).toBe('人工智能');
-  });
-
-  it('returns default public courses when list is empty', () => {
-    expect(resolvePublicCoursesList([])).toEqual([...DEFAULT_PUBLIC_COURSES]);
-  });
-});
-
-describe('DEFAULT_PUBLIC_COURSES', () => {
-  it('defines four fallback public courses', () => {
-    expect(DEFAULT_PUBLIC_COURSES).toHaveLength(4);
-    expect(DEFAULT_PUBLIC_COURSES[0].code).toBe('CS201');
-  });
-});

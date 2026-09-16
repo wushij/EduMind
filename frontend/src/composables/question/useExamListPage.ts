@@ -1,12 +1,12 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { useExam } from '@/composables/question/useExam';
 import type { ExamPaper } from '@/types/question/exam';
 
 export function useExamListPage() {
   const router = useRouter();
-  const { exams, loading, total, fetchExams, loadCourseOptions } = useExam();
+  const { exams, loading, total, fetchExams, loadCourseOptions, removeExam } = useExam();
 
   const pageNum = ref(1);
   const pageSize = ref(10);
@@ -61,6 +61,26 @@ export function useExamListPage() {
     ElMessage.success(`试卷《${exam.title}》已成功发布至选课班级考试中心！`);
   }
 
+  async function handleDelete(exam: ExamPaper) {
+    try {
+      await ElMessageBox.confirm(
+        `确定删除试卷「${exam.title}」吗？删除后不可恢复。`,
+        '删除确认',
+        {
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      );
+      await removeExam(exam.id);
+      ElMessage.success('试卷已删除');
+      await loadExams();
+    } catch (err: unknown) {
+      if (err === 'cancel' || err === 'close') return;
+      ElMessage.error(err instanceof Error ? err.message : '删除试卷失败');
+    }
+  }
+
   onMounted(async () => {
     pageReady.value = false;
     try {
@@ -87,6 +107,7 @@ export function useExamListPage() {
     clearKeyword,
     handlePreview,
     handleExportPdf,
-    handlePublish
+    handlePublish,
+    handleDelete
   };
 }

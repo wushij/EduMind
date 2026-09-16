@@ -78,16 +78,26 @@
           </div>
         </div>
 
-        <button
-          type="button"
-          class="capsule-action-btn"
-          @click.stop="handleEnterCourse"
-        >
-          <span>进入课程</span>
-          <svg viewBox="0 0 24 24" class="btn-arrow-svg" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </button>
+        <div class="card-action-group" @click.stop>
+          <button
+            v-permission="'course:delete'"
+            type="button"
+            class="table-action-pill table-action-pill--danger"
+            @click="handleArchive"
+          >
+            归档
+          </button>
+          <button
+            type="button"
+            class="capsule-action-btn"
+            @click="handleEnterCourse"
+          >
+            <span>进入课程</span>
+            <svg viewBox="0 0 24 24" class="btn-arrow-svg" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -104,7 +114,14 @@ const props = defineProps<{
 }>();
 
 const router = useRouter();
-const { setCurrentCourse } = useCourse();
+const { setCurrentCourse, confirmArchiveCourse } = useCourse();
+
+async function handleArchive() {
+  await confirmArchiveCourse(
+    { id: props.course.id, title: props.course.title },
+    () => router.push('/course')
+  );
+}
 const imageError = ref(false);
 
 function handleImageError() {
@@ -112,14 +129,24 @@ function handleImageError() {
 }
 
 const statusText = computed(() => {
-  if (props.course.status === 'ARCHIVED' || props.course.status === 2) {
+  if (
+    props.course.status === 'ARCHIVED'
+    || props.course.status === 'INACTIVE'
+    || props.course.status === 0
+    || props.course.status === 2
+  ) {
     return '已结课';
   }
   return '进行中';
 });
 
 const statusClass = computed(() => {
-  if (props.course.status === 'ARCHIVED' || props.course.status === 2) {
+  if (
+    props.course.status === 'ARCHIVED'
+    || props.course.status === 'INACTIVE'
+    || props.course.status === 0
+    || props.course.status === 2
+  ) {
     return 'status-archived';
   }
   return 'status-active';
@@ -388,7 +415,7 @@ function handleEnterCourse() {
     }
 
     // 4. 底部教师信息与胶囊按钮
-    .card-footer {
+      .card-footer {
       margin-top: auto;
       padding-top: 14px;
       border-top: 1px solid #F1F5F9;
@@ -396,6 +423,13 @@ function handleEnterCourse() {
       align-items: center;
       justify-content: space-between;
       gap: 10px;
+
+      .card-action-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
 
       .teacher-info {
         display: flex;

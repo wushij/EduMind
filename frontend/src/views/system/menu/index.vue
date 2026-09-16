@@ -170,22 +170,21 @@
         <!-- 操作列 -->
         <el-table-column label="操作" width="220" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="action-btns" @click.stop>
-              <el-button type="primary" size="small" link @click="handleEdit(row)">
+            <div class="action-pill-group" @click.stop>
+              <button type="button" class="table-action-pill table-action-pill--primary" @click="handleEdit(row)">
                 编辑
-              </el-button>
-              <el-button
+              </button>
+              <button
                 v-if="row.type !== 3"
-                type="primary"
-                size="small"
-                link
+                type="button"
+                class="table-action-pill table-action-pill--primary"
                 @click="handleCreate(row.id, row.type)"
               >
                 添加子项
-              </el-button>
-              <el-button type="danger" size="small" link @click="handleDelete(row)">
+              </button>
+              <button type="button" class="table-action-pill table-action-pill--danger" @click="handleDelete(row)">
                 删除
-              </el-button>
+              </button>
             </div>
           </template>
         </el-table-column>

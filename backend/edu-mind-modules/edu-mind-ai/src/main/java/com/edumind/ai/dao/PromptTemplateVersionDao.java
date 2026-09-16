@@ -34,4 +34,11 @@ public class PromptTemplateVersionDao {
                         .last("LIMIT 1")
         );
     }
+
+    public int deleteByTemplateId(Long templateId) {
+        return promptTemplateVersionMapper.delete(
+                new LambdaQueryWrapper<PromptTemplateVersionEntity>()
+                        .eq(PromptTemplateVersionEntity::getTemplateId, templateId)
+        );
+    }
 }

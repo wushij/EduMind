@@ -5,6 +5,7 @@ import com.edumind.common.api.PageResult;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.teaching.converter.ExamConverter;
 import com.edumind.teaching.dao.AssignmentDao;
+import com.edumind.teaching.dao.SubmissionDao;
 import com.edumind.teaching.dto.assignment.AssignmentCreateDTO;
 import com.edumind.teaching.entity.AssignmentEntity;
 import com.edumind.teaching.service.assignment.AssignmentService;
@@ -20,6 +21,7 @@ import java.util.stream.Collectors;
 public class AssignmentServiceImpl implements AssignmentService {
 
     private final AssignmentDao assignmentDao;
+    private final SubmissionDao submissionDao;
     private final ExamConverter examConverter;
 
     @Override
@@ -68,5 +70,20 @@ public class AssignmentServiceImpl implements AssignmentService {
         }
         entity.setStatus("PUBLISHED");
         assignmentDao.updateById(entity);
+    }
+
+    @Override
+    public void delete(Long id) {
+        AssignmentEntity entity = assignmentDao.findById(id);
+        if (entity == null) {
+            throw new BusinessException("作业不存在");
+        }
+        if (!"DRAFT".equals(entity.getStatus())) {
+            throw new BusinessException("仅草稿状态的作业允许删除");
+        }
+        if (!submissionDao.listByAssignmentId(id).isEmpty()) {
+            throw new BusinessException("该作业已存在答卷记录，无法删除");
+        }
+        assignmentDao.deleteById(id);
     }
 }

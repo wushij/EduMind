@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { Course, CourseQuery, CourseCreateRequest } from '@/types/course/course';
 import { Chapter } from '@/types/course/chapter';
 import {
@@ -15,7 +16,7 @@ import {
   updateChapterApi,
   deleteChapterApi
 } from '@/api/course/chapter';
-import { mapCourse } from '@/utils/course/map-course';
+import { mapCourse, normalizeCourseStatus } from '@/utils/course/map-course';
 
 // 模块级单例响应式状态，确保跨组件、跨子路由切换时数据秒开不闪烁
 const courses = ref<Course[]>([]);
@@ -188,10 +189,39 @@ export function useCourse() {
     return null;
   }
 
-  async function removeCourse(id: number) {
+  async function archiveCourse(id: number) {
     await deleteCourse(id);
-    courses.value = courses.value.filter(c => c.id !== id);
-    total.value = courses.value.length;
+    const archivedStatus = normalizeCourseStatus('ARCHIVED');
+    const patchStatus = (c: Course) =>
+      c.id === id ? { ...c, status: archivedStatus } : c;
+    courses.value = courses.value.map(patchStatus);
+    if (currentCourse.value?.id === id) {
+      currentCourse.value = { ...currentCourse.value, status: archivedStatus };
+      courseCache.set(id, currentCourse.value);
+    } else if (courseCache.has(id)) {
+      courseCache.set(id, { ...courseCache.get(id)!, status: archivedStatus });
+    }
+  }
+
+  async function confirmArchiveCourse(course: { id: number; title?: string }, onSuccess?: () => void) {
+    const title = course.title || '当前课程';
+    try {
+      await ElMessageBox.confirm(
+        `确定归档课程「${title}」吗？归档后学员将无法继续访问该课程空间，且不可恢复为进行中状态。`,
+        '归档课程确认',
+        {
+          confirmButtonText: '确定归档',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      );
+      await archiveCourse(course.id);
+      ElMessage.success('课程已归档，可在课程列表「已结课」中查看');
+      onSuccess?.();
+    } catch (err: unknown) {
+      if (err === 'cancel' || err === 'close') return;
+      ElMessage.error(err instanceof Error ? err.message : '归档课程失败');
+    }
   }
 
   async function saveCourse(id: number, data: Partial<CourseCreateRequest>) {
@@ -220,7 +250,8 @@ export function useCourse() {
     createSection,
     removeSection,
     createCourse,
-    removeCourse,
+    archiveCourse,
+    confirmArchiveCourse,
     saveCourse,
     enrollCourseByCode,
     setCurrentCourse

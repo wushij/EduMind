@@ -101,12 +101,7 @@ export function createDefaultFormState(): CourseCreateFormState {
     plannedHours: 48,
     description: '',
     coverUrl: '',
-    initialChapters: [
-      '第一章 导论与现代学科体系架构',
-      '第二章 核心理论基石与数学建模',
-      '第三章 经典关键算法与逻辑实现',
-      '第四章 行业工程级实战与综合案例'
-    ],
+    initialChapters: [],
     knowledgeBaseId: undefined,
     aiPersona: 'socrates',
     welcomeMessage:
@@ -204,10 +199,6 @@ export function useCourseCreate() {
   }
 
   function removeChapter(idx: number) {
-    if (form.initialChapters.length <= 1) {
-      ElMessage.warning('课程大纲至少保留一个基础章节');
-      return;
-    }
     form.initialChapters.splice(idx, 1);
   }
 
@@ -224,9 +215,12 @@ export function useCourseCreate() {
     isAiGeneratingOutline.value = true;
     const courseName = form.name.trim();
     try {
-      const res = await askGlobalAssistant({
-        message: `请针对大学专业课程《${courseName}》（所属门类：${form.category}）设计一份结构严谨、循序渐进的教学大纲。要求只输出 5 个章节标题，格式严格为：第一章 xxx、第二章 xxx、第三章 xxx、第四章 xxx、第五章 xxx。不要任何多余问候或解释，直接换行输出章节标题。`
-      });
+      const [res] = await Promise.all([
+        askGlobalAssistant({
+          message: `请针对大学专业课程《${courseName}》（所属门类：${form.category}）设计一份结构严谨、循序渐进的教学大纲。要求只输出 5 个章节标题，格式严格为：第一章 xxx、第二章 xxx、第三章 xxx、第四章 xxx、第五章 xxx。不要任何多余问候或解释，直接换行输出章节标题。`
+        }),
+        new Promise((resolve) => setTimeout(resolve, 600))
+      ]);
       const rawText = (res.data?.content || '').trim();
       const lines = rawText.split('\n')
         .map((l: string) => l.trim().replace(/^[-*•\d.]+\s*/, ''))

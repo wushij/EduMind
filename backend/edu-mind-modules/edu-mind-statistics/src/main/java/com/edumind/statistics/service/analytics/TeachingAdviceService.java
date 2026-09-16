@@ -6,4 +6,8 @@ import com.edumind.statistics.vo.analytics.TeachingAdviceVO;
 public interface TeachingAdviceService {
 
     TeachingAdviceVO generateAdvice(TeachingAdviceRequestDTO request);
+
+    TeachingAdviceVO getLatestAdvice(Long courseId, Long studentId);
+
+    void clearAdvice(Long courseId, Long studentId);
 }
