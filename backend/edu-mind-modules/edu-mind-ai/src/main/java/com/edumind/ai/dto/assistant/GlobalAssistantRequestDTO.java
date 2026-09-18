@@ -13,6 +13,22 @@ public class GlobalAssistantRequestDTO {
 
     private String conversationId;
 
+    /** 课节章节 ID（微课节） */
+    private Long lessonChapterId;
+
+    /** lesson_studio / lesson_learn / course_space / global */
+    private String contextModule;
+
+    private String selectedText;
+
+    private String draftExcerpt;
+
+    private String draftTitle;
+
+    private String draftDescription;
+
+    private String objectiveExcerpt;
+
     /**
      * 兼容前端历史传参 input 别名
      */

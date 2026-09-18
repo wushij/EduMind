@@ -118,6 +118,14 @@ function normalizeInlineBulletLists(text: string): string {
     .join('');
 }
 
+/** 聊天 / 课节预览共用：拆粘连列表并规范行首 - 与 •（与深度思考区同源） */
+export function normalizeDisplayListMarkdown(text: string): string {
+  if (!text?.trim()) return text || '';
+  let out = normalizeInlineNumberedLists(text);
+  out = normalizeInlineBulletLists(out);
+  return out;
+}
+
 /** 代码块内的字符画知识树：拆行便于阅读与 Mermaid 转换 */
 function normalizeAsciiTreeInCodeFences(text: string): string {
   return text.replace(/```[^\n]*\n([\s\S]*?)```/g, (full, body: string) => {
@@ -312,13 +320,154 @@ export function normalizeReasoningMarkdown(raw: string): string {
   text = normalizeInlineBulletLists(text);
   text = normalizeQuotedKeywordLines(text);
   text = normalizeTeachingHeaders(text);
-
-  const fenceMatches = text.match(/```/g);
-  if (fenceMatches && fenceMatches.length % 2 !== 0) {
-    text += '\n```';
-  }
+  text = fixUnclosedCodeFences(text);
 
   return text;
+}
+
+/** 单行 compact Java 示例（Hello.java 一类），不含中文 */
+const JAVA_ONE_LINER_RE =
+  /^public\s+class\s+\w+\s*\{[^{}\n]*(?:\{[^{}\n]*\}[^{}\n]*)*\}$/;
+
+/** 模型常把 Hello.java 写成无围栏的单行代码，仅包这一行，不碰后面中文正文 */
+function wrapStandaloneJavaSnippets(text: string): string {
+  return text
+    .split(FENCED_CODE_BLOCK_RE)
+    .map((segment) => {
+      if (segment.startsWith('```')) return segment;
+      return segment
+        .split('\n')
+        .map((line) => {
+          const trimmed = line.trim();
+          if (!JAVA_ONE_LINER_RE.test(trimmed)) return line;
+          if (trimmed.length > 1500 || /[\u4e00-\u9fa5]/.test(trimmed)) return line;
+          return `\`\`\`java\n${trimmed}\n\`\`\``;
+        })
+        .join('\n');
+    })
+    .join('');
+}
+
+/** 从 public class 起按大括号配平，返回结束行下标（含） */
+function findJavaClassBlockEndLine(lines: string[], startIdx: number): number {
+  let depth = 0;
+  let started = false;
+  for (let i = startIdx; i < lines.length; i++) {
+    for (const ch of lines[i]) {
+      if (ch === '{') {
+        depth += 1;
+        started = true;
+      } else if (ch === '}') {
+        depth -= 1;
+      }
+    }
+    if (started && depth === 0) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function closeFenceAfterJavaLine(head: string, openFence: string, body: string): string | null {
+  const lines = body.split('\n');
+  const classStart = lines.findIndex((l) => /^public\s+class\s+\w+/.test(l.trim()));
+  if (classStart >= 0) {
+    const endIdx = findJavaClassBlockEndLine(lines, classStart);
+    if (endIdx >= 0) {
+      const javaBlock = lines.slice(classStart, endIdx + 1).join('\n');
+      const before = lines.slice(0, classStart).join('\n');
+      const after = lines.slice(endIdx + 1).join('\n');
+      const prefix = before ? `${before}\n` : '';
+      return `${head}${prefix}${openFence}${javaBlock}\n\`\`\`\n${after}`;
+    }
+  }
+
+  const oneLinerIdx = lines.findIndex((l) => JAVA_ONE_LINER_RE.test(l.trim()));
+  if (oneLinerIdx >= 0) {
+    const before = lines.slice(0, oneLinerIdx).join('\n');
+    const javaLine = lines[oneLinerIdx].trim();
+    const after = lines.slice(oneLinerIdx + 1).join('\n');
+    const prefix = before ? `${before}\n` : '';
+    const fence = /java/i.test(openFence) ? openFence : '```java\n';
+    return `${head}${prefix}${fence}${javaLine}\n\`\`\`\n${after}`;
+  }
+
+  return null;
+}
+
+/** 正文中间粘连的小节标题，如「运行链路##5.1编写」 */
+function normalizeGluedInlineHeadings(text: string): string {
+  return text
+    .split(FENCED_CODE_BLOCK_RE)
+    .map((segment) => {
+      if (segment.startsWith('```')) return segment;
+      let s = segment.replace(/([^\s#\n])(#{2,6})(\d+(?:\.\d+)?)/g, '$1\n\n$2 $3');
+      s = s.replace(
+        /([^\s#\n])(#{2,6})(?=[\u4e00-\u9fa5（(「『【A-Za-z])/g,
+        '$1\n\n$2 '
+      );
+      return s;
+    })
+    .join('');
+}
+
+/** 去掉模型复读、未闭合的围栏行，避免页面上直接露出 ``` */
+function fixUnclosedCodeFences(text: string): string {
+  const count = (text.match(/```/g) || []).length;
+  if (count % 2 === 0) return text;
+
+  const lastIdx = text.lastIndexOf('```');
+  const head = text.slice(0, lastIdx);
+  const tailFromFence = text.slice(lastIdx);
+  const openMatch = tailFromFence.match(/^```([^\n]*)\n?/);
+  if (!openMatch) {
+    return head + tailFromFence.replace(/^```+/, '');
+  }
+
+  const body = tailFromFence.slice(openMatch[0].length);
+
+  const javaClosed = closeFenceAfterJavaLine(head, openMatch[0], body);
+  if (javaClosed) return javaClosed;
+
+  const chineseChars = (body.match(/[\u4e00-\u9fa5]/g) || []).length;
+
+  if (chineseChars > 60 || /^#{1,6}\s/m.test(body) || /^\s*\d+[.、．]\s/m.test(body)) {
+    return head + body;
+  }
+
+  const blankBreak = body.search(/\n\s*\n/);
+  if (blankBreak > 0 && blankBreak < 2000) {
+    return `${head}${openMatch[0]}${body.slice(0, blankBreak)}\n\`\`\`\n${body.slice(blankBreak)}`;
+  }
+
+  if (body.length < 1200 && chineseChars < 30) {
+    return `${text}\n\`\`\``;
+  }
+
+  return head + body;
+}
+
+function tidyStrayFenceMarkers(text: string): string {
+  let s = text;
+  s = s.replace(/(```[a-zA-Z0-9+#-]*)\s*\n\s*\1\s*\n/g, '$1\n');
+  s = s.replace(/^[ \t]*`[ \t]*`[ \t]*$/gm, '');
+  return s
+    .split('\n')
+    .filter((line) => {
+      const t = line.trim();
+      if (t === '`' || t === '``' || t === '```') return false;
+      return true;
+    })
+    .join('\n');
+}
+
+/** 围栏未配对时 markdown-it 会把 ```java 渲染成普通段落，需从 HTML 剔除 */
+function stripOrphanFenceParagraphs(html: string): string {
+  if (!html) return '';
+  return html
+    .replace(/<p>\s*```[a-zA-Z0-9+#-]*\s*<\/p>/gi, '')
+    .replace(/<p>\s*```\s*<\/p>/gi, '')
+    .replace(/<p>\s*`{1,2}\s*<\/p>/gi, '');
 }
 
 /**
@@ -328,6 +477,8 @@ export function normalizeChatMarkdown(raw: string): string {
   if (!raw) return '';
 
   let text = normalizeCodeFences(raw);
+  text = wrapStandaloneJavaSnippets(text);
+  text = tidyStrayFenceMarkers(text);
   text = normalizeMermaidInCodeFences(text);
   text = normalizeAsciiTreeInCodeFences(text);
   text = wrapBareAsciiTreeBlocks(text);
@@ -335,6 +486,7 @@ export function normalizeChatMarkdown(raw: string): string {
 
   text = text.replace(/^\s*#{1,3}\s*(?:回答|答案|解决方案)[:：]?\s*\n+/gi, '');
   text = text.replace(/^\s*#{1,3}\s*((?:针对)?您关于)/, '$1');
+  text = normalizeGluedInlineHeadings(text);
   text = text.replace(/(^|\n)(#{1,6})([^\s#\n])/g, '$1$2 $3');
 
   text = text.replace(/\*\*\s+([^*\n]+?)\s+\*\*/g, '**$1**');
@@ -352,11 +504,7 @@ export function normalizeChatMarkdown(raw: string): string {
   // 7. 教学与问答高频小标题（如「**参考答案：**」「**解析：**」「【题目】」等）粘连自动拆行
   text = normalizeTeachingHeaders(text);
 
-  const fenceMatches = text.match(/```/g);
-  const isCodeFenceUnclosed = fenceMatches && fenceMatches.length % 2 !== 0;
-  if (isCodeFenceUnclosed) {
-    text += '\n```';
-  }
+  text = fixUnclosedCodeFences(text);
 
   // 补齐末尾流式未闭合的单个 $ 符号（仅在整篇消息 $ 数量为奇数时补在末尾）
   const dollarMatches = text.replace(/\$\$/g, '').match(/(?<!\\)\$/g);
@@ -367,10 +515,12 @@ export function normalizeChatMarkdown(raw: string): string {
   return text;
 }
 
-/** 剥离正文中的行内 <code>（无 class），避免模型滥用反引号 */
+/** 行内 <code> 保留等宽样式（代码块在 pre 内，不受此影响） */
 export function unwrapChatInlineCode(html: string): string {
   if (!html) return '';
-  return html.replace(/<code>([^<]*)<\/code>/g, (_match, inner: string) => inner);
+  return html.replace(/<code>([^<]*)<\/code>/g, (_match, inner: string) => {
+    return `<code class="chat-inline-code">${inner}</code>`;
+  });
 }
 
 /** 渲染聊天消息 HTML */
@@ -382,6 +532,7 @@ export function renderChatMarkdown(raw: string): string {
   let html = renderMarkdownForChat(withBold);
 
   html = unwrapChatInlineCode(html);
+  html = stripOrphanFenceParagraphs(html);
 
   html = html.replace(/\[([1-9]\d*)\]/g, (_match, id) => {
     return `<sup class="copilot-citation-sup" data-citation-idx="${id}">[${id}]</sup>`;

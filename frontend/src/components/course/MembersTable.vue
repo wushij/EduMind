@@ -59,19 +59,15 @@
             <el-icon><TrendCharts /></el-icon>
             <span>{{ m.memberRole === 'TEACHER' ? '课程学情' : '学情画像' }}</span>
           </button>
-          <el-popconfirm
+          <button
             v-if="manageable && m.memberRole !== 'TEACHER'"
-            title="确定将该成员移出此课程空间吗？"
-            confirm-button-text="确定"
-            cancel-button-text="取消"
-            @confirm="emit('remove', m.userId)"
+            type="button"
+            class="action-pill-btn action-pill-btn--del"
+            title="移出课程"
+            @click="emit('remove', m.userId)"
           >
-            <template #reference>
-              <button type="button" class="action-pill-btn action-pill-btn--del" title="移出课程">
-                <el-icon><Delete /></el-icon>
-              </button>
-            </template>
-          </el-popconfirm>
+            <el-icon><Delete /></el-icon>
+          </button>
         </div>
       </div>
     </div>

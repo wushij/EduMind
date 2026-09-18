@@ -17,7 +17,10 @@ public class ChapterTreeVO implements Serializable {
 
     private Long id;
     private String title;
+    private String description;
     private Integer sort;
+    private Long parentId;
+    private LessonMetaVO lessonMeta;
 
     @Builder.Default
     private List<ChapterTreeVO> children = new ArrayList<>();

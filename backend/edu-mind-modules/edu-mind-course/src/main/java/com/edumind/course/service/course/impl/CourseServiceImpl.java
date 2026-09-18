@@ -64,35 +64,46 @@ public class CourseServiceImpl implements CourseService {
         if (scope.isAllTenant()) {
             page = courseDao.pageQueryAll(query);
         } else {
-            Set<Long> allowedCourseIds = new HashSet<>(scope.getCourseIds());
             List<String> roles = userQueryApi.getRolesByUserId(currentUserId);
-            if (roles != null && roles.contains(RoleCode.TEACHER.getCode())) {
-                List<Long> teacherCourseIds = courseDao.findByTeacherId(currentUserId).stream()
-                        .map(CourseEntity::getId)
-                        .collect(Collectors.toList());
-                allowedCourseIds.addAll(teacherCourseIds);
-            }
-            if (roles != null && roles.contains(RoleCode.STUDENT.getCode())) {
-                allowedCourseIds.addAll(courseMemberDao.findCourseIdsByUserId(currentUserId));
-            }
-            // 院系管理员/教研负责人：包含所属组织及子树下所有成员所授课程
-            if (scope.getOrgIds() != null && !scope.getOrgIds().isEmpty()) {
-                for (Long orgId : scope.getOrgIds()) {
-                    List<Long> userIds = organizationQueryApi.listUserIdsByOrgId(tenantId, orgId);
-                    if (!CollectionUtils.isEmpty(userIds)) {
-                        for (Long uid : userIds) {
-                            allowedCourseIds.addAll(courseDao.findByTeacherId(uid).stream()
-                                     .map(CourseEntity::getId)
-                                     .collect(Collectors.toList()));
+            // 纯学生：课程中心仅展示已加入（选课）的课程，不按院系扩散教师开课
+            if (isStudentOnlyRole(roles)) {
+                List<Long> enrolledIds = courseMemberDao.findCourseIdsByUserId(currentUserId);
+                if (CollectionUtils.isEmpty(enrolledIds)) {
+                    return PageResult.empty(defaultPage(query), defaultPageSize(query));
+                }
+                page = courseDao.pageQuery(query, enrolledIds);
+            } else {
+                Set<Long> allowedCourseIds = new HashSet<>(scope.getCourseIds());
+                if (roles != null && roles.contains(RoleCode.TEACHER.getCode())) {
+                    List<Long> teacherCourseIds = courseDao.findByTeacherId(currentUserId).stream()
+                            .map(CourseEntity::getId)
+                            .collect(Collectors.toList());
+                    allowedCourseIds.addAll(teacherCourseIds);
+                }
+                if (roles != null && roles.contains(RoleCode.STUDENT.getCode())) {
+                    allowedCourseIds.addAll(courseMemberDao.findCourseIdsByUserId(currentUserId));
+                }
+                // 院系管理员 / 教研负责人：包含所属组织及子树下成员所授课程（学生身份不进入此分支）
+                if (canExpandOrgTeacherCourses(roles)
+                        && scope.getOrgIds() != null
+                        && !scope.getOrgIds().isEmpty()) {
+                    for (Long orgId : scope.getOrgIds()) {
+                        List<Long> userIds = organizationQueryApi.listUserIdsByOrgId(tenantId, orgId);
+                        if (!CollectionUtils.isEmpty(userIds)) {
+                            for (Long uid : userIds) {
+                                allowedCourseIds.addAll(courseDao.findByTeacherId(uid).stream()
+                                        .map(CourseEntity::getId)
+                                        .collect(Collectors.toList()));
+                            }
                         }
                     }
                 }
-            }
 
-            if (allowedCourseIds.isEmpty()) {
-                return PageResult.empty(defaultPage(query), defaultPageSize(query));
+                if (allowedCourseIds.isEmpty()) {
+                    return PageResult.empty(defaultPage(query), defaultPageSize(query));
+                }
+                page = courseDao.pageQuery(query, new ArrayList<>(allowedCourseIds));
             }
-            page = courseDao.pageQuery(query, new ArrayList<>(allowedCourseIds));
         }
 
         List<CourseVO> list = page.getRecords().stream()
@@ -102,9 +113,11 @@ public class CourseServiceImpl implements CourseService {
                     Long chapterCount = chapterDao.countByCourseId(cid);
                     Long kpCount = knowledgePointDao.countByCourseId(cid);
                     Long resourceCount = resourceQueryApi != null ? resourceQueryApi.countResourcesByCourseId(cid) : 0L;
+                    UserBriefVO teacher = resolveTeacher(entity.getTeacherId());
                     return courseConverter.toVO(
                             entity,
-                            resolveTeacherName(entity.getTeacherId()),
+                            resolveTeacherName(teacher),
+                            resolveTeacherAvatar(teacher),
                             studentCount,
                             chapterCount,
                             kpCount,
@@ -131,9 +144,11 @@ public class CourseServiceImpl implements CourseService {
         Long chapterCount = chapterDao.countByCourseId(entity.getId());
         Long kpCount = knowledgePointDao.countByCourseId(entity.getId());
         Long resourceCount = resourceQueryApi != null ? resourceQueryApi.countResourcesByCourseId(entity.getId()) : 0L;
+        UserBriefVO teacher = resolveTeacher(entity.getTeacherId());
         CourseDetailVO detail = courseConverter.toDetailVO(
                 entity,
-                resolveTeacherName(entity.getTeacherId()),
+                resolveTeacherName(teacher),
+                resolveTeacherAvatar(teacher),
                 studentCount,
                 chapterCount,
                 kpCount,
@@ -145,8 +160,7 @@ public class CourseServiceImpl implements CourseService {
     @Override
     public Long createCourse(CourseCreateDTO dto) {
         Long currentUserId = StpUtil.getLoginIdAsLong();
-        List<String> roles = userQueryApi.getRolesByUserId(currentUserId);
-        if (!roles.contains(RoleCode.ADMIN.getCode()) && !roles.contains(RoleCode.TEACHER.getCode())) {
+        if (!StpUtil.hasPermission("course:create")) {
             throw new BusinessException("无权限创建课程");
         }
         CourseEntity entity = courseConverter.toEntity(dto, currentUserId);
@@ -290,9 +304,11 @@ public class CourseServiceImpl implements CourseService {
                     Long chapterCount = chapterDao.countByCourseId(cid);
                     Long kpCount = knowledgePointDao.countByCourseId(cid);
                     Long resourceCount = resourceQueryApi != null ? resourceQueryApi.countResourcesByCourseId(cid) : 0L;
+                    UserBriefVO teacher = resolveTeacher(entity.getTeacherId());
                     return courseConverter.toVO(
                             entity,
-                            resolveTeacherName(entity.getTeacherId()),
+                            resolveTeacherName(teacher),
+                            resolveTeacherAvatar(teacher),
                             studentCount,
                             chapterCount,
                             kpCount,
@@ -309,15 +325,25 @@ public class CourseServiceImpl implements CourseService {
         courseAccessService.assertCanView(course);
     }
 
-    private String resolveTeacherName(Long teacherId) {
+    private UserBriefVO resolveTeacher(Long teacherId) {
         if (teacherId == null) {
-            return "";
+            return null;
         }
-        UserBriefVO teacher = userQueryApi.getUserById(teacherId);
+        return userQueryApi.getUserById(teacherId);
+    }
+
+    private String resolveTeacherName(UserBriefVO teacher) {
         if (teacher == null) {
             return "";
         }
         return teacher.getRealName() != null ? teacher.getRealName() : teacher.getUsername();
+    }
+
+    private String resolveTeacherAvatar(UserBriefVO teacher) {
+        if (teacher == null || teacher.getAvatar() == null || teacher.getAvatar().isBlank()) {
+            return null;
+        }
+        return teacher.getAvatar();
     }
 
     private long defaultPage(CourseQueryDTO query) {
@@ -326,5 +352,27 @@ public class CourseServiceImpl implements CourseService {
 
     private long defaultPageSize(CourseQueryDTO query) {
         return query.getPageSize() != null && query.getPageSize() > 0 ? query.getPageSize() : 10L;
+    }
+
+    /** 仅学生身份（无管理/教师全局角色） */
+    private boolean isStudentOnlyRole(List<String> roles) {
+        if (roles == null || roles.isEmpty()) {
+            return false;
+        }
+        if (roles.contains(RoleCode.ADMIN.getCode())
+                || roles.contains("PLATFORM_ADMIN")
+                || roles.contains(RoleCode.TENANT_ADMIN.getCode())
+                || roles.contains(RoleCode.ORG_ADMIN.getCode())
+                || roles.contains(RoleCode.TEACHER.getCode())) {
+            return false;
+        }
+        return roles.contains(RoleCode.STUDENT.getCode());
+    }
+
+    private boolean canExpandOrgTeacherCourses(List<String> roles) {
+        if (roles == null) {
+            return false;
+        }
+        return roles.contains(RoleCode.ORG_ADMIN.getCode()) || roles.contains(RoleCode.TEACHER.getCode());
     }
 }

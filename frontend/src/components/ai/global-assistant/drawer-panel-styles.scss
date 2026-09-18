@@ -771,6 +771,17 @@
     font-size: 12.5px;
   }
 
+  :deep(code.chat-inline-code),
+  :deep(:not(pre) > code) {
+    background: rgba(15, 23, 42, 0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: #0284c7;
+    word-break: break-word;
+  }
+
   :deep(hr) {
     margin: 14px 0;
     border: none;
@@ -903,6 +914,13 @@
       overflow-x: auto;
       font-size: 12px;
       line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    pre code {
+      white-space: pre-wrap;
+      word-break: break-word;
     }
   }
 

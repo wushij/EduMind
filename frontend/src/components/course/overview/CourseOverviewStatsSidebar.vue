@@ -158,18 +158,54 @@ function go(path: string) {
         background: #1677ff;
         color: #fff;
         box-shadow: 0 4px 12px rgba(22, 119, 255, 0.25);
+
+        &:not(:disabled):hover {
+          background: #0958d9;
+          box-shadow: 0 6px 16px rgba(22, 119, 255, 0.35);
+          transform: translateY(-1px);
+        }
+
+        &:not(:disabled):active {
+          transform: translateY(0);
+          box-shadow: 0 2px 8px rgba(22, 119, 255, 0.28);
+        }
       }
 
       &--ai {
         background: linear-gradient(135deg, #eef2ff 0%, #faf5ff 100%);
         border: 1px solid #c7d2fe;
         color: #4f46e5;
+
+        &:not(:disabled):hover {
+          background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%);
+          border-color: #a5b4fc;
+          color: #4338ca;
+          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
+          transform: translateY(-1px);
+        }
+
+        &:not(:disabled):active {
+          transform: translateY(0);
+        }
       }
 
       &--outline {
         background: #fff;
         border: 1px solid #e2e8f0;
         color: #334155;
+
+        &:not(:disabled):hover {
+          background: #f8fafc;
+          border-color: #cbd5e1;
+          color: #0f172a;
+          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+          transform: translateY(-1px);
+        }
+
+        &:not(:disabled):active {
+          transform: translateY(0);
+          background: #f1f5f9;
+        }
       }
     }
   }

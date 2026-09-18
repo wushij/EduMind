@@ -12,5 +12,7 @@ public class CourseResourceVO {
     private Long documentId;
     private String title;
     private String resourceType;
+    private Long chapterId;
+    private String downloadUrl;
     private LocalDateTime createTime;
 }

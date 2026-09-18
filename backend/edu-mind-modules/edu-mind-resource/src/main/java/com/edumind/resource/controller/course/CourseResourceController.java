@@ -21,8 +21,9 @@ public class CourseResourceController {
 
     @SaCheckPermission("course:view")
     @GetMapping("/{id}/resources")
-    public ApiResult<List<CourseResourceVO>> listCourseResources(@PathVariable("id") Long courseId) {
-        return ApiResult.success(courseResourceService.listByCourseId(courseId));
+    public ApiResult<List<CourseResourceVO>> listCourseResources(@PathVariable("id") Long courseId,
+                                                                 @org.springframework.web.bind.annotation.RequestParam(value = "chapterId", required = false) Long chapterId) {
+        return ApiResult.success(courseResourceService.listByCourseId(courseId, chapterId));
     }
 
     @SaCheckPermission("course:edit")

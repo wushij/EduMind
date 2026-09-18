@@ -158,8 +158,14 @@ public class ChatServiceImpl implements ChatService {
                     conversation.getId(), ChatHistoryBuilder.MAX_HISTORY_MESSAGES);
             String conversationHistory = chatHistoryBuilder.formatConversationHistory(recentMessages);
 
+            String dispatchMessage = dto.getMessage();
+            if (dto.getLessonChapterId() != null) {
+                dispatchMessage = "[当前微课节ID: " + dto.getLessonChapterId() + "] " + dispatchMessage;
+            } else if (dto.getChapterId() != null) {
+                dispatchMessage = "[当前章节ID: " + dto.getChapterId() + "] " + dispatchMessage;
+            }
             IntentDispatchRequest dispatchRequest = IntentDispatchRequest.builder()
-                    .message(dto.getMessage())
+                    .message(dispatchMessage)
                     .courseId(dto.getCourseId())
                     .knowledgeBaseId(useRag ? knowledgeBaseId : null)
                     .documentId(dto.getDocumentId())

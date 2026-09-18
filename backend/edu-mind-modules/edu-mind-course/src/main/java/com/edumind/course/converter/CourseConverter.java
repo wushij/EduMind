@@ -84,7 +84,7 @@ public class CourseConverter {
         return entity;
     }
 
-    public CourseVO toVO(CourseEntity entity, String teacherName, Long studentCount, Long chapterCount, Long knowledgePointCount, Long resourceCount) {
+    public CourseVO toVO(CourseEntity entity, String teacherName, String teacherAvatar, Long studentCount, Long chapterCount, Long knowledgePointCount, Long resourceCount) {
         if (entity == null) {
             return null;
         }
@@ -96,6 +96,7 @@ public class CourseConverter {
                 .coverUrl(entity.getCoverImage())
                 .teacherId(entity.getTeacherId())
                 .teacherName(teacherName)
+                .teacherAvatar(teacherAvatar)
                 .studentCount(studentCount != null ? studentCount : 0L)
                 .chapterCount(chapterCount != null ? chapterCount : 0L)
                 .knowledgePointCount(knowledgePointCount != null ? knowledgePointCount : 0L)
@@ -111,11 +112,11 @@ public class CourseConverter {
                 .build();
     }
 
-    public CourseVO toVO(CourseEntity entity, String teacherName, Long studentCount) {
-        return toVO(entity, teacherName, studentCount, 0L, 0L, 0L);
+    public CourseVO toVO(CourseEntity entity, String teacherName, String teacherAvatar, Long studentCount) {
+        return toVO(entity, teacherName, teacherAvatar, studentCount, 0L, 0L, 0L);
     }
 
-    public CourseDetailVO toDetailVO(CourseEntity entity, String teacherName, Long studentCount, Long chapterCount, Long knowledgePointCount, Long resourceCount) {
+    public CourseDetailVO toDetailVO(CourseEntity entity, String teacherName, String teacherAvatar, Long studentCount, Long chapterCount, Long knowledgePointCount, Long resourceCount) {
         if (entity == null) {
             return null;
         }
@@ -129,6 +130,7 @@ public class CourseConverter {
                 .status(mapStatus(entity.getStatus()))
                 .teacherId(entity.getTeacherId())
                 .teacherName(teacherName)
+                .teacherAvatar(teacherAvatar)
                 .studentCount(studentCount != null ? studentCount : 0L)
                 .chapterCount(chapterCount != null ? chapterCount : 0L)
                 .knowledgePointCount(knowledgePointCount != null ? knowledgePointCount : 0L)
@@ -144,8 +146,8 @@ public class CourseConverter {
                 .build();
     }
 
-    public CourseDetailVO toDetailVO(CourseEntity entity, String teacherName, Long studentCount) {
-        return toDetailVO(entity, teacherName, studentCount, 0L, 0L, 0L);
+    public CourseDetailVO toDetailVO(CourseEntity entity, String teacherName, String teacherAvatar, Long studentCount) {
+        return toDetailVO(entity, teacherName, teacherAvatar, studentCount, 0L, 0L, 0L);
     }
 
     public List<ChapterTreeVO> toChapterTree(List<ChapterEntity> chapters) {
@@ -179,6 +181,10 @@ public class CourseConverter {
                 .courseId(entity.getCourseId())
                 .chapterId(entity.getChapterId())
                 .title(entity.getTitle())
+                .code(entity.getCode())
+                .description(entity.getDescription())
+                .cognitiveDimension(entity.getCognitiveDimension())
+                .importance(entity.getImportance())
                 .sort(entity.getSortOrder())
                 .build();
     }
@@ -194,7 +200,9 @@ public class CourseConverter {
         return ChapterTreeVO.builder()
                 .id(entity.getId())
                 .title(entity.getTitle())
+                .description(entity.getDescription())
                 .sort(entity.getSortOrder())
+                .parentId(entity.getParentId())
                 .children(new ArrayList<>())
                 .build();
     }

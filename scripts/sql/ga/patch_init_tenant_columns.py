@@ -9,6 +9,7 @@ content = init_path.read_text(encoding="utf-8")
 
 TABLES = [
     "course_chapter", "course_member", "course_resource", "course_knowledge_point",
+    "course_chapter_knowledge_point", "course_lesson_progress",
     "knowledge_document", "knowledge_document_text", "knowledge_document_chunk",
     "knowledge_index_task", "knowledge_chunk_index", "knowledge_ocr_page",
     "teaching_exam", "exam_question", "assignment", "assignment_submission", "submission_answer",

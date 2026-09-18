@@ -3,7 +3,9 @@
             <div class="context-banner">
               <div class="context-pill">
                 <el-icon class="context-icon"><Reading /></el-icon>
-                <span class="context-label">当前教学研读空间：</span>
+                <span class="context-label">
+                  {{ isLessonStudioContext ? '课节备课上下文：' : '当前教学研读空间：' }}
+                </span>
                 <span class="context-title" :title="activeCourseLabel">
                   {{ activeCourseLabel }}
                 </span>
@@ -25,5 +27,6 @@ import { inject } from 'vue';
 import { Reading, Switch } from '@element-plus/icons-vue';
 import { globalAssistantUiKey } from '@/components/ai/global-assistant/global-assistant-ui-key';
 
-const { activeCourseLabel, manualGlobalScope, toggleScopeMode } = inject(globalAssistantUiKey)!;
+const { activeCourseLabel, manualGlobalScope, toggleScopeMode, isLessonStudioContext } =
+  inject(globalAssistantUiKey)!;
 </script>

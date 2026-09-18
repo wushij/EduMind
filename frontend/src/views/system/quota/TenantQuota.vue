@@ -98,6 +98,6 @@ const {
 } = useTenantQuota();
 </script>
 
-<style scoped lang="scss">
+<style lang="scss">
 @use '@/components/system/quota/tenant-quota-layout';
 </style>

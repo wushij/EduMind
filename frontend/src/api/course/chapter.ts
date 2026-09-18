@@ -3,8 +3,19 @@ import { Chapter } from '@/types/course/chapter';
 
 export const getChapters = (courseId: number) => get<Chapter[]>(`/courses/${courseId}/chapters`);
 
-export const createChapterApi = (courseId: number, data: { title: string; parentId?: number; sortOrder?: number }) =>
-  post<number>(`/courses/${courseId}/chapters`, data);
+export const createChapterApi = (
+  courseId: number,
+  data: {
+    title: string;
+    parentId?: number;
+    sortOrder?: number;
+    description?: string;
+    durationMinutes?: number;
+    lessonType?: string;
+    type?: string;
+    duration?: string;
+  }
+) => post<number>(`/courses/${courseId}/chapters`, data);
 
 export const updateChapterApi = (
   courseId: number,

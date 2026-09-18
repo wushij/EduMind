@@ -1,7 +1,13 @@
 <template>
-  <div class="course-detail-container" :class="{ 'course-detail-container--ai': isAiRoute }">
+  <div
+    class="course-detail-container"
+    :class="{
+      'course-detail-container--ai': isAiRoute,
+      'course-detail-container--immersive': isImmersiveLessonStudio
+    }"
+  >
     <!-- 顶部课程上下文 Hero Banner (模仿课程中心 PageHeroBanner 视觉设计) -->
-    <div class="course-hero-header">
+    <div v-if="!isImmersiveLessonStudio" class="course-hero-header">
       <!-- 柔光微动效光晕 -->
       <div class="glow-orb glow-orb--left"></div>
       <div class="glow-orb glow-orb--right"></div>
@@ -148,7 +154,7 @@
     </div>
 
     <!-- 课程空间二级导航 Tab (长圆药丸指示栏) -->
-    <div class="course-nav-bar">
+    <div v-if="!isImmersiveLessonStudio" class="course-nav-bar">
       <div class="pill-nav-tabs">
         <router-link
           v-for="item in subTabs"
@@ -166,7 +172,7 @@
     </div>
 
     <!-- 子路由内容展示区 -->
-    <div class="course-subview-content">
+    <div class="course-subview-content" :class="{ 'course-subview-content--immersive': isImmersiveLessonStudio }">
       <div class="course-subview-router">
         <router-view v-slot="{ Component }">
           <transition name="fade-slide" mode="out-in">
@@ -226,6 +232,7 @@ function handleCourseSaved(updated: any) {
 
 const courseId = computed(() => (route.params.id ? String(route.params.id) : ''));
 const isAiRoute = computed(() => route.path.endsWith('/ai'));
+const isImmersiveLessonStudio = computed(() => Boolean(route.meta.immersiveLessonStudio));
 
 const statusText = computed(() => {
   if (
@@ -708,6 +715,21 @@ onMounted(() => {
     .course-subview-content {
       width: 100%;
       min-width: 0;
+    }
+  }
+
+  &.course-detail-container--immersive {
+    gap: 0;
+
+    .course-subview-content--immersive {
+      min-height: calc(100vh - 72px);
+      padding: 0;
+      max-width: none;
+    }
+
+    .course-subview-inner {
+      max-width: none;
+      padding: 0;
     }
   }
 }

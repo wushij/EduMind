@@ -13,6 +13,8 @@ export interface Chapter {
     duration?: string;
     knowledgePointCount?: number;
     type?: string;
+    contentStatus?: string;
+    hasContent?: boolean;
   }>;
   children?: Chapter[];
 }

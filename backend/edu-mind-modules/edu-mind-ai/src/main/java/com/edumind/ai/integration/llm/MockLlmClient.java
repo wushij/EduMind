@@ -38,6 +38,9 @@ public class MockLlmClient implements LlmClient {
         if (systemPrompt != null && (systemPrompt.contains("学情分析专家") || systemPrompt.contains("长期记忆特征") || systemPrompt.contains("认知特征"))) {
             return mockMemoryExtractionJson(userPrompt);
         }
+        if (systemPrompt != null && systemPrompt.contains("课节内容生成助手")) {
+            return mockLessonContentBlocksJson(systemPrompt);
+        }
         return "[" + modelKey + "] 这是 Mock LLM 的回复。您的问题是：" + userPrompt;
     }
 
@@ -86,6 +89,33 @@ public class MockLlmClient implements LlmClient {
                 "title", "提升自主学习能力",
                 "description", "能够利用课程资源与 AI 助教进行预习、复习与拓展。"));
         return JSON.toJSONString(Map.of("objectives", objectives));
+    }
+
+    private String mockLessonContentBlocksJson(String systemPrompt) {
+        String lessonTitle = extractLineValue(systemPrompt, "课节：");
+        if (!org.springframework.util.StringUtils.hasText(lessonTitle)) {
+            lessonTitle = "本课节";
+        }
+        String courseName = extractLineValue(systemPrompt, "课程：");
+        if (!org.springframework.util.StringUtils.hasText(courseName)) {
+            courseName = "本课程";
+        }
+        List<Map<String, Object>> blocks = new ArrayList<>();
+        blocks.add(Map.of(
+                "type", "callout",
+                "variant", "objective",
+                "title", "学习目标",
+                "body", "- 能够说明「" + lessonTitle + "」的核心概念与术语\n"
+                        + "- 能够结合「" + courseName + "」大纲完成本课基础练习"));
+        blocks.add(Map.of(
+                "type", "markdown",
+                "body", "## " + lessonTitle + "\n\n"
+                        + "本节围绕「" + lessonTitle + "」展开，建议先阅读导读，再按要点完成练习。\n\n"
+                        + "### 核心要点\n\n"
+                        + "1. 概念界定与常见误区\n"
+                        + "2. 典型示例与课堂讨论\n"
+                        + "3. 小结与课后拓展"));
+        return JSON.toJSONString(Map.of("version", 1, "blocks", blocks));
     }
 
     private String mockCourseDescription(String userPrompt) {

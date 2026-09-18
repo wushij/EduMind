@@ -23,6 +23,7 @@ public class CourseDetailVO implements Serializable {
     private String status;
     private Long teacherId;
     private String teacherName;
+    private String teacherAvatar;
     private Long studentCount;
     private Long chapterCount;
     private Long knowledgePointCount;

@@ -6,13 +6,18 @@ import com.edumind.course.dao.ChapterDao;
 import com.edumind.course.dao.CourseDao;
 import com.edumind.course.entity.CourseEntity;
 import com.edumind.course.service.access.CourseAccessService;
+import com.edumind.course.dto.chapter.ChapterCreateDTO;
 import com.edumind.course.service.chapter.ChapterService;
+import com.edumind.course.service.chapter.ChapterTreeEnrichService;
 import com.edumind.course.vo.chapter.ChapterTreeVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChapterServiceImpl implements ChapterService {
@@ -21,6 +26,7 @@ public class ChapterServiceImpl implements ChapterService {
     private final ChapterDao chapterDao;
     private final CourseConverter courseConverter;
     private final CourseAccessService courseAccessService;
+    private final ChapterTreeEnrichService chapterTreeEnrichService;
 
     @Override
     public List<ChapterTreeVO> getChapterTree(Long courseId) {
@@ -29,11 +35,28 @@ public class ChapterServiceImpl implements ChapterService {
             throw new BusinessException("课程不存在");
         }
         courseAccessService.assertCanView(course);
-        return courseConverter.toChapterTree(chapterDao.findByCourseId(courseId));
+        List<com.edumind.course.entity.ChapterEntity> flat = chapterDao.findByCourseId(courseId);
+        List<ChapterTreeVO> tree = courseConverter.toChapterTree(flat);
+        try {
+            chapterTreeEnrichService.enrichTree(tree, flat);
+        } catch (Exception ex) {
+            // Allow chapter tree when lesson-progress / junction tables are not migrated yet
+            log.warn("Chapter tree enrich skipped: {}", ex.getMessage());
+        }
+        return tree;
     }
 
     @Override
     public Long createChapter(Long courseId, String title, Long parentId, Integer sortOrder) {
+        ChapterCreateDTO dto = new ChapterCreateDTO();
+        dto.setTitle(title);
+        dto.setParentId(parentId);
+        dto.setSortOrder(sortOrder);
+        return createChapter(courseId, dto);
+    }
+
+    @Override
+    public Long createChapter(Long courseId, ChapterCreateDTO dto) {
         CourseEntity course = courseDao.findById(courseId);
         if (course == null) {
             throw new BusinessException("课程不存在");
@@ -41,12 +64,25 @@ public class ChapterServiceImpl implements ChapterService {
         courseAccessService.assertCanEdit(course);
         com.edumind.course.entity.ChapterEntity chapter = new com.edumind.course.entity.ChapterEntity();
         chapter.setCourseId(courseId);
-        chapter.setTitle(title);
-        chapter.setParentId(parentId != null ? parentId : 0L);
-        chapter.setSortOrder(sortOrder != null ? sortOrder : 1);
+        chapter.setTitle(dto.getTitle());
+        chapter.setParentId(dto.getParentId() != null ? dto.getParentId() : 0L);
+        chapter.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 1);
+        chapter.setDescription(dto.getDescription());
+        if (chapter.isLessonNode()) {
+            chapter.setDurationMinutes(dto.getDurationMinutes());
+            chapter.setLessonType(normalizeLessonType(dto.getLessonType()));
+            chapter.setContentStatus("DRAFT");
+        }
         chapter.setCreateTime(java.time.LocalDateTime.now());
         chapterDao.insert(chapter);
         return chapter.getId();
+    }
+
+    private String normalizeLessonType(String type) {
+        if (!StringUtils.hasText(type)) {
+            return "LECTURE";
+        }
+        return type.trim().toUpperCase();
     }
 
     @Override

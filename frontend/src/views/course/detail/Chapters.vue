@@ -144,6 +144,7 @@
                 </div>
                 <div class="sec-meta-col">
                   <span class="sec-title">{{ sec.title }}</span>
+                  <p v-if="sec.description" class="sec-desc">{{ sec.description }}</p>
                   <div class="sec-sub-tags">
                     <span v-if="sec.duration" class="pill-mini-tag">
                       <el-icon><Clock /></el-icon> {{ sec.duration }}
@@ -154,12 +155,30 @@
                     <span v-if="sec.type === 'quiz'" class="pill-mini-tag pill-mini-tag--quiz">
                       <el-icon><EditPen /></el-icon> 智能自测
                     </span>
+                    <span
+                      v-if="sec.contentStatus"
+                      class="pill-mini-tag"
+                      :class="sec.contentStatus === 'PUBLISHED' ? 'pill-mini-tag--published' : 'pill-mini-tag--draft'"
+                    >
+                      {{ sec.contentStatus === 'PUBLISHED' ? '已发布' : '草稿' }}
+                    </span>
+                    <span v-if="sec.hasContent === false" class="pill-mini-tag pill-mini-tag--empty">
+                      正文待编写
+                    </span>
                   </div>
                 </div>
               </div>
 
               <!-- 右侧快捷按钮 -->
               <div class="sec-actions">
+                <button
+                  v-if="courseEditable"
+                  type="button"
+                  class="capsule-sec-btn capsule-sec-btn--edit"
+                  @click.stop="goEditLesson(sec)"
+                >
+                  <span>编辑内容</span>
+                </button>
                 <button
                   type="button"
                   class="capsule-sec-btn capsule-sec-btn--ai"
@@ -322,6 +341,7 @@ const courseId = computed(() => {
 
 const {
   chapters,
+  lessonProgressSummary,
   fetchChapters,
   createChapter,
   updateChapter,
@@ -418,9 +438,13 @@ async function handleSectionSubmit(data: any) {
   if (!activeChapter.value?.id) return;
   const cId = Number(courseId.value);
   try {
+    const durationMinutes = parseDurationMinutes(data.duration);
     await createSection(cId, activeChapter.value.id, {
       title: data.title,
-      sortOrder: (activeChapter.value.sections?.length || 0) + 1
+      sortOrder: (activeChapter.value.sections?.length || 0) + 1,
+      description: data.description,
+      durationMinutes,
+      lessonType: data.type
     });
     ElMessage.success('微课节已成功录入大纲！');
     if (!openChapters.value.includes(activeChapter.value.id)) {
@@ -438,10 +462,15 @@ async function handleAiApplySections(sections: any[]) {
     for (let i = 0; i < sections.length; i++) {
       await createSection(cId, activeChapter.value.id, {
         title: sections[i].title,
-        sortOrder: (activeChapter.value.sections?.length || 0) + i + 1
+        sortOrder: (activeChapter.value.sections?.length || 0) + i + 1,
+        description: sections[i].description,
+        durationMinutes: parseDurationMinutes(sections[i].duration),
+        lessonType: sections[i].type
       });
     }
-    ElMessage.success(`AI 已为本章导入 ${sections.length} 个微课节！`);
+    ElMessage.success(
+      `AI 已导入 ${sections.length} 个课节标题，请点击「编辑内容」或「AI 生成正文」填写微课正文`
+    );
     if (!openChapters.value.includes(activeChapter.value.id)) {
       openChapters.value.push(activeChapter.value.id);
     }
@@ -481,10 +510,16 @@ const filteredChapters = computed(() => {
 });
 
 const totalLessonCount = computed(() => {
+  if (lessonProgressSummary.value.totalLessonCount > 0) {
+    return lessonProgressSummary.value.totalLessonCount;
+  }
   return chapters.value.reduce((acc, cur) => acc + (cur.sections?.length || 0), 0);
 });
 
 const completedLessonCount = computed(() => {
+  if (lessonProgressSummary.value.completedLessonCount > 0 || lessonProgressSummary.value.totalLessonCount > 0) {
+    return lessonProgressSummary.value.completedLessonCount;
+  }
   let count = 0;
   chapters.value.forEach(ch => {
     (ch.sections || []).forEach(s => {
@@ -515,6 +550,12 @@ function toggleAllCollapse() {
   }
 }
 
+function parseDurationMinutes(duration?: string) {
+  if (!duration) return undefined;
+  const matched = String(duration).match(/(\d+)/);
+  return matched ? Number(matched[1]) : undefined;
+}
+
 function handleChapterAiQuiz() {
   router.push(`/ai/question/generate?courseId=${courseId.value}`);
 }
@@ -527,14 +568,24 @@ function handleAiExplain(secTitle: string) {
 }
 
 function handleStartStudy(sec: any) {
-  if (sec.type === 'quiz') {
-    router.push(`/ai/question/generate?courseId=${courseId.value}`);
-  } else {
-    router.push({
-      path: `/course/${courseId.value}/ai`,
-      query: { prompt: `请针对课时【${sec.title}】的重点概念、定理公式与代码实现进行苏格拉底式精细辅导。` }
-    });
+  if (sec.contentStatus && sec.contentStatus !== 'PUBLISHED' && !courseEditable.value) {
+    ElMessage.warning('该课节尚未发布，请稍后再试');
+    return;
   }
+  if (courseEditable.value && sec.hasContent === false) {
+    ElMessage.info('该课节尚无块式正文，请先编辑内容或使用 AI 生成');
+    goEditLesson(sec);
+    return;
+  }
+  const query: Record<string, string> = {};
+  if (courseEditable.value && sec.contentStatus && sec.contentStatus !== 'PUBLISHED') {
+    query.preview = 'true';
+  }
+  router.push({ path: `/course/${courseId.value}/learn/${sec.id}`, query });
+}
+
+function goEditLesson(sec: { id: number }) {
+  router.push(`/course/${courseId.value}/lessons/${sec.id}/edit`);
 }
 
 async function handleSaveNewChapter() {
@@ -877,6 +928,14 @@ onMounted(async () => {
                 color: #1E293B;
               }
 
+              .sec-desc {
+                margin: 0;
+                font-size: 12px;
+                line-height: 1.45;
+                color: #64748B;
+                max-width: 520px;
+              }
+
               .sec-sub-tags {
                 display: flex;
                 align-items: center;
@@ -892,6 +951,21 @@ onMounted(async () => {
                   &--quiz {
                     background: #FEF3C7;
                     color: #D97706;
+                  }
+
+                  &--published {
+                    background: #DCFCE7;
+                    color: #15803D;
+                  }
+
+                  &--draft {
+                    background: #FEF3C7;
+                    color: #B45309;
+                  }
+
+                  &--empty {
+                    background: #EEF2FF;
+                    color: #4338CA;
                   }
                 }
               }

@@ -86,11 +86,23 @@ describe('streamGlobalAssistantChat', () => {
       stop: vi.fn()
     } as unknown as SSEClient;
 
-    await streamGlobalAssistantChat(sseClient, 'q', 101, 'conv-1', { value: '' }, {});
+    await streamGlobalAssistantChat(
+      sseClient,
+      'q',
+      { courseId: 101, conversationId: 'conv-1', contextModule: 'lesson_studio', lessonChapterId: 8 },
+      { value: '' },
+      {}
+    );
 
     expect(sseClient.streamEvents).toHaveBeenCalledWith(
       expect.stringContaining('/ai/assistant/chat'),
-      { message: 'q', courseId: 101, conversationId: 'conv-1' },
+      {
+        message: 'q',
+        courseId: 101,
+        conversationId: 'conv-1',
+        contextModule: 'lesson_studio',
+        lessonChapterId: 8
+      },
       expect.any(Function)
     );
   });

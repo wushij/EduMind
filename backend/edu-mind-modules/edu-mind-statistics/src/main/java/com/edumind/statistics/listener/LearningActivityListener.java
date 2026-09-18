@@ -24,6 +24,8 @@ public class LearningActivityListener {
         entity.setActionType(event.getActionType());
         entity.setDurationMinutes(event.getDurationMinutes());
         entity.setResourceId(event.getResourceId());
+        entity.setChapterId(event.getChapterId());
+        entity.setKnowledgePointId(event.getKnowledgePointId());
         learningRecordDao.insert(entity);
     }
 }

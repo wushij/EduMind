@@ -17,6 +17,8 @@ public class CourseVO implements Serializable {
     private String name;
     private String coverUrl;
     private String teacherName;
+    /** 主讲教师头像 URL（来自用户档案） */
+    private String teacherAvatar;
     private Long teacherId;
     private Long studentCount;
     private String status;

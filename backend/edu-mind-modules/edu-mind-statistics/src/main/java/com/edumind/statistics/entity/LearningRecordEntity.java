@@ -18,5 +18,7 @@ public class LearningRecordEntity implements Serializable {
     private String actionType;
     private Integer durationMinutes;
     private Long resourceId;
+    private Long chapterId;
+    private Long knowledgePointId;
     private LocalDateTime createTime;
 }

@@ -17,5 +17,9 @@ public class KnowledgePointVO implements Serializable {
     private Long courseId;
     private Long chapterId;
     private String title;
+    private String code;
+    private String description;
+    private String cognitiveDimension;
+    private Integer importance;
     private Integer sort;
 }

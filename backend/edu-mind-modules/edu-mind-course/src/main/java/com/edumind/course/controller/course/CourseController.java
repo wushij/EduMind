@@ -82,7 +82,27 @@ public class CourseController {
         String title = (String) body.get("title");
         Long parentId = body.get("parentId") != null ? Long.valueOf(body.get("parentId").toString()) : 0L;
         Integer sortOrder = body.get("sortOrder") != null ? Integer.valueOf(body.get("sortOrder").toString()) : 1;
-        return ApiResult.success(chapterService.createChapter(id, title, parentId, sortOrder));
+        com.edumind.course.dto.chapter.ChapterCreateDTO dto = new com.edumind.course.dto.chapter.ChapterCreateDTO();
+        dto.setTitle(title);
+        dto.setParentId(parentId);
+        dto.setSortOrder(sortOrder);
+        if (body.get("description") != null) {
+            dto.setDescription(body.get("description").toString());
+        }
+        if (body.get("durationMinutes") != null) {
+            dto.setDurationMinutes(Integer.valueOf(body.get("durationMinutes").toString()));
+        } else if (body.get("duration") != null) {
+            String duration = body.get("duration").toString().replace("分钟", "").trim();
+            if (!duration.isEmpty()) {
+                dto.setDurationMinutes(Integer.parseInt(duration));
+            }
+        }
+        if (body.get("lessonType") != null) {
+            dto.setLessonType(body.get("lessonType").toString());
+        } else if (body.get("type") != null) {
+            dto.setLessonType(body.get("type").toString());
+        }
+        return ApiResult.success(chapterService.createChapter(id, dto));
     }
 
     @SaCheckPermission("course:edit")

@@ -51,6 +51,8 @@ public class MybatisPlusConfig {
             "course_member",
             "course_resource",
             "course_knowledge_point",
+            "course_chapter_knowledge_point",
+            "course_lesson_progress",
             "knowledge_document",
             "knowledge_document_text",
             "knowledge_document_chunk",

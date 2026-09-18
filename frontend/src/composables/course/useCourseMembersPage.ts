@@ -1,6 +1,6 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { useCourseMember } from '@/composables/course/useCourseMember';
 import type { CourseMemberItem } from '@/types/course/member';
 import { normalizeAvatarUrl } from '@/utils/format/file';
@@ -101,6 +101,23 @@ export function useCourseMembersPage(courseId: number) {
   }
 
   async function handleRemove(userId: number) {
+    const member = members.value.find((m) => m.userId === userId);
+    const displayName = member?.realName || member?.username || `用户${userId}`;
+    try {
+      await ElMessageBox.confirm(
+        `确定将「${displayName}」移出此课程空间吗？移出后该成员将无法继续访问课程学习内容。`,
+        '移出成员确认',
+        {
+          type: 'warning',
+          confirmButtonText: '确定移出',
+          cancelButtonText: '取消',
+          confirmButtonClass: 'el-button--danger',
+          lockScroll: false
+        }
+      );
+    } catch {
+      return;
+    }
     try {
       await removeMember(userId);
       ElMessage.success('成员已成功移出课程班级');

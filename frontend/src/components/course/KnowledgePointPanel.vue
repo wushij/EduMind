@@ -105,9 +105,10 @@
               <el-button
                 size="small"
                 class="card-action-btn card-action-btn--ai"
+                title="AI 解析此考点（打开侧边栏助教）"
                 @click="handleAskAi(kp)"
               >
-                <el-icon><Cpu /></el-icon>
+                <span class="card-action-gem-mark" aria-hidden="true">✦</span>
                 <span>AI解析</span>
               </el-button>
             </div>
@@ -202,7 +203,7 @@
               class="capsule-btn-action capsule-btn-action--ai"
               @click="handleAskAi(selectedGraphKp)"
             >
-              向 AI 助教提问此考点
+              向 AI 助教解析此考点
             </button>
             <button
               type="button"
@@ -421,7 +422,6 @@ import {
   Loading,
   Refresh,
   Reading,
-  Cpu,
   Delete,
   EditPen
 } from '@element-plus/icons-vue';
@@ -743,6 +743,12 @@ const {
                 background: #f3e8ff;
                 border-color: #d8b4fe;
                 color: #6d28d9;
+              }
+
+              .card-action-gem-mark {
+                font-size: 13px;
+                font-weight: 700;
+                line-height: 1;
               }
             }
 

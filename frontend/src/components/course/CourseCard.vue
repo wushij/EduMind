@@ -68,7 +68,14 @@
       <div class="card-footer">
         <div class="teacher-info">
           <div class="teacher-avatar">
-            {{ course.teacherName.slice(0, 1) }}
+            <img
+              v-if="teacherAvatarSrc && !avatarError"
+              :src="teacherAvatarSrc"
+              alt=""
+              class="teacher-avatar-img"
+              @error="avatarError = true"
+            />
+            <span v-else>{{ teacherInitial }}</span>
           </div>
           <div class="meta-texts">
             <span class="teacher-name">{{ course.teacherName }}</span>
@@ -104,10 +111,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Course } from '@/types/course/course';
 import { useCourse } from '@/composables/course/useCourse';
+import { normalizeAvatarUrl } from '@/utils/format/file';
 
 const props = defineProps<{
   course: Course;
@@ -115,6 +123,17 @@ const props = defineProps<{
 
 const router = useRouter();
 const { setCurrentCourse, confirmArchiveCourse } = useCourse();
+
+const avatarError = ref(false);
+const teacherAvatarSrc = computed(() => normalizeAvatarUrl(props.course.teacherAvatar));
+const teacherInitial = computed(() => (props.course.teacherName || '师').slice(0, 1));
+
+watch(
+  () => props.course.teacherAvatar,
+  () => {
+    avatarError.value = false;
+  }
+);
 
 async function handleArchive() {
   await confirmArchiveCourse(
@@ -449,6 +468,14 @@ function handleEnterCourse() {
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
+          overflow: hidden;
+
+          .teacher-avatar-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+          }
         }
 
         .meta-texts {

@@ -1,4 +1,4 @@
-import { ref, computed, nextTick, watch } from 'vue';
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { SSEClient } from '@/core/sse/client';
@@ -25,10 +25,14 @@ import { useStreamingMarkdown } from '@/composables/ai/useStreamingMarkdown';
 import { bindMarkdownCodeCopy } from '@/utils/ai/chat-markdown';
 import type {
   CitationItem,
+  GlobalAssistantChatRequest,
   GlobalAssistantIntentEvent,
   GlobalAssistantMessage,
   GlobalAssistantSession
 } from '@/types/ai/assistant';
+import { useTeachingCopilotStore, OPEN_GLOBAL_ASSISTANT_EVENT } from '@/stores/ai/teaching-copilot-context';
+import { buildTeachingContextRequestPayload } from '@/types/ai/teaching-copilot-context';
+import { useAuthStore } from '@/stores/auth/auth';
 import {
   getDefaultReasoningFolded,
   isThinkingPanelHidden
@@ -106,25 +110,15 @@ function generateSmartFollowUps(query: string): string[] {
 
 const SESSION_STORAGE_PREFIX = 'edumind_global_assistant_session:';
 
-function sessionStorageKey(courseId?: number): string {
-  return `${SESSION_STORAGE_PREFIX}${courseId ?? 'global'}`;
-}
-
-function getStoredSessionId(courseId?: number): string {
-  const stored = storage.get(sessionStorageKey(courseId));
-  return typeof stored === 'string' ? stored : '';
-}
-
-function storeSessionId(courseId: number | undefined, sessionId: string) {
-  if (!sessionId) return;
-  storage.set(sessionStorageKey(courseId), sessionId);
-}
-
-function clearStoredSessionId(courseId: number | undefined, sessionId: string) {
-  if (!sessionId) return;
-  if (getStoredSessionId(courseId) === sessionId) {
-    storage.remove(sessionStorageKey(courseId));
+function resolveSessionStorageKey(
+  courseId?: number,
+  lessonChapterId?: number,
+  userId?: number
+): string {
+  if (courseId && lessonChapterId && userId) {
+    return `edumind_lesson_copilot_session_${userId}_${courseId}_${lessonChapterId}`;
   }
+  return `${SESSION_STORAGE_PREFIX}${courseId ?? 'global'}`;
 }
 
 function buildSessionTitleFromPrompt(text: string): string {
@@ -195,8 +189,32 @@ function mapApiMessage(raw: Record<string, unknown>): GlobalAssistantMessage {
   };
 }
 
+const DEFAULT_PRESET_CHIPS = [
+  { label: '智能组卷', prompt: '帮我出一份包含导数与微分的期中试卷，含选择、填空与大题' },
+  { label: '检索切片', prompt: '请深度检索微积分第一章的核心知识点切片与讲义资料' },
+  { label: '学情看板', prompt: '我想查看近期班级知识点掌握度与薄弱点学情报表' },
+  { label: '知识图谱', prompt: '生成并展示当前微积分课程的拓扑知识图谱' }
+];
+
+const LESSON_STUDIO_PRESET_CHIPS = [
+  {
+    label: '润色导读',
+    prompt: '请润色本课节侧栏导读文案，语气专业简洁，输出可直接填入导读的正文。'
+  },
+  {
+    label: '学习目标',
+    prompt: '请为本课节撰写 3–5 条可测量的学习目标，输出可直接填入学习目标卡的内容。'
+  },
+  {
+    label: '续写正文',
+    prompt: '请根据当前课节正文摘录自然续写下一小节 Markdown 正文，保持教学节奏。'
+  }
+];
+
 export function useGlobalAssistant() {
   const route = useRoute();
+  const authStore = useAuthStore();
+  const teachingCopilotStore = useTeachingCopilotStore();
   const router = useRouter();
   const sseClient = new SSEClient();
 
@@ -280,8 +298,52 @@ export function useGlobalAssistant() {
   // 是否手动指定为全域研读模式（彻底杜绝无故写死 #102）
   const manualGlobalScope = ref(false);
 
+  const lessonSessionScope = computed(() => {
+    const ctx = teachingCopilotStore.activeContext;
+    if (ctx?.contextModule === 'lesson_studio' && ctx.lessonChapterId && ctx.courseId) {
+      return {
+        courseId: ctx.courseId,
+        lessonChapterId: ctx.lessonChapterId
+      };
+    }
+    return null;
+  });
+
+  function sessionStorageKey(courseId?: number): string {
+    const scope = lessonSessionScope.value;
+    const userId = authStore.currentUser?.id;
+    if (scope?.courseId && scope.lessonChapterId && userId) {
+      return resolveSessionStorageKey(scope.courseId, scope.lessonChapterId, userId);
+    }
+    return resolveSessionStorageKey(courseId, undefined, undefined);
+  }
+
+  function getStoredSessionId(courseId?: number): string {
+    const stored = storage.get(sessionStorageKey(courseId));
+    return typeof stored === 'string' ? stored : '';
+  }
+
+  function storeSessionId(courseId: number | undefined, sessionId: string) {
+    if (!sessionId) return;
+    storage.set(sessionStorageKey(courseId), sessionId);
+  }
+
+  function clearStoredSessionId(courseId: number | undefined, sessionId: string) {
+    if (!sessionId) return;
+    if (getStoredSessionId(courseId) === sessionId) {
+      storage.remove(sessionStorageKey(courseId));
+    }
+  }
+
   const activeCourseId = computed<number | undefined>(() => {
     if (manualGlobalScope.value) return undefined;
+    const ctx = teachingCopilotStore.activeContext;
+    if (
+      ctx?.courseId &&
+      (ctx.contextModule === 'lesson_studio' || ctx.contextModule === 'lesson_learn')
+    ) {
+      return ctx.courseId;
+    }
     const queryCourseId = route.query.courseId;
     if (queryCourseId) {
       const parsed = Number(queryCourseId);
@@ -296,9 +358,23 @@ export function useGlobalAssistant() {
     return undefined;
   });
 
+  const isLessonStudioContext = computed(
+    () =>
+      !manualGlobalScope.value &&
+      teachingCopilotStore.activeContext?.contextModule === 'lesson_studio'
+  );
+
   const activeCourseLabel = computed(() => {
     if (manualGlobalScope.value) {
       return '全域研读模式 · 通用教学空间';
+    }
+    const ctx = teachingCopilotStore.activeContext;
+    if (ctx?.contextModule === 'lesson_studio') {
+      const statusLabel = ctx.contentStatus === 'PUBLISHED' ? '已发布' : '草稿';
+      return `课节备课 · ${ctx.title || '未命名课节'}（${statusLabel}）`;
+    }
+    if (ctx?.contextModule === 'lesson_learn') {
+      return `课节学习 · ${ctx.title || '未命名课节'}`;
     }
     if (activeCourseId.value) {
       return `课程空间: #${activeCourseId.value} 教学研读中枢`;
@@ -320,12 +396,20 @@ export function useGlobalAssistant() {
     }
   }
 
-  const presetChips = [
-    { label: '智能组卷', prompt: '帮我出一份包含导数与微分的期中试卷，含选择、填空与大题' },
-    { label: '检索切片', prompt: '请深度检索微积分第一章的核心知识点切片与讲义资料' },
-    { label: '学情看板', prompt: '我想查看近期班级知识点掌握度与薄弱点学情报表' },
-    { label: '知识图谱', prompt: '生成并展示当前微积分课程的拓扑知识图谱' }
-  ];
+  const presetChips = computed(() =>
+    isLessonStudioContext.value ? LESSON_STUDIO_PRESET_CHIPS : DEFAULT_PRESET_CHIPS
+  );
+
+  function buildAssistantRequestBase(): Omit<GlobalAssistantChatRequest, 'message'> {
+    const ctxPayload = manualGlobalScope.value
+      ? {}
+      : buildTeachingContextRequestPayload(teachingCopilotStore.activeContext);
+    return {
+      courseId: activeCourseId.value,
+      conversationId: conversationId.value,
+      ...ctxPayload
+    };
+  }
 
   function toggleDrawer() {
     drawerVisible.value = !drawerVisible.value;
@@ -646,8 +730,7 @@ export function useGlobalAssistant() {
     return streamGlobalAssistantChat(
       sseClient,
       query,
-      activeCourseId.value,
-      conversationId.value,
+      buildAssistantRequestBase(),
       streamingContent,
       {
         onIntent: (data) => applyIntentEvent(data as GlobalAssistantIntentEvent),
@@ -698,8 +781,7 @@ export function useGlobalAssistant() {
   async function fallbackAsk(query: string) {
     const res = await askGlobalAssistant({
       message: query,
-      courseId: activeCourseId.value,
-      conversationId: conversationId.value
+      ...buildAssistantRequestBase()
     });
     const data = res?.data;
     if (!data) {
@@ -728,11 +810,14 @@ export function useGlobalAssistant() {
 
     const isRegenerate = Boolean(options && typeof options === 'object' && 'isRegenerate' in options && (options as { isRegenerate?: boolean }).isRegenerate);
     if (!isRegenerate) {
+      const lessonInsertIntent = teachingCopilotStore.activeContext?.lessonInsertIntent;
+      teachingCopilotStore.patchContext({ lessonInsertIntent: undefined });
       messages.value.push({
         id: Date.now(),
         role: 'user',
         content: query,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        ...(lessonInsertIntent ? { lessonInsertIntent } : {})
       });
     }
     inputContent.value = '';
@@ -891,6 +976,33 @@ export function useGlobalAssistant() {
     }
   );
 
+  function handleOpenAssistantEvent(e: Event) {
+    const detail = (e as CustomEvent<{ prefill?: string; autoSend?: boolean }>).detail;
+    const prefill = detail?.prefill?.trim();
+    const autoSend = Boolean(detail?.autoSend && prefill);
+    drawerVisible.value = true;
+    sessions.value = readSessionsFromStorage();
+    restoreFollowUpsForLastTurn();
+    if (prefill) {
+      inputContent.value = prefill;
+    }
+    nextTick(() => {
+      scrollToBottomSmooth();
+      bindMarkdownCodeCopy(messagesScrollRef.value);
+      if (autoSend) {
+        void handleSubmit();
+      }
+    });
+  }
+
+  onMounted(() => {
+    window.addEventListener(OPEN_GLOBAL_ASSISTANT_EVENT, handleOpenAssistantEvent);
+  });
+
+  onUnmounted(() => {
+    window.removeEventListener(OPEN_GLOBAL_ASSISTANT_EVENT, handleOpenAssistantEvent);
+  });
+
   return {
     drawerVisible,
     inputContent,
@@ -905,6 +1017,7 @@ export function useGlobalAssistant() {
     manualGlobalScope,
     toggleScopeMode,
     presetChips,
+    isLessonStudioContext,
     followUpPrompts,
     showThinkingPanel: computed(() => !isThinkingPanelHidden()),
     // 历史会话管理 (对标 Code Compass 原型)

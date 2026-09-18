@@ -28,7 +28,7 @@
                 <!-- 快捷探索推荐长条胶囊 (告别单调方块按钮) -->
                 <div class="empty-prompts-wrap">
                   <div class="empty-prompts-header">
-                    <span class="prompts-tag">✦ 快捷探索推荐</span>
+                    <span class="prompts-tag"><el-icon class="prompts-tag-icon"><StarFilled /></el-icon> 快捷探索推荐</span>
                     <span class="prompts-hint">点击即问</span>
                   </div>
                   <div class="empty-prompts-list">
@@ -40,7 +40,7 @@
                       :title="chip.prompt"
                       @click="handleSendPrompt(chip.prompt)"
                     >
-                      <span class="pill-sparkle">✦</span>
+                      <el-icon class="pill-sparkle"><StarFilled /></el-icon>
                       <span class="pill-text">{{ chip.prompt }}</span>
                       <span class="pill-arrow">↗</span>
                     </button>
@@ -164,6 +164,13 @@
                         <el-icon :size="12"><Delete /></el-icon>
                         <span class="action-chip-text">删除</span>
                       </button>
+
+                      <LessonStudioInsertActions
+                        v-if="msg.role === 'assistant' && isLessonStudioContext && msg.content?.trim()"
+                        :msg="msg"
+                        :msg-index="idx"
+                        :messages="messages"
+                      />
                     </div>
 
                     <!-- 推荐追问胶囊 (仅在最后一条助手回答完毕后展示) -->
@@ -172,7 +179,7 @@
                       class="message-followup-tray"
                     >
                       <div class="followup-tray-title">
-                        <span class="followup-sparkle">✦</span>
+                        <el-icon class="followup-sparkle"><StarFilled /></el-icon>
                         <span>推荐继续探索：</span>
                       </div>
                       <div class="followup-pills-list">
@@ -256,8 +263,9 @@
 
 <script setup lang="ts">
 import { inject } from 'vue';
-import { Reading, CopyDocument, RefreshRight, Delete } from '@element-plus/icons-vue';
+import { Reading, CopyDocument, RefreshRight, Delete, StarFilled } from '@element-plus/icons-vue';
 import AIThinking from '@/components/ai/AIChat/AIThinking.vue';
+import LessonStudioInsertActions from '@/components/ai/global-assistant/LessonStudioInsertActions.vue';
 import { globalAssistantUiKey } from '@/components/ai/global-assistant/global-assistant-ui-key';
 
 const {
@@ -291,6 +299,7 @@ const {
   isReasoningFolded,
   isReasoningActive,
   streamPhaseMessage,
-  pauseAutoScrollFollow
+  pauseAutoScrollFollow,
+  isLessonStudioContext
 } = inject(globalAssistantUiKey)!;
 </script>

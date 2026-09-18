@@ -14,6 +14,7 @@
     size="440px"
     append-to-body
     class="notify-drawer"
+    @opened="onDrawerOpened"
   >
     <NotificationPanel
       ref="panelRef"
@@ -29,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { Bell } from '@element-plus/icons-vue';
 import { useNotifyStore } from '@/stores/notification/notify';
@@ -51,11 +52,10 @@ function goCenter() {
   void router.push('/notice');
 }
 
-watch(drawerVisible, (visible) => {
-  if (visible) {
-    panelRef.value?.refresh();
-  }
-});
+async function onDrawerOpened() {
+  await nextTick();
+  panelRef.value?.refresh();
+}
 </script>
 
 <style scoped lang="scss">

@@ -45,6 +45,23 @@ export const courseRoutes: RouteRecordRaw[] = [
         meta: { title: '教学大纲', requiresAuth: true }
       },
       {
+        path: 'learn/:lessonId',
+        name: 'CourseLessonLearn',
+        component: () => import('@/views/course/learn/LessonLearn.vue'),
+        meta: { title: '课节学习', requiresAuth: true }
+      },
+      {
+        path: 'lessons/:lessonId/edit',
+        name: 'CourseLessonEdit',
+        component: () => import('@/views/course/lesson/LessonEdit.vue'),
+        meta: {
+          title: '编辑课节',
+          requiresAuth: true,
+          roles: ['ADMIN', 'TEACHER'],
+          immersiveLessonStudio: true
+        }
+      },
+      {
         path: 'knowledge-points',
         name: 'CourseKnowledgePoints',
         component: () => import('@/views/course/detail/KnowledgePoints.vue'),

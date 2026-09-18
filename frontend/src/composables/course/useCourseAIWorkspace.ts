@@ -405,8 +405,10 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     if (course.value?.aiPersona && messages.value.length === 0) {
       finalPrompt = `${getPersonaPromptPrefix(course.value.aiPersona)}${finalPrompt}`;
     }
+    const lessonChapterId = route.query.lessonId ? Number(route.query.lessonId) : undefined;
     sendMessage(finalPrompt, courseId, {
       chapterId: activeChapterId.value,
+      lessonChapterId: Number.isFinite(lessonChapterId) ? lessonChapterId : undefined,
       modelKey: currentModelKey.value,
       useRag: Boolean(course.value?.knowledgeBaseId)
     });

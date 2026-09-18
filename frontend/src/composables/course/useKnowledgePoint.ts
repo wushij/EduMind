@@ -4,10 +4,12 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { getCourseKnowledgePoints, createKnowledgePoint, deleteKnowledgePoint } from '@/api/course/knowledge-point';
 import { getChapters } from '@/api/course/chapter';
 import { askGlobalAssistant } from '@/api/ai/assistant';
+import { useTeachingCopilotStore } from '@/stores/ai/teaching-copilot-context';
 
 export function useKnowledgePoint() {
   const route = useRoute();
   const router = useRouter();
+  const teachingCopilotStore = useTeachingCopilotStore();
   const courseId = computed(() => Number(route.params.id) || 101);
 
   const loading = ref(false);
@@ -257,10 +259,29 @@ export function useKnowledgePoint() {
   }
 
   function handleAskAi(kp: any) {
-    router.push({
-      path: `/course/${courseId.value}/ai`,
-      query: { prompt: `请结合本课程知识图谱，详细讲解核心考点【${kp.title || kp.name}】的定义、推导与常见考查题型。` }
-    });
+    const title = kp.title || kp.name || '核心考点';
+    const prompt = `请结合本课程知识图谱，详细讲解核心考点【${title}】的定义、推导与常见考查题型。`;
+    const excerpt = [
+      `知识点：${title}`,
+      kp.code ? `编码：${kp.code}` : '',
+      `所属章节：${getChapterTitle(kp.chapterId)}`,
+      kp.cognitiveDimension ? `认知维度：${getLevelLabel(kp.cognitiveDimension)}` : '',
+      kp.description ? `说明：${kp.description}` : ''
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    teachingCopilotStore.openAssistantWithContext(
+      {
+        contextModule: 'course_space',
+        courseId: courseId.value,
+        title: `考点：${title}`,
+        description: kp.description || '',
+        draftExcerpt: excerpt
+      },
+      prompt,
+      { autoSend: true }
+    );
   }
 
   function handleGenerateQuizForKp(kp: any) {

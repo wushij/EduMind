@@ -1,3 +1,5 @@
+import type { LessonInsertIntent } from '@/utils/ai/lesson-copilot-intent';
+
 /** RAG 引用切片（课程 AI / 全局助手 / 知识库溯源共用） */
 export interface CitationItem {
   id?: number | string;
@@ -29,12 +31,21 @@ export interface GlobalAssistantMessage {
   followUpPrompts?: string[];
   createdAt?: string | number;
   error?: boolean;
+  /** 课节备课：发起本条提问时锁定的插入目标（对齐 Code Compass 按轮次判定） */
+  lessonInsertIntent?: LessonInsertIntent;
 }
 
 export interface GlobalAssistantChatRequest {
   message: string;
   courseId?: number;
   conversationId?: string;
+  contextModule?: string;
+  lessonChapterId?: number;
+  selectedText?: string;
+  draftExcerpt?: string;
+  draftTitle?: string;
+  draftDescription?: string;
+  objectiveExcerpt?: string;
 }
 
 export interface GlobalAssistantAskResponse {

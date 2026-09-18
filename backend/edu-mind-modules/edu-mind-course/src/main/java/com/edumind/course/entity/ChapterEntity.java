@@ -17,6 +17,16 @@ public class ChapterEntity implements Serializable {
     private Long courseId;
     private Long parentId;
     private String title;
+    private String description;
     private Integer sortOrder;
+    private Integer durationMinutes;
+    private String lessonType;
+    private String contentJson;
+    private String contentStatus;
+    private LocalDateTime publishedAt;
     private LocalDateTime createTime;
+
+    public boolean isLessonNode() {
+        return parentId != null && parentId > 0;
+    }
 }

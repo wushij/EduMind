@@ -38,6 +38,7 @@ export interface ChatSession {
 
 export interface StreamOptions {
   chapterId?: number;
+  lessonChapterId?: number;
   modelKey?: string;
   model?: string;
   useRag?: boolean;
@@ -399,6 +400,7 @@ export async function streamAssistantChat(
       message: query,
       courseId,
       chapterId: options?.chapterId,
+      lessonChapterId: options?.lessonChapterId,
       conversationId: conversationId || undefined,
       modelKey: resolveStreamModelKey(options),
       useRag: options?.useRag ?? true,

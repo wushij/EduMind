@@ -18,6 +18,7 @@ import com.edumind.security.context.LoginUserResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -40,9 +41,10 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
         SseEmitter emitter = new SseEmitter(180000L);
         String convId = dto.getConversationId() != null ? dto.getConversationId() : "conv-" + UUID.randomUUID().toString().substring(0, 8);
 
-        IntentRouter.IntentResult intent = intentDispatchService.route(dto.getMessage(), dto.getCourseId());
+        String dispatchMessage = buildDispatchMessage(dto);
+        IntentRouter.IntentResult intent = intentDispatchService.route(dispatchMessage, dto.getCourseId());
         IntentDispatchPlan plan = intentDispatchService.prepare(IntentDispatchRequest.builder()
-                .message(dto.getMessage())
+                .message(dispatchMessage)
                 .courseId(dto.getCourseId())
                 .intent(intent)
                 .build());
@@ -129,9 +131,10 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
     @Override
     public Map<String, Object> ask(GlobalAssistantRequestDTO dto) {
         String convId = dto.getConversationId() != null ? dto.getConversationId() : "conv-" + UUID.randomUUID().toString().substring(0, 8);
-        IntentRouter.IntentResult intent = intentDispatchService.route(dto.getMessage(), dto.getCourseId());
+        String dispatchMessage = buildDispatchMessage(dto);
+        IntentRouter.IntentResult intent = intentDispatchService.route(dispatchMessage, dto.getCourseId());
         IntentDispatchPlan plan = intentDispatchService.prepare(IntentDispatchRequest.builder()
-                .message(dto.getMessage())
+                .message(dispatchMessage)
                 .courseId(dto.getCourseId())
                 .intent(intent)
                 .build());
@@ -200,6 +203,52 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
             case "navigate" -> "识别意图：页面功能直达";
             default -> "识别意图：课程助教答疑";
         };
+    }
+
+    private String buildDispatchMessage(GlobalAssistantRequestDTO dto) {
+        String base = dto.getMessage() != null ? dto.getMessage() : "";
+        if (dto.getLessonChapterId() != null && !"lesson_studio".equalsIgnoreCase(String.valueOf(dto.getContextModule()))) {
+            return "[当前微课节ID: " + dto.getLessonChapterId() + "] " + base;
+        }
+        if (!"lesson_studio".equalsIgnoreCase(String.valueOf(dto.getContextModule()))) {
+            return base;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("[课节备课上下文]");
+        if (dto.getLessonChapterId() != null) {
+            sb.append("\n微课节ID: ").append(dto.getLessonChapterId());
+        }
+        if (dto.getCourseId() != null) {
+            sb.append("\n课程ID: ").append(dto.getCourseId());
+        }
+        if (StringUtils.hasText(dto.getDraftTitle())) {
+            sb.append("\n课节标题: ").append(dto.getDraftTitle().trim());
+        }
+        if (StringUtils.hasText(dto.getDraftDescription())) {
+            sb.append("\n课节导读: ").append(truncate(dto.getDraftDescription(), 400));
+        }
+        if (StringUtils.hasText(dto.getObjectiveExcerpt())) {
+            sb.append("\n学习目标摘录: ").append(truncate(dto.getObjectiveExcerpt(), 400));
+        }
+        if (StringUtils.hasText(dto.getDraftExcerpt())) {
+            sb.append("\n正文摘录: ").append(truncate(dto.getDraftExcerpt(), 1200));
+        }
+        if (StringUtils.hasText(dto.getSelectedText())) {
+            sb.append("\n编辑器选区: ").append(truncate(dto.getSelectedText(), 800));
+        }
+        sb.append("\n\n教师提问: ").append(base);
+        return sb.toString();
+    }
+
+    private String truncate(String text, int maxLen) {
+        if (text == null) {
+            return "";
+        }
+        String trimmed = text.trim();
+        if (trimmed.length() <= maxLen) {
+            return trimmed;
+        }
+        return trimmed.substring(0, maxLen) + "…";
     }
 
     private void sendEvent(SseEmitter emitter, String eventName, Object data) {

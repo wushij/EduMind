@@ -8,6 +8,8 @@ public interface CourseResourceService {
 
     List<CourseResourceVO> listByCourseId(Long courseId);
 
+    List<CourseResourceVO> listByCourseId(Long courseId, Long chapterId);
+
     Long addResource(Long courseId, com.edumind.resource.dto.course.CourseResourceCreateDTO dto);
 
     void deleteResource(Long resourceId);

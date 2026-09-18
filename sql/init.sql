@@ -242,7 +242,13 @@ CREATE TABLE IF NOT EXISTS course_chapter (
     course_id   BIGINT       NOT NULL COMMENT '所属课程ID',
     parent_id   BIGINT       DEFAULT 0 COMMENT '父章节ID',
     title       VARCHAR(128) NOT NULL COMMENT '章节标题',
+    description TEXT         DEFAULT NULL COMMENT '章概要或课节导读',
     sort_order  INT          DEFAULT 0 COMMENT '排序号',
+    duration_minutes INT     DEFAULT NULL COMMENT '课节时长（分钟）',
+    lesson_type VARCHAR(16)  DEFAULT NULL COMMENT 'LECTURE/PRACTICE/QUIZ',
+    content_json MEDIUMTEXT  DEFAULT NULL COMMENT '课节块式正文 JSON',
+    content_status VARCHAR(16) DEFAULT 'DRAFT' COMMENT 'DRAFT/PUBLISHED',
+    published_at DATETIME    DEFAULT NULL COMMENT '发布时间',
     create_time DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
@@ -255,6 +261,10 @@ CREATE TABLE IF NOT EXISTS course_knowledge_point (
     course_id   BIGINT       NOT NULL COMMENT '所属课程ID',
     chapter_id  BIGINT       DEFAULT NULL COMMENT '所属章节ID',
     title       VARCHAR(128) NOT NULL COMMENT '知识点名称',
+    code        VARCHAR(32)  DEFAULT NULL COMMENT '知识点编码',
+    description TEXT         DEFAULT NULL COMMENT '知识点说明',
+    cognitive_dimension VARCHAR(16) DEFAULT NULL COMMENT '认知维度',
+    importance  TINYINT      DEFAULT 3 COMMENT '重要程度1-5',
     sort_order  INT          DEFAULT 0 COMMENT '排序号',
     create_time DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     KEY idx_tenant_id (tenant_id),
@@ -262,6 +272,40 @@ CREATE TABLE IF NOT EXISTS course_knowledge_point (
     KEY idx_course_id (course_id),
     KEY idx_chapter_id (chapter_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程知识点表';
+
+CREATE TABLE IF NOT EXISTS course_chapter_knowledge_point (
+    id                  BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    tenant_id           BIGINT NOT NULL DEFAULT 1 COMMENT '租户ID',
+    course_id           BIGINT NOT NULL COMMENT '课程ID',
+    chapter_id          BIGINT NOT NULL COMMENT '微课节章节ID',
+    knowledge_point_id  BIGINT NOT NULL COMMENT '知识点ID',
+    sort_order          INT DEFAULT 0 COMMENT '排序',
+    create_time         DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_tenant_id (tenant_id),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_chapter_kp (chapter_id, knowledge_point_id),
+    KEY idx_course_chapter (course_id, chapter_id),
+    KEY idx_knowledge_point (knowledge_point_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课节与知识点关联';
+
+CREATE TABLE IF NOT EXISTS course_lesson_progress (
+    id                  BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    tenant_id           BIGINT NOT NULL DEFAULT 1 COMMENT '租户ID',
+    student_id          BIGINT NOT NULL COMMENT '学生ID',
+    course_id           BIGINT NOT NULL COMMENT '课程ID',
+    lesson_chapter_id   BIGINT NOT NULL COMMENT '微课节ID',
+    status              VARCHAR(16) NOT NULL DEFAULT 'NOT_STARTED' COMMENT 'NOT_STARTED/IN_PROGRESS/COMPLETED',
+    progress_percent    INT NOT NULL DEFAULT 0 COMMENT '进度0-100',
+    last_block_id       VARCHAR(64) DEFAULT NULL COMMENT '最后学习块ID',
+    last_study_at       DATETIME DEFAULT NULL COMMENT '最近学习时间',
+    completed_at        DATETIME DEFAULT NULL COMMENT '完成时间',
+    create_time         DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_tenant_id (tenant_id),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_student_lesson (student_id, lesson_chapter_id),
+    KEY idx_course_student (course_id, student_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学生课节学习进度';
 
 CREATE TABLE IF NOT EXISTS course_member (
     id          BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -806,6 +850,8 @@ CREATE TABLE IF NOT EXISTS learning_record (
     action_type     VARCHAR(32)  NOT NULL COMMENT 'LOGIN/STUDY/RESOURCE_VIEW/AI_CHAT',
     duration_minutes INT         DEFAULT 0 COMMENT '学习时长（分钟）',
     resource_id     BIGINT       DEFAULT NULL COMMENT '关联资源ID',
+    chapter_id      BIGINT       DEFAULT NULL COMMENT '微课节章节ID',
+    knowledge_point_id BIGINT     DEFAULT NULL COMMENT '知识点ID',
     create_time     DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
@@ -1620,6 +1666,16 @@ INSERT IGNORE INTO course_chapter (id, course_id, parent_id, title, sort_order) 
 (13, 103, 0,  '第二章 导数与微分',          2),
 (14, 103, 13, '2.1 复合函数与隐函数求导',    1);
 
+-- 7.1 微课节演示内容（Java 课节 8，供学习页联调）
+UPDATE course_chapter SET
+    description = '理解 Java 基本数据类型、变量作用域与包装类拆装箱机制。',
+    duration_minutes = 30,
+    lesson_type = 'LECTURE',
+    content_status = 'PUBLISHED',
+    published_at = NOW(),
+    content_json = '{"version":1,"blocks":[{"type":"callout","variant":"objective","title":"学习目标","body":"掌握基本数据类型分类；理解包装类与自动拆装箱。"},{"type":"markdown","body":"## 核心概念\\n\\nJava 将数据类型分为基本类型与引用类型。基本类型直接存储值，引用类型存储对象地址。"},{"type":"heading","level":2,"text":"实践要点"}]}'
+WHERE id = 8 AND course_id = 102;
+
 -- 8. 知识点
 INSERT IGNORE INTO course_knowledge_point (id, course_id, chapter_id, title, sort_order) VALUES
 (10, 101, 2,  '时间与空间复杂度分析',            1),
@@ -1632,6 +1688,16 @@ INSERT IGNORE INTO course_knowledge_point (id, course_id, chapter_id, title, sor
 (17, 103, 12, '等价无穷小代换及其应用条件',      1),
 (18, 103, 12, '洛必达法则求未定式极限',          2),
 (19, 103, 14, '复合函数链式求导法则',            3);
+
+UPDATE course_knowledge_point SET
+    code = 'KP-014',
+    description = '八种基本类型与默认值规则',
+    cognitive_dimension = 'UNDERSTAND',
+    importance = 4
+WHERE id = 14;
+
+INSERT IGNORE INTO course_chapter_knowledge_point (tenant_id, course_id, chapter_id, knowledge_point_id, sort_order)
+VALUES (1, 102, 8, 14, 1);
 
 -- 9. 课程选课成员
 INSERT IGNORE INTO course_member (course_id, user_id, member_role) VALUES

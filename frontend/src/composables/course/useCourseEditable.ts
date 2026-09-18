@@ -1,5 +1,6 @@
 import { computed, inject, type ComputedRef, type InjectionKey, type Ref } from 'vue';
 import type { Course } from '@/types/course/course';
+import { useAuthStore } from '@/stores/auth/auth';
 
 export const courseDetailInjectionKey: InjectionKey<Ref<Course | null>> = Symbol('courseDetail');
 
@@ -15,15 +16,32 @@ function resolveCourse(source?: CourseSource): Course | null | undefined {
   return source;
 }
 
+function isCourseOwner(course: Course | null | undefined): boolean {
+  if (!course?.teacherId) {
+    return false;
+  }
+  const authStore = useAuthStore();
+  const uid = authStore.currentUser?.id;
+  if (uid == null) {
+    return false;
+  }
+  return Number(course.teacherId) === Number(uid);
+}
+
 export function useCourseEditable(course?: CourseSource): ComputedRef<boolean> {
   const injected = inject(courseDetailInjectionKey, null);
   return computed(() => {
     const fromProp = resolveCourse(course);
-    if (fromProp?.editable !== undefined) {
-      return Boolean(fromProp.editable);
+    const resolved = fromProp ?? injected?.value ?? null;
+
+    if (resolved?.editable === true) {
+      return true;
     }
-    if (injected?.value?.editable !== undefined) {
-      return Boolean(injected.value.editable);
+    if (isCourseOwner(resolved)) {
+      return true;
+    }
+    if (resolved?.editable === false) {
+      return false;
     }
     return false;
   });

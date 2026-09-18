@@ -16,7 +16,12 @@
         <span>加入课程</span>
       </button>
 
-      <button type="button" class="capsule-btn capsule-btn--primary" @click="router.push('/course/create')">
+      <button
+        v-if="canCreateCourse"
+        type="button"
+        class="capsule-btn capsule-btn--primary"
+        @click="router.push('/course/create')"
+      >
         <svg viewBox="0 0 24 24" class="btn-icon-svg" fill="none" stroke="currentColor" stroke-width="2.2">
           <line x1="12" y1="5" x2="12" y2="19"></line>
           <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -49,8 +54,11 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
+import { useAuthStore } from '@/stores/auth/auth';
+import { RoleEnum } from '@/constants/auth';
 
 defineProps<{
   total: number;
@@ -63,6 +71,11 @@ const emit = defineEmits<{
 }>();
 
 const router = useRouter();
+const authStore = useAuthStore();
+
+const canCreateCourse = computed(() =>
+  authStore.hasAnyRole([RoleEnum.ADMIN, RoleEnum.TEACHER])
+);
 </script>
 
 <style scoped lang="scss">

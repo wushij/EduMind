@@ -30,6 +30,7 @@ sql/
 │   ├── V2_2_3__course_ai_and_attributes_expansion.sql # V2.2.3 课程学分/学时/AI 人设等字段
 │   ├── V2_2_4__course_overview_portal.sql      # V2.2.4 课程概览：教学目标/公告/教学团队
 │   ├── V2_2_5__sys_menu.sql                    # V2.2.5 系统菜单表 + assignment:delete 权限
+│   ├── V2_3_0__course_lesson_content.sql       # V2.3.0 微课节正文/进度/课节-知识点（幂等，可重复执行）
 │   ├── R__seed_data.sql                        # V0 增量路径演示种子（用户/课程/题库/AI 等，幂等）
 │   ├── R__seed_legacy.sql                      # 旧库升级补丁（租户角色/组织成员/权限乱码修复，幂等）
 │   └── R__gate_e2e_seeds.sql                   # Gate F/G/H 集成测试种子（幂等，init 不含 Gate F）
@@ -53,7 +54,7 @@ mysql -u root -p < sql/init.sql
 
 > 已有业务数据的库 **禁止** 执行 `init.sql`；补表、改结构、版本升级请走 `sql/migration/V*.sql`（执行前 `mysqldump` 备份）。
 
-`init.sql` 已包含 **V0.1 ~ V2.2.5** 迁移最终状态（含多租户 Wave1/2、权限补全、课程 AI 字段、课程概览门户表、`sys_menu`、RAG/国密 KMS/组织配额/操作日志等），**全新空库跑 init 后无需再跑 `V*.sql` migration**（Gate E2E 可选种子除外）。
+`init.sql` 已包含 **V0.1 ~ V2.3.0** 迁移最终状态（含多租户 Wave1/2、权限补全、课程 AI 字段、课程概览门户表、`sys_menu`、微课节正文/进度、RAG/国密 KMS/组织配额/操作日志等），**全新空库跑 init 后无需再跑 `V*.sql` migration**（Gate E2E 可选种子除外）。
 
 ### 方式二：按版本增量迁移（已有空库分步升级）
 
@@ -80,9 +81,10 @@ mysql -u root -p < sql/init.sql
 18. V2_2_3__course_ai_and_attributes_expansion.sql
 19. V2_2_4__course_overview_portal.sql
 20. V2_2_5__sys_menu.sql
-21. R__seed_data.sql          # 可选，V0 增量路径补充演示数据
-22. R__seed_legacy.sql        # 可选，旧库升级补丁（租户 RBAC / 组织成员）
-23. R__gate_e2e_seeds.sql     # 可选，Gate F/G/H 集成测试专用
+21. V2_3_0__course_lesson_content.sql   # V2.3.0 微课节内容（幂等，可重复执行）
+22. R__seed_data.sql          # 可选，V0 增量路径补充演示数据
+23. R__seed_legacy.sql        # 可选，旧库升级补丁（租户 RBAC / 组织成员）
+24. R__gate_e2e_seeds.sql     # 可选，Gate F/G/H 集成测试专用
 ```
 
 > **执行顺序说明：** V1.2 依赖 V2.0 多租户表结构，因此 `V1_1__*` 插在 `V2_0_0__*` 与 `V2_0_1__*` 之间，与历史细粒度脚本顺序一致。
@@ -138,6 +140,15 @@ mysql -u root -p edumind < sql/migration/R__seed_legacy.sql
 | V2.0.21 AI 模型密钥 KMS | `V2_0_4__ai_model_key_version.sql` | `ai_model_config.key_version` + 平台模型密钥种子 `edumind-model-key` (Gate I10) |
 | V2.0.22 组织院系配额 | `V2_0_5__sys_org_quota.sql` | `sys_org_quota` 表 + 组织级 TOKEN/STORAGE/SEATS 演示种子 |
 | V2.0.23 操作日志加固 | `V2_0_6__oper_log_tenant_hardening.sql` | `sys_oper_log` 多租户索引与 operlog 权限闭环 (Gate I11) |
+| V2.3.0 微课节内容 | `V2_3_0__course_lesson_content.sql` | 课节正文/进度/课节-知识点关联（**幂等，可重复执行**） |
+
+已在 **V2.2.5** 的库只需执行：
+
+```bash
+mysql -u root -p --default-character-set=utf8mb4 edumind -e "source E:/EduMind/sql/migration/V2_3_0__course_lesson_content.sql"
+```
+
+（Navicat：打开该文件 → 运行；若曾执行失败过一半，直接再跑本脚本即可。）
 
 示例（从 V0.2 升级到 V0.5）：
 
@@ -160,7 +171,7 @@ mysql -u root -p edumind < sql/migration/V2_0_5__sys_org_quota.sql
 mysql -u root -p edumind < sql/migration/V2_0_6__oper_log_tenant_hardening.sql
 ```
 
-> 全新建库请直接执行最新版 `sql/init.sql`（已含 V0.1~V2.0.23 与 V1.2.x 完整结构及种子），无需再跑 migration。
+> 全新建库请直接执行最新版 `sql/init.sql`（已含 V0.1~V2.3.0 与 V1.2.x 完整结构及种子），无需再跑 migration。
 
 ### V1.1 回滚（慎用，先备份）
 
@@ -244,8 +255,10 @@ Get-Content sql\migration\R__gate_e2e_seeds.sql -Raw -Encoding UTF8 | mysql -uro
 | | `sys_tenant_quota` | - | 租户资源配额（Token/存储/QPS/席位） |
 | | `sys_org_quota` | `SysOrgQuotaEntity` | 组织院系算力配额分配表（Gate I11/V2.0.5） |
 | **课程教学** | `course` | `CourseEntity` | 课程主信息 |
-| | `course_chapter` | `ChapterEntity` | 课程大纲层级章节树 |
+| | `course_chapter` | `ChapterEntity` | 课程大纲层级章节树（含微课节正文 JSON） |
 | | `course_knowledge_point` | `KnowledgePointEntity` | 知识图谱核心知识点 |
+| | `course_chapter_knowledge_point` | - | 微课节与知识点关联（V2.3.0） |
+| | `course_lesson_progress` | - | 学生课节学习进度（V2.3.0） |
 | | `course_member` | `CourseMemberEntity` | 选课成员与教师绑定 |
 | **题库试卷** | `question_bank` | `QuestionBankEntity` | 课程题库管理 |
 | | `edu_question` | `QuestionEntity` | 试题（支持单选/多选/判断/填空/简答） |

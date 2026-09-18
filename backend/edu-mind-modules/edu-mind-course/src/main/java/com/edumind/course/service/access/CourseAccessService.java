@@ -2,6 +2,7 @@ package com.edumind.course.service.access;
 
 import com.edumind.common.enums.RoleCode;
 import com.edumind.common.exception.BusinessException;
+import com.edumind.course.dao.CourseDao;
 import com.edumind.course.dao.CourseMemberDao;
 import com.edumind.course.entity.CourseEntity;
 import com.edumind.course.entity.CourseMemberEntity;
@@ -15,8 +16,26 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CourseAccessService {
 
+    private final CourseDao courseDao;
     private final CourseMemberDao courseMemberDao;
     private final UserQueryApi userQueryApi;
+
+    public CourseEntity assertCanViewByCourseId(Long courseId) {
+        CourseEntity course = courseDao.findById(courseId);
+        if (course == null) {
+            throw new BusinessException("课程不存在");
+        }
+        assertCanView(course);
+        return course;
+    }
+
+    public CourseEntity requireCourse(Long courseId) {
+        CourseEntity course = courseDao.findById(courseId);
+        if (course == null) {
+            throw new BusinessException("课程不存在");
+        }
+        return course;
+    }
 
     public void assertCanView(CourseEntity course) {
         Long currentUserId = LoginUserResolver.requireUserId();
@@ -44,18 +63,19 @@ public class CourseAccessService {
     }
 
     /**
-     * 课程门户编辑权限：仅课程主讲、本课助教/教师成员可改。
-     * 不因全局 course:edit、平台管理员或「仅选课学生」身份获得编辑权。
+     * 课程门户编辑权限：仅课程创建者（{@code teacher_id}）、本课教师/助教成员可维护。
+     * 平台管理员查看他人课程时不可编辑；创建课程时创建者会写入 {@code teacher_id}。
+     * 不因全局 {@code course:edit} 或「仅选课学生」身份获得编辑权。
      */
     public void assertCanEdit(CourseEntity course) {
         Long currentUserId = LoginUserResolver.requireUserId();
-        if (currentUserId.equals(course.getTeacherId())) {
+        if (course.getTeacherId() != null && course.getTeacherId().equals(currentUserId)) {
             return;
         }
         CourseMemberEntity member = courseMemberDao.findByCourseIdAndUserId(course.getId(), currentUserId);
         if (member != null && ("TEACHER".equals(member.getMemberRole()) || "ASSISTANT".equals(member.getMemberRole()))) {
             return;
         }
-        throw new BusinessException("无权限编辑该课程，仅主讲教师或本课助教可维护");
+        throw new BusinessException("无权限编辑该课程，仅课程创建者或本课教师/助教可维护");
     }
 }

@@ -38,9 +38,11 @@ public class CourseQueryServiceImpl implements CourseQueryService {
         if (entity == null) {
             return null;
         }
+        UserBriefVO teacher = resolveTeacher(entity.getTeacherId());
         return courseConverter.toDetailVO(
                 entity,
-                resolveTeacherName(entity.getTeacherId()),
+                resolveTeacherName(teacher),
+                resolveTeacherAvatar(teacher),
                 courseMemberDao.countStudentsByCourseId(entity.getId()));
     }
 
@@ -50,10 +52,14 @@ public class CourseQueryServiceImpl implements CourseQueryService {
             return Collections.emptyList();
         }
         return courseDao.findByIds(courseIds).stream()
-                .map(entity -> courseConverter.toVO(
-                        entity,
-                        resolveTeacherName(entity.getTeacherId()),
-                        courseMemberDao.countStudentsByCourseId(entity.getId())))
+                .map(entity -> {
+                    UserBriefVO teacher = resolveTeacher(entity.getTeacherId());
+                    return courseConverter.toVO(
+                            entity,
+                            resolveTeacherName(teacher),
+                            resolveTeacherAvatar(teacher),
+                            courseMemberDao.countStudentsByCourseId(entity.getId()));
+                })
                 .collect(Collectors.toList());
     }
 
@@ -113,14 +119,24 @@ public class CourseQueryServiceImpl implements CourseQueryService {
         return courseMemberDao.findStudentUserIdsByCourseId(courseId);
     }
 
-    private String resolveTeacherName(Long teacherId) {
+    private UserBriefVO resolveTeacher(Long teacherId) {
         if (teacherId == null) {
-            return "";
+            return null;
         }
-        UserBriefVO teacher = userQueryApi.getUserById(teacherId);
+        return userQueryApi.getUserById(teacherId);
+    }
+
+    private String resolveTeacherName(UserBriefVO teacher) {
         if (teacher == null) {
             return "";
         }
         return teacher.getRealName() != null ? teacher.getRealName() : teacher.getUsername();
+    }
+
+    private String resolveTeacherAvatar(UserBriefVO teacher) {
+        if (teacher == null || teacher.getAvatar() == null || teacher.getAvatar().isBlank()) {
+            return null;
+        }
+        return teacher.getAvatar();
     }
 }

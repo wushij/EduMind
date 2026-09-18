@@ -9,6 +9,7 @@ export interface Course {
   coverUrl?: string;
   teacherId?: number;
   teacherName: string;
+  teacherAvatar?: string;
   semester?: string;
   studentCount: number;
   chapterCount: number;

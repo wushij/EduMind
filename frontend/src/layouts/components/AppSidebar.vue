@@ -3,9 +3,9 @@
     <!-- Logo 品牌区域 (docs/logo.png + PRD 品牌命名) -->
     <div class="logo" @click="router.push('/dashboard')" title="EduMind｜AI 智能教学赋能平台">
       <div class="logo-icon">
-        <img class="logo-image" src="@/assets/images/logo.png" alt="EduMind" />
+        <img class="logo-image" :src="logoSidebar" alt="EduMind" />
       </div>
-      <div v-show="!isCollapsed" class="logo-text">
+      <div v-if="!isCollapsed" class="logo-text">
         <span class="logo-title">EduMind</span>
         <span class="logo-subtitle">智教云 · EduMind</span>
       </div>
@@ -79,6 +79,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import logoSidebar from '@/assets/images/logo-sidebar.png';
 import {
   HomeFilled,
   Compass,
@@ -573,8 +574,16 @@ onMounted(() => {
 }
 
 .sidebar.is-collapse .logo {
-  justify-content: center;
+  width: 100%;
+  display: grid;
+  place-items: center;
   padding: 0;
+  gap: 0;
+}
+
+.sidebar.is-collapse .menu-wrapper {
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .logo-icon {
@@ -584,18 +593,20 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: transform 0.4s ease;
+}
+
+.sidebar.is-collapse .logo-icon {
+  width: 64px;
+  height: 40px;
 }
 
 .logo-image {
-  width: 100%;
-  height: 100%;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
+  object-position: center center;
   display: block;
-}
-
-.logo:hover .logo-icon {
-  transform: scale(1.05);
+  flex-shrink: 0;
 }
 
 .logo-text {

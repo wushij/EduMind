@@ -18,7 +18,8 @@ import {
   getCategoryEmptyText
 } from '@/utils/notification/notify-category';
 import { getNotificationNavigatePath } from '@/utils/notification/notify-nav';
-import type { NotificationCategory, NotificationType } from '@/types/notification';
+import type { NotificationCategory, NotificationListResult, NotificationType, NotificationVO } from '@/types/notification';
+import type { PageResult } from '@/types/common/api';
 
 export interface NotifyListItem {
   id: number;
@@ -43,6 +44,36 @@ export interface UseNotificationListOptions {
   enableRealtime?: boolean;
   /** 仅抽屉打开时追加（由外部传入） */
   realtimeActive?: () => boolean;
+}
+
+function normalizeListPage(data?: NotificationListResult): {
+  items: NotificationVO[];
+  total: number;
+  unreadCount?: number;
+} {
+  if (!data) {
+    return { items: [], total: 0 };
+  }
+  const page = data.list;
+  let items: NotificationVO[] = [];
+  if (Array.isArray(page)) {
+    items = page;
+  } else if (page && typeof page === 'object') {
+    const pageObj = page as PageResult<NotificationVO> & { records?: NotificationVO[] };
+    items = pageObj.list ?? pageObj.records ?? [];
+  }
+  const pageTotal =
+    page && typeof page === 'object' && !Array.isArray(page)
+      ? Number((page as PageResult<NotificationVO>).total)
+      : NaN;
+  const total = Number.isFinite(pageTotal) && pageTotal >= 0
+    ? pageTotal
+    : Number(data.totalCount ?? items.length);
+  return {
+    items,
+    total,
+    unreadCount: data.unreadCount
+  };
 }
 
 function toListItem(raw: {
@@ -97,12 +128,14 @@ export function useNotificationList(options: UseNotificationListOptions = {}) {
         pageSize: pageSize.value,
         category: activeCategory.value
       });
-      const list = res.data?.list?.list || [];
-      notifications.value = list.map(toListItem);
-      total.value = res.data?.list?.total ?? 0;
-      if (res.data?.unreadCount != null) {
-        notifyStore.unreadCount = res.data.unreadCount;
+      const { items, total: listTotal, unreadCount: apiUnread } = normalizeListPage(res.data);
+      notifications.value = items.map(toListItem);
+      total.value = listTotal;
+      if (apiUnread != null) {
+        notifyStore.unreadCount = apiUnread;
       }
+    } catch {
+      ElMessage.error('消息列表加载失败，请稍后重试');
     } finally {
       loading.value = false;
     }

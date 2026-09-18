@@ -22,7 +22,8 @@ export type GlobalAssistantUiContext = {
   activeCourseLabel: Ref<string>;
   manualGlobalScope: Ref<boolean>;
   toggleScopeMode: () => void;
-  presetChips: { prompt: string }[];
+  presetChips: ComputedRef<{ label?: string; prompt: string }[]>;
+  isLessonStudioContext: ComputedRef<boolean>;
   followUpPrompts: Ref<string[]>;
   showThinkingPanel: Ref<boolean> | ComputedRef<boolean>;
   isHistoryPanelOpen: Ref<boolean>;

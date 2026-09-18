@@ -14,6 +14,7 @@ public class ChatStreamDTO {
     private Long knowledgeBaseId;
     private Boolean useRag;
     private Long chapterId;
+    private Long lessonChapterId;
     private Long documentId;
 
     /** 前端选择的模型配置标识（config_name / model_key），为空时使用默认对话模型 */

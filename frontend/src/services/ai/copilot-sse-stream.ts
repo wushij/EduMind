@@ -1,7 +1,7 @@
 import type { SSEClient } from '@/core/sse/client';
 import { API_BASE_URL } from '@/config';
 import { splitCopilotStream } from '@/utils/ai/copilot-stream-split';
-import type { CitationItem } from '@/types/ai/assistant';
+import type { CitationItem, GlobalAssistantChatRequest } from '@/types/ai/assistant';
 
 export type CopilotStreamProgress = {
   receivedContent: boolean;
@@ -104,8 +104,7 @@ export async function runCopilotSseStream(
 export async function streamGlobalAssistantChat(
   sseClient: SSEClient,
   query: string,
-  courseId: number | undefined,
-  conversationId: string | undefined,
+  request: Omit<GlobalAssistantChatRequest, 'message'>,
   streamingContentRef: { value: string },
   handlers: CopilotSseHandlers
 ): Promise<boolean> {
@@ -114,8 +113,7 @@ export async function streamGlobalAssistantChat(
     `${API_BASE_URL}/ai/assistant/chat`,
     {
       message: query,
-      courseId,
-      conversationId
+      ...request
     },
     streamingContentRef,
     {

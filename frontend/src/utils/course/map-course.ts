@@ -41,6 +41,7 @@ export function mapCourse(raw: Record<string, any>): Course {
     cover: raw.coverUrl || raw.cover || raw.coverImage,
     teacherId: raw.teacherId,
     teacherName: raw.teacherName || '',
+    teacherAvatar: raw.teacherAvatar || raw.teacher_avatar,
     semester: raw.semester,
     studentCount: Number(raw.studentCount ?? 0),
     chapterCount: Number(raw.chapterCount ?? 0),
