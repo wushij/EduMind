@@ -17,18 +17,20 @@
       @clear-keyword="clearKeyword"
     />
 
-    <CourseListGrid
-      :loading="loading"
-      :courses="courses"
-      @reset-filters="resetFilters"
-    />
+    <div class="course-list-panel system-table-card">
+      <CourseListGrid
+        :loading="loading"
+        :courses="courses"
+        @reset-filters="resetFilters"
+      />
 
-    <AppPagination
-      v-model:page-num="currentPage"
-      v-model:page-size="pageSize"
-      :total="total"
-      @change="loadData"
-    />
+      <AppPagination
+        v-model:page-num="currentPage"
+        v-model:page-size="pageSize"
+        :total="total"
+        @change="loadData"
+      />
+    </div>
 
     <CourseJoinDialog
       v-model:visible="showJoinDialog"
@@ -80,11 +82,32 @@ const {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/system-page-shell.scss';
+
 .course-list-page {
   display: flex;
   flex-direction: column;
   gap: 12px;
   width: 100%;
-  padding-bottom: 40px;
+  min-height: 0;
+  padding-bottom: 8px;
+  box-sizing: border-box;
+
+  > * {
+    flex: 0 0 auto;
+  }
+}
+
+.course-list-panel {
+  padding: 20px 24px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+
+  :deep(.pagination-bar) {
+    margin-top: 16px;
+    padding-top: 12px;
+  }
 }
 </style>

@@ -1,31 +1,30 @@
 <template>
-  <div class="page-container role-management-page gb-fade-in">
-    <!-- 顶部过滤栏 (对标 Code Compass Filter Card) -->
-    <el-card shadow="never" class="filter-card">
-      <div class="filter-row">
-        <div class="filter-left">
-          <span class="filter-title">系统角色与权限授权</span>
-          <span class="filter-tag">RBAC 核心控制</span>
-          <span class="filter-count">共 {{ roles.length }} 个系统角色 · 支持细粒度菜单与功能授权</span>
+  <div class="system-page-shell role-management-page gb-fade-in">
+    <ProfilePageHero
+      title="系统角色与权限授权"
+      :subtitle="`共 ${roles.length} 个系统角色，支持细粒度菜单与功能授权`"
+    >
+      <template #actions>
+        <div class="hero-action-row">
+          <button type="button" class="hero-pill-btn is-primary" @click="openCreateDialog">
+            <el-icon><Plus /></el-icon>
+            新增角色
+          </button>
         </div>
-        <div class="filter-actions">
-          <el-input
-            v-model="searchKeyword"
-            clearable
-            placeholder="搜索角色名称或编码..."
-            style="width: 220px"
-            :prefix-icon="Search"
-            class="search-input"
-          />
-          <el-button type="primary" round class="add-btn" @click="openCreateDialog">
-            <el-icon><Plus /></el-icon> 新增角色
-          </el-button>
-        </div>
-      </div>
-    </el-card>
+      </template>
+    </ProfilePageHero>
 
-    <!-- 角色数据表格 (对标 Code Compass gb-modern-table) -->
-    <el-card shadow="never" class="table-card">
+    <div class="system-filter-card filter-toolbar">
+      <el-input
+        v-model="searchKeyword"
+        clearable
+        placeholder="搜索角色名称或编码..."
+        class="search-input"
+        :prefix-icon="Search"
+      />
+    </div>
+
+    <div class="system-table-card table-card">
       <el-table
         v-loading="loading"
         :data="filteredRoles"
@@ -91,7 +90,7 @@
           </div>
         </template>
       </el-table>
-    </el-card>
+    </div>
 
     <!-- 角色新增 / 编辑弹窗 -->
     <el-dialog
@@ -130,7 +129,7 @@
     <el-drawer
       v-model="permDrawer"
       title="分配菜单权限"
-      size="480px"
+      size="520px"
       append-to-body
       class="perm-drawer"
     >
@@ -203,6 +202,7 @@
 
 <script setup lang="ts">
 import { Plus, Search } from '@element-plus/icons-vue';
+import ProfilePageHero from '@/components/profile/ProfilePageHero.vue';
 import { useRole } from '@/composables/system/useRole';
 
 const {
@@ -237,68 +237,29 @@ const {
 } = useRole();
 </script>
 
-<style scoped>
-.page-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 20px;
-  background: #f8fafc;
-  min-height: calc(100vh - 64px);
-}
+<style scoped lang="scss">
+@use '@/styles/system-page-shell.scss';
 
-.filter-card {
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-}
+.role-management-page {
+  .filter-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
 
-.filter-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
+    .search-input {
+      width: 320px;
 
-.filter-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
+      :deep(.el-input__wrapper) {
+        border-radius: 999px;
+      }
+    }
+  }
 
-.filter-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.filter-tag {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #6366f1;
-  background: rgba(99, 102, 241, 0.08);
-  padding: 2px 8px;
-  border-radius: 6px;
-}
-
-.filter-count {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.filter-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.table-card {
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-  overflow: hidden;
+  .table-card {
+    overflow: hidden;
+    padding: 0;
+  }
 }
 
 .role-table :deep(.el-table__header th) {
@@ -352,10 +313,11 @@ const {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 12px;
-  background: #f8fafc;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8faff 100%);
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(30, 80, 150, 0.05);
 }
 
 .toolbar-btns {
@@ -368,8 +330,10 @@ const {
   max-height: calc(100vh - 230px);
   overflow-y: auto;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 10px;
+  border-radius: 24px;
+  padding: 16px 18px;
+  background: #ffffff;
+  box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
 }
 
 .tree-node-item {

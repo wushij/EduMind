@@ -1,118 +1,98 @@
 <template>
   <div class="not-found-page">
-    <div class="glow-orb glow-orb--left"></div>
-    <div class="glow-orb glow-orb--right"></div>
+    <div class="page-glow page-glow--blue" aria-hidden="true" />
+    <div class="page-glow page-glow--purple" aria-hidden="true" />
 
-    <div class="not-found-card">
-      <!-- 科技感 404 浮空插画 -->
-      <div class="illustration-box">
-        <svg class="space-svg" viewBox="0 0 320 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <ellipse cx="160" cy="195" rx="110" ry="18" fill="#1677FF" fill-opacity="0.08" />
-          <ellipse cx="160" cy="195" rx="70" ry="10" fill="#722ED1" fill-opacity="0.12" />
+    <div class="not-found-shell">
+      <section class="hero-panel">
+        <div class="hero-panel__glow hero-panel__glow--blue" aria-hidden="true" />
+        <div class="hero-panel__glow hero-panel__glow--purple" aria-hidden="true" />
 
-          <!-- 悬浮小行星 -->
-          <circle cx="60" cy="65" r="16" fill="url(#planet-grad-1)" filter="drop-shadow(0 4px 12px rgba(22, 119, 255, 0.2))" />
-          <ellipse cx="60" cy="65" rx="24" ry="6" stroke="#93C5FD" stroke-width="1.5" stroke-dasharray="3 3" />
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <span class="status-chip">HTTP 404</span>
+            <h1 class="hero-title">页面不存在或已迁移</h1>
+            <p class="hero-desc">
+              链接可能已失效、权限不足，或菜单结构调整后路径变更。你可以返回工作台，或使用下方快捷入口继续教学与学习任务。
+            </p>
 
-          <circle cx="265" cy="110" r="12" fill="url(#planet-grad-2)" filter="drop-shadow(0 4px 10px rgba(114, 46, 209, 0.25))" />
+            <div class="hero-actions">
+              <button type="button" class="hero-pill-btn is-primary" @click="router.push('/dashboard')">
+                <el-icon><HomeFilled /></el-icon>
+                返回工作台首页
+              </button>
+              <button type="button" class="hero-pill-btn is-outline" @click="router.back()">
+                <el-icon><Back /></el-icon>
+                返回上一页
+              </button>
+              <button type="button" class="hero-pill-btn is-outline" @click="router.push('/ai/marketplace/all')">
+                <el-icon><Shop /></el-icon>
+                AI 工具广场
+              </button>
+            </div>
+          </div>
 
-          <!-- 中心大 404 文字与智能体头盔 -->
-          <g class="float-agent">
-            <text x="50" y="150" font-size="82" font-weight="900" fill="url(#text-grad)" font-family="system-ui, sans-serif" letter-spacing="4">4</text>
-            <text x="210" y="150" font-size="82" font-weight="900" fill="url(#text-grad)" font-family="system-ui, sans-serif" letter-spacing="4">4</text>
-
-            <!-- 中心 0 替换为科技头盔机器人 -->
-            <g transform="translate(125, 68)">
-              <!-- 身体 -->
-              <rect x="12" y="52" width="46" height="30" rx="14" fill="#1677FF" />
-              <!-- 头部外壳 -->
-              <rect x="0" y="4" width="70" height="50" rx="20" fill="#FFFFFF" filter="drop-shadow(0 8px 20px rgba(22, 119, 255, 0.25))" />
-              <!-- 面罩 -->
-              <rect x="6" y="10" width="58" height="38" rx="15" fill="#0F172A" />
-              <!-- 眨眼光点 (迷茫表情) -->
-              <ellipse cx="26" cy="29" rx="5" ry="3" fill="#38BDF8" />
-              <ellipse cx="44" cy="29" rx="5" ry="3" fill="#38BDF8" />
-              <!-- 天线 -->
-              <circle cx="35" cy="0" r="3.5" fill="#1677FF" />
-              <line x1="35" y1="0" x2="35" y2="4" stroke="#1677FF" stroke-width="2" />
-            </g>
-          </g>
-
-          <defs>
-            <linearGradient id="text-grad" x1="50" y1="70" x2="270" y2="160" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#1677FF" />
-              <stop offset="1" stop-color="#722ED1" />
-            </linearGradient>
-            <linearGradient id="planet-grad-1" x1="44" y1="49" x2="76" y2="81" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#38BDF8" />
-              <stop offset="1" stop-color="#1677FF" />
-            </linearGradient>
-            <linearGradient id="planet-grad-2" x1="253" y1="98" x2="277" y2="122" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#C084FC" />
-              <stop offset="1" stop-color="#722ED1" />
-            </linearGradient>
-          </defs>
-        </svg>
-      </div>
-
-      <!-- 文字信息区 -->
-      <h1 class="error-title">抱歉，您访问的页面已漫游至未知星域</h1>
-      <p class="error-desc">
-        目标页面可能已被重新调整教学大纲归属，或当前 URL 地址有误。别担心，平台 AI 智能体可以随时引导你重返核心航道。
-      </p>
-
-      <!-- 核心胶囊操作按钮 (1:1 胶囊标准) -->
-      <div class="actions-row">
-        <button
-          type="button"
-          class="capsule-btn capsule-btn--primary"
-          @click="router.push('/dashboard')"
-        >
-          <el-icon class="btn-icon"><HomeFilled /></el-icon>
-          <span>返回工作台首页</span>
-        </button>
-
-        <button
-          type="button"
-          class="capsule-btn capsule-btn--secondary"
-          @click="router.back()"
-        >
-          <el-icon class="btn-icon"><Back /></el-icon>
-          <span>返回上一页</span>
-        </button>
-
-        <button
-          type="button"
-          class="capsule-btn capsule-btn--ai"
-          @click="router.push('/ai/marketplace/all')"
-        >
-          <el-icon class="btn-icon"><Shop /></el-icon>
-          <span>探索 AI 工具广场</span>
-        </button>
-      </div>
-
-      <!-- 快捷导航药丸组合 (Quick Navigation Pills) -->
-      <div class="quick-nav-section">
-        <span class="quick-nav-label">快捷直达推荐：</span>
-        <div class="pills-list">
-          <span class="nav-pill" @click="router.push('/course')">
-            <el-icon class="pill-icon"><FolderOpened /></el-icon>
-            <span>课程中心</span>
-          </span>
-          <span class="nav-pill" @click="router.push('/ai/question/generate')">
-            <el-icon class="pill-icon"><EditPen /></el-icon>
-            <span>AI 智能出题</span>
-          </span>
-          <span class="nav-pill" @click="router.push('/ai/exam/generate')">
-            <el-icon class="pill-icon"><Document /></el-icon>
-            <span>AI 智能组卷</span>
-          </span>
-          <span class="nav-pill" @click="router.push('/learning/home')">
-            <el-icon class="pill-icon"><Aim /></el-icon>
-            <span>自适应学习</span>
-          </span>
+          <div class="hero-visual" aria-hidden="true">
+            <div class="code-ring">
+              <span class="code-digit">4</span>
+              <div class="code-center">
+                <el-icon class="code-icon"><Compass /></el-icon>
+                <span class="code-label">NOT FOUND</span>
+              </div>
+              <span class="code-digit">4</span>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
+
+      <section class="quick-section">
+        <header class="quick-header">
+          <span class="quick-title">常用入口</span>
+          <span class="quick-sub">一键回到核心业务模块</span>
+        </header>
+        <div class="quick-grid">
+          <button type="button" class="quick-card" @click="router.push('/course')">
+            <span class="quick-card__icon quick-card__icon--blue">
+              <el-icon><FolderOpened /></el-icon>
+            </span>
+            <span class="quick-card__text">
+              <strong>课程中心</strong>
+              <small>浏览与管理课程</small>
+            </span>
+            <el-icon class="quick-card__arrow"><ArrowRight /></el-icon>
+          </button>
+          <button type="button" class="quick-card" @click="router.push('/ai/question/generate')">
+            <span class="quick-card__icon quick-card__icon--violet">
+              <el-icon><EditPen /></el-icon>
+            </span>
+            <span class="quick-card__text">
+              <strong>AI 智能出题</strong>
+              <small>快速生成试题</small>
+            </span>
+            <el-icon class="quick-card__arrow"><ArrowRight /></el-icon>
+          </button>
+          <button type="button" class="quick-card" @click="router.push('/ai/exam/generate')">
+            <span class="quick-card__icon quick-card__icon--teal">
+              <el-icon><Document /></el-icon>
+            </span>
+            <span class="quick-card__text">
+              <strong>AI 智能组卷</strong>
+              <small>组卷与导出</small>
+            </span>
+            <el-icon class="quick-card__arrow"><ArrowRight /></el-icon>
+          </button>
+          <button type="button" class="quick-card" @click="router.push('/learning/home')">
+            <span class="quick-card__icon quick-card__icon--green">
+              <el-icon><Aim /></el-icon>
+            </span>
+            <span class="quick-card__text">
+              <strong>自适应学习</strong>
+              <small>学习中心首页</small>
+            </span>
+            <el-icon class="quick-card__arrow"><ArrowRight /></el-icon>
+          </button>
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -126,7 +106,9 @@ import {
   FolderOpened,
   EditPen,
   Document,
-  Aim
+  Aim,
+  Compass,
+  ArrowRight
 } from '@element-plus/icons-vue';
 
 const router = useRouter();
@@ -135,219 +117,370 @@ const router = useRouter();
 <style scoped lang="scss">
 .not-found-page {
   position: relative;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  min-height: calc(100vh - 64px - 48px - 80px);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #F0F7FF 0%, #FAF5FF 100%);
-  overflow: hidden;
-  padding: 24px;
+  padding: 8px 0 32px;
   box-sizing: border-box;
+  background: transparent;
+  overflow: hidden;
+}
 
-  .glow-orb {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(70px);
-    pointer-events: none;
+.page-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+  opacity: 0.45;
 
-    &--left {
-      top: -60px;
-      left: 10%;
-      width: 320px;
-      height: 320px;
-      background: rgba(22, 119, 255, 0.15);
-    }
-
-    &--right {
-      bottom: -60px;
-      right: 12%;
-      width: 360px;
-      height: 360px;
-      background: rgba(114, 46, 209, 0.12);
-    }
+  &--blue {
+    width: 420px;
+    height: 420px;
+    top: -120px;
+    left: 8%;
+    background: #bfdbfe;
   }
 
-  .not-found-card {
-    position: relative;
-    z-index: 1;
-    width: 100%;
-    max-width: 660px;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    border-radius: 24px;
-    padding: 44px 48px;
-    box-shadow: 0 16px 40px rgba(22, 119, 255, 0.08), 0 2px 6px rgba(0, 0, 0, 0.03);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
+  &--purple {
+    width: 360px;
+    height: 360px;
+    bottom: -100px;
+    right: 10%;
+    background: #ddd6fe;
+  }
+}
 
-    .illustration-box {
-      width: 300px;
-      height: 190px;
-      margin-bottom: 8px;
+.not-found-shell {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 920px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 
-      .space-svg {
-        width: 100%;
-        height: 100%;
-        overflow: visible;
+.hero-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(135deg, #ffffff 0%, #f8faff 55%, #f5f3ff 100%);
+  box-shadow: 0 8px 32px rgba(22, 119, 255, 0.06);
+  padding: 32px 36px;
 
-        .float-agent {
-          animation: floatY 3.6s ease-in-out infinite alternate;
-        }
-      }
+  &__glow {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    filter: blur(60px);
+    opacity: 0.35;
+
+    &--blue {
+      width: 220px;
+      height: 220px;
+      background: #bfdbfe;
+      top: -80px;
+      right: 80px;
     }
 
-    .error-title {
-      font-size: 22px;
-      font-weight: 700;
-      color: #0F172A;
-      margin: 0 0 10px 0;
-      letter-spacing: -0.3px;
-    }
-
-    .error-desc {
-      font-size: 13.5px;
-      color: #64748B;
-      line-height: 1.6;
-      margin: 0 0 26px 0;
-      max-width: 500px;
-    }
-
-    // 胶囊主按钮组
-    .actions-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-bottom: 28px;
-
-      .capsule-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        height: 42px;
-        padding: 0 22px;
-        border-radius: 9999px; // 纯正长圆跑道
-        font-size: 13.5px;
-        font-weight: 600;
-        cursor: pointer;
-        border: none;
-        transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-
-        &--primary {
-          background: #1677FF;
-          color: #FFFFFF;
-          box-shadow: 0 3px 12px rgba(22, 119, 255, 0.28);
-
-          &:hover {
-            background: #4096FF;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 18px rgba(22, 119, 255, 0.38);
-          }
-        }
-
-        &--secondary {
-          background: #FFFFFF;
-          color: #334155;
-          border: 1.5px solid #CBD5E1;
-
-          &:hover {
-            background: #F8FAFC;
-            color: #1677FF;
-            border-color: #93C5FD;
-            transform: translateY(-2px);
-          }
-        }
-
-        &--ai {
-          background: linear-gradient(135deg, #1677FF 0%, #722ED1 100%);
-          color: #FFFFFF;
-          box-shadow: 0 3px 12px rgba(114, 46, 209, 0.28);
-
-          &:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 18px rgba(114, 46, 209, 0.38);
-          }
-        }
-      }
-    }
-
-    // 快捷导航药丸
-    .quick-nav-section {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      flex-wrap: wrap;
-      justify-content: center;
-      padding-top: 20px;
-      border-top: 1px solid #F1F5F9;
-      width: 100%;
-
-      .quick-nav-label {
-        color: #94A3B8;
-      }
-
-      .pills-list {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-
-        .nav-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 3px 12px;
-          border-radius: 9999px; // 长圆药丸
-          background: #F1F5F9;
-          color: #475569;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s;
-
-          .pill-icon {
-            font-size: 13px;
-          }
-
-          &:hover {
-            background: #EFF6FF;
-            color: #1677FF;
-            transform: translateY(-1px);
-          }
-        }
-      }
+    &--purple {
+      width: 160px;
+      height: 160px;
+      background: #ddd6fe;
+      bottom: -60px;
+      left: 24px;
     }
   }
 }
 
-@keyframes floatY {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(-8px); }
+.hero-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 28px;
+  align-items: center;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hero-copy {
+  min-width: 0;
+  text-align: left;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.14);
+}
+
+.hero-title {
+  margin: 14px 0 10px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.hero-desc {
+  margin: 0;
+  max-width: 520px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: #64748b;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.hero-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+
+  &.is-primary {
+    border: none;
+    color: #ffffff;
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.36);
+    }
+  }
+
+  &.is-outline {
+    color: #334155;
+    background: #ffffff;
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+
+    &:hover {
+      color: #2563eb;
+      border-color: #93c5fd;
+      background: #f8fafc;
+    }
+  }
+}
+
+.hero-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+}
+
+.code-ring {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.code-digit {
+  font-size: clamp(72px, 12vw, 96px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  background: linear-gradient(160deg, #2563eb 0%, #6366f1 55%, #9333ea 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  user-select: none;
+}
+
+.code-center {
+  width: 88px;
+  height: 88px;
+  border-radius: 24px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 8px 28px rgba(37, 99, 235, 0.12);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.code-icon {
+  font-size: 28px;
+  color: #2563eb;
+}
+
+.code-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #94a3b8;
+}
+
+.quick-section {
+  border-radius: 24px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
+  padding: 22px 24px 24px;
+}
+
+.quick-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.quick-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.quick-sub {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.quick-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(160deg, #ffffff 0%, #f8fafc 100%);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+
+  &:hover {
+    border-color: #93c5fd;
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.08);
+    transform: translateY(-1px);
+
+    .quick-card__arrow {
+      color: #2563eb;
+      transform: translateX(2px);
+    }
+  }
+
+  &__icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 20px;
+
+    &--blue {
+      color: #2563eb;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+    }
+
+    &--violet {
+      color: #7c3aed;
+      background: #f5f3ff;
+      border: 1px solid #ddd6fe;
+    }
+
+    &--teal {
+      color: #0d9488;
+      background: #ecfdf5;
+      border: 1px solid #99f6e4;
+    }
+
+    &--green {
+      color: #059669;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+    }
+  }
+
+  &__text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    strong {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    small {
+      font-size: 12px;
+      color: #64748b;
+    }
+  }
+
+  &__arrow {
+    flex-shrink: 0;
+    color: #cbd5e1;
+    transition: color 0.2s, transform 0.2s;
+  }
 }
 
 @media (max-width: 640px) {
-  .not-found-card {
-    padding: 32px 20px !important;
+  .hero-panel {
+    padding: 24px 20px;
+  }
 
-    .illustration-box {
-      width: 240px !important;
-      height: 150px !important;
+  .hero-title {
+    font-size: 24px;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+
+    .hero-pill-btn {
+      justify-content: center;
     }
+  }
 
-    .actions-row {
-      flex-direction: column;
-      width: 100%;
-
-      .capsule-btn {
-        width: 100%;
-        justify-content: center;
-      }
-    }
+  .hero-visual {
+    min-height: 160px;
   }
 }
 </style>

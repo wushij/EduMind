@@ -55,9 +55,12 @@ export function useAIStreamScrollFollow(options: {
 
   function scrollToBottomInstant() {
     nextTick(() => {
-      if (messagesScrollRef.value) {
-        messagesScrollRef.value.scrollTop = messagesScrollRef.value.scrollHeight;
-      }
+      requestAnimationFrame(() => {
+        if (messagesScrollRef.value) {
+          messagesScrollRef.value.scrollTop = messagesScrollRef.value.scrollHeight;
+          bindMarkdownCodeCopy(messagesScrollRef.value);
+        }
+      });
     });
   }
 

@@ -301,7 +301,8 @@ const KNOWN_CODE_LANGS = [
   'typescript', 'ts', 'java', 'golang', 'go', 'rust', 'rs', 'kotlin', 'kt',
   'swift', 'scala', 'sql', 'html', 'css', 'scss', 'less', 'bash', 'shell', 'sh', 'zsh',
   'json', 'xml', 'yaml', 'yml', 'markdown', 'md', 'mermaid', 'r', 'matlab',
-  'php', 'ruby', 'rb', 'perl', 'lua', 'dart', 'c'
+  'php', 'ruby', 'rb', 'perl', 'lua', 'dart', 'c',
+  'text', 'plain', 'txt', 'console', 'output', 'code'
 ];
 
 /**
@@ -727,13 +728,40 @@ function readMermaidSource(wrapper: HTMLElement): string {
   return '';
 }
 
+function sanitizeMermaidFallbackLabel(label: string): string | null {
+  const t = label.replace(/```+/g, '').replace(/^text/i, '').trim();
+  if (!t || t.length < 2) return null;
+  if (/^`+$/.test(t)) return null;
+  return t;
+}
+
+function buildPlainHierarchyFallback(rawCode: string): string | null {
+  const lines = rawCode
+    .split('\n')
+    .map((l) => l.replace(/```+/g, '').trim())
+    .filter((l) => l && !/^text$/i.test(l));
+  if (lines.length < 2 || lines.length > 24) return null;
+  if (/(?:^|\n)\s*(?:graph|flowchart)\s/im.test(rawCode)) return null;
+  if (/(?:-->|==>)/.test(rawCode)) return null;
+  const items = lines
+    .map((l) => l.replace(/^[-*•]\s*/, ''))
+    .map((l) => sanitizeMermaidFallbackLabel(l))
+    .filter((l): l is string => Boolean(l));
+  if (items.length < 2) return null;
+  const lis = items.map((l) => `<li>${md.utils.escapeHtml(l)}</li>`).join('');
+  return `<div class="mermaid-outline-fallback"><p class="mermaid-outline-title">层级结构概要（流程图渲染失败时的可读版）</p><ul>${lis}</ul></div>`;
+}
+
 function buildMermaidOutlineFallback(rawCode: string): string {
+  const plain = buildPlainHierarchyFallback(rawCode);
+  if (plain) return plain;
+
   const labels: string[] = [];
   const seen = new Set<string>();
   const re = /\["((?:\\.|[^"\\])*)"\]|\[([^\]"]+)\]/g;
   let match: RegExpExecArray | null;
   while ((match = re.exec(rawCode)) !== null) {
-    const label = (match[1] ?? match[2] ?? '').replace(/\\"/g, '"').trim();
+    const label = sanitizeMermaidFallbackLabel((match[1] ?? match[2] ?? '').replace(/\\"/g, '"'));
     if (!label || seen.has(label)) continue;
     seen.add(label);
     labels.push(label);
@@ -743,6 +771,23 @@ function buildMermaidOutlineFallback(rawCode: string): string {
   }
   const items = labels.map((l) => `<li>${md.utils.escapeHtml(l)}</li>`).join('');
   return `<div class="mermaid-outline-fallback"><p class="mermaid-outline-title">图谱结构概要（流程图渲染失败时的可读版）</p><ul>${items}</ul></div>`;
+}
+
+function looksLikePlainHierarchyDiagram(code: string): boolean {
+  const t = code.trim();
+  if (!t || /(?:^|\n)\s*(?:graph|flowchart)\s/im.test(t)) return false;
+  if (/(?:-->|==>)/.test(t)) return false;
+  const lines = t.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2 || lines.length > 24) return false;
+  const joined = lines.join(' ');
+  return /(?:JDK|JRE|JVM|字节码)/.test(joined);
+}
+
+function renderPlainHierarchyBlock(code: string): string {
+  const html = buildPlainHierarchyFallback(code);
+  if (html) return html;
+  const escaped = md.utils.escapeHtml(code.trim());
+  return `<div class="mermaid-outline-fallback"><p class="mermaid-outline-title">层级结构</p><pre class="hierarchy-plain-pre">${escaped}</pre></div>`;
 }
 
 const MERMAID_ZOOM_BTN =
@@ -830,6 +875,14 @@ function renderCodeBlock(code: string, declaredLang: string, enableMermaid = tru
     lang = 'text';
   }
 
+  const decl = normalizeDeclaredLang(declaredLang);
+  if (
+    (decl === '' || decl === 'text' || decl === 'plain' || decl === 'txt') &&
+    looksLikePlainHierarchyDiagram(code)
+  ) {
+    return renderPlainHierarchyBlock(code);
+  }
+
   if (looksLikeAsciiKnowledgeTree(code)) {
     const mermaidSource = asciiTreeToMermaid(code);
     if (mermaidSource && mermaidAllowed) {
@@ -839,6 +892,9 @@ function renderCodeBlock(code: string, declaredLang: string, enableMermaid = tru
   }
 
   if (lang === 'mermaid' && mermaidAllowed) {
+    if (looksLikePlainHierarchyDiagram(code) && !looksLikeMermaid(code)) {
+      return renderPlainHierarchyBlock(code);
+    }
     return buildMermaidWrapper(code);
   }
 

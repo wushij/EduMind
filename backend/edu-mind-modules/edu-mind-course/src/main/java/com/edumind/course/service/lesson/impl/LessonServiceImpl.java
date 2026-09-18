@@ -19,10 +19,12 @@ import com.edumind.course.vo.lesson.CourseLessonProgressSummaryVO;
 import com.edumind.course.vo.lesson.LessonDetailVO;
 import com.edumind.course.vo.lesson.LessonProgressVO;
 import com.edumind.course.vo.lesson.LessonResourceSummaryVO;
+import com.edumind.knowledge.api.LessonContentIndexApi;
 import com.edumind.resource.api.ResourceQueryApi;
 import com.edumind.resource.vo.ResourceVO;
 import com.edumind.security.context.LoginUserResolver;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -32,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LessonServiceImpl implements LessonService {
@@ -44,6 +47,7 @@ public class LessonServiceImpl implements LessonService {
     private final CourseAccessService courseAccessService;
     private final ResourceQueryApi resourceQueryApi;
     private final ApplicationEventPublisher eventPublisher;
+    private final LessonContentIndexApi lessonContentIndexApi;
 
     @Override
     public LessonDetailVO getLessonDetail(Long courseId, Long lessonId, boolean previewDraft) {
@@ -129,6 +133,12 @@ public class LessonServiceImpl implements LessonService {
         lesson.setContentStatus("PUBLISHED");
         lesson.setPublishedAt(LocalDateTime.now());
         chapterDao.updateById(lesson);
+        try {
+            lessonContentIndexApi.ingestLesson(courseId, lessonId);
+        } catch (Exception ex) {
+            log.error("Lesson copilot index failed after publish courseId={} lessonId={}: {}",
+                    courseId, lessonId, ex.getMessage(), ex);
+        }
     }
 
     @Override
@@ -139,6 +149,11 @@ public class LessonServiceImpl implements LessonService {
         lesson.setContentStatus("DRAFT");
         lesson.setPublishedAt(null);
         chapterDao.updateById(lesson);
+        try {
+            lessonContentIndexApi.removeLessonIndex(courseId, lessonId);
+        } catch (Exception ex) {
+            log.warn("Remove lesson index failed courseId={} lessonId={}: {}", courseId, lessonId, ex.getMessage());
+        }
     }
 
     @Override
@@ -149,6 +164,12 @@ public class LessonServiceImpl implements LessonService {
         lesson.setContentJson(contentJson);
         lesson.setContentStatus("DRAFT");
         chapterDao.updateById(lesson);
+        try {
+            lessonContentIndexApi.removeLessonIndex(courseId, lessonId);
+        } catch (Exception ex) {
+            log.warn("Remove lesson index on draft save failed courseId={} lessonId={}: {}",
+                    courseId, lessonId, ex.getMessage());
+        }
     }
 
     @Override

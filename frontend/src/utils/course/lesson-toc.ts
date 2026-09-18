@@ -55,7 +55,7 @@ function isPseudoHeadingParagraph(p: HTMLParagraphElement): boolean {
     /^第[一二三四五六七八九十\d]+[章节部分]/.test(probe) ||
     /^\d+\.\d+(\s|：|:|、|．|.)?/.test(probe) ||
     (/^\*\*/.test(text) === false &&
-      strong &&
+      !!strong &&
       /^(?:\d+\.|[一二三四五六七八九十]+[、．.])/.test(probe))
   );
 }

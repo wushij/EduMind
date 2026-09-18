@@ -10,9 +10,11 @@
       <ChatSessionList
         :sessions="sessions"
         :current-id="currentSessionId"
+        show-clear-all
         @select="handleSelectSession"
         @create="handleCreateNewSession"
         @delete="handleDeleteSession"
+        @clear-all="handleClearAllSessions"
       />
     </el-drawer>
 </template>
@@ -28,6 +30,7 @@ const {
   currentSessionId,
   handleSelectSession,
   handleCreateNewSession,
-  handleDeleteSession
+  handleDeleteSession,
+  handleClearAllSessions
 } = inject(courseAiUiKey)!;
 </script>

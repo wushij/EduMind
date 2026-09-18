@@ -9,6 +9,7 @@ import com.edumind.ai.entity.AiGatewayRouteEntity;
 import com.edumind.ai.entity.AiModelConfigEntity;
 import com.edumind.ai.integration.crypto.AiApiKeyCipherService;
 import com.edumind.ai.integration.llm.AiModelConnectivityTester;
+import com.edumind.ai.integration.embedding.EmbeddingClientRegistry;
 import com.edumind.ai.integration.llm.LlmClientRegistry;
 import com.edumind.ai.service.gateway.AiModelManageService;
 import com.edumind.ai.service.gateway.AiProviderPresetCatalog;
@@ -37,6 +38,7 @@ public class AiModelManageServiceImpl implements AiModelManageService {
     private final AiModelConnectivityTester aiModelConnectivityTester;
     private final AiProviderPresetCatalog aiProviderPresetCatalog;
     private final LlmClientRegistry llmClientRegistry;
+    private final EmbeddingClientRegistry embeddingClientRegistry;
 
     @Override
     public AiProviderPresetsResponseVO getProviderPresets() {
@@ -76,6 +78,7 @@ public class AiModelManageServiceImpl implements AiModelManageService {
         }
         aiModelConfigDao.insert(entity);
         llmClientRegistry.invalidateAll();
+        embeddingClientRegistry.invalidate();
         return aiModelConfigConverter.toVo(entity);
     }
 
@@ -101,6 +104,7 @@ public class AiModelManageServiceImpl implements AiModelManageService {
         }
         aiModelConfigDao.updateById(existing);
         llmClientRegistry.invalidateAll();
+        embeddingClientRegistry.invalidate();
     }
 
     @Override
@@ -109,6 +113,7 @@ public class AiModelManageServiceImpl implements AiModelManageService {
         requireByConfigName(configName);
         aiModelConfigDao.deleteByConfigName(configName);
         llmClientRegistry.invalidateAll();
+        embeddingClientRegistry.invalidate();
     }
 
     @Override
@@ -121,6 +126,7 @@ public class AiModelManageServiceImpl implements AiModelManageService {
         aiModelConfigDao.updateById(target);
         syncGatewayRoutesForDefault(target);
         llmClientRegistry.invalidateAll();
+        embeddingClientRegistry.invalidate();
     }
 
     private void syncGatewayRoutesForDefault(AiModelConfigEntity target) {

@@ -334,6 +334,7 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     stopStream,
     startNewChat,
     deleteSession,
+    clearAllSessions,
     handleRegenerate: regenerateStreamMessage,
     confirmDeleteMessage,
     scrollToBottomSmooth,
@@ -364,6 +365,13 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
 
   function handleDeleteSession(id: string) {
     void deleteSession(id, resolveCourseId());
+  }
+
+  async function handleClearAllSessions() {
+    if (streaming.value) {
+      stopStream();
+    }
+    await clearAllSessions(resolveCourseId());
   }
 
   function handleSelectSession(id: string) {
@@ -502,7 +510,6 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
   onMounted(() => {
     loadModels();
     loadTenantCourses();
-    scrollToBottomInstant();
     nextTick(() => {
       const appContent = document.querySelector('.app-content');
       if (appContent) {
@@ -560,6 +567,7 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     showThinkingPanel,
     allDisplayMessages,
     handleDeleteSession,
+    handleClearAllSessions,
     handleSelectSession,
     handleCreateNewSession,
     handleSend,

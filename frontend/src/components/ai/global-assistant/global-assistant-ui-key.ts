@@ -55,7 +55,7 @@ export type GlobalAssistantUiContext = {
   pauseAutoScrollFollow: () => void;
   handleViewportScroll: (e: Event) => void;
   getIntentTagType: (intent?: string) => string;
-  formatMatchScore: (score?: number) => string;
+  formatMatchScore: (score?: number, peerScores?: number[]) => string;
   renderChatMarkdown: (content: string) => string;
   resolveReasoningFolded: (folded?: boolean) => boolean;
 };

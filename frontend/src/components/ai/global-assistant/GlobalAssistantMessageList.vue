@@ -102,16 +102,36 @@
                         v-html="renderChatMarkdown(msg.content)"
                       />
 
-                      <!-- 引用切片溯源卡片 (若存在 citations) -->
+                      <!-- 引用切片溯源（默认折叠，需时展开） -->
                       <div
                         v-if="msg.citations && msg.citations.length > 0"
                         class="citations-tray"
                       >
-                        <div class="citations-header">
-                          <span class="citations-badge"><el-icon><Reading /></el-icon> 参考课程知识库切片</span>
-                          <span class="citations-sub">点击直达知识库详情</span>
-                        </div>
-                        <div class="citations-cards">
+                        <button
+                          type="button"
+                          class="citations-header citations-header--toggle"
+                          @click="toggleCitationTray(citationTrayKey(msg, idx))"
+                        >
+                          <span class="citations-badge">
+                            <el-icon><Reading /></el-icon>
+                            参考课程知识库切片 ({{ msg.citations.length }})
+                          </span>
+                          <span class="citations-header-right">
+                            <span class="citations-sub">
+                              {{ isCitationTrayExpanded(citationTrayKey(msg, idx)) ? '收起' : '展开查看' }}
+                            </span>
+                            <el-icon
+                              class="citations-chevron"
+                              :class="{ 'is-expanded': isCitationTrayExpanded(citationTrayKey(msg, idx)) }"
+                            >
+                              <ArrowDown />
+                            </el-icon>
+                          </span>
+                        </button>
+                        <div
+                          v-show="isCitationTrayExpanded(citationTrayKey(msg, idx))"
+                          class="citations-cards"
+                        >
                           <div
                             v-for="(item, cIdx) in msg.citations"
                             :key="cIdx"
@@ -121,10 +141,12 @@
                             <div class="citation-top">
                               <span class="citation-idx">[{{ cIdx + 1 }}]</span>
                               <span class="citation-doc">《{{ item.documentName || '课程核心资料' }}》</span>
-                              <span class="citation-match">匹配度 {{ formatMatchScore(item.score) }}</span>
+                              <span class="citation-match">
+                                匹配度 {{ formatMatchScore(item.score, citationScores(msg.citations)) }}
+                              </span>
                             </div>
-                            <div v-if="item.excerpt" class="citation-excerpt">
-                              {{ item.excerpt }}
+                            <div v-if="citationExcerptSource(item)" class="citation-excerpt">
+                              {{ formatCitationCardPreview(citationExcerptSource(item)) }}
                             </div>
                           </div>
                         </div>
@@ -262,8 +284,14 @@
 </template>
 
 <script setup lang="ts">
-import { inject } from 'vue';
-import { Reading, CopyDocument, RefreshRight, Delete, StarFilled } from '@element-plus/icons-vue';
+import { inject, ref } from 'vue';
+import { Reading, CopyDocument, RefreshRight, Delete, StarFilled, ArrowDown } from '@element-plus/icons-vue';
+import type { CitationItem, GlobalAssistantMessage } from '@/types/ai/assistant';
+import { collectCitationScores } from '@/utils/ai/citation-score';
+import {
+  citationExcerptSource,
+  formatCitationCardPreview
+} from '@/utils/ai/citation-excerpt';
 import AIThinking from '@/components/ai/AIChat/AIThinking.vue';
 import LessonStudioInsertActions from '@/components/ai/global-assistant/LessonStudioInsertActions.vue';
 import { globalAssistantUiKey } from '@/components/ai/global-assistant/global-assistant-ui-key';
@@ -302,4 +330,29 @@ const {
   pauseAutoScrollFollow,
   isLessonStudioContext
 } = inject(globalAssistantUiKey)!;
+
+/** 参考切片托盘默认折叠 */
+const expandedCitationTrays = ref<Set<string>>(new Set());
+
+function citationTrayKey(msg: GlobalAssistantMessage, idx: number): string {
+  return String(msg.id ?? `idx-${idx}`);
+}
+
+function isCitationTrayExpanded(key: string): boolean {
+  return expandedCitationTrays.value.has(key);
+}
+
+function citationScores(citations?: CitationItem[]) {
+  return collectCitationScores(citations);
+}
+
+function toggleCitationTray(key: string) {
+  const next = new Set(expandedCitationTrays.value);
+  if (next.has(key)) {
+    next.delete(key);
+  } else {
+    next.add(key);
+  }
+  expandedCitationTrays.value = next;
+}
 </script>

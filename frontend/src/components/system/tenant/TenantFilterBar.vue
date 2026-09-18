@@ -75,7 +75,7 @@ defineEmits<{
 <style scoped lang="scss">
 .filter-card {
   background: #FFFFFF;
-  border-radius: 20px;
+  border-radius: 24px;
   border: 1.5px solid rgba(226, 232, 240, 0.9);
   padding: 14px 20px;
   margin-bottom: 22px;

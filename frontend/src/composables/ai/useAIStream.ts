@@ -103,6 +103,7 @@ export function useAIStream() {
     startNewChat,
     switchSession,
     removeSession,
+    clearAllSessions,
     renameSession,
     syncSessionTitleIfDefaultLocal,
     refreshSessionsMeta
@@ -167,6 +168,7 @@ export function useAIStream() {
     startNewChat,
     switchSession,
     deleteSession: removeSession,
+    clearAllSessions,
     renameSession,
     handleRegenerate,
     confirmDeleteMessage,

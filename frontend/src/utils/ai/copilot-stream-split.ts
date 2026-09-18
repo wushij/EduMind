@@ -65,16 +65,39 @@ export function splitCopilotStream(raw: string): CopilotStreamSplit {
   }
 
   const afterThink = text.slice(thinkStart + thinkHeaderLen);
-  const codeIdx = afterThink.indexOf('```');
-  if (codeIdx >= 0) {
+  const bodyStart = findAnswerBodyStartInThinkTail(afterThink);
+  if (bodyStart >= 0) {
     return {
-      thinking: afterThink.slice(0, codeIdx).trim(),
-      answer: afterThink.slice(codeIdx).trim(),
+      thinking: afterThink.slice(0, bodyStart).trim(),
+      answer: afterThink.slice(bodyStart).trim(),
       inThinkingPhase: false
     };
   }
 
   return { thinking: afterThink.trim(), answer: '', inThinkingPhase: true };
+}
+
+/**
+ * 思考段结束后正文常见起笔（勿用 ``` 切段，否则链路示意会把整篇回答包进代码块）。
+ */
+function findAnswerBodyStartInThinkTail(afterThink: string): number {
+  const patterns = [
+    /\n+## (?:回答|答案|解决方案)[:：]?\s*\n/i,
+    /\n+### [\d.]+\s+[\u4e00-\u9fa5A-Za-z]/,
+    /\n+## [一二三四五六七八九十百千]+、/,
+    /\n+\*\*[^*\n]{2,40}：\*\*\s*\n/
+  ];
+  let best = -1;
+  for (const re of patterns) {
+    const m = re.exec(afterThink);
+    if (!m || m.index < 0) continue;
+    const leadingNewlines = m[0].match(/^(\n+)/)?.[0].length ?? 0;
+    const idx = m.index + leadingNewlines;
+    if (best === -1 || idx < best) {
+      best = idx;
+    }
+  }
+  return best;
 }
 
 export function cleanReasoningText(raw: string): string {

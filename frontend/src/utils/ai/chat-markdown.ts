@@ -9,6 +9,31 @@ import { expandAsciiTreeToMultiline, looksLikeAsciiKnowledgeTree } from './ascii
 
 const FENCED_CODE_BLOCK_RE = /(```[\s\S]*?```)/g;
 
+function looksLikeProseNotCode(inner: string): boolean {
+  const t = inner.trim();
+  if (!t) return false;
+  const cn = (t.match(/[\u4e00-\u9fa5]/g) || []).length;
+  if (/^#{1,6}\s/m.test(t) && cn > 15) return true;
+  if (/^\s*[-*]\s+\*\*/m.test(t) && cn > 30) return true;
+  if (cn > 90 && (t.match(/\n/g) || []).length >= 2) return true;
+  if (/^#{1,3}\s+[\d一二三四五六七八九十]/m.test(t)) return true;
+  return false;
+}
+
+/** 模型常把整段 Markdown 讲义包在 ``` / ```markdown 里，渲染会变成 CODE 黑框 */
+function unwrapProseCodeFences(text: string): string {
+  return text.replace(/```([a-zA-Z0-9+#-]*)\s*\n([\s\S]*?)```/g, (full, lang: string, inner: string) => {
+    const langLower = (lang || '').trim().toLowerCase();
+    if (langLower && !['markdown', 'md', 'text', 'txt'].includes(langLower)) {
+      return full;
+    }
+    if (looksLikeProseNotCode(inner)) {
+      return inner.trim();
+    }
+    return full;
+  });
+}
+
 /**
  * 大模型常把「1.知识地图…2.概念辨析…3.定理…」挤在同一行；
  * Markdown 无法识别，需拆行并在序号后补空格。
@@ -258,6 +283,21 @@ function normalizeTeachingHeaders(text: string): string {
     .join('');
 }
 
+/**
+ * 8. 模型常输出用 ▼ 或 ↓ 串联的字符执行链路（例如「Hello.java | javac ▼Hello.class | 类加载...」）
+ * 将粘连在同一行的符号与步骤自动拆分为结构清晰的垂直分步执行流。
+ */
+function normalizeInlineExecutionChains(text: string): string {
+  return text
+    .split(FENCED_CODE_BLOCK_RE)
+    .map((segment) => {
+      if (segment.startsWith('```')) return segment;
+      if (!/[▼↓]/.test(segment)) return segment;
+      return segment.replace(/\s*([▼↓])\s*/g, '\n\n$1\n\n');
+    })
+    .join('');
+}
+
 function escapeHtmlText(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -368,6 +408,61 @@ function findJavaClassBlockEndLine(lines: string[], startIdx: number): number {
   return -1;
 }
 
+function findCodeEndLineBeforeProse(lines: string[]): number {
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (/^#{1,6}\s/.test(line)) return i - 1;
+    if (/^\d+[.、．]\s*(?:\*\*|[\u4e00-\u9fa5])/.test(line)) return i - 1;
+    if (
+      i > 1 &&
+      lines[i - 1].trim() === '' &&
+      /^[\u4e00-\u9fa5`“"‘']/.test(line) &&
+      !/^(?:\/\/|\/\*|\*|#|--)/.test(line)
+    ) {
+      const cnCount = (line.match(/[\u4e00-\u9fa5]/g) || []).length;
+      if (cnCount >= 4) return i - 1;
+    }
+  }
+  return -1;
+}
+
+/**
+ * 保护机制：若代码块内部在代码之后紧跟了 Markdown 标题（## ）、列表（1. **...**）或大段中文正文，
+ * 说明模型漏写了闭合的 ```（或闭合围栏缺失），在代码与正文交界处自动补齐 ``` 闭合代码块，防止正文被吞入黑色代码框。
+ */
+function splitProseFromCodeBlocks(text: string): string {
+  return text.replace(
+    /(```[a-zA-Z0-9+#-]*\n)([\s\S]*?)(```|$)/g,
+    (full, openFence: string, body: string, _closeFence: string) => {
+      const lines = body.split('\n');
+      if (lines.length < 3) return full;
+
+      let endIdx = -1;
+      const classStart = lines.findIndex((l) =>
+        /^(?:public\s+)?(?:class|interface|enum)\s+\w+/.test(l.trim())
+      );
+      if (classStart >= 0) {
+        endIdx = findJavaClassBlockEndLine(lines, classStart);
+      }
+      if (endIdx < 0) {
+        endIdx = findCodeEndLineBeforeProse(lines);
+      }
+
+      if (endIdx >= 0 && endIdx < lines.length - 1) {
+        const remainingLines = lines.slice(endIdx + 1);
+        const remainingText = remainingLines.join('\n').trim();
+        if (/[\u4e00-\u9fa5]/.test(remainingText) || /^#{1,6}\s/m.test(remainingText)) {
+          const code = lines.slice(0, endIdx + 1).join('\n').trimEnd();
+          const prose = remainingLines.join('\n').trimStart();
+          return `${openFence}${code}\n\`\`\`\n\n${prose}\n\n`;
+        }
+      }
+
+      return full;
+    }
+  );
+}
+
 function closeFenceAfterJavaLine(head: string, openFence: string, body: string): string | null {
   const lines = body.split('\n');
   const classStart = lines.findIndex((l) => /^public\s+class\s+\w+/.test(l.trim()));
@@ -455,7 +550,7 @@ function tidyStrayFenceMarkers(text: string): string {
     .split('\n')
     .filter((line) => {
       const t = line.trim();
-      if (t === '`' || t === '``' || t === '```') return false;
+      if (t === '`' || t === '``') return false;
       return true;
     })
     .join('\n');
@@ -477,6 +572,9 @@ export function normalizeChatMarkdown(raw: string): string {
   if (!raw) return '';
 
   let text = normalizeCodeFences(raw);
+  text = text.replace(/```text([A-Za-z\u4e00-\u9fa5])/gi, '```text\n$1');
+  text = unwrapProseCodeFences(text);
+  text = splitProseFromCodeBlocks(text);
   text = wrapStandaloneJavaSnippets(text);
   text = tidyStrayFenceMarkers(text);
   text = normalizeMermaidInCodeFences(text);
@@ -503,6 +601,8 @@ export function normalizeChatMarkdown(raw: string): string {
   text = normalizeQuotedKeywordLines(text);
   // 7. 教学与问答高频小标题（如「**参考答案：**」「**解析：**」「【题目】」等）粘连自动拆行
   text = normalizeTeachingHeaders(text);
+  // 8. 执行链路（如用 ▼ 或 ↓ 串联的步骤）粘连自动拆分
+  text = normalizeInlineExecutionChains(text);
 
   text = fixUnclosedCodeFences(text);
 

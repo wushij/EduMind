@@ -558,6 +558,10 @@ CREATE TABLE IF NOT EXISTS knowledge_document (
     id                BIGINT       NOT NULL AUTO_INCREMENT COMMENT '文档ID',
     tenant_id   BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
     knowledge_base_id BIGINT       NOT NULL COMMENT '所属知识库ID',
+    source_type       VARCHAR(16)  NOT NULL DEFAULT 'UPLOAD' COMMENT 'UPLOAD|LESSON',
+    course_id         BIGINT       DEFAULT NULL COMMENT '课程ID(课节虚拟文档)',
+    lesson_chapter_id BIGINT       DEFAULT NULL COMMENT '微课节章节ID',
+    content_hash      VARCHAR(64)  DEFAULT NULL COMMENT '讲义内容哈希(增量索引)',
     file_name         VARCHAR(256) NOT NULL COMMENT '文件名称',
     file_type         VARCHAR(32)  DEFAULT NULL COMMENT '文件类型（PDF/WORD/MD/TXT）',
     file_size         BIGINT       DEFAULT 0 COMMENT '文件字节大小',
@@ -569,7 +573,8 @@ CREATE TABLE IF NOT EXISTS knowledge_document (
     update_time       DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
-    KEY idx_kb_id (knowledge_base_id)
+    KEY idx_kb_id (knowledge_base_id),
+    UNIQUE KEY uk_lesson_chapter_doc (lesson_chapter_id, source_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库文档表';
 
 CREATE TABLE IF NOT EXISTS knowledge_document_text (
@@ -631,6 +636,7 @@ CREATE TABLE IF NOT EXISTS knowledge_chunk_index (
     vector_id         VARCHAR(64)  NOT NULL COMMENT '向量库中的向量ID',
     embed_status      VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/INDEXED/FAILED',
     embedding_model   VARCHAR(64)  DEFAULT NULL COMMENT 'Embedding 模型',
+    embedding_vector  MEDIUMTEXT   DEFAULT NULL COMMENT 'Embedding JSON 数组(内存向量库恢复)',
     error_message     VARCHAR(512) DEFAULT NULL COMMENT '错误信息',
     create_time       DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time       DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

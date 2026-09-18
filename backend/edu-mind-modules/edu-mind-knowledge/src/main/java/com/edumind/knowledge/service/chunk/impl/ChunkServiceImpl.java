@@ -13,19 +13,24 @@ import com.edumind.knowledge.entity.KnowledgeBaseEntity;
 import com.edumind.knowledge.entity.KnowledgeDocumentChunkEntity;
 import com.edumind.knowledge.entity.KnowledgeDocumentEntity;
 import com.edumind.knowledge.entity.KnowledgeDocumentTextEntity;
+import com.edumind.knowledge.entity.KnowledgeChunkIndexEntity;
 import com.edumind.knowledge.service.chunk.ChunkService;
 import com.edumind.knowledge.service.chunk.ChunkSplitter;
+import com.edumind.knowledge.service.index.IndexingService;
 import com.edumind.knowledge.service.knowledge.KnowledgeAccessService;
+import org.springframework.util.StringUtils;
 import com.edumind.knowledge.vo.knowledge.ChunkStatsVO;
 import com.edumind.knowledge.vo.knowledge.ChunkTaskVO;
 import com.edumind.knowledge.vo.knowledge.ChunkVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChunkServiceImpl implements ChunkService {
@@ -38,6 +43,7 @@ public class ChunkServiceImpl implements ChunkService {
     private final ChunkConverter chunkConverter;
     private final KnowledgeAccessService knowledgeAccessService;
     private final KnowledgeChunkIndexDao knowledgeChunkIndexDao;
+    private final IndexingService indexingService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -47,8 +53,8 @@ public class ChunkServiceImpl implements ChunkService {
             throw new BusinessException("文档不存在");
         }
         knowledgeAccessService.assertAccessible(document.getKnowledgeBaseId());
-        if (!"SUCCESS".equals(document.getParseStatus())) {
-            throw new BusinessException("请先完成文档解析");
+        if (!isReadyForRechunk(document)) {
+            throw new BusinessException("请先完成文档解析（上传文档需解析成功；课节讲义请使用「发布」或 RAG 大盘同步）");
         }
         KnowledgeDocumentTextEntity textEntity = knowledgeDocumentTextDao.findByDocumentId(documentId);
         if (textEntity == null || textEntity.getContent() == null || textEntity.getContent().isBlank()) {
@@ -79,6 +85,11 @@ public class ChunkServiceImpl implements ChunkService {
             document.setErrorMessage(null);
             knowledgeDocumentDao.updateById(document);
             refreshChunkCount(document.getKnowledgeBaseId());
+            try {
+                indexingService.reindexDocument(documentId);
+            } catch (Exception ex) {
+                log.warn("Reindex after chunk failed documentId={}: {}", documentId, ex.getMessage());
+            }
 
             ChunkTaskVO vo = new ChunkTaskVO();
             vo.setTaskId(taskId);
@@ -94,21 +105,44 @@ public class ChunkServiceImpl implements ChunkService {
     }
 
     @Override
-    public PageResult<ChunkVO> pageChunks(Long documentId, long page, long pageSize, String keyword) {
+    public PageResult<ChunkVO> pageChunks(Long documentId, long page, long pageSize, String keyword,
+                                          String embedStatus) {
         KnowledgeDocumentEntity document = knowledgeDocumentDao.findById(documentId);
         if (document == null) {
             throw new BusinessException("文档不存在");
         }
         knowledgeAccessService.assertAccessible(document.getKnowledgeBaseId());
         long currentPage = Math.max(page, 1);
-        long size = Math.min(Math.max(pageSize, 1), 100);
+        long size = Math.min(Math.max(pageSize, 1), 500);
+        String statusFilter = normalizeEmbedStatusFilter(embedStatus);
+        if (statusFilter != null) {
+            List<KnowledgeDocumentChunkEntity> all = knowledgeDocumentChunkDao.findByDocumentId(documentId);
+            List<ChunkVO> filtered = all.stream()
+                    .map(entity -> enrichStatus(chunkConverter.toVO(entity)))
+                    .filter(vo -> matchesKeyword(vo, keyword))
+                    .filter(vo -> statusFilter.equals(vo.getStatus()))
+                    .toList();
+            long total = filtered.size();
+            int from = (int) Math.min((currentPage - 1) * size, total);
+            int to = (int) Math.min(from + size, total);
+            List<ChunkVO> pageList = from < to ? filtered.subList(from, to) : List.of();
+            return PageResult.<ChunkVO>builder()
+                    .total(total)
+                    .pageNum(currentPage)
+                    .pageSize(size)
+                    .list(pageList)
+                    .build();
+        }
         Page<KnowledgeDocumentChunkEntity> result = knowledgeDocumentChunkDao.pageByDocumentId(
                 documentId, currentPage, size, keyword);
+        List<ChunkVO> list = result.getRecords().stream()
+                .map(entity -> enrichStatus(chunkConverter.toVO(entity)))
+                .toList();
         return PageResult.<ChunkVO>builder()
                 .total(result.getTotal())
                 .pageNum(currentPage)
                 .pageSize(size)
-                .list(chunkConverter.toVOList(result.getRecords()))
+                .list(list)
                 .build();
     }
 
@@ -134,6 +168,53 @@ public class ChunkServiceImpl implements ChunkService {
         vo.setAvgTokens(avgTokens);
         vo.setTotalTokens(tokenSum);
         return vo;
+    }
+
+    private boolean isReadyForRechunk(KnowledgeDocumentEntity document) {
+        if ("LESSON".equalsIgnoreCase(document.getSourceType())) {
+            return true;
+        }
+        String ps = document.getParseStatus();
+        return "SUCCESS".equals(ps) || "CHUNKED".equals(ps);
+    }
+
+    private ChunkVO enrichStatus(ChunkVO vo) {
+        if (vo == null || vo.getId() == null) {
+            return vo;
+        }
+        KnowledgeChunkIndexEntity index = knowledgeChunkIndexDao.findByChunkId(vo.getId());
+        if (index == null || !StringUtils.hasText(index.getEmbedStatus())) {
+            vo.setStatus("PENDING");
+        } else if ("FAILED".equalsIgnoreCase(index.getEmbedStatus())) {
+            vo.setStatus("INDEX_FAILED");
+        } else if ("INDEXED".equalsIgnoreCase(index.getEmbedStatus())) {
+            vo.setStatus("INDEXED");
+        } else {
+            vo.setStatus("PENDING");
+        }
+        return vo;
+    }
+
+    private String normalizeEmbedStatusFilter(String embedStatus) {
+        if (!StringUtils.hasText(embedStatus) || "ALL".equalsIgnoreCase(embedStatus)) {
+            return null;
+        }
+        if ("INDEX_FAILED".equalsIgnoreCase(embedStatus)) {
+            return "INDEX_FAILED";
+        }
+        if ("INDEXED".equalsIgnoreCase(embedStatus) || "PENDING".equalsIgnoreCase(embedStatus)) {
+            return embedStatus.toUpperCase();
+        }
+        return null;
+    }
+
+    private boolean matchesKeyword(ChunkVO vo, String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            return true;
+        }
+        String k = keyword.trim().toLowerCase();
+        return (vo.getContent() != null && vo.getContent().toLowerCase().contains(k))
+                || (vo.getHeading() != null && vo.getHeading().toLowerCase().contains(k));
     }
 
     private void refreshChunkCount(Long knowledgeBaseId) {

@@ -8,9 +8,17 @@ import com.edumind.ai.integration.llm.LlmStreamRelay;
 import com.edumind.ai.router.IntentRouter;
 import com.edumind.ai.service.assistant.GlobalAssistantService;
 import com.edumind.ai.service.audit.AiCallAuditContext;
+import com.edumind.ai.service.routing.CopilotRagPolicy;
 import com.edumind.ai.service.routing.IntentDispatchPlan;
 import com.edumind.ai.service.routing.IntentDispatchRequest;
 import com.edumind.ai.service.routing.IntentDispatchService;
+import com.edumind.ai.service.teaching.LessonCopilotEnricher;
+import com.edumind.ai.vo.rag.CitationVO;
+import com.edumind.course.api.LessonQueryApi;
+import com.edumind.knowledge.api.LessonContentIndexApi;
+import com.edumind.course.vo.lesson.LessonCopilotContextVO;
+import com.edumind.knowledge.api.KnowledgeQueryApi;
+import com.edumind.knowledge.vo.knowledge.KnowledgeBaseVO;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.model.LoginUser;
 import com.edumind.common.model.UserContext;
@@ -25,6 +33,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -34,6 +43,10 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
 
     private final IntentDispatchService intentDispatchService;
     private final AiGatewayFacade aiGatewayFacade;
+    private final KnowledgeQueryApi knowledgeQueryApi;
+    private final LessonQueryApi lessonQueryApi;
+    private final LessonContentIndexApi lessonContentIndexApi;
+    private final LessonCopilotEnricher lessonCopilotEnricher;
     private final java.util.concurrent.ExecutorService assistantExecutor = java.util.concurrent.Executors.newCachedThreadPool();
 
     @Override
@@ -41,13 +54,11 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
         SseEmitter emitter = new SseEmitter(180000L);
         String convId = dto.getConversationId() != null ? dto.getConversationId() : "conv-" + UUID.randomUUID().toString().substring(0, 8);
 
+        String userQuestion = dto.getMessage() != null ? dto.getMessage() : "";
         String dispatchMessage = buildDispatchMessage(dto);
-        IntentRouter.IntentResult intent = intentDispatchService.route(dispatchMessage, dto.getCourseId());
-        IntentDispatchPlan plan = intentDispatchService.prepare(IntentDispatchRequest.builder()
-                .message(dispatchMessage)
-                .courseId(dto.getCourseId())
-                .intent(intent)
-                .build());
+        IntentRouter.IntentResult intent = intentDispatchService.route(
+                isLessonLearnWithIndex(dto) ? userQuestion : dispatchMessage, dto.getCourseId());
+        IntentDispatchPlan plan = intentDispatchService.prepare(buildDispatchRequest(dto, dispatchMessage, intent));
 
         final Long userId = LoginUserResolver.requireUserId();
         final Long tenantId = TenantContext.getTenantId();
@@ -70,6 +81,19 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
 
                 if ("navigate".equals(plan.getRoute()) && plan.getNavigatePayload() != null) {
                     sendEvent(emitter, "navigate", plan.getNavigatePayload());
+                }
+
+                if (plan.isUseRag()) {
+                    String module = dto.getContextModule() != null ? dto.getContextModule().trim() : "";
+                    sendEvent(emitter, "status", Map.of(
+                            "phase", "rag_searching",
+                            "message", isLessonTeachingContext(module) ? "正在检索本课讲义…" : "正在检索课程资料…"
+                    ));
+                }
+
+                List<CitationVO> citations = plan.getCitations() != null ? plan.getCitations() : List.of();
+                if (!citations.isEmpty()) {
+                    sendEvent(emitter, "citation", Map.of("citations", citations));
                 }
 
                 StringBuilder contentBuilder = new StringBuilder();
@@ -131,13 +155,11 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
     @Override
     public Map<String, Object> ask(GlobalAssistantRequestDTO dto) {
         String convId = dto.getConversationId() != null ? dto.getConversationId() : "conv-" + UUID.randomUUID().toString().substring(0, 8);
+        String userQuestion = dto.getMessage() != null ? dto.getMessage() : "";
         String dispatchMessage = buildDispatchMessage(dto);
-        IntentRouter.IntentResult intent = intentDispatchService.route(dispatchMessage, dto.getCourseId());
-        IntentDispatchPlan plan = intentDispatchService.prepare(IntentDispatchRequest.builder()
-                .message(dispatchMessage)
-                .courseId(dto.getCourseId())
-                .intent(intent)
-                .build());
+        IntentRouter.IntentResult intent = intentDispatchService.route(
+                isLessonLearnWithIndex(dto) ? userQuestion : dispatchMessage, dto.getCourseId());
+        IntentDispatchPlan plan = intentDispatchService.prepare(buildDispatchRequest(dto, dispatchMessage, intent));
 
         AiCallAuditContext auditContext = AiCallAuditContext.builder()
                 .userId(LoginUserResolver.requireUserId())
@@ -207,37 +229,134 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
 
     private String buildDispatchMessage(GlobalAssistantRequestDTO dto) {
         String base = dto.getMessage() != null ? dto.getMessage() : "";
-        if (dto.getLessonChapterId() != null && !"lesson_studio".equalsIgnoreCase(String.valueOf(dto.getContextModule()))) {
-            return "[当前微课节ID: " + dto.getLessonChapterId() + "] " + base;
+        String module = dto.getContextModule() != null ? dto.getContextModule().trim() : "";
+        if (isLessonTeachingContext(module)) {
+            boolean learn = "lesson_learn".equalsIgnoreCase(module);
+            if (learn && isLessonLearnWithIndex(dto)) {
+                return base;
+            }
+            LessonCopilotContextVO lessonCtx = loadLessonCopilotContext(dto, learn, base);
+            StringBuilder sb = new StringBuilder();
+            sb.append(learn ? "[课节学习上下文]" : "[课节备课上下文]");
+            sb.append("\n说明: 以下为本课讲义内容（课程课节），不是知识库文档。");
+            if (dto.getLessonChapterId() != null) {
+                sb.append("\n微课节ID: ").append(dto.getLessonChapterId());
+            }
+            if (dto.getCourseId() != null) {
+                sb.append("\n课程ID: ").append(dto.getCourseId());
+            }
+            String title = lessonCtx != null && StringUtils.hasText(lessonCtx.getTitle())
+                    ? lessonCtx.getTitle()
+                    : dto.getDraftTitle();
+            if (StringUtils.hasText(title)) {
+                sb.append("\n课节标题: ").append(title.trim());
+            }
+            String description = lessonCtx != null && StringUtils.hasText(lessonCtx.getDescription())
+                    ? lessonCtx.getDescription()
+                    : dto.getDraftDescription();
+            if (StringUtils.hasText(description)) {
+                sb.append("\n课节导读: ").append(truncate(description, 600));
+            }
+            String objectives = lessonCtx != null && StringUtils.hasText(lessonCtx.getObjectivesText())
+                    ? lessonCtx.getObjectivesText()
+                    : dto.getObjectiveExcerpt();
+            if (StringUtils.hasText(objectives)) {
+                sb.append("\n\n【学习目标】\n").append(objectives.trim());
+            }
+            String body = lessonCtx != null && StringUtils.hasText(lessonCtx.getRelevantBodyMarkdown())
+                    ? lessonCtx.getRelevantBodyMarkdown()
+                    : dto.getDraftExcerpt();
+            if (StringUtils.hasText(body)) {
+                sb.append("\n\n【本课讲义】\n").append(body.trim());
+            }
+            if (!learn && StringUtils.hasText(dto.getSelectedText())) {
+                sb.append("\n\n【编辑器选区】\n").append(truncate(dto.getSelectedText(), 1500));
+            }
+            sb.append("\n\n").append(learn ? "学生提问: " : "教师提问: ").append(base);
+            return sb.toString();
         }
-        if (!"lesson_studio".equalsIgnoreCase(String.valueOf(dto.getContextModule()))) {
-            return base;
+        return base;
+    }
+
+    private boolean isLessonTeachingContext(String module) {
+        return "lesson_studio".equalsIgnoreCase(module) || "lesson_learn".equalsIgnoreCase(module);
+    }
+
+    private LessonCopilotContextVO loadLessonCopilotContext(GlobalAssistantRequestDTO dto, boolean learn,
+                                                            String userQuestion) {
+        if (dto.getCourseId() == null || dto.getLessonChapterId() == null) {
+            return null;
         }
-        StringBuilder sb = new StringBuilder();
-        sb.append("[课节备课上下文]");
-        if (dto.getLessonChapterId() != null) {
-            sb.append("\n微课节ID: ").append(dto.getLessonChapterId());
+        try {
+            return lessonQueryApi.getCopilotContext(
+                    dto.getCourseId(),
+                    dto.getLessonChapterId(),
+                    !learn,
+                    userQuestion);
+        } catch (Exception ex) {
+            log.warn("Load lesson copilot context failed courseId={} lessonId={}: {}",
+                    dto.getCourseId(), dto.getLessonChapterId(), ex.getMessage());
+            return null;
         }
-        if (dto.getCourseId() != null) {
-            sb.append("\n课程ID: ").append(dto.getCourseId());
+    }
+
+    private boolean isLessonLearnWithIndex(GlobalAssistantRequestDTO dto) {
+        if (!"lesson_learn".equalsIgnoreCase(
+                dto.getContextModule() != null ? dto.getContextModule().trim() : "")) {
+            return false;
         }
+        if (dto.getCourseId() == null || dto.getLessonChapterId() == null) {
+            return false;
+        }
+        return lessonContentIndexApi.findLessonDocumentId(dto.getCourseId(), dto.getLessonChapterId()).isPresent();
+    }
+
+    private IntentDispatchRequest buildDispatchRequest(
+            GlobalAssistantRequestDTO dto, String dispatchMessage, IntentRouter.IntentResult intent) {
+        String module = dto.getContextModule() != null ? dto.getContextModule().trim() : "";
+        String userQuestion = dto.getMessage() != null ? dto.getMessage() : "";
+        Long knowledgeBaseId = resolveKnowledgeBaseId(dto);
+        boolean lessonContext = isLessonTeachingContext(module);
+        boolean lessonLearnIndexed = isLessonLearnWithIndex(dto);
+        boolean skipRag = CopilotRagPolicy.shouldSkipRag(userQuestion);
+        boolean useRag = knowledgeBaseId != null && !skipRag
+                && (!lessonContext || lessonLearnIndexed);
+        Optional<Long> lessonDocId = Optional.empty();
+        String enrichment = "";
+        if (lessonContext && dto.getCourseId() != null && dto.getLessonChapterId() != null) {
+            boolean previewDraft = !"lesson_learn".equalsIgnoreCase(module);
+            enrichment = lessonCopilotEnricher.buildEnrichmentBlock(
+                    dto.getCourseId(), dto.getLessonChapterId(), previewDraft, userQuestion);
+            lessonDocId = lessonContentIndexApi.findLessonDocumentId(dto.getCourseId(), dto.getLessonChapterId());
+        }
+        String userPrompt = lessonLearnIndexed ? userQuestion : dispatchMessage;
+        return IntentDispatchRequest.builder()
+                .message(userPrompt)
+                .retrievalQuery(buildRetrievalQuery(dto))
+                .courseId(dto.getCourseId())
+                .contextModule(module)
+                .lessonChapterId(dto.getLessonChapterId())
+                .lessonDocumentId(lessonDocId.orElse(null))
+                .lessonEnrichmentBlock(enrichment)
+                .knowledgeBaseId(useRag ? knowledgeBaseId : null)
+                .intent(intent)
+                .build();
+    }
+
+    private Long resolveKnowledgeBaseId(GlobalAssistantRequestDTO dto) {
+        if (dto.getCourseId() == null) {
+            return null;
+        }
+        List<KnowledgeBaseVO> knowledgeBases = knowledgeQueryApi.listKnowledgeBasesByCourseId(dto.getCourseId());
+        return knowledgeBases.isEmpty() ? null : knowledgeBases.get(0).getId();
+    }
+
+    private String buildRetrievalQuery(GlobalAssistantRequestDTO dto) {
+        String question = dto.getMessage() != null ? dto.getMessage().trim() : "";
         if (StringUtils.hasText(dto.getDraftTitle())) {
-            sb.append("\n课节标题: ").append(dto.getDraftTitle().trim());
+            return dto.getDraftTitle().trim() + " " + question;
         }
-        if (StringUtils.hasText(dto.getDraftDescription())) {
-            sb.append("\n课节导读: ").append(truncate(dto.getDraftDescription(), 400));
-        }
-        if (StringUtils.hasText(dto.getObjectiveExcerpt())) {
-            sb.append("\n学习目标摘录: ").append(truncate(dto.getObjectiveExcerpt(), 400));
-        }
-        if (StringUtils.hasText(dto.getDraftExcerpt())) {
-            sb.append("\n正文摘录: ").append(truncate(dto.getDraftExcerpt(), 1200));
-        }
-        if (StringUtils.hasText(dto.getSelectedText())) {
-            sb.append("\n编辑器选区: ").append(truncate(dto.getSelectedText(), 800));
-        }
-        sb.append("\n\n教师提问: ").append(base);
-        return sb.toString();
+        return question;
     }
 
     private String truncate(String text, int maxLen) {

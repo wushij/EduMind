@@ -51,20 +51,6 @@
             @quiz="goQuiz"
           />
           <LessonLearnToc :items="tocItems" />
-          <el-collapse v-if="lesson.knowledgePoints?.length" class="lesson-kp-collapse">
-            <el-collapse-item name="kp">
-              <template #title>
-                <span class="side-title side-title--collapse">本课知识点</span>
-              </template>
-              <div class="kp-list">
-                <div v-for="kp in lesson.knowledgePoints" :key="kp.id" class="kp-card">
-                  <span class="kp-name">{{ kp.title || kp.name }}</span>
-                  <p v-if="kp.description" class="kp-desc">{{ kp.description }}</p>
-                </div>
-              </div>
-            </el-collapse-item>
-          </el-collapse>
-          <p v-else class="side-empty">暂无关联知识点</p>
         </aside>
       </div>
     </template>
@@ -83,6 +69,7 @@ import LessonCompleteBar from '@/components/course/lesson/LessonCompleteBar.vue'
 import LessonLearnToc from '@/components/course/lesson/LessonLearnToc.vue';
 import type { LessonTocItem } from '@/utils/course/lesson-toc';
 import { buildLessonToc } from '@/utils/course/lesson-toc';
+import { buildLessonLearnAiExcerpt } from '@/utils/course/lesson-learn-ai-context';
 
 const route = useRoute();
 const router = useRouter();
@@ -109,22 +96,25 @@ watch(
 
 const teachingCopilotStore = useTeachingCopilotStore();
 
-watch(
-  lesson,
-  (val) => {
-    if (!val) return;
-    teachingCopilotStore.setContext({
-      contextModule: 'lesson_learn',
-      courseId: courseId.value,
-      lessonChapterId: lessonId.value,
-      title: val.title,
-      description: val.description,
-      lessonType: val.lessonType,
-      contentStatus: val.contentStatus
-    });
-  },
-  { immediate: true }
-);
+function syncLessonLearnTeachingContext() {
+  const val = lesson.value;
+  if (!val) return;
+  const { draftExcerpt, objectiveExcerpt } = buildLessonLearnAiExcerpt(content.value);
+  teachingCopilotStore.setContext({
+    contextModule: 'lesson_learn',
+    courseId: courseId.value,
+    lessonChapterId: lessonId.value,
+    title: val.title,
+    description: val.description,
+    lessonType: val.lessonType,
+    contentStatus: val.contentStatus,
+    draftExcerpt,
+    objectiveExcerpt
+  });
+}
+
+watch(lesson, () => syncLessonLearnTeachingContext(), { immediate: true });
+watch(() => content.value.blocks, () => syncLessonLearnTeachingContext(), { deep: true });
 
 onUnmounted(() => {
   if (teachingCopilotStore.activeContext?.contextModule === 'lesson_learn') {
@@ -141,10 +131,19 @@ function goCourseAi() {
 }
 
 function goCourseAiWithContext() {
-  router.push({
-    path: `/course/${courseId.value}/ai`,
-    query: { lessonId: String(lessonId.value), prompt: `请针对课节「${lesson.value?.title}」进行辅导。` }
-  });
+  teachingCopilotStore.openAssistantWithContext(
+    {
+      contextModule: 'lesson_learn',
+      courseId: courseId.value,
+      lessonChapterId: lessonId.value,
+      title: lesson.value?.title,
+      description: lesson.value?.description,
+      lessonType: lesson.value?.lessonType,
+      contentStatus: lesson.value?.contentStatus
+    },
+    '',
+    { autoSend: false }
+  );
 }
 
 function goQuiz() {
@@ -181,73 +180,16 @@ function goEditLesson() {
   border: 1px solid #e2e8f0;
   border-radius: 20px;
   padding: 16px;
-  height: fit-content;
   position: sticky;
   top: 16px;
   align-self: start;
+  height: fit-content;
 }
 
 .lesson-side-actions {
   margin-bottom: 16px;
   padding-bottom: 16px;
   border-bottom: 1px solid #f1f5f9;
-}
-
-.side-title {
-  margin: 0 0 12px;
-  font-size: 0.95rem;
-  color: #0f172a;
-
-  &--collapse {
-    margin: 0;
-    font-weight: 700;
-  }
-}
-
-.lesson-kp-collapse {
-  border: none;
-
-  :deep(.el-collapse-item__header) {
-    border: none;
-    height: auto;
-    line-height: 1.4;
-    padding: 4px 0;
-    font-size: inherit;
-    color: #0f172a;
-  }
-
-  :deep(.el-collapse-item__wrap) {
-    border: none;
-  }
-
-  :deep(.el-collapse-item__content) {
-    padding: 0 0 8px;
-  }
-}
-
-.side-empty {
-  margin: 0;
-  font-size: 12px;
-  color: #94a3b8;
-}
-
-.kp-card {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #f8fafc;
-  margin-bottom: 8px;
-}
-
-.kp-name {
-  font-weight: 600;
-  color: #1e293b;
-  font-size: 0.88rem;
-}
-
-.kp-desc {
-  margin: 6px 0 0;
-  font-size: 0.78rem;
-  color: #64748b;
 }
 
 .lesson-loading,

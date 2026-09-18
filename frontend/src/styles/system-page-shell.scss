@@ -1,0 +1,89 @@
+/* 系统管理 — 与 personal AI 消耗明细 / profile-page-shell 对齐的页壳与卡片 */
+$system-surface-radius: 24px;
+$system-surface-border: 1px solid #e2e8f0;
+$system-surface-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
+$system-hero-gradient: linear-gradient(135deg, #ffffff 0%, #f8faff 55%, #f5f3ff 100%);
+$system-hero-shadow: 0 8px 32px rgba(22, 119, 255, 0.06);
+
+.system-page-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding-bottom: 0;
+  box-sizing: border-box;
+
+  /* 高度随内容收缩，避免列表/分页下方被 flex 撑出大块留白 */
+  > * {
+    flex: 0 0 auto;
+  }
+}
+
+.system-surface-card,
+.system-filter-card,
+.system-table-card {
+  background: #ffffff;
+  border: $system-surface-border;
+  border-radius: $system-surface-radius;
+  box-shadow: $system-surface-shadow;
+  box-sizing: border-box;
+}
+
+.system-filter-card {
+  padding: 20px 28px;
+}
+
+.system-table-card {
+  padding: 24px 28px 16px;
+}
+
+.system-page-hero-card {
+  position: relative;
+  overflow: hidden;
+  background: $system-hero-gradient;
+  border: $system-surface-border;
+  border-radius: $system-surface-radius;
+  padding: 28px 32px 24px;
+  box-shadow: $system-hero-shadow;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    filter: blur(60px);
+    opacity: 0.35;
+  }
+
+  &::before {
+    width: 220px;
+    height: 220px;
+    background: #bfdbfe;
+    top: -80px;
+    right: 120px;
+  }
+
+  &::after {
+    width: 160px;
+    height: 160px;
+    background: #ddd6fe;
+    bottom: -60px;
+    left: 40px;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+@mixin system-surface-card {
+  background: #ffffff;
+  border: $system-surface-border;
+  border-radius: $system-surface-radius;
+  box-shadow: $system-surface-shadow;
+  box-sizing: border-box;
+}

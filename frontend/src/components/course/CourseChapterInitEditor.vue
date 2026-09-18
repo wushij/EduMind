@@ -17,33 +17,31 @@
       element-loading-background="rgba(255, 255, 255, 0.85)"
     >
       <div class="syllabus-generator-toolbar">
-        <div class="template-pill-group">
-          <span class="template-label">标准模板导入：</span>
-          <button
-            type="button"
-            class="template-pill-btn"
-            :disabled="isAiGeneratingOutline"
-            @click="$emit('apply-template', 'core')"
-          >
-            高校核心课 (6章)
-          </button>
-          <button
-            type="button"
-            class="template-pill-btn"
-            :disabled="isAiGeneratingOutline"
-            @click="$emit('apply-template', 'practical')"
-          >
-            前沿实训课 (4阶段)
-          </button>
-          <button
-            type="button"
-            class="template-pill-btn"
-            :disabled="isAiGeneratingOutline"
-            @click="$emit('apply-template', 'general')"
-          >
-            通识导论课 (4章)
-          </button>
-        </div>
+        <span class="template-label">标准模板：</span>
+        <button
+          type="button"
+          class="template-pill-btn"
+          :disabled="isAiGeneratingOutline"
+          @click="$emit('apply-template', 'core')"
+        >
+          高校核心课 (6章)
+        </button>
+        <button
+          type="button"
+          class="template-pill-btn"
+          :disabled="isAiGeneratingOutline"
+          @click="$emit('apply-template', 'practical')"
+        >
+          前沿实训课 (4阶段)
+        </button>
+        <button
+          type="button"
+          class="template-pill-btn"
+          :disabled="isAiGeneratingOutline"
+          @click="$emit('apply-template', 'general')"
+        >
+          通识导论课 (4章)
+        </button>
 
         <button
           type="button"
@@ -203,18 +201,38 @@ defineEmits<{
   .syllabus-generator-toolbar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 12px;
+    flex-wrap: nowrap;
+    gap: 8px;
     background: #F8FAFC;
     border: 1px solid #EDF2F7;
     border-radius: 14px;
-    padding: 12px 16px;
+    padding: 10px 14px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+
+    .template-label {
+      flex-shrink: 0;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #475569;
+      white-space: nowrap;
+    }
 
     .ai-generate-capsule-btn {
-      margin-left: auto;
       display: inline-flex;
+      flex-shrink: 0;
+      margin-left: auto;
       align-items: center;
+      white-space: nowrap;
       gap: 7px;
       height: 36px;
       padding: 0 18px;
@@ -248,33 +266,29 @@ defineEmits<{
       }
     }
 
-    .template-pill-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
+    .template-pill-btn {
+      flex-shrink: 0;
+      height: 32px;
+      padding: 0 12px;
+      border-radius: 9999px;
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s;
 
-      .template-label {
-        font-size: 12px;
-        color: #64748B;
+      &:hover:not(:disabled) {
+        color: #1677FF;
+        border-color: #93C5FD;
+        background: #F0F7FF;
       }
 
-      .template-pill-btn {
-        height: 28px;
-        padding: 0 12px;
-        border-radius: 9999px;
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        color: #475569;
-        font-size: 12px;
-        cursor: pointer;
-        transition: all 0.2s;
-
-        &:hover {
-          color: #1677FF;
-          border-color: #93C5FD;
-          background: #F0F7FF;
-        }
+      &:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
     }
   }
@@ -287,11 +301,11 @@ defineEmits<{
     .chapter-pill-item-row {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       background: #FFFFFF;
       border: 1px solid #E2E8F0;
-      border-radius: 9999px;
-      padding: 4px 6px 4px 14px;
+      border-radius: 14px;
+      padding: 8px 10px 8px 14px;
       transition: all 0.2s;
 
       &:hover {

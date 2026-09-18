@@ -14,13 +14,10 @@
             :ai-personas="aiPersonas"
             :preset-covers="presetCovers"
             :selected-cover-id="selectedCoverId"
-            :submitting="submitting"
             @generate-code="generateRandomCourseCode"
             @select-persona="selectPersona"
             @select-cover="selectPresetCover"
             @clear-cover-selection="selectedCoverId = 0"
-            @cancel="goToCourseList"
-            @submit="handleSubmit"
           >
             <template #chapter-editor>
               <CourseChapterInitEditor
@@ -47,6 +44,22 @@
       </div>
     </div>
 
+    <div class="create-page-actions">
+      <button type="button" class="action-btn action-btn--cancel" @click="goToCourseList">
+        取消并返回
+      </button>
+      <button
+        type="button"
+        class="action-btn action-btn--submit"
+        :disabled="submitting"
+        @click="handleSubmit"
+      >
+        <el-icon v-if="!submitting"><Select /></el-icon>
+        <span v-if="!submitting">立即创建并初始化全链路空间</span>
+        <span v-else>正在全链路初始化空间与大纲...</span>
+      </button>
+    </div>
+
     <CourseCreateSuccessModal
       v-model:visible="successModalVisible"
       :created-course-name="createdCourse?.name || form.name"
@@ -60,6 +73,7 @@
 </template>
 
 <script setup lang="ts">
+import { Select } from '@element-plus/icons-vue';
 import { useCourseCreate } from '@/composables/course/useCourseCreate';
 import CourseCreateHeader from '@/components/course/CourseCreateHeader.vue';
 import CourseCreateForm from '@/components/course/CourseCreateForm.vue';
@@ -82,7 +96,64 @@ const {
   flex-direction: column;
   gap: 12px;
   width: 100%;
-  padding-bottom: 50px;
+  padding-bottom: 24px;
+}
+
+.create-page-actions {
+  margin-top: 4px;
+  padding: 20px 28px;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #ebf1f7;
+  box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 28px;
+    border-radius: 9999px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.22s ease;
+
+    &--cancel {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      color: #64748b;
+
+      &:hover {
+        background: #f8fafc;
+        color: #1e293b;
+        border-color: #cbd5e1;
+      }
+    }
+
+    &--submit {
+      background: #1677ff;
+      border: none;
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(22, 119, 255, 0.3);
+
+      &:hover:not(:disabled) {
+        background: #4096ff;
+        transform: translateY(-1px);
+        box-shadow: 0 8px 22px rgba(22, 119, 255, 0.4);
+      }
+
+      &:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+      }
+    }
+  }
 }
 
 .create-workspace-layout {

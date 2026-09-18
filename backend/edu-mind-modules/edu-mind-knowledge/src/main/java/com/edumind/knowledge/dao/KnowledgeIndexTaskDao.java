@@ -6,6 +6,8 @@ import com.edumind.knowledge.mapper.KnowledgeIndexTaskMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 @RequiredArgsConstructor
 public class KnowledgeIndexTaskDao {
@@ -27,5 +29,13 @@ public class KnowledgeIndexTaskDao {
 
     public int updateById(KnowledgeIndexTaskEntity entity) {
         return knowledgeIndexTaskMapper.updateById(entity);
+    }
+
+    public KnowledgeIndexTaskEntity findLatestGlobal() {
+        return knowledgeIndexTaskMapper.selectOne(
+                new LambdaQueryWrapper<KnowledgeIndexTaskEntity>()
+                        .orderByDesc(KnowledgeIndexTaskEntity::getId)
+                        .last("LIMIT 1")
+        );
     }
 }

@@ -62,12 +62,20 @@
 
         <div class="form-grid-3">
           <el-form-item label="学科门类" prop="category">
-            <el-select v-model="formData.category" placeholder="分类" class="w-full">
-              <el-option label="计算机与软件" value="计算机与软件" />
-              <el-option label="人工智能与大数据" value="人工智能与大数据" />
-              <el-option label="电子信息与通信" value="电子信息与通信" />
-              <el-option label="数学与基础学科" value="数学与基础学科" />
-              <el-option label="通识与工程素养" value="通识与工程素养" />
+            <el-select
+              v-model="formData.category"
+              placeholder="选择或输入学科专业"
+              class="w-full"
+              filterable
+              allow-create
+              default-first-option
+            >
+              <el-option
+                v-for="cat in courseCategoryPresets"
+                :key="cat"
+                :label="cat"
+                :value="cat"
+              />
             </el-select>
           </el-form-item>
 
@@ -193,6 +201,9 @@ import { EditPen, Reading, Service, Loading, Opportunity, Tools, Sunny, MagicSti
 import { suggestCourseDescription } from '@/api/ai/course-profile';
 import type { Course } from '@/types/course/course';
 import { useCourse } from '@/composables/course/useCourse';
+import { COURSE_CATEGORY_PRESETS } from '@/constants/course';
+
+const courseCategoryPresets = COURSE_CATEGORY_PRESETS;
 
 const props = defineProps<{
   modelValue: boolean;

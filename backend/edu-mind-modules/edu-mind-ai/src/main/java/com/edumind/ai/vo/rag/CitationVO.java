@@ -10,4 +10,8 @@ public class CitationVO {
     private Double score;
     private String excerpt;
     private Integer chunkIndex;
+    private Long lessonChapterId;
+    private String anchor;
+    private Long documentId;
+    private Long knowledgeBaseId;
 }

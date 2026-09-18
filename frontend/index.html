@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" style="overflow: hidden; height: 100%; margin: 0; padding: 0;">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
@@ -7,8 +7,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>智教云 · EduMind｜AI 智能教学赋能平台</title>
     <meta name="description" content="高校级 B 端 AI 智能教学赋能平台 - 课程、知识库、RAG、出题、组卷与智能问答中枢" />
+    <style>
+      html, body {
+        overflow: hidden !important;
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        scrollbar-width: none !important;
+      }
+      html::-webkit-scrollbar,
+      body::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+      }
+    </style>
   </head>
-  <body>
+  <body style="overflow: hidden; height: 100%; margin: 0; padding: 0;">
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -48,4 +48,17 @@ public class KnowledgeDocumentDao {
                         .eq(KnowledgeDocumentEntity::getKnowledgeBaseId, knowledgeBaseId)
         );
     }
+
+    public KnowledgeDocumentEntity findLessonDocument(Long courseId, Long lessonChapterId) {
+        if (courseId == null || lessonChapterId == null) {
+            return null;
+        }
+        return knowledgeDocumentMapper.selectOne(
+                new LambdaQueryWrapper<KnowledgeDocumentEntity>()
+                        .eq(KnowledgeDocumentEntity::getSourceType, "LESSON")
+                        .eq(KnowledgeDocumentEntity::getCourseId, courseId)
+                        .eq(KnowledgeDocumentEntity::getLessonChapterId, lessonChapterId)
+                        .last("LIMIT 1")
+        );
+    }
 }

@@ -1,9 +1,25 @@
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { DocumentChunk, ChunkStatsVO, ChunkQueryRequest } from '@/types/knowledge/chunk';
 import { KBDocument } from '@/types/knowledge/document';
 import { getDocuments } from '@/api/knowledge/document';
 import { getChunks, triggerChunk, getChunkStats } from '@/api/knowledge/chunk';
 import { ElMessage } from 'element-plus';
+
+function deriveStatsFromChunks(list: DocumentChunk[]): ChunkStatsVO {
+  const total = list.length;
+  const indexed = list.filter((c) => c.status === 'INDEXED').length;
+  const pending = list.filter((c) => c.status === 'PENDING').length;
+  const failed = list.filter((c) => c.status === 'INDEX_FAILED').length;
+  const totalTokens = list.reduce((sum, c) => sum + (c.tokenCount || 0), 0);
+  return {
+    totalChunks: total,
+    indexedChunks: indexed,
+    pendingChunks: pending,
+    failedChunks: failed,
+    totalTokens,
+    avgTokens: total > 0 ? Math.round(totalTokens / total) : 0
+  };
+}
 
 export function useDocumentChunk(initialDocId?: number) {
   const loading = ref(false);
@@ -18,6 +34,7 @@ export function useDocumentChunk(initialDocId?: number) {
     totalTokens: 0
   });
 
+  const knowledgeBaseId = ref<number | undefined>();
   const selectedDocumentId = ref<number | undefined>(initialDocId);
   const searchKeyword = ref('');
   const statusFilter = ref<string>('ALL');
@@ -28,9 +45,13 @@ export function useDocumentChunk(initialDocId?: number) {
 
   // 分页状态
   const currentPage = ref(1);
-  const pageSize = ref(8);
+  const pageSize = ref(10);
 
   const fetchChunks = async () => {
+    if (!selectedDocumentId.value) {
+      chunks.value = [];
+      return;
+    }
     loading.value = true;
     try {
       const params: ChunkQueryRequest = {
@@ -38,25 +59,40 @@ export function useDocumentChunk(initialDocId?: number) {
         status: statusFilter.value === 'ALL' ? undefined : statusFilter.value
       };
       chunks.value = await getChunks(selectedDocumentId.value, params);
+      currentPage.value = 1;
     } catch {
       chunks.value = [];
+      ElMessage.error('加载切片列表失败');
     } finally {
       loading.value = false;
     }
   };
 
+  watch(statusFilter, () => {
+    void fetchChunks();
+  });
+
   const fetchStats = async (kbId?: number) => {
+    const targetKbId = kbId ?? knowledgeBaseId.value;
+    const fallback = deriveStatsFromChunks(chunks.value);
+    if (!targetKbId) {
+      if (fallback.totalChunks > 0) {
+        stats.value = fallback;
+      }
+      return;
+    }
     try {
-      stats.value = await getChunkStats(kbId);
+      const apiStats = await getChunkStats(targetKbId);
+      const apiEmpty =
+        (apiStats.totalChunks ?? 0) === 0 && (apiStats.indexedChunks ?? 0) === 0;
+      stats.value =
+        apiEmpty && fallback.totalChunks > 0
+          ? { ...apiStats, ...fallback }
+          : apiStats;
     } catch {
-      stats.value = {
-        totalChunks: 0,
-        indexedChunks: 0,
-        pendingChunks: 0,
-        failedChunks: 0,
-        avgTokens: 0,
-        totalTokens: 0
-      };
+      if (fallback.totalChunks > 0) {
+        stats.value = fallback;
+      }
     }
   };
 
@@ -71,7 +107,7 @@ export function useDocumentChunk(initialDocId?: number) {
       const res = await triggerChunk(targetDocId);
       ElMessage.success(res.message || '重新切片任务已提交');
       await fetchChunks();
-      await fetchStats();
+      await fetchStats(knowledgeBaseId.value);
     } catch (err: any) {
       ElMessage.error(err.message || '触发切片失败');
     } finally {
@@ -115,14 +151,13 @@ export function useDocumentChunk(initialDocId?: number) {
 
   async function initializeChunksPage(kbId?: number) {
     if (kbId) {
+      knowledgeBaseId.value = kbId;
       await loadDocuments(kbId);
-      try {
-        await fetchStats(kbId);
-      } catch {
-        await fetchStats(kbId);
+      if (selectedDocumentId.value) {
+        await fetchChunks();
       }
-    }
-    if (selectedDocumentId.value) {
+      await fetchStats(kbId);
+    } else if (selectedDocumentId.value) {
       await fetchChunks();
     }
   }

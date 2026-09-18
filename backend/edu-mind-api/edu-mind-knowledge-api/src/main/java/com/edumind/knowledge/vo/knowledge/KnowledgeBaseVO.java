@@ -10,6 +10,8 @@ public class KnowledgeBaseVO {
     private String name;
     private String description;
     private Long courseId;
+    private String courseName;
+    private String category;
     private Integer docCount;
     private Integer chunkCount;
     private String indexStatus;

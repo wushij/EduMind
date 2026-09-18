@@ -2,18 +2,63 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
 }
 
 html, body {
   width: 100%;
   height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden !important; /* 彻底禁用浏览器根窗口的滚动条，消除双滚动条问题 */
+  scrollbar-width: none !important; /* Firefox 禁用根滚动条 */
+  -ms-overflow-style: none; /* IE 10+ */
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
   background-color: #F5F8FC;
   color: #1F2937;
   -webkit-font-smoothing: antialiased;
 }
 
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 #app {
   width: 100%;
   height: 100%;
+  overflow: hidden !important;
+}
+
+/* 全局内部容器精致微拟物滚动条（彻底清除 Windows 原生粗糙灰槽与上下箭头） */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: rgba(100, 116, 139, 0.6);
+  }
+}
+
+::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }

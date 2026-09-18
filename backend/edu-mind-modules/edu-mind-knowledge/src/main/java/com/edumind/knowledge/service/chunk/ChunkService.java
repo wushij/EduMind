@@ -9,7 +9,7 @@ public interface ChunkService {
 
     ChunkTaskVO triggerChunk(Long documentId);
 
-    PageResult<ChunkVO> pageChunks(Long documentId, long page, long pageSize, String keyword);
+    PageResult<ChunkVO> pageChunks(Long documentId, long page, long pageSize, String keyword, String embedStatus);
 
     ChunkStatsVO getChunkStats(Long knowledgeBaseId);
 }

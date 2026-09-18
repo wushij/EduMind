@@ -75,7 +75,7 @@ defineProps<{
 
   .metric-capsule-card {
     background: #ffffff;
-    border-radius: $border-radius-xl;
+    border-radius: 24px;
     padding: 20px;
     display: flex;
     align-items: center;

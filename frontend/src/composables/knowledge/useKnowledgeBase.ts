@@ -11,6 +11,7 @@ import {
 import { getCourseList } from '@/api/course/course';
 import { KnowledgeBase } from '@/types/knowledge/knowledge-base';
 import type { Course } from '@/types/course/course';
+import { mapKnowledgeBaseVectorStatus } from '@/utils/knowledge/knowledge-base-status';
 
 export function useKnowledgeBase() {
   const knowledgeBases = ref<KnowledgeBase[]>([]);
@@ -151,6 +152,9 @@ export function useKnowledgeBaseCreate() {
 }
 
 function normalizeKnowledgeBase(raw: Record<string, any>): KnowledgeBase {
+  const indexMapped = mapKnowledgeBaseVectorStatus(
+    raw.vectorStatus || raw.indexStatus
+  );
   return {
     id: Number(raw.id),
     name: raw.name || '',
@@ -159,8 +163,8 @@ function normalizeKnowledgeBase(raw: Record<string, any>): KnowledgeBase {
     categoryLabel: raw.categoryLabel || '专业核心',
     documentCount: Number(raw.docCount ?? raw.documentCount ?? 0),
     chunkCount: Number(raw.chunkCount ?? 0),
-    vectorStatus: raw.vectorStatus || raw.indexStatus || 'PENDING',
-    vectorStatusLabel: raw.vectorStatusLabel || '待解析',
+    vectorStatus: indexMapped.vectorStatus,
+    vectorStatusLabel: indexMapped.vectorStatusLabel,
     vectorProgress: raw.vectorProgress ?? 0,
     embeddingModel: raw.embeddingModel || '',
     updatedAt: raw.updateTime || raw.updatedAt || '',

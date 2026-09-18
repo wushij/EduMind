@@ -1,8 +1,8 @@
 <template>
   <el-dialog
     :model-value="visible"
-    title="创建新课程教学知识库"
-    width="560px"
+    :title="isEdit ? '编辑知识库基本信息' : '创建新课程专有知识库'"
+    width="580px"
     class="capsule-custom-dialog"
     :show-close="true"
     destroy-on-close
@@ -39,23 +39,43 @@
         </div>
       </el-form-item>
 
-      <el-form-item label="关联课程大纲" prop="courseName">
-        <select v-model="createForm.courseName" class="capsule-form-select">
-          <option value="高等数学（上）">高等数学（上）</option>
-          <option value="数据结构与算法">数据结构与算法</option>
-          <option value="大学物理">大学物理</option>
-          <option value="人工智能导论">人工智能导论</option>
-          <option value="线性代数">线性代数</option>
-          <option value="不关联特定课程（通用）">不关联特定课程（通用）</option>
-        </select>
+      <el-form-item label="关联课程大纲" prop="courseId">
+        <el-select
+          v-model="createForm.courseId"
+          placeholder="不关联特定课程（通用公共库）"
+          clearable
+          filterable
+          size="large"
+          class="kb-dialog-select w-full"
+        >
+          <el-option
+            v-for="course in courses"
+            :key="course.id"
+            :label="course.title"
+            :value="course.id"
+          />
+        </el-select>
+        <span v-if="courses.length === 0" class="field-hint-text">
+          当前暂无可选课程，将创建为通用公共库；可在课程中心创建课程后编辑绑定。
+        </span>
+        <span v-else class="field-hint-text">清空选择即不绑定课程，知识库仍可独立使用。</span>
       </el-form-item>
 
       <el-form-item label="向量嵌入模型 (Embedding Model)" prop="embeddingModel">
-        <select v-model="createForm.embeddingModel" class="capsule-form-select">
-          <option value="bge-large-zh-v1.5 (1024维)">bge-large-zh-v1.5 (1024维 - 推荐中文教学)</option>
-          <option value="text-embedding-3-small (1536维)">text-embedding-3-small (1536维 - 多语言均衡)</option>
-          <option value="bge-m3 (多模态高密度嵌入)">bge-m3 (多模态高密度嵌入)</option>
-        </select>
+        <el-select v-model="createForm.embeddingModel" size="large" class="kb-dialog-select w-full">
+          <el-option
+            label="bge-large-zh-v1.5 (1024维 - 推荐中文教学)"
+            value="bge-large-zh-v1.5 (1024维)"
+          />
+          <el-option
+            label="text-embedding-3-small (1536维 - 多语言高精度)"
+            value="text-embedding-3-small (1536维)"
+          />
+          <el-option
+            label="bge-m3 (多模态高密度嵌入 - 跨语言大文档)"
+            value="bge-m3 (多模态高密度嵌入)"
+          />
+        </el-select>
       </el-form-item>
 
       <el-form-item label="知识库简介与入库文档说明" prop="description">
@@ -82,7 +102,7 @@
           class="capsule-modal-btn capsule-modal-btn--confirm"
           @click="emit('confirm')"
         >
-          <span>立即创建知识库</span>
+          <span>{{ isEdit ? '保存修改' : '立即创建知识库' }}</span>
         </button>
       </div>
     </template>
@@ -101,17 +121,26 @@ type CategoryTab = {
 type CreateForm = {
   name: string;
   category: string;
-  courseName: string;
+  courseId?: number;
+  courseName?: string;
   embeddingModel: string;
   description: string;
 };
 
-defineProps<{
-  visible: boolean;
-  createForm: CreateForm;
-  createRules: Record<string, unknown>;
-  categoryOptions: CategoryTab[];
-}>();
+withDefaults(
+  defineProps<{
+    visible: boolean;
+    isEdit?: boolean;
+    createForm: CreateForm;
+    createRules: Record<string, unknown>;
+    categoryOptions: CategoryTab[];
+    courses?: Array<{ id: number; title: string }>;
+  }>(),
+  {
+    isEdit: false,
+    courses: () => []
+  }
+);
 
 const emit = defineEmits<{
   'update:visible': [value: boolean];
@@ -121,22 +150,46 @@ const emit = defineEmits<{
 
 <style scoped lang="scss">
 .capsule-dialog-form {
-  .capsule-form-input,
-  .capsule-form-select {
+  .w-full {
+    width: 100%;
+  }
+
+  .field-hint-text {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #94a3b8;
+    line-height: 1.45;
+  }
+
+  .kb-dialog-select {
+    :deep(.el-select__wrapper) {
+      border-radius: 9999px !important;
+      min-height: 42px;
+      box-shadow: 0 0 0 1px #e2e8f0 inset !important;
+      padding: 0 16px;
+    }
+
+    :deep(.el-select__wrapper.is-focused) {
+      box-shadow: 0 0 0 2px #1677ff inset !important;
+    }
+  }
+
+  .capsule-form-input {
     width: 100%;
     height: 42px;
     border-radius: 9999px;
-    border: 1px solid #E2E8F0;
-    background: #FFFFFF;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
     padding: 0 18px;
     font-size: 13.5px;
-    color: #1E293B;
+    color: #1e293b;
     outline: none;
     box-sizing: border-box;
     transition: all 0.2s;
 
     &:focus {
-      border-color: #1677FF;
+      border-color: #1677ff;
       box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.16);
     }
   }
@@ -144,18 +197,18 @@ const emit = defineEmits<{
   .capsule-form-textarea {
     width: 100%;
     border-radius: 14px;
-    border: 1px solid #E2E8F0;
-    background: #FFFFFF;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
     padding: 12px 16px;
     font-size: 13.5px;
-    color: #1E293B;
+    color: #1e293b;
     outline: none;
     box-sizing: border-box;
     resize: vertical;
     font-family: inherit;
 
     &:focus {
-      border-color: #1677FF;
+      border-color: #1677ff;
       box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.16);
     }
   }
@@ -172,9 +225,9 @@ const emit = defineEmits<{
       gap: 6px;
       padding: 6px 16px;
       border-radius: 9999px;
-      border: 1px solid #E2E8F0;
-      background: #F8FAFC;
-      color: #64748B;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #64748b;
       font-size: 12.5px;
       font-weight: 500;
       cursor: pointer;
@@ -185,14 +238,14 @@ const emit = defineEmits<{
       }
 
       &:hover {
-        border-color: #93C5FD;
-        color: #1677FF;
+        border-color: #93c5fd;
+        color: #1677ff;
       }
 
       &.active {
-        background: #EFF6FF;
-        border-color: #1677FF;
-        color: #1677FF;
+        background: #eff6ff;
+        border-color: #1677ff;
+        color: #1677ff;
         font-weight: 600;
       }
     }
@@ -216,21 +269,21 @@ const emit = defineEmits<{
     transition: all 0.2s;
 
     &--cancel {
-      background: #F1F5F9;
-      color: #64748B;
+      background: #f1f5f9;
+      color: #64748b;
 
       &:hover {
-        background: #E2E8F0;
+        background: #e2e8f0;
       }
     }
 
     &--confirm {
-      background: #1677FF;
-      color: #FFFFFF;
+      background: linear-gradient(135deg, #1677ff 0%, #2563eb 100%);
+      color: #ffffff;
       box-shadow: 0 3px 10px rgba(22, 119, 255, 0.28);
 
       &:hover {
-        background: #4096FF;
+        background: linear-gradient(135deg, #4096ff 0%, #1d4ed8 100%);
       }
     }
   }

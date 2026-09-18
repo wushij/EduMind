@@ -39,32 +39,43 @@
       </div>
 
       <div class="card-body">
-        <div class="metric-row">
-          <div class="metric-item">
-            <span class="metric-val">{{ tenant.campusCount || 1 }}</span>
-            <span class="metric-key">独立校区</span>
+        <div class="tenant-metric-panel">
+          <div class="metric-cell">
+            <div class="cell-icon cell-icon--blue">
+              <el-icon><OfficeBuilding /></el-icon>
+            </div>
+            <div class="cell-text">
+              <span class="cell-label">独立校区</span>
+              <span class="cell-value cell-value--blue">{{ tenant.campusCount || 1 }}</span>
+            </div>
           </div>
-          <div class="metric-divider"></div>
-          <div class="metric-item">
-            <span class="metric-val">{{ (tenant.memberCount || 0).toLocaleString() }}</span>
-            <span class="metric-key">师生总数</span>
+          <div class="metric-cell">
+            <div class="cell-icon cell-icon--teal">
+              <el-icon><UserFilled /></el-icon>
+            </div>
+            <div class="cell-text">
+              <span class="cell-label">师生总数</span>
+              <span class="cell-value cell-value--teal">{{ (tenant.memberCount || 0).toLocaleString() }}</span>
+            </div>
           </div>
-          <div class="metric-divider"></div>
-          <div class="metric-item">
-            <div class="metric-val-with-bar">
-              <span class="val-num">{{ tenant.tokenUsagePercent || 0 }}%</span>
-              <div class="mini-progress-pill">
+          <div class="metric-cell metric-cell--quota">
+            <div class="cell-icon cell-icon--purple">
+              <el-icon><Cpu /></el-icon>
+            </div>
+            <div class="cell-text">
+              <span class="cell-label">Token 配额</span>
+              <span class="cell-value cell-value--purple">{{ tenant.tokenUsagePercent || 0 }}%</span>
+              <div class="quota-progress-track">
                 <div
-                  class="mini-fill"
+                  class="quota-progress-fill"
                   :style="{ width: `${Math.min(100, tenant.tokenUsagePercent || 0)}%` }"
-                ></div>
+                />
               </div>
             </div>
-            <span class="metric-key">Token 配额</span>
           </div>
         </div>
 
-        <div class="info-list">
+        <div class="tenant-info-panel">
           <div class="info-line">
             <el-icon class="icon"><Link /></el-icon>
             <span class="label">域名：</span>
@@ -167,7 +178,8 @@ import {
   Delete,
   Check,
   OfficeBuilding,
-  Lock
+  Lock,
+  UserFilled
 } from '@element-plus/icons-vue';
 import type { TenantListVO } from '@/types/system/tenant';
 
@@ -191,20 +203,26 @@ defineEmits<{
 <style scoped lang="scss">
 .tenant-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
+  width: 100%;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
 
   .tenant-card {
     position: relative;
     background: #FFFFFF;
-    border: 1.5px solid #E2E8F0;
+    border: 1px solid #E2E8F0;
     border-radius: 24px;
-    padding: 22px;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.03);
+    padding: 24px 28px;
+    box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
     transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    gap: 0;
+    justify-content: flex-start;
 
     &:hover {
       border-color: #93C5FD;
@@ -344,75 +362,124 @@ defineEmits<{
     }
 
     .card-body {
-      margin-bottom: 18px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
 
-      .metric-row {
-        background: #F8FAFC;
-        border: 1px solid #E2E8F0;
-        border-radius: 18px;
-        padding: 12px 16px;
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
-        margin-bottom: 14px;
+      .tenant-metric-panel {
+        box-sizing: border-box;
+        border-radius: 24px;
+        border: 1.5px solid #E2E8F0;
+        background: linear-gradient(160deg, #FFFFFF 0%, #F8FAFC 100%);
+        padding: 18px 22px;
+        box-shadow: 0 4px 20px rgba(30, 80, 150, 0.06);
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 20px;
+        row-gap: 0;
 
-        .metric-item {
+        .metric-cell {
+          min-width: 0;
           display: flex;
-          flex-direction: column;
           align-items: center;
+          gap: 12px;
+          padding: 4px 2px;
 
-          .metric-val {
-            font-size: 17px;
-            font-weight: 800;
-            color: #0F172A;
-          }
-
-          .metric-val-with-bar {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 2px;
-
-            .val-num {
-              font-size: 15px;
-              font-weight: 800;
-              color: #2563EB;
-            }
-
-            .mini-progress-pill {
-              width: 48px;
-              height: 4px;
-              background: #E2E8F0;
-              border-radius: 9999px;
-              overflow: hidden;
-
-              .mini-fill {
-                height: 100%;
-                background: #2563EB;
-                border-radius: 9999px;
-              }
-            }
-          }
-
-          .metric-key {
-            font-size: 11px;
-            color: #64748B;
-            margin-top: 3px;
+          &--quota {
+            grid-column: 1 / -1;
+            padding-top: 12px;
+            margin-top: 4px;
+            border-top: 1px solid #E2E8F0;
           }
         }
 
-        .metric-divider {
-          width: 1px;
-          height: 24px;
-          background: #E2E8F0;
+        .cell-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 22px;
+          flex-shrink: 0;
+
+          &--blue {
+            background: #FFFFFF;
+            color: #2563EB;
+            border: 1.5px solid #BFDBFE;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.14);
+          }
+
+          &--teal {
+            background: #FFFFFF;
+            color: #0D9488;
+            border: 1.5px solid #99F6E4;
+            box-shadow: 0 4px 14px rgba(13, 148, 136, 0.14);
+          }
+
+          &--purple {
+            background: #FFFFFF;
+            color: #9333EA;
+            border: 1.5px solid #E9D5FF;
+            box-shadow: 0 4px 14px rgba(147, 51, 234, 0.14);
+          }
+        }
+
+        .cell-text {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          min-width: 0;
+
+          .cell-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #64748B;
+            line-height: 1.2;
+          }
+
+          .cell-value {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            font-variant-numeric: tabular-nums;
+            line-height: 1.1;
+
+            &--blue { color: #2563EB; }
+            &--teal { color: #0D9488; }
+            &--purple { color: #9333EA; }
+          }
+
+          .quota-progress-track {
+            width: 100%;
+            max-width: none;
+            height: 8px;
+            margin-top: 2px;
+            background: #E2E8F0;
+            border-radius: 9999px;
+            overflow: hidden;
+            border: 1px solid #CBD5E1;
+
+            .quota-progress-fill {
+              height: 100%;
+              min-width: 4px;
+              background: linear-gradient(90deg, #9333EA 0%, #6366F1 100%);
+              border-radius: 9999px;
+            }
+          }
         }
       }
 
-      .info-list {
+      .tenant-info-panel {
+        border-radius: 24px;
+        border: 1.5px solid #E2E8F0;
+        background: #FFFFFF;
+        padding: 18px 24px;
+        box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
         display: flex;
         flex-direction: column;
-        gap: 7px;
-        padding: 0 4px;
+        gap: 10px;
 
         .info-line {
           display: flex;
@@ -472,8 +539,9 @@ defineEmits<{
     }
 
     .card-footer {
-      border-top: 1px solid rgba(226, 232, 240, 0.8);
-      padding-top: 14px;
+      border-top: 1px solid #F1F5F9;
+      padding-top: 18px;
+      margin-top: auto;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -544,11 +612,11 @@ defineEmits<{
 }
 
 :deep(.pill-dropdown-menu) {
-  border-radius: 14px;
-  padding: 6px;
+  border-radius: 20px;
+  padding: 8px;
 
   .el-dropdown-menu__item {
-    border-radius: 8px;
+    border-radius: 12px;
     font-size: 12px;
     padding: 6px 14px;
 

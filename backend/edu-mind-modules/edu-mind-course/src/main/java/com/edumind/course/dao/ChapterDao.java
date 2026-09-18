@@ -60,4 +60,15 @@ public class ChapterDao {
         }
         return chapterMapper.deleteById(id);
     }
+
+    public List<ChapterEntity> findPublishedLessonChapters(Long courseId) {
+        LambdaQueryWrapper<ChapterEntity> wrapper = new LambdaQueryWrapper<ChapterEntity>()
+                .isNotNull(ChapterEntity::getParentId)
+                .gt(ChapterEntity::getParentId, 0)
+                .eq(ChapterEntity::getContentStatus, "PUBLISHED");
+        if (courseId != null) {
+            wrapper.eq(ChapterEntity::getCourseId, courseId);
+        }
+        return chapterMapper.selectList(wrapper.orderByAsc(ChapterEntity::getCourseId).orderByAsc(ChapterEntity::getId));
+    }
 }

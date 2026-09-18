@@ -20,10 +20,13 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import type { LessonTocItem } from '@/utils/course/lesson-toc';
+import { getScrollParent, scrollElementIntoView } from '@/utils/dom/scroll-into-view';
 
 const props = defineProps<{
   items: LessonTocItem[];
 }>();
+
+const SCROLL_OFFSET = 96;
 
 const activeId = ref<string | null>(null);
 let observer: IntersectionObserver | null = null;
@@ -31,8 +34,7 @@ let observer: IntersectionObserver | null = null;
 function scrollTo(id: string) {
   const el = document.getElementById(id);
   if (!el) return;
-  const top = el.getBoundingClientRect().top + window.scrollY - 88;
-  window.scrollTo({ top, behavior: 'smooth' });
+  scrollElementIntoView(el, SCROLL_OFFSET);
   activeId.value = id;
 }
 
@@ -42,6 +44,9 @@ function setupObserver() {
   if (!props.items.length) return;
 
   const ids = props.items.map(i => i.id);
+  const first = document.getElementById(ids[0]);
+  const scrollRoot = getScrollParent(first);
+
   observer = new IntersectionObserver(
     entries => {
       const visible = entries
@@ -49,19 +54,13 @@ function setupObserver() {
         .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
       if (visible.length) {
         activeId.value = visible[0].target.id;
-        return;
       }
-      const scrollY = window.scrollY + 100;
-      let current: string | null = ids[0] ?? null;
-      for (const id of ids) {
-        const node = document.getElementById(id);
-        if (node && node.offsetTop <= scrollY) {
-          current = id;
-        }
-      }
-      activeId.value = current;
     },
-    { root: null, rootMargin: '-20% 0px -55% 0px', threshold: [0, 0.1, 1] }
+    {
+      root: scrollRoot === document.documentElement ? null : scrollRoot,
+      rootMargin: `-${SCROLL_OFFSET}px 0px -55% 0px`,
+      threshold: [0, 0.1, 1]
+    }
   );
 
   for (const id of ids) {
@@ -113,7 +112,7 @@ onUnmounted(() => {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: min(42vh, 280px);
+  max-height: min(55vh, 400px);
   overflow-y: auto;
   scrollbar-width: thin;
 }

@@ -683,12 +683,12 @@ onMounted(() => {
 /* 子菜单展开后的嵌入式圆角背景卡片（半透明，不遮挡底部背景图） */
 :deep(.el-menu--inline) {
   background: rgba(0, 0, 0, 0.22) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  margin: 4px 0 8px;
-  padding: 4px 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  margin: 6px 0 10px;
+  padding: 8px 6px;
   overflow: hidden;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(4px);
 }
 
 /* 核心优化：彻底关闭 Element Plus 子菜单高度展开过渡计算，解决折叠子项「跳动/抖动」问题 */
@@ -702,8 +702,8 @@ onMounted(() => {
 :deep(.el-sub-menu__title),
 :deep(.el-menu-item) {
   color: #D4DEEA;
-  border-radius: 8px;
-  margin: 2px 0;
+  border-radius: 12px;
+  margin: 3px 0;
   transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
   font-weight: 500;
   user-select: none;
@@ -749,9 +749,12 @@ onMounted(() => {
 
 /* 子菜单项内缩边距，形成舒适的卡片内部内嵌层级 */
 :deep(.el-menu--inline .el-menu-item) {
-  margin-left: 4px !important;
-  margin-right: 4px !important;
-  width: calc(100% - 8px);
+  margin-left: 6px !important;
+  margin-right: 6px !important;
+  width: calc(100% - 12px);
+  border-radius: 12px;
+  height: 42px;
+  line-height: 42px;
 }
 
 /* 悬停微动画 (柔和微光) */

@@ -1,6 +1,12 @@
 ﻿.key-version-page {
   position: relative;
   padding-bottom: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 
   .hero-stats-row {
     display: flex;
@@ -47,23 +53,23 @@
 
   .main-content-layout {
     max-width: 1440px;
-    margin: -16px auto 0 auto;
-    padding: 0 20px;
+    margin: 0 auto;
+    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
   }
 
-  // 椤堕儴绉熸埛鐘舵€佹潯
+  // 顶部租户状态条
   .kms-top-bar {
     background: #FFFFFF;
-    border-radius: 12px;
-    padding: 14px 20px;
+    border-radius: 24px;
+    padding: 20px 28px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     border: 1px solid #E2E8F0;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
 
     .context-info {
       display: flex;
@@ -71,9 +77,9 @@
       gap: 14px;
 
       .shield-badge {
-        width: 36px;
-        height: 36px;
-        border-radius: 10px;
+        width: 44px;
+        height: 44px;
+        border-radius: 16px;
         background: rgba(22, 119, 255, 0.08);
         color: #1677FF;
         display: flex;
@@ -115,10 +121,10 @@
     .active-key-card {
       position: relative;
       background: #FFFFFF;
-      border-radius: 14px;
-      padding: 18px 22px;
+      border-radius: 24px;
+      padding: 24px 28px;
       border: 1px solid #E2E8F0;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+      box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
       overflow: hidden;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
 
@@ -155,9 +161,9 @@
           gap: 12px;
 
           .key-icon-box {
-            width: 42px;
-            height: 42px;
-            border-radius: 10px;
+            width: 44px;
+            height: 44px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -326,16 +332,18 @@
   // 密钥管理主表格卡片
   .key-management-table-card {
     background: #FFFFFF;
-    border-radius: 14px;
+    border-radius: 24px;
     border: 1px solid #E2E8F0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-    padding: 18px 20px;
+    box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
+    padding: 24px 28px 16px;
 
     .table-header-box {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 14px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #F1F5F9;
       flex-wrap: wrap;
       gap: 12px;
 
@@ -430,9 +438,31 @@
     }
 
     .table-wrap {
-      border: 1px solid #F1F5F9;
-      border-radius: 12px;
+      border: none;
+      border-radius: 0;
       overflow: hidden;
+
+      .el-table {
+        --el-table-border-color: transparent;
+        background: transparent;
+
+        &::before {
+          display: none;
+        }
+
+        .el-table__header-wrapper th.el-table__cell {
+          border-bottom: 1px solid #EEF2F7;
+        }
+
+        .el-table__body td.el-table__cell {
+          padding: 14px 0;
+          border-bottom: 1px solid #F8FAFC;
+        }
+
+        .el-table__body tr:last-child td.el-table__cell {
+          border-bottom: none;
+        }
+      }
 
       .key-alias-cell {
         display: flex;

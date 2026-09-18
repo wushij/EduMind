@@ -27,7 +27,13 @@ const mainRoutes: RouteRecordRaw = {
     ...analyticsRoutes,
     ...systemRoutes,
     ...profileRoutes,
-    ...noticeRoutes
+    ...noticeRoutes,
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      component: () => import('@/views/auth/NotFound.vue'),
+      meta: { title: '404 - 页面未找到', requiresAuth: true }
+    }
   ]
 };
 

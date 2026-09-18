@@ -24,6 +24,12 @@ export const knowledgeRoutes: RouteRecordRaw[] = [
     meta: { title: '多模态 OCR 识别与校对', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
   },
   {
+    path: '/knowledge/rag-dashboard',
+    name: 'KnowledgeRagDashboard',
+    component: () => import('@/views/knowledge/RagKnowledgeDashboard.vue'),
+    meta: { title: 'RAG 切片大盘', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
+  },
+  {
     path: '/knowledge/:id',
     name: 'KnowledgeBaseDetail',
     component: () => import('@/views/knowledge/KnowledgeBaseDetail.vue'),

@@ -165,6 +165,7 @@ export function createAIStreamSessionActions(deps: AIStreamSessionsDeps) {
         storeSessionId(courseId, preferredId);
         if (!options?.skipMessageReload) {
           await loadMessages(preferredId, courseId);
+          scrollToBottomInstant();
         }
       } else if (!options?.skipMessageReload) {
         currentSessionId.value = '';
@@ -226,10 +227,28 @@ export function createAIStreamSessionActions(deps: AIStreamSessionsDeps) {
       if (currentSessionId.value) {
         storeSessionId(courseId, currentSessionId.value);
         await loadMessages(currentSessionId.value, courseId);
+        scrollToBottomInstant();
       } else {
         messages.value = [];
       }
     }
+  }
+
+  async function clearAllSessions(courseId?: number) {
+    if (sessions.value.length === 0) return;
+
+    const ids = sessions.value.map((s) => s.id);
+    await Promise.all(ids.map((id) => deleteRemoteSession(id).catch(() => undefined)));
+    ids.forEach((id) => clearMessageCache(courseId, id));
+    if (courseId) {
+      clearStoredSessionId(courseId, getStoredSessionId(courseId));
+    }
+    sessions.value = [];
+    currentSessionId.value = '';
+    messages.value = [];
+    followUpPrompts.value = [];
+    resetStreamingState();
+    ElMessage.success(ids.length > 0 ? `已清空 ${ids.length} 条历史会话` : '暂无历史会话可清空');
   }
 
   async function renameSession(id: string, title: string) {
@@ -254,6 +273,7 @@ export function createAIStreamSessionActions(deps: AIStreamSessionsDeps) {
     startNewChat,
     switchSession,
     removeSession,
+    clearAllSessions,
     renameSession
   };
 }

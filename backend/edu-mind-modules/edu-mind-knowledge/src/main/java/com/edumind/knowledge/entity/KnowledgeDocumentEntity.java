@@ -14,6 +14,11 @@ public class KnowledgeDocumentEntity implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long knowledgeBaseId;
+    /** UPLOAD | LESSON */
+    private String sourceType;
+    private Long courseId;
+    private Long lessonChapterId;
+    private String contentHash;
     private String fileName;
     private String fileType;
     private Long fileSize;

@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -111,6 +112,13 @@ public class DocumentServiceImpl implements DocumentService {
         if (entity == null) {
             throw new BusinessException("文档不存在");
         }
+        if ("LESSON".equalsIgnoreCase(entity.getSourceType())) {
+            reconcileLessonDocument(entity);
+            if ("SUCCESS".equals(entity.getParseStatus()) || "CHUNKED".equals(entity.getParseStatus())) {
+                return;
+            }
+            throw new BusinessException("课节讲义无正文，请在课程中编辑并发布课节后再索引");
+        }
         entity.setParseStatus("PARSING");
         entity.setErrorMessage(null);
         knowledgeDocumentDao.updateById(entity);
@@ -141,13 +149,35 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     private KnowledgeDocumentVO toDocumentVO(KnowledgeDocumentEntity entity) {
+        reconcileLessonDocument(entity);
         KnowledgeDocumentVO vo = knowledgeBaseConverter.toDocumentVO(entity);
         if (vo != null && entity.getId() != null) {
             long count = knowledgeDocumentChunkDao.countByDocumentId(entity.getId());
             vo.setChunkCount((int) count);
             vo.setChunkStatus(resolveChunkStatus(entity.getParseStatus(), count));
+            vo.setParseStatus(entity.getParseStatus());
         }
         return vo;
+    }
+
+    /**
+     * 课节虚拟文档不走 MinIO 解析；误点「解析」会标 FAILED，此处按正文+切片纠正为 SUCCESS。
+     */
+    private void reconcileLessonDocument(KnowledgeDocumentEntity entity) {
+        if (entity == null || !"LESSON".equalsIgnoreCase(entity.getSourceType())) {
+            return;
+        }
+        long count = knowledgeDocumentChunkDao.countByDocumentId(entity.getId());
+        KnowledgeDocumentTextEntity text = knowledgeDocumentTextDao.findByDocumentId(entity.getId());
+        boolean hasText = text != null && StringUtils.hasText(text.getContent());
+        if (count > 0 && hasText) {
+            String ps = entity.getParseStatus();
+            if ("FAILED".equals(ps) || "PENDING".equals(ps) || "PARSING".equals(ps)) {
+                entity.setParseStatus("SUCCESS");
+                entity.setErrorMessage(null);
+                knowledgeDocumentDao.updateById(entity);
+            }
+        }
     }
 
     private String resolveChunkStatus(String parseStatus, long chunkCount) {

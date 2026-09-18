@@ -1,64 +1,62 @@
 <template>
-  <div class="page-container gb-fade-in">
-    <!-- 顶部工具栏：标题、架构状态标签与操作按钮 (1:1 深度对标 Code Compass filter-card 视觉规范) -->
-    <el-card shadow="never" class="filter-card">
-      <div class="filter-row">
-        <div class="filter-left">
-          <div class="title-wrap">
-            <span class="filter-title">系统菜单与动态路由配置</span>
-            <span class="filter-tag">已同步最新 9 大核心业务模块架构（含学习中心 / AI 运维）</span>
-          </div>
-          <span class="filter-count">
-            共 <strong>{{ moduleCount }}</strong> 个顶层模块 · <strong>{{ totalMenuCount }}</strong> 个节点
-            <span class="type-stats">({{ typeStats.dirs }} 目录 / {{ typeStats.menus }} 菜单 / {{ typeStats.btns }} 权限)</span>
-          </span>
+  <div class="system-page-shell menu-management-page gb-fade-in">
+    <ProfilePageHero
+      title="系统菜单与动态路由配置"
+      subtitle="已同步最新 9 大核心业务模块架构（含学习中心 / AI 运维）"
+    >
+      <template #footer>
+        <p class="hero-meta-line">
+          共 <strong>{{ moduleCount }}</strong> 个顶层模块 · <strong>{{ totalMenuCount }}</strong> 个节点
+          <span class="type-stats">({{ typeStats.dirs }} 目录 / {{ typeStats.menus }} 菜单 / {{ typeStats.btns }} 权限)</span>
+        </p>
+      </template>
+      <template #actions>
+        <div class="hero-action-row">
+          <button type="button" class="hero-pill-btn is-primary" @click="handleCreate()">
+            <el-icon><Plus /></el-icon>
+            新增顶级菜单
+          </button>
         </div>
+      </template>
+    </ProfilePageHero>
 
-        <div class="filter-actions">
-          <el-input
-            v-model="searchKeyword"
-            clearable
-            placeholder="搜索菜单名称 / 路由路径 / 权限标识..."
-            style="width: 250px"
-            :prefix-icon="Search"
-            class="search-input"
-            @input="handleSearch"
-            @clear="handleSearch"
-          />
+    <div class="system-filter-card filter-toolbar">
+      <el-input
+        v-model="searchKeyword"
+        clearable
+        placeholder="搜索菜单名称 / 路由路径 / 权限标识..."
+        class="search-input"
+        :prefix-icon="Search"
+        @input="handleSearch"
+        @clear="handleSearch"
+      />
 
-          <el-button round class="action-btn" @click="toggleExpandAll">
-            <el-icon><Operation /></el-icon>
-            {{ expandAll ? '折叠全部' : '展开全部' }}
+      <el-button round class="action-btn" @click="toggleExpandAll">
+        <el-icon><Operation /></el-icon>
+        {{ expandAll ? '折叠全部' : '展开全部' }}
+      </el-button>
+
+      <el-button round class="btn-refresh" :icon="Refresh" :loading="loading" @click="fetchData">
+        刷新
+      </el-button>
+
+      <el-popconfirm
+        title="确定将菜单配置重置为官方 8 大业务模块预设吗？"
+        confirm-button-text="确定重置"
+        cancel-button-text="取消"
+        icon="Warning"
+        icon-color="#f59e0b"
+        @confirm="handleResetDefault"
+      >
+        <template #reference>
+          <el-button round class="action-btn text-amber">
+            恢复预设
           </el-button>
+        </template>
+      </el-popconfirm>
+    </div>
 
-          <el-button round class="btn-refresh" :icon="Refresh" :loading="loading" @click="fetchData">
-            刷新
-          </el-button>
-
-          <el-popconfirm
-            title="确定将菜单配置重置为官方 8 大业务模块预设吗？"
-            confirm-button-text="确定重置"
-            cancel-button-text="取消"
-            icon="Warning"
-            icon-color="#f59e0b"
-            @confirm="handleResetDefault"
-          >
-            <template #reference>
-              <el-button round class="action-btn text-amber">
-                恢复预设
-              </el-button>
-            </template>
-          </el-popconfirm>
-
-          <el-button type="primary" round class="add-btn" @click="handleCreate()">
-            <el-icon><Plus /></el-icon> 新增顶级菜单
-          </el-button>
-        </div>
-      </div>
-    </el-card>
-
-    <!-- 菜单树形数据表格 (1:1 复刻 Code Compass menu-tree-table 像素级对齐规范) -->
-    <el-card shadow="never" class="table-card">
+    <div class="system-table-card table-card">
       <el-table
         :key="tableKey"
         ref="tableRef"
@@ -195,7 +193,7 @@
           </div>
         </template>
       </el-table>
-    </el-card>
+    </div>
 
     <!-- 菜单编辑 / 新增对话框 (深度适配 EduMind dialog-shell 与长圆胶囊体系) -->
     <el-dialog
@@ -328,6 +326,7 @@
 
 <script setup lang="ts">
 import { Operation, Plus, Search, Refresh, Pointer, Document } from '@element-plus/icons-vue';
+import ProfilePageHero from '@/components/profile/ProfilePageHero.vue';
 import IconPicker from '@/components/system/menu/IconPicker.vue';
 import { useMenu } from '@/composables/system/useMenu';
 
@@ -365,137 +364,66 @@ const {
 </script>
 
 <style scoped lang="scss">
-/* 页面大容器与沉浸背景 */
-.page-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 20px;
-  background: #f8fafc;
-  min-height: calc(100vh - 64px);
-}
+@use '@/styles/system-page-shell.scss';
 
-/* 顶部搜索筛选卡片：对标 Code Compass filter-card */
-.filter-card {
-  border-radius: 14px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+.menu-management-page {
+  .hero-meta-line {
+    margin: 0;
+    font-size: 13px;
+    color: #64748b;
 
-  :deep(.el-card__body) {
-    padding: 16px 20px;
+    strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    .type-stats {
+      margin-left: 4px;
+      color: #94a3b8;
+      font-size: 12px;
+    }
   }
-}
 
-.filter-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.filter-left {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-
-  .title-wrap {
+  .filter-toolbar {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
-  }
-}
 
-.filter-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #0f172a;
-  letter-spacing: -0.2px;
-}
+    .search-input {
+      width: 320px;
 
-.filter-tag {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #1677ff;
-  background: rgba(22, 119, 255, 0.08);
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(22, 119, 255, 0.16);
-}
+      :deep(.el-input__wrapper) {
+        border-radius: 999px;
+        box-shadow: 0 0 0 1px #e2e8f0 inset;
+        background: #ffffff;
 
-.filter-count {
-  font-size: 12.5px;
-  color: #64748b;
+        &:hover {
+          box-shadow: 0 0 0 1px #93c5fd inset;
+        }
+      }
+    }
 
-  strong {
-    color: #0f172a;
-    font-weight: 700;
-  }
+    .action-btn {
+      border-radius: 999px;
+      font-weight: 500;
+      font-size: 13px;
+    }
 
-  .type-stats {
-    margin-left: 4px;
-    color: #94a3b8;
-    font-size: 11.5px;
-  }
-}
+    .text-amber {
+      color: #d97706;
+      border-color: #fde68a;
+      background: #fffbeb;
 
-.filter-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-
-  .search-input :deep(.el-input__wrapper) {
-    border-radius: 999px;
-    box-shadow: 0 0 0 1px #e2e8f0 inset;
-    background: #ffffff;
-
-    &:hover {
-      box-shadow: 0 0 0 1px #93c5fd inset;
+      &:hover {
+        background: #fef3c7;
+        border-color: #fcd34d;
+      }
     }
   }
 
-  .action-btn {
-    border-radius: 999px;
-    font-weight: 500;
-    font-size: 13px;
-  }
-
-  .text-amber {
-    color: #d97706;
-    border-color: #fde68a;
-    background: #fffbeb;
-
-    &:hover {
-      background: #fef3c7;
-      border-color: #fcd34d;
-    }
-  }
-
-  .add-btn {
-    border-radius: 999px;
-    font-weight: 600;
-    padding: 8px 18px;
-    background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
-    box-shadow: 0 4px 12px rgba(22, 119, 255, 0.28);
-    border: none;
-
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(22, 119, 255, 0.35);
-    }
-  }
-}
-
-/* 主数据表格卡片 */
-.table-card {
-  border-radius: 14px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-  overflow: hidden;
-
-  :deep(.el-card__body) {
+  .table-card {
+    overflow: hidden;
     padding: 0;
   }
 }

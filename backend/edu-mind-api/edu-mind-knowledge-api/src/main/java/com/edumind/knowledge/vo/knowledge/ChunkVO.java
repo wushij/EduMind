@@ -15,5 +15,7 @@ public class ChunkVO {
     private String heading;
     private Integer charCount;
     private Integer tokenEstimate;
+    /** 向量索引状态：PENDING | INDEXED | FAILED（前端展示为 INDEX_FAILED） */
+    private String status;
     private LocalDateTime createTime;
 }

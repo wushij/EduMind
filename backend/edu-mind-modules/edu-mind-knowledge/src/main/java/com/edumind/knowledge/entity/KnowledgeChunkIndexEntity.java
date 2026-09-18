@@ -19,6 +19,8 @@ public class KnowledgeChunkIndexEntity implements Serializable {
     private String vectorId;
     private String embedStatus;
     private String embeddingModel;
+    /** JSON 数组，Milvus 未启用时用于向量恢复 */
+    private String embeddingVector;
     private String errorMessage;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

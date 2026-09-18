@@ -1,9 +1,9 @@
 <template>
-  <main class="app-content">
+  <main class="app-content" :class="{ 'is-full-height': isFullHeight }">
     <div class="app-content-body">
-      <router-view v-slot="{ Component, route }">
+      <router-view v-slot="{ Component, route: currentRoute }">
         <transition name="page-switch" mode="out-in" appear>
-          <component :is="Component" :key="route.fullPath" />
+          <component :is="Component" :key="currentRoute.fullPath" />
         </transition>
       </router-view>
     </div>
@@ -11,6 +11,11 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
+
+const route = useRoute();
+const isFullHeight = computed(() => !!route.meta?.fullHeight || route.path.startsWith('/course/ai'));
 </script>
 
 <style scoped lang="scss">
@@ -22,15 +27,29 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 20px 24px $page-bottom-spacing;
+  padding: 20px calc(24px + #{$copilot-safe-right}) $page-bottom-spacing;
   background-color: #F5F8FC;
   box-sizing: border-box;
   scrollbar-gutter: stable;
 
+  &.is-full-height {
+    padding: 14px 20px 14px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+
+    .app-content-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      height: 100%;
+    }
+  }
+
   .app-content-body {
     width: 100%;
     min-width: 0;
-    min-height: var(--page-min-height, calc(100vh - 64px - 40px - 48px));
   }
 }
 </style>

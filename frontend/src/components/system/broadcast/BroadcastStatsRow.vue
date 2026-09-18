@@ -83,12 +83,12 @@ defineProps<{
 .stat-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 18px 20px;
+  border-radius: 24px;
+  padding: 20px 24px;
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 
   &:hover {
@@ -101,7 +101,7 @@ defineProps<{
 .stat-icon-wrapper {
   width: 48px;
   height: 48px;
-  border-radius: 12px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;

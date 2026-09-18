@@ -22,8 +22,8 @@
 
       <el-table-column prop="parseStatus" label="解析状态" width="140" align="center">
         <template #default="{ row }">
-          <span class="status-pill" :class="`status-pill--${getParseStatusTagType(row.parseStatus) || 'info'}`">
-            {{ formatParseStatusLabel(row.parseStatus) }}
+          <span class="status-pill" :class="`status-pill--${getParseStatusTagType(row.parseStatus, row) || 'info'}`">
+            {{ formatParseStatusLabel(row.parseStatus, row) }}
           </span>
         </template>
       </el-table-column>
@@ -57,7 +57,7 @@
               重新切片
             </button>
             <button
-              v-if="canTriggerParse(row.parseStatus)"
+              v-if="canTriggerParse(row.parseStatus, row.sourceType)"
               type="button"
               class="table-action-pill table-action-pill--success"
               @click="$emit('parse', row.id)"

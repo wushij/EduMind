@@ -3,7 +3,10 @@
             <transition name="slide-history">
               <div v-if="isHistoryPanelOpen" class="history-panel">
                 <div class="history-panel-header">
-                  <span class="history-title">历史问答会话</span>
+                  <span class="history-title">
+                    副驾驶历史（本侧栏）
+                    <span v-if="sessions.length > 0" class="history-count">共 {{ sessions.length }} 条</span>
+                  </span>
                   <div class="history-header-actions">
                     <button
                       v-if="sessions.length > 0"

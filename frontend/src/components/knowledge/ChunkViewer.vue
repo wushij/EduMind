@@ -1,7 +1,7 @@
 <template>
   <el-drawer
     :model-value="visible"
-    :title="`切片详情 · #${chunk?.chunkIndex ?? 0}`"
+    :title="`切片详情 · ${(chunk?.chunkIndex ?? 0) + 1}`"
     size="520px"
     destroy-on-close
     class="chunk-viewer-drawer"

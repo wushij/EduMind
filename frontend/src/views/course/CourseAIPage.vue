@@ -122,7 +122,10 @@ const { loading, courses, activeCourse, canCreateCourse, handleSwitchActiveCours
 <style scoped lang="scss">
 .course-ai-page-root {
   width: 100%;
-  min-height: 540px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   box-sizing: border-box;
 
   .page-loading-card {

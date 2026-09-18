@@ -56,16 +56,33 @@
         </div>
 
         <el-form-item label="学科专业分类">
-          <div class="pill-category-group">
-            <div
-              v-for="cat in categoryPresets"
-              :key="cat"
-              class="pill-category-tag"
-              :class="{ active: form.category === cat }"
-              @click="form.category = cat"
-            >
-              {{ cat }}
+          <div class="category-selector">
+            <div class="pill-category-group">
+              <button
+                v-for="cat in categoryPresets"
+                :key="cat"
+                type="button"
+                class="pill-category-tag"
+                :class="{ active: form.category === cat }"
+                @click="selectCategory(cat)"
+              >
+                {{ cat }}
+              </button>
             </div>
+            <div class="custom-category-row">
+              <span class="custom-category-label">自定义学科</span>
+              <el-input
+                :model-value="customCategoryInput"
+                placeholder="以上没有合适选项？输入本校专业或学科名称"
+                size="large"
+                clearable
+                class="custom-category-input"
+                @update:model-value="onCustomCategoryInput"
+              />
+            </div>
+            <span class="field-hint-text category-hint">
+              预设覆盖常见工科、经管、文史、艺术、医学等门类；自定义名称将用于 AI 大纲推导与课程检索归类。
+            </span>
           </div>
         </el-form-item>
 
@@ -286,33 +303,18 @@
         </div>
       </div>
     </div>
-
-    <div class="form-actions-row">
-      <button type="button" class="action-btn action-btn--cancel" @click="$emit('cancel')">
-        取消并返回
-      </button>
-      <button
-        type="button"
-        class="action-btn action-btn--submit"
-        :disabled="submitting"
-        @click="$emit('submit')"
-      >
-        <el-icon v-if="!submitting"><Select /></el-icon>
-        <span v-if="!submitting">立即创建并初始化全链路空间</span>
-        <span v-else>正在全链路初始化空间与大纲...</span>
-      </button>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { isCourseCategoryPreset } from '@/constants/course';
 import {
   Document,
   Connection,
   Cpu,
   Picture,
   Check,
-  Select,
   Refresh,
   Link,
   Lightning,
@@ -327,15 +329,33 @@ import type {
   PRESET_COVERS
 } from '@/composables/course/useCourseCreate';
 
-defineProps<{
+const props = defineProps<{
   form: CourseCreateFormState;
   categoryPresets: typeof CATEGORY_PRESETS;
   availableKnowledgeBases: Array<{ id: number; name: string; documentCount?: number }>;
   aiPersonas: typeof AI_PERSONAS;
   presetCovers: typeof PRESET_COVERS;
   selectedCoverId: number;
-  submitting: boolean;
 }>();
+
+const customCategoryInput = computed(() =>
+  isCourseCategoryPreset(props.form.category) ? '' : props.form.category
+);
+
+function selectCategory(cat: string) {
+  props.form.category = cat;
+}
+
+function onCustomCategoryInput(value: string) {
+  const trimmed = String(value ?? '').trim();
+  if (trimmed) {
+    props.form.category = trimmed;
+    return;
+  }
+  if (!isCourseCategoryPreset(props.form.category)) {
+    props.form.category = props.categoryPresets[0] ?? '通识与素质教育';
+  }
+}
 
 const kbMode = defineModel<'new' | 'existing'>('kbMode', { required: true });
 const enableRagAutoIndex = defineModel<boolean>('enableRagAutoIndex', { required: true });
@@ -345,8 +365,6 @@ defineEmits<{
   'select-persona': [persona: (typeof AI_PERSONAS)[number]];
   'select-cover': [preset: (typeof PRESET_COVERS)[number]];
   'clear-cover-selection': [];
-  cancel: [];
-  submit: [];
 }>();
 </script>
 
@@ -494,19 +512,30 @@ defineEmits<{
     display: block;
   }
 
-  .pill-category-group {
+  .category-selector {
     display: flex;
-    flex-wrap: wrap;
-    gap: 9px;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .pill-category-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    gap: 8px;
+    width: 100%;
 
     .pill-category-tag {
-      padding: 6px 15px;
-      border-radius: 9999px;
+      margin: 0;
+      padding: 8px 12px;
+      border-radius: 12px;
       background: #F8FAFC;
       border: 1px solid #E2E8F0;
       color: #475569;
       font-size: 12.5px;
       font-weight: 500;
+      line-height: 1.35;
+      text-align: center;
       cursor: pointer;
       transition: all 0.2s ease;
 
@@ -523,6 +552,33 @@ defineEmits<{
         box-shadow: 0 3px 10px rgba(22, 119, 255, 0.25);
       }
     }
+  }
+
+  .custom-category-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 12px;
+
+    @media (max-width: 640px) {
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+
+    .custom-category-label {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #64748B;
+      white-space: nowrap;
+    }
+
+    .custom-category-input {
+      width: 100%;
+    }
+  }
+
+  .category-hint {
+    margin-top: -4px;
   }
 
   .refined-textarea {
@@ -855,60 +911,5 @@ defineEmits<{
     }
   }
 
-  .form-actions-row {
-    margin-top: 10px;
-    padding: 20px 28px;
-    background: #FFFFFF;
-    border-radius: 20px;
-    border: 1px solid #EBF1F7;
-    box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 14px;
-
-    .action-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      height: 44px;
-      padding: 0 28px;
-      border-radius: 9999px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.22s ease;
-
-      &--cancel {
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        color: #64748B;
-
-        &:hover {
-          background: #F8FAFC;
-          color: #1E293B;
-          border-color: #CBD5E1;
-        }
-      }
-
-      &--submit {
-        background: #1677FF;
-        border: none;
-        color: #FFFFFF;
-        box-shadow: 0 4px 14px rgba(22, 119, 255, 0.3);
-
-        &:hover:not(:disabled) {
-          background: #4096FF;
-          transform: translateY(-1px);
-          box-shadow: 0 8px 22px rgba(22, 119, 255, 0.4);
-        }
-
-        &:disabled {
-          opacity: 0.65;
-          cursor: not-allowed;
-        }
-      }
-    }
-  }
 }
 </style>

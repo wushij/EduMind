@@ -1,5 +1,6 @@
 package com.edumind.knowledge.service.index.impl;
 
+import com.alibaba.fastjson2.JSON;
 import com.edumind.ai.api.embedding.EmbeddingApi;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
@@ -126,11 +127,11 @@ public class IndexingServiceImpl implements IndexingService {
                             metadata.put("tenantId", tenantId);
                         }
                         vectorStore.save(milvusProperties.getCollection(), vectorId, vectors.get(i), metadata);
-                        upsertChunkIndex(chunk, vectorId, "INDEXED", null);
+                        upsertChunkIndex(chunk, vectorId, "INDEXED", null, vectors.get(i));
                         indexed++;
                     } catch (Exception ex) {
                         failed++;
-                        upsertChunkIndex(chunk, String.valueOf(chunk.getId()), "FAILED", ex.getMessage());
+                        upsertChunkIndex(chunk, String.valueOf(chunk.getId()), "FAILED", ex.getMessage(), null);
                         IndexStatusVO.IndexErrorVO error = new IndexStatusVO.IndexErrorVO();
                         error.setChunkId(chunk.getId());
                         error.setMessage(ex.getMessage());
@@ -210,7 +211,8 @@ public class IndexingServiceImpl implements IndexingService {
         triggerIndex(document.getKnowledgeBaseId(), "INCREMENTAL");
     }
 
-    private void upsertChunkIndex(KnowledgeDocumentChunkEntity chunk, String vectorId, String status, String error) {
+    private void upsertChunkIndex(KnowledgeDocumentChunkEntity chunk, String vectorId, String status, String error,
+                                  List<Float> embeddingVector) {
         KnowledgeChunkIndexEntity existing = knowledgeChunkIndexDao.findByChunkId(chunk.getId());
         if (existing == null) {
             KnowledgeChunkIndexEntity entity = new KnowledgeChunkIndexEntity();
@@ -221,12 +223,18 @@ public class IndexingServiceImpl implements IndexingService {
             entity.setEmbedStatus(status);
             entity.setEmbeddingModel(embeddingApi.getModelName());
             entity.setErrorMessage(error);
+            if (embeddingVector != null && !embeddingVector.isEmpty()) {
+                entity.setEmbeddingVector(JSON.toJSONString(embeddingVector));
+            }
             knowledgeChunkIndexDao.insert(entity);
         } else {
             existing.setVectorId(vectorId);
             existing.setEmbedStatus(status);
             existing.setEmbeddingModel(embeddingApi.getModelName());
             existing.setErrorMessage(error);
+            if (embeddingVector != null && !embeddingVector.isEmpty()) {
+                existing.setEmbeddingVector(JSON.toJSONString(embeddingVector));
+            }
             knowledgeChunkIndexDao.updateById(existing);
         }
     }

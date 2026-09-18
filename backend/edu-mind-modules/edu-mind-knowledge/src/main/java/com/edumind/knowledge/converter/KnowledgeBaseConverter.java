@@ -61,6 +61,7 @@ public class KnowledgeBaseConverter {
         KnowledgeDocumentVO vo = new KnowledgeDocumentVO();
         vo.setId(entity.getId());
         vo.setKnowledgeBaseId(entity.getKnowledgeBaseId());
+        vo.setSourceType(entity.getSourceType());
         vo.setFileName(entity.getFileName());
         vo.setFileType(entity.getFileType());
         vo.setFileSize(entity.getFileSize());

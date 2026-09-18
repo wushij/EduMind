@@ -1,35 +1,34 @@
 <template>
-  <div class="page-container gb-fade-in">
-    <!-- 顶部工具栏：标题、架构状态标签与操作按钮 (1:1 像素级复刻 Code Compass Filter Card) -->
-    <el-card shadow="never" class="filter-card">
-      <div class="filter-row">
-        <div class="filter-left">
-          <span class="filter-title">系统菜单与路由权限树</span>
-          <span class="filter-tag">已同步最新 9 大核心业务模块架构（含学习中心 / AI 运维）</span>
-          <span class="filter-count">共 {{ moduleCount }} 个顶层模块 · {{ totalNodeCount }} 个节点</span>
-        </div>
-        <div class="filter-actions">
-          <el-input
-            v-model="keyword"
-            clearable
-            placeholder="搜索菜单名称 / 路径 / 权限标识"
-            style="width: 250px"
-            :prefix-icon="Search"
-            class="search-input"
-          />
-          <el-button @click="toggleExpandAll" class="expand-btn" round>
-            <el-icon><Operation /></el-icon>
-            {{ expandAll ? '折叠全部' : '展开全部' }}
-          </el-button>
-          <el-button round :icon="Refresh" class="btn-refresh" :loading="loading" @click="fetchData">
-            刷新
-          </el-button>
-        </div>
-      </div>
-    </el-card>
+  <div class="system-page-shell permission-tree-page gb-fade-in">
+    <ProfilePageHero
+      title="系统菜单与路由权限树"
+      subtitle="已同步最新 9 大核心业务模块架构（含学习中心 / AI 运维）"
+    >
+      <template #footer>
+        <p class="hero-meta-line">
+          共 <strong>{{ moduleCount }}</strong> 个顶层模块 · <strong>{{ totalNodeCount }}</strong> 个节点
+        </p>
+      </template>
+    </ProfilePageHero>
 
-    <!-- 菜单树形数据表格 (1:1 复刻 Code Compass menu-tree-table 规范) -->
-    <el-card shadow="never" class="table-card">
+    <div class="system-filter-card filter-toolbar">
+      <el-input
+        v-model="keyword"
+        clearable
+        placeholder="搜索菜单名称 / 路径 / 权限标识"
+        class="search-input"
+        :prefix-icon="Search"
+      />
+      <el-button round class="action-btn" @click="toggleExpandAll">
+        <el-icon><Operation /></el-icon>
+        {{ expandAll ? '折叠全部' : '展开全部' }}
+      </el-button>
+      <el-button round :icon="Refresh" class="btn-refresh" :loading="loading" @click="fetchData">
+        刷新
+      </el-button>
+    </div>
+
+    <div class="system-table-card table-card">
       <el-table
         :key="tableKey"
         ref="tableRef"
@@ -134,7 +133,7 @@
           </div>
         </template>
       </el-table>
-    </el-card>
+    </div>
   </div>
 </template>
 
@@ -181,6 +180,7 @@ import {
   Memo
 } from '@element-plus/icons-vue';
 import type { SysMenuNode } from '@/constants/permission';
+import ProfilePageHero from '@/components/profile/ProfilePageHero.vue';
 import { getIconComponent as getRoleIconComponent, usePermissionTree } from '@/composables/system/useRole';
 
 const {
@@ -215,68 +215,44 @@ function getIconComponent(iconName?: string) {
 }
 </script>
 
-<style scoped>
-.page-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 20px;
-  background: #f8fafc;
-  min-height: calc(100vh - 64px);
-}
+<style scoped lang="scss">
+@use '@/styles/system-page-shell.scss';
 
-.filter-card {
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-}
+.permission-tree-page {
+  .hero-meta-line {
+    margin: 0;
+    font-size: 13px;
+    color: #64748b;
 
-.filter-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
+    strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+  }
 
-.filter-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
+  .filter-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
 
-.filter-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: #0f172a;
-}
+    .search-input {
+      width: 320px;
 
-.filter-tag {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #6366f1;
-  background: rgba(99, 102, 241, 0.08);
-  padding: 2px 8px;
-  border-radius: 6px;
-}
+      :deep(.el-input__wrapper) {
+        border-radius: 999px;
+      }
+    }
 
-.filter-count {
-  font-size: 12px;
-  color: #64748b;
-}
+    .action-btn {
+      border-radius: 999px;
+    }
+  }
 
-.filter-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.table-card {
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-  overflow: hidden;
+  .table-card {
+    overflow: hidden;
+    padding: 0;
+  }
 }
 
 /* 核心：精确消除第一列占位符与箭头宽度差异，文本永不竖向折行 */

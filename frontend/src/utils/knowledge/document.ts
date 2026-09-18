@@ -24,6 +24,7 @@ export function normalizeKBDocument(raw: Record<string, unknown>): KBDocument {
     fileType: String(raw.fileType ?? raw.type ?? ''),
     fileSize: fileSizeRaw != null ? Number(fileSizeRaw) : undefined,
     chunkCount: Number(raw.chunkCount ?? 0),
+    sourceType: raw.sourceType ? String(raw.sourceType) : undefined,
     parseStatus: String(raw.parseStatus ?? raw.status ?? 'PENDING'),
     chunkStatus: String(raw.chunkStatus ?? ''),
     errorMessage: raw.errorMessage ? String(raw.errorMessage) : undefined,
@@ -32,15 +33,28 @@ export function normalizeKBDocument(raw: Record<string, unknown>): KBDocument {
   };
 }
 
-export function formatParseStatusLabel(status?: string): string {
+export function formatParseStatusLabel(
+  status?: string,
+  doc?: Pick<KBDocument, 'sourceType' | 'chunkCount'>
+): string {
+  if (doc?.sourceType === 'LESSON') {
+    if ((doc.chunkCount ?? 0) > 0) {
+      return '讲义已入库';
+    }
+    return '待发布课节';
+  }
   switch (status) {
     case 'SUCCESS':
     case 'PARSED':
+    case 'CHUNKED':
       return '已完成解析';
     case 'PARSING':
+    case 'CHUNKING':
       return '正在解析';
     case 'FAILED':
       return '解析失败';
+    case 'CHUNK_FAILED':
+      return '切片失败';
     case 'PENDING':
       return '待解析';
     default:
@@ -48,14 +62,23 @@ export function formatParseStatusLabel(status?: string): string {
   }
 }
 
-export function getParseStatusTagType(status?: string): '' | 'success' | 'warning' | 'info' | 'danger' {
+export function getParseStatusTagType(
+  status?: string,
+  doc?: Pick<KBDocument, 'sourceType' | 'chunkCount'>
+): '' | 'success' | 'warning' | 'info' | 'danger' {
+  if (doc?.sourceType === 'LESSON' && (doc.chunkCount ?? 0) > 0) {
+    return 'success';
+  }
   switch (status) {
     case 'SUCCESS':
     case 'PARSED':
+    case 'CHUNKED':
       return 'success';
     case 'PARSING':
+    case 'CHUNKING':
       return 'warning';
     case 'FAILED':
+    case 'CHUNK_FAILED':
       return 'danger';
     default:
       return 'info';
@@ -92,6 +115,12 @@ export function getChunkStatusTagType(chunkStatus?: string): '' | 'success' | 'w
   }
 }
 
-export function canTriggerParse(parseStatus?: string): boolean {
+export function canTriggerParse(
+  parseStatus?: string,
+  sourceType?: string
+): boolean {
+  if (sourceType === 'LESSON') {
+    return false;
+  }
   return parseStatus !== 'SUCCESS' && parseStatus !== 'PARSED' && parseStatus !== 'PARSING';
 }

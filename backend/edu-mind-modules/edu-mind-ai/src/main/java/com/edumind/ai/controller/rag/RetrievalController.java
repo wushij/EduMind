@@ -36,7 +36,7 @@ public class RetrievalController {
                 request.getQuery(),
                 knowledgeBaseId,
                 request.getTopK() != null ? request.getTopK() : 5,
-                request.getMinScore() != null ? request.getMinScore() : 0.65,
+                request.getMinScore() != null ? request.getMinScore() : 0.03,
                 request.getDocumentId(),
                 true
         );

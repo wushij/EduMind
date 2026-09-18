@@ -32,7 +32,7 @@ public class RagDebugController {
                 request.getQuery(),
                 request.getKnowledgeBaseId(),
                 request.getTopK() != null ? request.getTopK() : 5,
-                request.getMinScore() != null ? request.getMinScore() : 0.65,
+                request.getMinScore() != null ? request.getMinScore() : 0.03,
                 request.getDocumentId(),
                 Boolean.TRUE.equals(request.getSkipLlm())
         );

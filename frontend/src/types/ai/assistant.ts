@@ -13,6 +13,10 @@ export interface CitationItem {
   excerpt?: string;
   content?: string;
   score?: number;
+  lessonChapterId?: number;
+  anchor?: string;
+  documentId?: number;
+  knowledgeBaseId?: number;
 }
 
 export interface GlobalAssistantMessage {

@@ -1,5 +1,5 @@
 <template>
-  <div class="tenant-management-page" v-loading="loading">
+  <div class="tenant-management-page system-page-shell" v-loading="loading">
     <PageHeroBanner
       title="多租户与校区中心 · 集团化多级隔离治理"
       subtitle="统一管控多校区/分校、独立组织机构、企业级数据多租户隔离与独立资源配额"
@@ -113,13 +113,16 @@ const {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/system-page-shell.scss';
+
 .tenant-management-page {
   padding-bottom: 40px;
 
   .main-content-layout {
-    max-width: 1440px;
-    margin: 0 auto;
-    padding: 0 20px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
   }
 }
 </style>

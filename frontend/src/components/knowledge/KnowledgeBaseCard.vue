@@ -1,15 +1,33 @@
 <template>
   <div class="knowledge-base-card">
-    <!-- 顶部状态指示条 -->
+    <!-- 顶部状态指示条与操作坞 -->
     <div class="card-header-bar">
-      <span class="category-pill" :class="`category-pill--${item.category.toLowerCase()}`">
-        {{ item.categoryLabel }}
-      </span>
+      <div class="header-pills-wrap">
+        <span class="category-pill" :class="`category-pill--${item.category.toLowerCase()}`">
+          {{ item.categoryLabel }}
+        </span>
 
-      <span class="vector-status-pill" :class="`vector-status-pill--${item.vectorStatus.toLowerCase()}`">
-        <span class="status-dot"></span>
-        <span>{{ item.vectorStatusLabel }}</span>
-      </span>
+        <span class="vector-status-pill" :class="`vector-status-pill--${item.vectorStatus.toLowerCase()}`">
+          <span class="status-dot"></span>
+          <span>{{ item.vectorStatusLabel }}</span>
+        </span>
+      </div>
+
+      <el-dropdown trigger="click" @command="handleCommand">
+        <button type="button" class="card-more-btn" title="更多操作">
+          <el-icon><MoreFilled /></el-icon>
+        </button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="edit" :icon="Edit">编辑知识库</el-dropdown-item>
+            <el-dropdown-item command="retrieval" :icon="Search">语义检索测试</el-dropdown-item>
+            <el-dropdown-item command="reindex" :icon="Refresh">重新构建向量索引</el-dropdown-item>
+            <el-dropdown-item command="delete" :icon="Delete" divided style="color: #ef4444">
+              删除知识库
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
     </div>
 
     <!-- 知识库标题与图标 -->
@@ -80,18 +98,41 @@
 </template>
 
 <script setup lang="ts">
-import { Cpu, Reading, Document, Coin, Lightning, Upload, Right } from '@element-plus/icons-vue';
+import {
+  Cpu,
+  Reading,
+  Document,
+  Coin,
+  Lightning,
+  Upload,
+  Right,
+  MoreFilled,
+  Edit,
+  Search,
+  Refresh,
+  Delete
+} from '@element-plus/icons-vue';
 import type { KnowledgeBase } from '@/types/knowledge/knowledge-base';
 
-defineProps<{
+const props = defineProps<{
   item: KnowledgeBase;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'open', item: KnowledgeBase): void;
   (e: 'upload', item: KnowledgeBase): void;
+  (e: 'edit', item: KnowledgeBase): void;
+  (e: 'reindex', item: KnowledgeBase): void;
+  (e: 'retrieval', item: KnowledgeBase): void;
   (e: 'delete', item: KnowledgeBase): void;
 }>();
+
+function handleCommand(cmd: string) {
+  if (cmd === 'edit') emit('edit', props.item);
+  else if (cmd === 'reindex') emit('reindex', props.item);
+  else if (cmd === 'retrieval') emit('retrieval', props.item);
+  else if (cmd === 'delete') emit('delete', props.item);
+}
 
 const defaultGradient = 'linear-gradient(135deg, #1677FF 0%, #722ED1 100%)';
 </script>
@@ -120,6 +161,34 @@ const defaultGradient = 'linear-gradient(135deg, #1677FF 0%, #722ED1 100%)';
     justify-content: space-between;
     gap: 8px;
     margin-bottom: 16px;
+
+    .header-pills-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .card-more-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid #E2E8F0;
+      background: #F8FAFC;
+      color: #64748B;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      outline: none;
+
+      &:hover {
+        background: #EFF6FF;
+        color: #1677FF;
+        border-color: #BFDBFE;
+      }
+    }
 
     .category-pill {
       display: inline-flex;

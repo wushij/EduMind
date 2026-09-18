@@ -1,6 +1,11 @@
 <template>
   <!-- 课程卡片网格列表 (加载中 / 内容 / 空状态) -->
-  <div v-loading="loading" class="course-grid-container">
+  <div class="course-grid-container">
+    <div
+      v-loading="loading"
+      class="course-grid-loading-host"
+      :class="{ 'is-empty-loading': loading && courses.length === 0 }"
+    >
     <div v-if="courses.length > 0" class="course-grid">
       <CourseCard
         v-for="course in courses"
@@ -25,6 +30,7 @@
         重置全部筛选
       </button>
     </div>
+    </div>
   </div>
 </template>
 
@@ -43,9 +49,17 @@ const emit = defineEmits<{
 </script>
 
 <style scoped lang="scss">
-// 3. 课程卡片网格
+// 3. 课程卡片网格（高度随内容，避免列表页底部大块留白）
 .course-grid-container {
-  min-height: 420px;
+  min-height: 0;
+
+  .course-grid-loading-host {
+    min-height: 0;
+
+    &.is-empty-loading {
+      min-height: 240px;
+    }
+  }
 
   .course-grid {
     display: grid;

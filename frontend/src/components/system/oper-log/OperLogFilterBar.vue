@@ -1,5 +1,5 @@
 <template>
-  <div class="filter-capsule-card">
+  <div class="filter-capsule-card system-filter-card">
     <div class="filter-row">
       <div class="filter-inputs">
         <el-input
@@ -111,14 +111,10 @@ function onDateRangeChange(range: [string, string] | null) {
 </script>
 
 <style scoped lang="scss">
-@use '@/styles/variables.scss' as *;
+@use '@/styles/system-page-shell.scss';
 
 .filter-capsule-card {
-  background: #ffffff;
-  border-radius: $border-radius-xl;
-  padding: 16px 20px;
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow: $shadow-sm;
+  /* radius, border, shadow from system-filter-card */
 
   .filter-row {
     display: flex;

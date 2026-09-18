@@ -19,10 +19,13 @@ import com.edumind.ai.service.chat.ChatStreamRegistry;
 import com.edumind.ai.service.memory.MemoryPromptBuilder;
 import com.edumind.ai.service.memory.retrieval.MemoryContextBlock;
 import com.edumind.ai.service.memory.retrieval.MemoryRetrievalService;
+import com.edumind.ai.service.routing.CopilotRagPolicy;
 import com.edumind.ai.service.routing.IntentDispatchPlan;
 import com.edumind.ai.service.routing.IntentDispatchRequest;
 import com.edumind.ai.service.routing.IntentDispatchService;
+import com.edumind.ai.service.teaching.LessonCopilotEnricher;
 import com.edumind.ai.vo.rag.CitationVO;
+import com.edumind.knowledge.api.LessonContentIndexApi;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.event.LearningActivityEvent;
 import com.edumind.common.exception.BusinessException;
@@ -42,6 +45,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -60,6 +64,8 @@ public class ChatServiceImpl implements ChatService {
     private final MemoryRetrievalService memoryRetrievalService;
     private final MemoryPromptBuilder memoryPromptBuilder;
     private final ChatHistoryBuilder chatHistoryBuilder;
+    private final LessonContentIndexApi lessonContentIndexApi;
+    private final LessonCopilotEnricher lessonCopilotEnricher;
 
     @Override
     public SseEmitter streamChat(ChatStreamDTO dto) {
@@ -158,15 +164,37 @@ public class ChatServiceImpl implements ChatService {
                     conversation.getId(), ChatHistoryBuilder.MAX_HISTORY_MESSAGES);
             String conversationHistory = chatHistoryBuilder.formatConversationHistory(recentMessages);
 
-            String dispatchMessage = dto.getMessage();
-            if (dto.getLessonChapterId() != null) {
-                dispatchMessage = "[当前微课节ID: " + dto.getLessonChapterId() + "] " + dispatchMessage;
-            } else if (dto.getChapterId() != null) {
-                dispatchMessage = "[当前章节ID: " + dto.getChapterId() + "] " + dispatchMessage;
+            String userQuestion = dto.getMessage();
+            boolean lessonIndexed = dto.getLessonChapterId() != null
+                    && dto.getCourseId() != null
+                    && lessonContentIndexApi.findLessonDocumentId(dto.getCourseId(), dto.getLessonChapterId())
+                    .isPresent();
+            String dispatchMessage = userQuestion;
+            if (!lessonIndexed) {
+                if (dto.getLessonChapterId() != null) {
+                    dispatchMessage = "[当前微课节ID: " + dto.getLessonChapterId() + "] " + dispatchMessage;
+                } else if (dto.getChapterId() != null) {
+                    dispatchMessage = "[当前章节ID: " + dto.getChapterId() + "] " + dispatchMessage;
+                }
+            }
+            Optional<Long> lessonDocId = dto.getLessonChapterId() != null && dto.getCourseId() != null
+                    ? lessonContentIndexApi.findLessonDocumentId(dto.getCourseId(), dto.getLessonChapterId())
+                    : Optional.empty();
+            String enrichment = lessonDocId.isPresent()
+                    ? lessonCopilotEnricher.buildEnrichmentBlock(
+                    dto.getCourseId(), dto.getLessonChapterId(), false, userQuestion)
+                    : "";
+            if (lessonIndexed) {
+                useRag = knowledgeBaseId != null && !CopilotRagPolicy.shouldSkipRag(userQuestion);
             }
             IntentDispatchRequest dispatchRequest = IntentDispatchRequest.builder()
-                    .message(dispatchMessage)
+                    .message(lessonIndexed ? userQuestion : dispatchMessage)
+                    .retrievalQuery(userQuestion)
                     .courseId(dto.getCourseId())
+                    .contextModule(lessonIndexed ? "lesson_learn" : null)
+                    .lessonChapterId(dto.getLessonChapterId())
+                    .lessonDocumentId(lessonDocId.orElse(null))
+                    .lessonEnrichmentBlock(enrichment)
                     .knowledgeBaseId(useRag ? knowledgeBaseId : null)
                     .documentId(dto.getDocumentId())
                     .intent(intent)
@@ -352,10 +380,13 @@ public class ChatServiceImpl implements ChatService {
         if (dto.getUseRag() != null) {
             return dto.getUseRag();
         }
+        if (knowledgeBaseId == null || CopilotRagPolicy.shouldSkipRag(dto.getMessage())) {
+            return false;
+        }
         if ("rag".equalsIgnoreCase(intent.type())) {
             return true;
         }
-        return knowledgeBaseId != null && "chat".equalsIgnoreCase(intent.type());
+        return "chat".equalsIgnoreCase(intent.type());
     }
 
     private String truncate(String text, int maxLen) {

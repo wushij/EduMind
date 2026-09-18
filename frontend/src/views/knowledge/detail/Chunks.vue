@@ -65,11 +65,11 @@
         </el-select>
 
         <!-- 状态单选胶囊 -->
-        <el-radio-group v-model="statusFilter" size="default" @change="fetchChunks">
-          <el-radio-button label="ALL">全部切片</el-radio-button>
-          <el-radio-button label="INDEXED">已向量化</el-radio-button>
-          <el-radio-button label="PENDING">处理中</el-radio-button>
-          <el-radio-button label="INDEX_FAILED">索引异常</el-radio-button>
+        <el-radio-group v-model="statusFilter" size="default">
+          <el-radio-button value="ALL">全部切片</el-radio-button>
+          <el-radio-button value="INDEXED">已向量化</el-radio-button>
+          <el-radio-button value="PENDING">待向量化</el-radio-button>
+          <el-radio-button value="INDEX_FAILED">索引异常</el-radio-button>
         </el-radio-group>
 
         <!-- 关键词搜索 -->
@@ -98,41 +98,41 @@
 
     <!-- 3. 切片内容网格 -->
     <div v-loading="loading" class="chunks-content-area">
-      <div v-if="paginatedChunks.length > 0" class="chunks-grid">
+      <div v-if="paginatedChunks.length > 0" class="chunks-list-panel">
+        <div class="chunks-grid">
         <div
           v-for="chunk in paginatedChunks"
           :key="chunk.id"
-          class="chunk-card"
+          class="chunk-row"
           @click="openViewer(chunk)"
         >
-          <div class="chunk-card-header">
-            <div class="chunk-index-tag">#{{ chunk.chunkIndex }}</div>
-            <div class="chunk-badges">
-              <span class="badge page-badge" v-if="chunk.pageNo">P.{{ chunk.pageNo }}</span>
-              <span class="badge token-badge">{{ chunk.tokenCount }} tok</span>
-              <span
-                class="status-dot"
-                :class="chunk.status.toLowerCase()"
-                :title="chunk.status === 'INDEXED' ? '已向量化' : '未就绪'"
-              ></span>
-            </div>
-          </div>
-
-          <div v-if="chunk.heading" class="chunk-heading" :title="chunk.heading">
-            <el-icon><CollectionTag /></el-icon>
-            <span>{{ chunk.heading }}</span>
-          </div>
-
-          <p class="chunk-text-snippet">
-            {{ chunk.content }}
+          <span class="chunk-index-tag">{{ displayChunkNo(chunk) }}</span>
+          <span
+            class="status-dot"
+            :class="chunk.status.toLowerCase()"
+            :title="chunk.status === 'INDEXED' ? '已向量化' : '未就绪'"
+          />
+          <p class="chunk-row-preview" :title="chunk.content">
+            <span v-if="chunk.heading" class="chunk-row-heading">{{ chunk.heading }}</span>
+            {{ formatChunkListPreview(chunk.content) }}
           </p>
+          <span class="chunk-row-meta">
+            <template v-if="chunk.pageNo">P.{{ chunk.pageNo }} · </template>
+            {{ chunk.tokenCount }} tok
+          </span>
+          <span class="chunk-row-action">详情</span>
+        </div>
+        </div>
 
-          <div class="chunk-card-footer">
-            <span class="doc-label" :title="chunk.documentName">
-              {{ chunk.documentName || `文档 #${chunk.documentId}` }}
-            </span>
-            <span class="inspect-hint">查看详情 →</span>
-          </div>
+        <div class="pagination-footer">
+          <AppPagination
+            v-model:page-num="currentPage"
+            v-model:page-size="pageSize"
+            :total="totalCount"
+            :page-sizes="[10, 20, 50]"
+            layout="total, sizes, prev, pager, next, jumper"
+            @change="() => {}"
+          />
         </div>
       </div>
 
@@ -144,15 +144,6 @@
           </template>
         </el-empty>
       </div>
-
-      <!-- 分页栏 -->
-      <AppPagination
-        v-model:page-num="currentPage"
-        v-model:page-size="pageSize"
-        :total="totalCount"
-        :page-sizes="[8, 16, 24]"
-        @change="() => {}"
-      />
     </div>
 
     <!-- 4. 切片详情抽屉 -->
@@ -165,7 +156,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useDocumentChunk } from '@/composables/knowledge/useDocumentChunk';
 import { useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
 import ChunkViewer from '@/components/knowledge/ChunkViewer.vue';
@@ -176,13 +168,18 @@ import {
   DataAnalysis,
   Refresh,
   Search,
-  RefreshRight,
-  CollectionTag
+  RefreshRight
 } from '@element-plus/icons-vue';
+import { formatChunkListPreview } from '@/utils/format/chunk-preview';
+
+const route = useRoute();
+const { kbId } = useKnowledgeRoute();
+const initialDocId = Number(route.query.docId);
 
 const {
   loading,
   rechunking,
+  chunks,
   stats,
   selectedDocumentId,
   searchKeyword,
@@ -199,12 +196,34 @@ const {
   resetFilters,
   handleRechunk,
   openViewer
-} = useDocumentChunk();
+} = useDocumentChunk(
+  Number.isFinite(initialDocId) && initialDocId > 0 ? initialDocId : undefined
+);
 
-const { kbId } = useKnowledgeRoute();
+function displayChunkNo(chunk: { chunkIndex: number }) {
+  return String((chunk.chunkIndex ?? 0) + 1);
+}
+
+function openChunkFromRouteQuery() {
+  const raw = route.query.chunkId;
+  const chunkId = typeof raw === 'string' ? Number(raw) : NaN;
+  if (!Number.isFinite(chunkId) || chunkId <= 0) {
+    return;
+  }
+  const hit = chunks.value.find((c) => Number(c.id) === chunkId);
+  if (hit) {
+    openViewer(hit);
+  }
+}
+
+watch(
+  () => [chunks.value.length, route.query.chunkId] as const,
+  () => openChunkFromRouteQuery()
+);
 
 onMounted(async () => {
   await initializeChunksPage(kbId.value);
+  openChunkFromRouteQuery();
 });
 </script>
 
@@ -362,134 +381,99 @@ onMounted(async () => {
   .chunks-content-area {
     min-height: 420px;
 
+    .chunks-list-panel {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      box-shadow: 0 2px 8px rgba(30, 80, 150, 0.04);
+      overflow: hidden;
+    }
+
     .chunks-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 14px;
+      display: flex;
+      flex-direction: column;
+      padding: 8px 0;
 
-      @media (max-width: 1024px) {
-        grid-template-columns: 1fr;
-      }
-
-      .chunk-card {
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 18px;
-        padding: 16px 18px;
-        cursor: pointer;
+      .chunk-row {
         display: flex;
-        flex-direction: column;
+        align-items: flex-start;
         gap: 10px;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
+        padding: 10px 18px;
+        cursor: pointer;
+        border-bottom: 1px solid #f1f5f9;
+        transition: background 0.15s ease;
+
+        &:last-child {
+          border-bottom: none;
+        }
 
         &:hover {
-          border-color: #93C5FD;
-          box-shadow: 0 6px 20px rgba(37, 99, 235, 0.08);
-          transform: translateY(-2px);
+          background: #f8fafc;
 
-          .inspect-hint {
-            color: #2563EB;
+          .chunk-row-action {
+            color: #2563eb;
           }
         }
 
-        .chunk-card-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-
-          .chunk-index-tag {
-            font-family: ui-monospace, monospace;
-            font-size: 12px;
-            font-weight: 700;
-            color: #2563EB;
-            background: #EFF6FF;
-            padding: 2px 8px;
-            border-radius: 6px;
-          }
-
-          .chunk-badges {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-
-            .badge {
-              font-size: 11px;
-              padding: 2px 6px;
-              border-radius: 4px;
-              font-family: ui-monospace, monospace;
-
-              &.page-badge {
-                background: #F1F5F9;
-                color: #475569;
-              }
-
-              &.token-badge {
-                background: #F8FAFC;
-                color: #64748B;
-                border: 1px solid #E2E8F0;
-              }
-            }
-
-            .status-dot {
-              width: 8px;
-              height: 8px;
-              border-radius: 50%;
-
-              &.indexed { background: #16A34A; }
-              &.pending { background: #EAB308; }
-              &.index_failed { background: #EF4444; }
-            }
-          }
+        .chunk-index-tag {
+          flex-shrink: 0;
+          margin-top: 2px;
+          font-family: ui-monospace, monospace;
+          font-size: 11px;
+          font-weight: 700;
+          color: #2563eb;
+          background: #eff6ff;
+          padding: 2px 6px;
+          border-radius: 4px;
         }
 
-        .chunk-heading {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 13px;
-          font-weight: 600;
-          color: #0F172A;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+        .status-dot {
+          flex-shrink: 0;
+          margin-top: 6px;
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+
+          &.indexed { background: #16a34a; }
+          &.pending { background: #eab308; }
+          &.index_failed { background: #ef4444; }
         }
 
-        .chunk-text-snippet {
+        .chunk-row-preview {
+          flex: 1;
+          min-width: 0;
           margin: 0;
           font-size: 13px;
-          color: #475569;
-          line-height: 1.65;
+          line-height: 1.45;
+          color: #64748b;
           display: -webkit-box;
-          -webkit-line-clamp: 3;
           -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
           overflow: hidden;
-          text-overflow: ellipsis;
-          background: #F8FAFC;
-          padding: 10px 12px;
-          border-radius: 8px;
+          white-space: normal;
+          word-break: break-word;
+
+          .chunk-row-heading {
+            font-weight: 600;
+            color: #334155;
+            margin-right: 6px;
+          }
         }
 
-        .chunk-card-footer {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
+        .chunk-row-meta {
+          flex-shrink: 0;
+          margin-top: 2px;
+          font-size: 11px;
+          font-family: ui-monospace, monospace;
+          color: #94a3b8;
+        }
+
+        .chunk-row-action {
+          flex-shrink: 0;
+          margin-top: 2px;
           font-size: 12px;
-          color: #94A3B8;
-          border-top: 1px solid #F1F5F9;
-          padding-top: 8px;
-
-          .doc-label {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 70%;
-          }
-
-          .inspect-hint {
-            font-weight: 500;
-            transition: color 0.2s;
-          }
+          font-weight: 500;
+          color: #94a3b8;
         }
       }
     }
@@ -502,13 +486,25 @@ onMounted(async () => {
     }
 
     .pagination-footer {
+      padding: 14px 20px 16px;
+      padding-right: 72px;
+      border-top: 1px solid #f1f5f9;
       display: flex;
-      justify-content: flex-end;
-      margin-top: 20px;
-      background: #FFFFFF;
-      padding: 10px 20px;
-      border-radius: 9999px;
-      border: 1px solid #E2E8F0;
+      justify-content: flex-start;
+      align-items: center;
+
+      :deep(.pagination-bar) {
+        margin-top: 0;
+        padding: 0;
+        border-top: none;
+        width: 100%;
+      }
+
+      :deep(.el-pagination) {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        row-gap: 8px;
+      }
     }
   }
 }

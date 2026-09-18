@@ -1,5 +1,5 @@
 <template>
-  <div class="filter-card">
+  <div class="filter-card system-filter-card">
     <div class="filter-left">
       <el-input
         :model-value="searchKeyword"
@@ -87,16 +87,14 @@ defineEmits<{
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/system-page-shell.scss';
+
 .filter-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 14px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  box-shadow: none;
 }
 
 .filter-left {

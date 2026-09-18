@@ -1,9 +1,5 @@
 <template>
-  <div
-    v-loading="loading"
-    element-loading-text="正在检索审计日志..."
-    class="log-table-card"
-  >
+  <div class="log-table-card system-table-card">
     <div class="table-toolbar-bar">
       <div class="toolbar-left">
         <span class="table-title">操作日志列表</span>
@@ -38,6 +34,12 @@
       </div>
     </div>
 
+    <div
+      v-loading="loading"
+      element-loading-text="正在检索审计日志..."
+      class="oper-log-table-loading-host"
+      :class="{ 'is-loading-empty': loading && tableData.length === 0 }"
+    >
     <el-table
       :data="tableData"
       stripe
@@ -131,6 +133,7 @@
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <!-- 底部分页栏（严格左对齐项目规范） -->
     <div class="pagination-bar">
@@ -320,14 +323,19 @@ function onSelectionChange(rows: OperLogVO[]) {
 </script>
 
 <style scoped lang="scss">
-@use '@/styles/variables.scss' as *;
+@use '@/styles/system-page-shell.scss';
 
 .log-table-card {
-  background: #ffffff;
-  border-radius: $border-radius-xl;
-  padding: 20px;
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow: $shadow-sm;
+  /* surface from system-table-card */
+  min-height: 0;
+
+  .oper-log-table-loading-host {
+    min-height: 0;
+
+    &.is-loading-empty {
+      min-height: 200px;
+    }
+  }
 
   .table-toolbar-bar {
     display: flex;

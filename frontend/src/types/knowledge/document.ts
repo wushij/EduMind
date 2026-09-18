@@ -8,6 +8,7 @@ export interface KBDocument {
   fileType?: string;
   fileSize?: number;
   chunkCount?: number;
+  sourceType?: string;
   parseStatus?: string;
   chunkStatus?: string;
   errorMessage?: string;

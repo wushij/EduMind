@@ -53,7 +53,8 @@ watch(
 <style scoped lang="scss">
 .app-layout {
   display: flex;
-  width: 100vw;
+  width: 100%;
+  max-width: 100%;
   height: 100vh;
   overflow: hidden;
 

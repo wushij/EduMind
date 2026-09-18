@@ -51,4 +51,14 @@ public class KnowledgeChunkIndexDao {
                         .eq(KnowledgeChunkIndexEntity::getDocumentId, documentId)
         );
     }
+
+    public List<KnowledgeChunkIndexEntity> listIndexedWithEmbeddingVectors(long offset, int batchSize) {
+        return knowledgeChunkIndexMapper.selectList(
+                new LambdaQueryWrapper<KnowledgeChunkIndexEntity>()
+                        .eq(KnowledgeChunkIndexEntity::getEmbedStatus, "INDEXED")
+                        .isNotNull(KnowledgeChunkIndexEntity::getEmbeddingVector)
+                        .orderByAsc(KnowledgeChunkIndexEntity::getId)
+                        .last("LIMIT " + batchSize + " OFFSET " + offset)
+        );
+    }
 }

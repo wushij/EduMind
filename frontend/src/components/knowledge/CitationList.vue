@@ -27,12 +27,12 @@
           <span v-if="item.page || item.pageNo" class="page-tag">
             P.{{ item.page || item.pageNo }}
           </span>
-          <span v-if="item.score" class="score-tag">
-            {{ (item.score * 100).toFixed(0) }}% 匹配
+          <span v-if="item.score != null" class="score-tag">
+            {{ formatCitationMatchLabel(item.score, peerScores) }} 匹配
           </span>
         </div>
-        <p v-if="item.snippet || item.excerpt" class="snippet-preview">
-          {{ item.snippet || item.excerpt }}
+        <p v-if="citationExcerptSource(item)" class="snippet-preview">
+          {{ formatCitationCardPreview(citationExcerptSource(item)) }}
         </p>
       </div>
     </div>
@@ -41,18 +41,28 @@
     <el-dialog
       v-model="dialogVisible"
       :title="`教材出处引用 · ${activeCitation?.docTitle || activeCitation?.documentName || '课程资料'}`"
-      width="540px"
+      width="min(640px, 92vw)"
       append-to-body
+      destroy-on-close
       class="citation-modal"
     >
       <div v-if="activeCitation" class="modal-inner">
         <div class="meta-row">
           <span class="tag page">页码：P.{{ activeCitation.page || activeCitation.pageNo || 1 }}</span>
-          <span class="tag score">知识库置信度：{{ activeCitation.score ? (activeCitation.score * 100).toFixed(1) + '%' : '高' }}</span>
+          <span class="tag score">
+            相关度：{{
+              activeCitation.score != null
+                ? formatCitationMatchLabel(activeCitation.score, peerScores)
+                : '—'
+            }}
+          </span>
+          <span class="tag hint">以下为知识库切片原文（已排版）</span>
         </div>
-        <div class="modal-quote-box">
-          {{ activeCitation.snippet || activeCitation.excerpt || activeCitation.content }}
-        </div>
+        <div
+          ref="modalBodyRef"
+          class="modal-quote-box markdown-body chat-md-content citation-excerpt-md"
+          v-html="activeExcerptHtml"
+        />
       </div>
       <template #footer>
         <el-button type="primary" @click="dialogVisible = false">确定</el-button>
@@ -62,22 +72,45 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { Document, ArrowDown } from '@element-plus/icons-vue';
 import type { CitationItem } from '@/types/ai/assistant';
+import { collectCitationScores, formatCitationMatchLabel } from '@/utils/ai/citation-score';
+import {
+  citationExcerptSource,
+  formatCitationCardPreview,
+  prepareCitationMarkdown
+} from '@/utils/ai/citation-excerpt';
+import { bindMarkdownCodeCopy, renderChatMarkdown } from '@/utils/ai/chat-markdown';
 
-defineProps<{
+const props = defineProps<{
   citations: CitationItem[];
 }>();
+
+const peerScores = computed(() => collectCitationScores(props.citations));
 
 const isExpanded = ref(false);
 const dialogVisible = ref(false);
 const activeCitation = ref<CitationItem | null>(null);
+const modalBodyRef = ref<HTMLElement | null>(null);
+
+const activeExcerptHtml = computed(() => {
+  if (!activeCitation.value) return '';
+  const raw = citationExcerptSource(activeCitation.value);
+  if (!raw) return '';
+  return renderChatMarkdown(prepareCitationMarkdown(raw));
+});
 
 const openSnippetDialog = (item: CitationItem) => {
   activeCitation.value = item;
   dialogVisible.value = true;
 };
+
+watch(dialogVisible, (open) => {
+  if (open) {
+    nextTick(() => bindMarkdownCodeCopy(modalBodyRef.value));
+  }
+});
 </script>
 
 <style scoped lang="scss">
@@ -227,20 +260,56 @@ const openSnippetDialog = (item: CitationItem) => {
           background: #ECFDF5;
           color: #059669;
         }
+
+        &.hint {
+          background: #F1F5F9;
+          color: #64748B;
+          font-weight: 400;
+        }
       }
     }
 
     .modal-quote-box {
-      background: #F8FAFC;
+      background: #FFFFFF;
       border: 1px solid #E2E8F0;
-      border-radius: 8px;
-      padding: 16px;
-      font-size: 13.5px;
-      line-height: 1.7;
-      color: #1E293B;
-      white-space: pre-wrap;
-      max-height: 360px;
+      border-radius: 10px;
+      padding: 14px 16px;
+      max-height: min(52vh, 420px);
       overflow-y: auto;
+    }
+
+    .citation-excerpt-md {
+      font-size: 13px;
+      line-height: 1.65;
+      color: #1e293b;
+
+      :deep(h2),
+      :deep(h3),
+      :deep(h4) {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 12px 0 8px;
+        color: #0f172a;
+      }
+
+      :deep(p) {
+        margin: 0 0 8px;
+      }
+
+      :deep(ul),
+      :deep(ol) {
+        margin: 0 0 10px;
+        padding-left: 1.25em;
+      }
+
+      :deep(.code-block-wrapper) {
+        margin: 10px 0;
+      }
+
+      :deep(pre.hljs) {
+        font-size: 12px;
+        border-radius: 8px;
+      }
     }
   }
 }

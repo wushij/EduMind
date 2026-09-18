@@ -33,7 +33,8 @@ public class ChunkController {
             @PathVariable("documentId") Long documentId,
             @RequestParam(value = "page", defaultValue = "1") long page,
             @RequestParam(value = "pageSize", defaultValue = "20") long pageSize,
-            @RequestParam(value = "keyword", required = false) String keyword) {
-        return ApiResult.success(chunkService.pageChunks(documentId, page, pageSize, keyword));
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "status", required = false) String status) {
+        return ApiResult.success(chunkService.pageChunks(documentId, page, pageSize, keyword, status));
     }
 }

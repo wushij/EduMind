@@ -1,5 +1,5 @@
 <template>
-  <div class="oper-log-container">
+  <div class="oper-log-container system-page-shell">
     <OperLogStatsBar :stats="stats" />
 
     <OperLogFilterBar
@@ -68,12 +68,5 @@ const {
 </script>
 
 <style scoped lang="scss">
-@use '@/styles/variables.scss' as *;
-
-.oper-log-container {
-  padding: 0 0 $page-bottom-spacing 0;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
+@use '@/styles/system-page-shell.scss';
 </style>

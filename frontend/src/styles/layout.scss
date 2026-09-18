@@ -5,6 +5,8 @@
   --layout-header-height: 64px;
   --layout-content-padding-y: 20px;
   --page-bottom-spacing: #{$page-bottom-spacing};
+  --copilot-safe-bottom: #{$copilot-safe-bottom};
+  --copilot-safe-right: #{$copilot-safe-right};
   --page-min-height: calc(
     100vh - var(--layout-header-height) - var(--layout-content-padding-y) - var(--page-bottom-spacing)
   );

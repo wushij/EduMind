@@ -1,6 +1,6 @@
 <template>
-  <div class="broadcast-page">
-    <div class="page-header-card">
+  <div class="broadcast-page system-page-shell">
+    <div class="system-page-hero-card page-header-card">
       <div class="header-left">
         <div class="header-icon-box">
           <el-icon :size="24"><Promotion /></el-icon>
@@ -134,21 +134,13 @@ const {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/system-page-shell.scss';
+
 .broadcast-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 20px;
-  min-height: calc(100vh - 64px);
-  background: #f8fafc;
+  /* layout from system-page-shell */
 }
 
 .page-header-card {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border-radius: 16px;
-  padding: 22px 24px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.04);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -164,7 +156,7 @@ const {
 .header-icon-box {
   width: 52px;
   height: 52px;
-  border-radius: 14px;
+  border-radius: 16px;
   background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
   color: #ffffff;
   display: flex;

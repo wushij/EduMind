@@ -6,6 +6,14 @@
         <el-icon class="btn-icon"><Plus /></el-icon>
         <span>新建问答会话</span>
       </button>
+      <button
+        v-if="showClearAll && sessions.length > 0"
+        type="button"
+        class="capsule-clear-all-btn"
+        @click="handleClearAll"
+      >
+        清空全部历史
+      </button>
     </div>
 
     <!-- 搜索筛选 -->
@@ -61,16 +69,38 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, ChatDotRound, Close, Search } from '@element-plus/icons-vue';
 import type { ChatSession } from '@/composables/ai/useAIStream';
 
-const props = defineProps<{
-  sessions: ChatSession[];
-  currentId: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    sessions: ChatSession[];
+    currentId: string;
+    showClearAll?: boolean;
+  }>(),
+  {
+    showClearAll: false
+  }
+);
 
 const emit = defineEmits<{
   (e: 'select', id: string): void;
   (e: 'create'): void;
   (e: 'delete', id: string): void;
+  (e: 'clear-all'): void;
 }>();
+
+function handleClearAll() {
+  ElMessageBox.confirm(
+    '确定要清空全部问答历史会话吗？清空后记录将无法恢复。',
+    '清空全部历史记录',
+    {
+      confirmButtonText: '确定清空',
+      cancelButtonText: '取消',
+      type: 'warning',
+      lockScroll: false
+    }
+  )
+    .then(() => emit('clear-all'))
+    .catch(() => {});
+}
 
 function handleDeleteSession(item: ChatSession) {
   ElMessageBox.confirm(
@@ -111,6 +141,9 @@ const filteredSessions = computed(() => {
 
   .session-list-header {
     padding: 16px 14px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 
     .capsule-new-chat-btn {
       width: 100%;
@@ -139,6 +172,24 @@ const filteredSessions = computed(() => {
         border-style: solid;
         border-color: #1677FF;
         box-shadow: 0 3px 10px rgba(22, 119, 255, 0.25);
+      }
+    }
+
+    .capsule-clear-all-btn {
+      width: 100%;
+      height: 34px;
+      border-radius: 9999px;
+      border: 1px solid #fecaca;
+      background: #fff;
+      color: #dc2626;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: #fef2f2;
+        border-color: #f87171;
       }
     }
   }

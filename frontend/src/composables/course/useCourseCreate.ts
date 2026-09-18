@@ -1,18 +1,12 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
+import { COURSE_CATEGORY_PRESETS } from '@/constants/course';
 import { useCourse } from '@/composables/course/useCourse';
 import { getKnowledgeBases } from '@/api/knowledge/knowledge-base';
 import { askGlobalAssistant } from '@/api/ai/assistant';
 
-export const CATEGORY_PRESETS = [
-  '计算机与软件',
-  '人工智能与大模型',
-  '数据科学与大数据',
-  '电子与信息工程',
-  '通用高等数学',
-  '经济金融科技'
-] as const;
+export const CATEGORY_PRESETS = COURSE_CATEGORY_PRESETS;
 
 export const COURSE_CODE_LETTERS = ['CS', 'AI', 'SE', 'DATA', 'EE', 'MATH'] as const;
 
@@ -198,8 +192,24 @@ export function useCourseCreate() {
     form.initialChapters.push(`第 ${form.initialChapters.length + 1} 章 自定义核心教学单元`);
   }
 
-  function removeChapter(idx: number) {
-    form.initialChapters.splice(idx, 1);
+  async function removeChapter(idx: number) {
+    const raw = form.initialChapters[idx]?.trim();
+    const label = raw || `第 ${idx + 1} 章`;
+    const preview = label.length > 36 ? `${label.slice(0, 36)}…` : label;
+    try {
+      await ElMessageBox.confirm(
+        `确定移除大纲章节「${preview}」吗？移除后仍可手动添加或重新导入模板。`,
+        '移除章节确认',
+        {
+          confirmButtonText: '移除',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      );
+      form.initialChapters.splice(idx, 1);
+    } catch (err: unknown) {
+      if (err === 'cancel' || err === 'close') return;
+    }
   }
 
   function applySyllabusTemplate(type: SyllabusTemplateType) {

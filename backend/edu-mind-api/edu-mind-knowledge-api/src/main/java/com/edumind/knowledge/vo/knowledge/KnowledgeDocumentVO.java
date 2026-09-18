@@ -8,6 +8,8 @@ import java.time.LocalDateTime;
 public class KnowledgeDocumentVO {
     private Long id;
     private Long knowledgeBaseId;
+    /** UPLOAD | LESSON */
+    private String sourceType;
     private String fileName;
     private String fileType;
     private Long fileSize;

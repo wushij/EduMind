@@ -2,6 +2,7 @@ package com.edumind.ai.service.routing.impl;
 
 import com.edumind.ai.rag.model.RagResult;
 import com.edumind.ai.rag.model.RetrievalHit;
+import com.edumind.ai.rag.config.RagProperties;
 import com.edumind.ai.rag.pipeline.RagPipelineImpl;
 import com.edumind.ai.rag.query.QueryRewriteContext;
 import com.edumind.ai.router.IntentRouter;
@@ -31,6 +32,7 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
     private final RagPipelineImpl ragPipeline;
     private final KnowledgeAccessApi knowledgeAccessApi;
     private final CourseQueryApi courseQueryApi;
+    private final RagProperties ragProperties;
 
     @Override
     public IntentRouter.IntentResult route(String message, Long courseId) {
@@ -53,13 +55,25 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
     }
 
     private IntentDispatchPlan buildChatPlan(IntentDispatchRequest request, IntentRouter.IntentResult intent) {
+        String systemPrompt = promptService.getSystemPrompt("chat");
+        String userPrompt = request.getMessage();
+        List<CitationVO> citations = List.of();
+        boolean useRag = request.getKnowledgeBaseId() != null;
+
+        if (useRag) {
+            RagAugmentation augmentation = augmentWithKnowledgeBase(request);
+            systemPrompt = augmentation.systemPrompt();
+            citations = augmentation.citations();
+        }
+
         return IntentDispatchPlan.builder()
                 .route("chat")
                 .agentCode(intent.targetCode())
                 .targetCode(intent.targetCode())
-                .systemPrompt(promptService.getSystemPrompt("chat"))
-                .userPrompt(request.getMessage())
-                .useRag(false)
+                .systemPrompt(systemPrompt)
+                .userPrompt(userPrompt)
+                .useRag(useRag)
+                .citations(citations)
                 .build();
     }
 
@@ -70,27 +84,10 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
         boolean useRag = request.getKnowledgeBaseId() != null;
 
         if (useRag) {
-            knowledgeAccessApi.assertAccessible(request.getKnowledgeBaseId());
-            QueryRewriteContext rewriteContext = QueryRewriteContext.builder()
-                    .question(request.getMessage())
-                    .courseName(resolveCourseName(request))
-                    .conversationHistory(request.getConversationHistory())
-                    .build();
-            RagResult ragResult = ragPipeline.executeDetailed(
-                    request.getMessage(),
-                    request.getKnowledgeBaseId(),
-                    5,
-                    0.65,
-                    request.getDocumentId(),
-                    false,
-                    rewriteContext
-            );
-            userPrompt = ragResult.getPromptPreview();
-            citations = toCitations(ragResult);
-            Map<String, String> vars = new HashMap<>();
-            vars.put("context", ragResult.getContext() != null ? ragResult.getContext() : "");
-            vars.put("question", request.getMessage());
-            systemPrompt = promptService.renderTemplate("chat_rag", vars);
+            RagAugmentation augmentation = augmentWithKnowledgeBase(request);
+            systemPrompt = augmentation.systemPrompt();
+            userPrompt = augmentation.promptPreview() != null ? augmentation.promptPreview() : userPrompt;
+            citations = augmentation.citations();
         }
 
         return IntentDispatchPlan.builder()
@@ -149,14 +146,7 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
         };
     }
 
-    private List<CitationVO> toCitations(RagResult ragResult) {
-        if (ragResult == null || ragResult.getRetrievalResults() == null) {
-            return List.of();
-        }
-        return ragResult.getRetrievalResults().stream().map(this::toCitation).collect(Collectors.toList());
-    }
-
-    private CitationVO toCitation(RetrievalHit hit) {
+    private CitationVO toCitation(RetrievalHit hit, IntentDispatchRequest request) {
         CitationVO citation = new CitationVO();
         citation.setDocumentName(hit.getDocumentName());
         citation.setPageNo(hit.getPageNo());
@@ -164,7 +154,79 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
         citation.setScore(hit.getScore());
         citation.setExcerpt(hit.getExcerpt());
         citation.setChunkIndex(hit.getChunkIndex());
+        citation.setLessonChapterId(request.getLessonChapterId());
+        citation.setAnchor(hit.getHeading());
+        citation.setDocumentId(hit.getDocumentId());
+        citation.setKnowledgeBaseId(request.getKnowledgeBaseId());
         return citation;
+    }
+
+    private List<CitationVO> toCitations(RagResult ragResult, IntentDispatchRequest request) {
+        if (ragResult == null || ragResult.getRetrievalResults() == null) {
+            return List.of();
+        }
+        return ragResult.getRetrievalResults().stream()
+                .map(hit -> toCitation(hit, request))
+                .collect(Collectors.toList());
+    }
+
+    private RagAugmentation augmentWithKnowledgeBase(IntentDispatchRequest request) {
+        knowledgeAccessApi.assertAccessible(request.getKnowledgeBaseId());
+        String retrievalQuery = StringUtils.hasText(request.getRetrievalQuery())
+                ? request.getRetrievalQuery()
+                : request.getMessage();
+        QueryRewriteContext rewriteContext = QueryRewriteContext.builder()
+                .question(retrievalQuery)
+                .courseName(resolveCourseName(request))
+                .conversationHistory(request.getConversationHistory())
+                .build();
+        RagResult ragResult = executeLessonScopedRag(request, retrievalQuery, rewriteContext);
+        Map<String, String> vars = new HashMap<>();
+        vars.put("context", ragResult.getContext() != null ? ragResult.getContext() : "");
+        String questionForTemplate = StringUtils.hasText(request.getRetrievalQuery())
+                ? request.getRetrievalQuery()
+                : request.getMessage();
+        vars.put("question", questionForTemplate);
+        String systemPrompt = promptService.renderTemplate("chat_rag", vars);
+        if (StringUtils.hasText(request.getLessonEnrichmentBlock())) {
+            systemPrompt = systemPrompt + "\n\n" + request.getLessonEnrichmentBlock().trim();
+        }
+        return new RagAugmentation(systemPrompt, ragResult.getPromptPreview(), toCitations(ragResult, request));
+    }
+
+    private RagResult executeLessonScopedRag(IntentDispatchRequest request, String retrievalQuery,
+                                               QueryRewriteContext rewriteContext) {
+        Long lessonDocId = request.getLessonDocumentId() != null
+                ? request.getLessonDocumentId()
+                : request.getDocumentId();
+        if (lessonDocId != null) {
+            double minScore = ragProperties.getMinRrfScore();
+            RagResult scoped = ragPipeline.executeDetailed(
+                    retrievalQuery,
+                    request.getKnowledgeBaseId(),
+                    5,
+                    minScore,
+                    lessonDocId,
+                    false,
+                    rewriteContext
+            );
+            if (scoped.getRetrievalResults() != null && !scoped.getRetrievalResults().isEmpty()
+                    && scoped.getRetrievalResults().get(0).getScore() >= minScore) {
+                return scoped;
+            }
+        }
+        return ragPipeline.executeDetailed(
+                retrievalQuery,
+                request.getKnowledgeBaseId(),
+                5,
+                ragProperties.getMinRrfScore(),
+                request.getDocumentId(),
+                false,
+                rewriteContext
+        );
+    }
+
+    private record RagAugmentation(String systemPrompt, String promptPreview, List<CitationVO> citations) {
     }
 
     private String resolveCourseName(IntentDispatchRequest request) {

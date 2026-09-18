@@ -2,7 +2,7 @@
   <div
     v-loading="loading"
     element-loading-text="正在检索全校广播推送记录..."
-    class="table-card"
+    class="table-card system-table-card"
   >
     <el-table :data="paginatedData" stripe class="broadcast-table">
       <el-table-column prop="id" label="ID" width="80" align="center">
@@ -160,12 +160,10 @@ defineEmits<{
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/system-page-shell.scss';
+
 .table-card {
-  background: #ffffff;
-  border-radius: 14px;
-  padding: 16px 20px 20px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+  padding: 24px 28px 20px;
 }
 
 .broadcast-table {

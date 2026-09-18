@@ -37,6 +37,10 @@ $control-height-lg: 48px;
 // 页面底部留白（主内容区统一，与首页一致）
 $page-bottom-spacing: 48px;
 
+// 全局 AI 副驾驶悬浮钮占位（分页/卡片局部使用，勿与 $page-bottom-spacing 叠加到主内容 padding）
+$copilot-safe-bottom: 76px;
+$copilot-safe-right: 12px;
+
 // 阴影与光晕 (聚焦蓝光环与浮起微阴影)
 $shadow-sm: 0 2px 8px rgba(30, 80, 150, 0.04);
 $shadow-base: 0 4px 20px rgba(30, 80, 150, 0.06);

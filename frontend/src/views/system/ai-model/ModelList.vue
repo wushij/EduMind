@@ -1,5 +1,5 @@
 <template>
-  <div class="page-container">
+  <div class="system-page-shell">
     <ModelListHeader
       :active-tab="activeTab"
       :refreshing="refreshing"
@@ -94,9 +94,5 @@ const {
 </script>
 
 <style scoped lang="scss">
-.page-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
+@use '@/styles/system-page-shell.scss';
 </style>

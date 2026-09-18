@@ -23,6 +23,7 @@ import {
 } from '@/utils/ai/copilot-stream-split';
 import { useStreamingMarkdown } from '@/composables/ai/useStreamingMarkdown';
 import { bindMarkdownCodeCopy } from '@/utils/ai/chat-markdown';
+import { formatCitationMatchLabel } from '@/utils/ai/citation-score';
 import type {
   CitationItem,
   GlobalAssistantChatRequest,
@@ -211,6 +212,46 @@ const LESSON_STUDIO_PRESET_CHIPS = [
   }
 ];
 
+const LESSON_LEARN_PRESET_CHIPS = [
+  {
+    label: '讲解难点',
+    prompt: '请结合当前课节正文，用例子讲清最容易混淆的概念，并附 2 个自测小问题。'
+  },
+  {
+    label: '知识脉络',
+    prompt: '请梳理本课的知识结构，用要点说明各小节如何衔接、各自解决什么问题。'
+  },
+  {
+    label: '检索切片',
+    prompt: '请检索本课程知识库中与当前课节相关的讲义切片，概括要点并标注可继续阅读的方向。'
+  },
+  {
+    label: '巩固练习',
+    prompt: '请针对当前课节出 3 道练手题（含简要解题思路），难度与课堂讲义一致。'
+  }
+];
+
+function buildCourseSpacePresetChips() {
+  return [
+    {
+      label: '智能组卷',
+      prompt: '请根据当前课程考查知识点，帮我组一份含选择、填空与简答的练习卷提纲。'
+    },
+    {
+      label: '检索切片',
+      prompt: '请深度检索当前课程知识库的核心知识点切片与讲义资料，并列出摘要。'
+    },
+    {
+      label: '学情看板',
+      prompt: '我想查看本课程近期知识点掌握度与薄弱点，请给出可操作的改进建议。'
+    },
+    {
+      label: '知识图谱',
+      prompt: '请梳理当前课程的知识拓扑关系，用层级要点说明前后依赖。'
+    }
+  ];
+}
+
 export function useGlobalAssistant() {
   const route = useRoute();
   const authStore = useAuthStore();
@@ -364,6 +405,12 @@ export function useGlobalAssistant() {
       teachingCopilotStore.activeContext?.contextModule === 'lesson_studio'
   );
 
+  const isLessonLearnContext = computed(
+    () =>
+      !manualGlobalScope.value &&
+      teachingCopilotStore.activeContext?.contextModule === 'lesson_learn'
+  );
+
   const activeCourseLabel = computed(() => {
     if (manualGlobalScope.value) {
       return '全域研读模式 · 通用教学空间';
@@ -396,9 +443,15 @@ export function useGlobalAssistant() {
     }
   }
 
-  const presetChips = computed(() =>
-    isLessonStudioContext.value ? LESSON_STUDIO_PRESET_CHIPS : DEFAULT_PRESET_CHIPS
-  );
+  const presetChips = computed(() => {
+    const ctx = teachingCopilotStore.activeContext;
+    if (isLessonStudioContext.value) return LESSON_STUDIO_PRESET_CHIPS;
+    if (isLessonLearnContext.value) return LESSON_LEARN_PRESET_CHIPS;
+    if (!manualGlobalScope.value && activeCourseId.value) {
+      return buildCourseSpacePresetChips();
+    }
+    return DEFAULT_PRESET_CHIPS;
+  });
 
   function buildAssistantRequestBase(): Omit<GlobalAssistantChatRequest, 'message'> {
     const ctxPayload = manualGlobalScope.value
@@ -947,15 +1000,32 @@ export function useGlobalAssistant() {
   }
 
   function jumpToCitation(citation: CitationItem) {
-    if (citation.chunkId) {
+    const ctx = teachingCopilotStore.activeContext;
+    const lessonId = citation.lessonChapterId ?? ctx?.lessonChapterId;
+    const courseId = ctx?.courseId ?? activeCourseId.value;
+
+    if (courseId && lessonId) {
+      drawerVisible.value = false;
+      const hash = citation.anchor ? `#${encodeURIComponent(citation.anchor)}` : '';
+      router.push(`/course/${courseId}/learn/${lessonId}${hash}`);
+      return;
+    }
+
+    const kbId = citation.knowledgeBaseId;
+    const docId = citation.documentId;
+    if (kbId && citation.chunkId) {
       drawerVisible.value = false;
       router.push({
-        path: '/knowledge/retrieval',
-        query: { chunkId: String(citation.chunkId), doc: citation.documentName || '' }
+        path: `/knowledge/${kbId}/chunks`,
+        query: {
+          ...(docId ? { docId: String(docId) } : {}),
+          chunkId: String(citation.chunkId)
+        }
       });
-    } else {
-      ElMessage.info(`参考来源：${citation.documentName || '课程知识切片'}`);
+      return;
     }
+
+    ElMessage.info(`参考来源：${citation.documentName || '课程知识切片'}`);
   }
 
   function handleNavigate(path: string) {
@@ -963,10 +1033,8 @@ export function useGlobalAssistant() {
     router.push(path);
   }
 
-  function formatMatchScore(score?: number): string {
-    if (score == null || Number.isNaN(score)) return '92%';
-    const pct = score <= 1 ? Math.round(score * 100) : Math.round(score);
-    return `${pct}%`;
+  function formatMatchScore(score?: number, peerScores?: number[]): string {
+    return formatCitationMatchLabel(score, peerScores);
   }
 
   watch(

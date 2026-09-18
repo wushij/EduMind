@@ -17,7 +17,7 @@ export const courseRoutes: RouteRecordRaw[] = [
     path: '/course/ai',
     name: 'CourseAIAssistant',
     component: () => import('@/views/course/CourseAIPage.vue'),
-    meta: { title: '课程 AI 助手', requiresAuth: true }
+    meta: { title: '课程 AI 助手', requiresAuth: true, fullHeight: true }
   },
   {
     path: '/course/ai-assistant',

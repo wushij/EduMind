@@ -1,19 +1,20 @@
 <template>
-  <div class="user-list-container">
-    <div class="page-header-card">
-      <div class="header-left">
-        <h2>用户管理</h2>
-        <p>管理系统账号、角色授权与账号状态</p>
-      </div>
-      <div class="header-right">
-        <el-button type="primary" :icon="Plus" @click="showCreateDialog = true">
-          新增系统用户
-        </el-button>
-      </div>
-    </div>
+  <div class="user-list-page system-page-shell">
+    <ProfilePageHero
+      title="用户管理"
+      subtitle="管理系统账号、角色授权与账号状态"
+    >
+      <template #actions>
+        <div class="hero-action-row">
+          <button type="button" class="hero-pill-btn is-primary" @click="showCreateDialog = true">
+            <el-icon><Plus /></el-icon>
+            新增系统用户
+          </button>
+        </div>
+      </template>
+    </ProfilePageHero>
 
-    <!-- 筛选过滤行 -->
-    <div class="filter-capsule-card">
+    <div class="system-filter-card">
       <div class="filter-left">
         <el-input
           v-model="searchKeyword"
@@ -64,7 +65,7 @@
     <div
       v-loading="loading"
       element-loading-text="正在检索系统用户信息..."
-      class="user-table-card"
+      class="system-table-card user-table-card"
     >
       <el-table :data="users" stripe class="main-table">
         <el-table-column label="用户信息" min-width="220">
@@ -187,6 +188,7 @@
 import { useRouter } from 'vue-router';
 import { Plus, Search, Refresh } from '@element-plus/icons-vue';
 import AppPagination from '@/components/common/AppPagination.vue';
+import ProfilePageHero from '@/components/profile/ProfilePageHero.vue';
 import { normalizeAvatarUrl } from '@/utils/format/file';
 import { useUser } from '@/composables/system/useUser';
 
@@ -222,46 +224,10 @@ const {
 </script>
 
 <style scoped lang="scss">
-.user-list-container {
-  padding: 24px;
-  background: #f8fafc;
+@use '@/styles/system-page-shell.scss';
 
-  .page-header-card {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 20px;
-    padding: 20px 24px;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
-
-    .header-left {
-      h2 {
-        margin: 0;
-        font-size: 20px;
-        font-weight: 700;
-        color: #0f172a;
-      }
-
-      p {
-        margin: 6px 0 0;
-        font-size: 14px;
-        color: #64748b;
-      }
-    }
-  }
-
-  .filter-capsule-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 14px 20px;
-    margin-bottom: 20px;
-
-    .filter-left {
+.user-list-page {
+  .system-filter-card .filter-left {
       display: flex;
       align-items: center;
       gap: 12px;
@@ -282,15 +248,8 @@ const {
         margin-left: 4px;
       }
     }
-  }
 
   .user-table-card {
-    background: #ffffff;
-    border-radius: 14px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
-    padding: 16px 20px;
-
     .em-user-cell {
       display: flex;
       align-items: center;

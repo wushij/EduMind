@@ -24,6 +24,16 @@ const EMPTY_CHUNK_STATS: ChunkStatsVO = {
   totalTokens: 0
 };
 
+function normalizeChunkStatus(status?: string): DocumentChunk['status'] {
+  if (status === 'INDEXED' || status === 'PENDING' || status === 'INDEX_FAILED') {
+    return status;
+  }
+  if (status === 'FAILED') {
+    return 'INDEX_FAILED';
+  }
+  return 'PENDING';
+}
+
 function mapChunk(raw: Record<string, unknown>): DocumentChunk {
   return {
     id: raw.id as number | string,
@@ -34,7 +44,7 @@ function mapChunk(raw: Record<string, unknown>): DocumentChunk {
     tokenCount: (raw.tokenEstimate as number) ?? (raw.tokenCount as number) ?? 0,
     heading: raw.heading as string | undefined,
     pageNo: raw.pageNo as number | undefined,
-    status: (raw.status as DocumentChunk['status']) || 'PENDING',
+    status: normalizeChunkStatus(raw.status as string | undefined),
     charCount: raw.charCount as number | undefined,
     createdAt: raw.createTime as string | undefined
   };
@@ -47,8 +57,9 @@ export const getChunks = async (docId?: number, params?: ChunkQueryRequest): Pro
 
   const res = await get<PageResult<Record<string, unknown>>>(`/documents/${docId}/chunks`, {
     page: params?.page || 1,
-    pageSize: params?.pageSize || 50,
-    keyword: params?.keyword
+    pageSize: params?.pageSize || 500,
+    keyword: params?.keyword,
+    status: params?.status
   });
 
   const list = res?.data?.list;

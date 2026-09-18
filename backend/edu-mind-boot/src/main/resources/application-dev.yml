@@ -42,6 +42,9 @@ edumind:
       force-fail-model: ''
   rate-limit:
     enabled: false
+  rag:
+    hybrid-enabled: true
+    min-rrf-score: 0.03
   chunk:
     size: 800
     overlap: 128
@@ -50,7 +53,7 @@ edumind:
     api-key: ${EMBEDDING_API_KEY:}
     model: text-embedding-3-small
     dimensions: 1536
-    mock-enabled: true   # dev 默认 true；联调真实向量时设为 false
+    mock-enabled: true   # 仅当后台 embedding 与 yaml 均无 Key 时走 Mock；已配后台模型则自动真向量
   milvus:
     enabled: false       # dev 默认 false → InMemoryVectorStore；联调 Milvus 时设为 true
     host: localhost

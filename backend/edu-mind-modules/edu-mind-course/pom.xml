@@ -29,5 +29,14 @@
             <groupId>com.edumind</groupId>
             <artifactId>edu-mind-notification-api</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.edumind</groupId>
+            <artifactId>edu-mind-knowledge-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

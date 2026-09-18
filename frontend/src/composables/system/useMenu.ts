@@ -54,6 +54,8 @@ import {
   deleteMenu,
   resetDefaultMenus
 } from '@/services/system/menu-service';
+import { getStoredMenuTree } from '@/mock/menu';
+import { filterMenuTree } from '@/utils/system/menu-tree-filter';
 import type { SysMenu, MenuType } from '@/types/system/menu';
 
 const ICON_COMPONENT_MAP: Record<string, unknown> = {
@@ -289,11 +291,26 @@ export function useMenu() {
     loading.value = true;
     try {
       const res = await getMenuTree({ keyword: searchKeyword.value });
-      tableData.value = res.data || [];
+      let data = res.data || [];
+      // 后端库表暂无菜单时，回退本地预设树（与「恢复预设」一致，避免管理页空白）
+      if (data.length === 0 && !searchKeyword.value.trim()) {
+        const localTree = filterMenuTree(getStoredMenuTree(), searchKeyword.value);
+        if (localTree.length > 0) {
+          data = localTree;
+        }
+      }
+      tableData.value = data;
       tableKey.value++;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '获取系统菜单失败';
       ElMessage.error(message);
+      if (!searchKeyword.value.trim()) {
+        const localTree = filterMenuTree(getStoredMenuTree(), searchKeyword.value);
+        if (localTree.length > 0) {
+          tableData.value = localTree;
+          tableKey.value++;
+        }
+      }
     } finally {
       loading.value = false;
     }
@@ -449,9 +466,10 @@ export function useMenu() {
   async function handleResetDefault() {
     loading.value = true;
     try {
-      await resetDefaultMenus();
+      const res = await resetDefaultMenus();
+      tableData.value = res.data || [];
+      tableKey.value++;
       ElMessage.success('已恢复为 EduMind 8 大核心模块预设菜单');
-      await fetchData();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '重置菜单失败';
       ElMessage.error(message);
