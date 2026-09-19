@@ -26,6 +26,7 @@ import {
   streamAssistantChat,
   fallbackAskAssistant
 } from '@/services/ai/stream-service';
+import { cancelChatStream } from '@/api/ai/chat';
 
 export type AIStreamOperationsDeps = {
   sseClient: SSEClient;
@@ -64,6 +65,22 @@ export type AIStreamOperationsDeps = {
 export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
   const getInitialReasoningFolded = getDefaultReasoningFolded;
   const currentStreamingMemories = ref<Array<{ id: number; summary: string; memoryType?: string }>>([]);
+  let activeChatStreamId = '';
+
+  function clearActiveChatStreamId() {
+    activeChatStreamId = '';
+  }
+
+  async function notifyBackendStreamCancel() {
+    const id = activeChatStreamId;
+    clearActiveChatStreamId();
+    if (!id) return;
+    try {
+      await cancelChatStream(id);
+    } catch {
+      // 静默：SSE 断开 + 后端 TTL 仍可兜底
+    }
+  }
 
   function finalizeAssistantMessage(
     promptText: string,
@@ -126,6 +143,9 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
       options,
       {
         isStopped: () => deps.userStoppedGeneration.value,
+        onStreamId: (streamId) => {
+          activeChatStreamId = streamId;
+        },
         onStatus: (message, phase) => {
           deps.streamPhaseMessage.value = message;
           if (phase === 'reasoning') deps.isReasoningActive.value = true;
@@ -302,6 +322,7 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
   function stopStream() {
     if (!deps.streaming.value) return;
     deps.userStoppedGeneration.value = true;
+    void notifyBackendStreamCancel();
     deps.sseClient.stop();
     deps.streaming.value = false;
 
@@ -323,7 +344,7 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
       deps.currentSessionId.value,
       deps.messages.value
     );
-    ElMessage.info('已停止当前生成');
+    ElMessage.info('已停止生成（后续 Token 将尽快停止计费）');
     deps.scrollToBottomInstant();
   }
 

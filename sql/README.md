@@ -33,6 +33,15 @@ sql/
 │   ├── V2_3_0__course_lesson_content.sql       # V2.3.0 微课节正文/进度/课节-知识点（幂等，可重复执行）
 │   ├── V2_4_0__lesson_copilot_index.sql        # V2.4.0 课节讲义虚拟文档进知识库（source_type/lesson_chapter_id 等）
 │   ├── V2_5_0__chunk_embedding_persist.sql       # V2.5.0 Chunk 向量 JSON 持久化（dev 内存库重启恢复）
+│   ├── V2_5_1__reasoning_prompt_discipline.sql # V2.5.1 深度思考输出预算与 RAG 提示词纪律
+│   ├── V2_5_2__course_knowledge_point_exam_focus.sql # V2.5.2 知识点考查重点字段 (exam_focus)
+│   ├── V2_5_2__export_task_progress.sql        # V2.5.2 异步导出任务进度字段 (progress)
+│   ├── V2_5_3__purge_garbage_question_stems.sql # V2.5.3 清理异常脏题题干
+│   ├── V2_5_4__reset_demo_questions_to_three.sql # V2.5.4 演示题库精简收敛至 3 道高质量题
+│   ├── V2_5_5__fix_question_latex_escaping.sql # V2.5.5 试题解析 LaTeX 双反斜杠转义规范化
+│   ├── V2_5_6__assignment_settings.sql         # V2.5.6 作业分值与高级设置 (total_score/pass_score/settings_json)
+│   ├── V2_5_7__wrong_book_enrich.sql           # V2.5.7 个人错题本作答与攻克状态 (last_student_answer/status)
+│   ├── V2_5_8__knowledge_document_course_resource.sql # V2.5.8 课件资源与知识库文档关联 (course_resource_id)
 │   ├── R__seed_data.sql                        # V0 增量路径演示种子（用户/课程/题库/AI 等，幂等）
 │   ├── R__seed_legacy.sql                      # 旧库升级补丁（租户角色/组织成员/权限乱码修复，幂等）
 │   └── R__gate_e2e_seeds.sql                   # Gate F/G/H 集成测试种子（幂等，init 不含 Gate F）
@@ -56,7 +65,7 @@ mysql -u root -p < sql/init.sql
 
 > 已有业务数据的库 **禁止** 执行 `init.sql`；补表、改结构、版本升级请走 `sql/migration/V*.sql`（执行前 `mysqldump` 备份）。
 
-`init.sql` 已包含 **V0.1 ~ V2.5.0** 迁移最终状态（含多租户 Wave1/2、权限补全、课程 AI 字段、课程概览门户表、`sys_menu`、微课节正文/进度、课节讲义 AI 索引字段、RAG/国密 KMS/组织配额/操作日志等），**全新空库跑 init 后无需再跑 `V*.sql` migration**（Gate E2E 可选种子除外）。
+`init.sql` 已包含 **V0.1 ~ V2.5.8** 所有迁移最终状态（含多租户 Wave1/2、权限补全、课程 AI 字段、课程概览门户表、`sys_menu`、微课节正文/进度、课节讲义 AI 索引、Chunk 向量持久化、深度思考提示词纪律、考查重点、导出进度、作业高级配置、错题本状态、试题 LaTeX 规范化转义等），**全新空库跑 init 后无需再跑任何 `V*.sql` migration**（Gate E2E 可选种子除外）。
 
 ### 方式二：按版本增量迁移（已有空库分步升级）
 
@@ -146,6 +155,14 @@ mysql -u root -p edumind < sql/migration/R__seed_legacy.sql
 | V2.0.23 操作日志加固 | `V2_0_6__oper_log_tenant_hardening.sql` | `sys_oper_log` 多租户索引与 operlog 权限闭环 (Gate I11) |
 | V2.3.0 微课节内容 | `V2_3_0__course_lesson_content.sql` | 课节正文/进度/课节-知识点关联（**幂等，可重复执行**） |
 | V2.4.0 课节讲义索引 | `V2_4_0__lesson_copilot_index.sql` | `knowledge_document` 课节虚拟文档字段与唯一索引（**幂等，可重复执行**） |
+| V2.5.0 向量持久化 | `V2_5_0__chunk_embedding_persist.sql` | Chunk 向量 JSON 持久化字段（**幂等，可重复执行**） |
+| V2.5.1 思考提示词纪律 | `V2_5_1__reasoning_prompt_discipline.sql` | 深度思考输出预算与 RAG 模板约束 |
+| V2.5.2 考查重点与导出进度 | `V2_5_2__course_knowledge_point_exam_focus.sql` / `V2_5_2__export_task_progress.sql` | 知识点 `exam_focus` 考查重点与导出任务 `progress` |
+| V2.5.3~V2.5.4 演示题库精简 | `V2_5_3__purge_garbage_question_stems.sql` / `V2_5_4__reset_demo_questions_to_three.sql` | 清理脏题并收敛为 3 道高质量演示题 |
+| V2.5.5 LaTeX 转义修复 | `V2_5_5__fix_question_latex_escaping.sql` | 规范化试题解析与选项公式转义字符 |
+| V2.5.6 作业分值与高级设置 | `V2_5_6__assignment_settings.sql` | `total_score`, `pass_score`, `settings_json` |
+| V2.5.7 错题本攻克与作答 | `V2_5_7__wrong_book_enrich.sql` | 错题本最近作答、攻克状态与检索索引 |
+| V2.5.8 课件资源关联 | `V2_5_8__knowledge_document_course_resource.sql` | 知识库文档关联 `course_resource_id` |
 
 已在 **V2.3.0** 的库只需执行：
 

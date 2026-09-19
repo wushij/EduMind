@@ -61,6 +61,7 @@ export interface StreamDonePayload {
 }
 
 export interface StreamEventHandlers {
+  onStreamId?: (streamId: string) => void;
   onStatus?: (message: string, phase?: string) => void;
   onReasoningChunk?: (chunk: string) => void;
   onDeltaChunk?: (chunk: string, answerDelta: string) => void;
@@ -409,6 +410,7 @@ export async function streamAssistantChat(
     streamingContentRef,
     {
       isStopped: handlers.isStopped,
+      onStreamId: handlers.onStreamId,
       onStatus: handlers.onStatus,
       onReasoningChunk: handlers.onReasoningChunk,
       onDeltaChunk: handlers.onDeltaChunk,

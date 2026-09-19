@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'elem
 import {
   getQuestionBanks,
   createQuestionBank,
+  updateQuestionBank,
   getQuestionBankDetail,
   addQuestionsToBank,
   removeQuestionFromBank,
@@ -158,7 +159,13 @@ export function downloadMarkdownFile(title: string, questions: QuestionItem[], c
 export function resolveCourseName(courses: Course[], courseId: number | string | undefined | null): string {
   if (!courseId) return '专业核心课';
   const c = courses.find((item) => String(item.id) === String(courseId));
-  return c ? (c.title || c.name || '专业核心课') : '专业核心课';
+  if (c) return c.title || (c as any).name || '专业核心课';
+  const staticNames: Record<string, string> = {
+    '101': '数据结构与算法',
+    '102': 'Java面向对象程序设计',
+    '103': '高等数学（上）'
+  };
+  return staticNames[String(courseId)] || '专业核心课';
 }
 
 export function useBankList() {
@@ -182,13 +189,31 @@ export function useBankList() {
     description: ''
   });
 
+  const editBankForm = reactive({
+    name: '',
+    courseId: undefined as number | undefined,
+    description: ''
+  });
+  const showEditDialog = ref(false);
+  const editingBankId = ref<number | string | null>(null);
+  const editDialogFormRef = ref<FormInstance>();
+  const updating = ref(false);
+  const sortBy = ref<'updateTime' | 'questionCount' | 'name'>('updateTime');
+
   const dialogRules: FormRules = {
     name: [{ required: true, message: '请输入题库名称', trigger: 'blur' }],
     courseId: [{ required: true, message: '请选择关联课程', trigger: 'change' }]
   };
 
+  const coursesWithCounts = computed(() => {
+    return courses.value.map(c => ({
+      ...c,
+      bankCount: banks.value.filter(b => String(b.courseId) === String(c.id)).length
+    }));
+  });
+
   const filteredBanks = computed(() => {
-    return banks.value.filter(b => {
+    const list = banks.value.filter(b => {
       if (selectedCourseId.value !== null && String(b.courseId) !== String(selectedCourseId.value)) {
         return false;
       }
@@ -201,6 +226,19 @@ export function useBankList() {
         if (!inName && !inDesc && !inCourse) return false;
       }
       return true;
+    });
+
+    return [...list].sort((a, b) => {
+      if (sortBy.value === 'questionCount') {
+        return (Number(b.questionCount) || 0) - (Number(a.questionCount) || 0);
+      }
+      if (sortBy.value === 'name') {
+        return (a.name || '').localeCompare(b.name || '');
+      }
+      // default: updateTime desc
+      const timeA = a.updateTime ? new Date(a.updateTime).getTime() : 0;
+      const timeB = b.updateTime ? new Date(b.updateTime).getTime() : 0;
+      return timeB - timeA;
     });
   });
 
@@ -318,6 +356,73 @@ export function useBankList() {
     }
   }
 
+  function handleOpenEdit(bank: any) {
+    editingBankId.value = bank.id;
+    editBankForm.name = bank.name || '';
+    editBankForm.courseId = bank.courseId;
+    editBankForm.description = bank.description || '';
+    showEditDialog.value = true;
+  }
+
+  async function handleSaveEdit() {
+    if (!editDialogFormRef.value || !editingBankId.value) return;
+    await editDialogFormRef.value.validate(async (valid) => {
+      if (valid) {
+        updating.value = true;
+        try {
+          await updateQuestionBank(editingBankId.value!, editBankForm);
+          ElMessage.success('题库信息更新成功！');
+          showEditDialog.value = false;
+          await loadBanks();
+        } catch (err: any) {
+          ElMessage.error(err?.message || '更新题库失败');
+        } finally {
+          updating.value = false;
+        }
+      }
+    });
+  }
+
+  async function handleCloneBank(bank: any) {
+    try {
+      ElMessage.info(`正在准备复制题库「${bank.name}」...`);
+      const resDetail = await getQuestionBankDetail(bank.id);
+      const rawQuestions = resDetail.data?.questions || [];
+      const questionIds = rawQuestions.map((q: any) => q.id);
+      const resCreate = await createQuestionBank({
+        name: `${bank.name} - 副本`,
+        courseId: bank.courseId,
+        description: bank.description ? `${bank.description} (克隆副本)` : '题库克隆副本'
+      });
+      const newBankId = resCreate.data;
+      if (questionIds.length > 0 && newBankId) {
+        await addQuestionsToBank(newBankId, questionIds);
+      }
+      ElMessage.success(`题库「${bank.name}」克隆成功！共继承 ${questionIds.length} 道试题`);
+      await loadBanks();
+    } catch (err: any) {
+      ElMessage.error(err?.message || '克隆题库失败');
+    }
+  }
+
+  function handleFastCompose(bank: any) {
+    router.push({
+      path: '/question/exams/create',
+      query: { bankId: bank.id, courseId: bank.courseId }
+    });
+  }
+
+  function handleAiExpand(bank: any) {
+    router.push({
+      path: '/ai/question/generate',
+      query: {
+        courseId: bank.courseId,
+        targetBankId: bank.id,
+        bankName: bank.name
+      }
+    });
+  }
+
   onMounted(async () => {
     await Promise.all([loadCourses(), loadBanks()]);
   });
@@ -326,18 +431,25 @@ export function useBankList() {
     router,
     loading,
     creating,
+    updating,
     showCreateDialog,
+    showEditDialog,
+    editingBankId,
     dialogFormRef,
+    editDialogFormRef,
     banks,
     filteredBanks,
     courses,
+    coursesWithCounts,
     selectedCourseId,
     searchKeyword,
+    sortBy,
     pageNum,
     pageSize,
     total,
     totalQuestionsAcrossBanks,
     newBankForm,
+    editBankForm,
     dialogRules,
     getCourseBankCount,
     handleCourseFilter,
@@ -345,6 +457,11 @@ export function useBankList() {
     loadCourses,
     loadBanks,
     handleCreateBank,
+    handleOpenEdit,
+    handleSaveEdit,
+    handleCloneBank,
+    handleFastCompose,
+    handleAiExpand,
     handleDeleteBank,
     exportSingleBankMarkdown
   };
@@ -401,6 +518,9 @@ export function useBank() {
     try {
       const res = await getQuestionBankDetail(bankId.value);
       bankInfo.value = res.data;
+      if (bankInfo.value) {
+        bankInfo.value.courseName = bankInfo.value.courseName || resolveCourseName(courses.value, bankInfo.value.courseId);
+      }
       if (bankInfo.value?.questions && Array.isArray(bankInfo.value.questions)) {
         bankQuestions.value = normalizeQuestionList(bankInfo.value.questions as Record<string, unknown>[]);
       } else {
@@ -493,7 +613,11 @@ export function useBank() {
   function handleFastComposeExam() {
     router.push({
       path: '/question/exams/create',
-      query: { bankId: bankId.value, courseId: bankInfo.value?.courseId }
+      query: {
+        bankId: bankId.value,
+        courseId: bankInfo.value?.courseId,
+        bankName: bankInfo.value?.name
+      }
     });
   }
 
@@ -526,8 +650,12 @@ export function useBank() {
       const res = await getCourseList({ page: 1, pageSize: 100 });
       courses.value = (res.data?.list || []).map(c => ({
         ...c,
+        id: Number(c.id),
         title: c.title || c.name || '未命名课程'
       }));
+      if (bankInfo.value && (!bankInfo.value.courseName || bankInfo.value.courseName === '未指定课程')) {
+        bankInfo.value.courseName = resolveCourseName(courses.value, bankInfo.value.courseId);
+      }
     } catch {}
   }
 
@@ -549,6 +677,17 @@ export function useBank() {
     ElMessage.success(`题库「${bankInfo.value?.name || '试题集'}」已成功导出为 Markdown 文件`);
   }
 
+  function handleCreateNewQuestion() {
+    router.push({
+      path: '/question/create',
+      query: {
+        bankId: bankId.value,
+        courseId: bankInfo.value?.courseId,
+        bankName: bankInfo.value?.name
+      }
+    });
+  }
+
   function handleAiExpand() {
     const cId = bankInfo.value?.courseId || '';
     const bId = bankId.value;
@@ -556,7 +695,11 @@ export function useBank() {
   }
 
   onMounted(async () => {
-    await Promise.all([loadBankDetail(), loadCandidatePool(), loadCourses()]);
+    await loadCourses();
+    await Promise.all([loadBankDetail(), loadCandidatePool()]);
+    if (bankInfo.value && (!bankInfo.value.courseName || bankInfo.value.courseName === '未指定课程')) {
+      bankInfo.value.courseName = resolveCourseName(courses.value, bankInfo.value.courseId);
+    }
   });
 
   return {
@@ -594,6 +737,7 @@ export function useBank() {
     toggleCandidateSelect,
     confirmAddQuestions,
     handleFastComposeExam,
+    handleCreateNewQuestion,
     handleDeleteBank,
     exportBankMarkdown,
     handleAiExpand,

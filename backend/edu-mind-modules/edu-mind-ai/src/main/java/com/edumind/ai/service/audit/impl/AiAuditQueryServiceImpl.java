@@ -96,6 +96,18 @@ public class AiAuditQueryServiceImpl implements AiAuditQueryService {
     }
 
     @Override
+    public long countCallsByCourseAndUser(Long courseId, Long userId, LocalDateTime since) {
+        if (courseId == null || userId == null) {
+            return 0L;
+        }
+        LambdaQueryWrapper<AiCallLogEntity> wrapper = new LambdaQueryWrapper<AiCallLogEntity>()
+                .eq(AiCallLogEntity::getCourseId, courseId)
+                .eq(AiCallLogEntity::getUserId, userId)
+                .ge(since != null, AiCallLogEntity::getCreateTime, since);
+        return aiCallLogDao.count(wrapper);
+    }
+
+    @Override
     public Map<Long, Long> countCallsByCourseBatch(List<Long> courseIds, LocalDateTime since) {
         Map<Long, Long> result = new HashMap<>();
         if (CollectionUtils.isEmpty(courseIds)) {

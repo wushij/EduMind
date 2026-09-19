@@ -1,5 +1,5 @@
 <template>
-  <div class="question-edit-page">
+  <div class="question-edit-page question-module-page">
     <div class="page-top-bar">
       <div class="left-nav">
         <el-button link @click="router.back()">
@@ -76,11 +76,9 @@ async function handleFormSubmit(formData: Partial<Question>) {
 </script>
 
 <style scoped lang="scss">
-.question-edit-page {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
+@use '@/styles/question/module-page-shell.scss';
 
+.question-edit-page {
   .page-top-bar {
     display: flex;
     justify-content: space-between;

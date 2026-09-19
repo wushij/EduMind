@@ -30,8 +30,9 @@ public class LearningAnalyticsController {
     @GetMapping("/portrait")
     public ApiResult<com.edumind.statistics.vo.analytics.StudentPortraitVO> getStudentPortrait(
             @RequestParam Long courseId,
-            @RequestParam(required = false) Long studentId) {
+            @RequestParam(required = false) Long studentId,
+            @RequestParam(defaultValue = "30d") String range) {
         Long targetStudent = studentId != null ? studentId : com.edumind.common.model.UserContext.getUserId();
-        return ApiResult.success(learningAnalyticsService.getStudentPortrait(courseId, targetStudent));
+        return ApiResult.success(learningAnalyticsService.getStudentPortrait(courseId, targetStudent, range));
     }
 }

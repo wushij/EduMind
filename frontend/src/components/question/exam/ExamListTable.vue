@@ -110,6 +110,7 @@
     </div>
 
     <AppPagination
+      class="exam-list-pagination"
       :page-num="pageNum"
       :page-size="pageSize"
       :total="total"
@@ -156,7 +157,11 @@ const emit = defineEmits<{
 
 <style scoped lang="scss">
 .exam-list-content {
-  min-height: 360px;
+  :deep(.pagination-bar) {
+    margin-top: 12px;
+    padding-top: 12px;
+    padding-bottom: 0;
+  }
 
   .exams-cards-grid {
     display: flex;

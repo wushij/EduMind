@@ -114,6 +114,12 @@
       </div>
     </div>
 
+    <!-- 单题 AI 换一题：与命题页相同的推演引擎弹窗（计时 + 中止） -->
+    <QuestionGenerateEngineDialog
+      :visible="regeneratingIndex !== null"
+      @abort="abortGeneration"
+    />
+
     <!-- 智能入库与归档引导弹窗 -->
     <el-dialog
       v-model="saveDialogVisible"
@@ -234,6 +240,7 @@ import {
 } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import QuestionCard from '@/components/question/QuestionCard.vue';
+import QuestionGenerateEngineDialog from '@/components/ai/generation/QuestionGenerateEngineDialog.vue';
 import { useQuestionGenerate } from '@/composables/ai/useQuestionGenerate';
 import type { Question } from '@/types/question/question';
 
@@ -247,10 +254,12 @@ const {
   deleteQuestion,
   updateQuestion,
   regenerateSingleQuestion,
+  abortGeneration,
   batchSave,
   exportMarkdown,
   loadCourseOptions,
-  loadExistingBanksForCourse
+  loadExistingBanksForCourse,
+  formState
 } = useQuestionGenerate();
 
 onMounted(async () => {
@@ -290,12 +299,18 @@ async function handleBatchSave() {
   const dateStr = new Date().toLocaleDateString();
   newBankName.value = `${selectedCourseName.value} - AI命题专项集 (${dateStr})`;
   newBankDescription.value = `由 AI 智能命题推演生成，收录 ${generatedQuestions.value.length} 道高契合度精选题。`;
-  archiveMode.value = 'NEW_BANK';
-  selectedExistingBankId.value = undefined;
 
   await loadExistingBanksForCourse();
-  if (existingCourseBanks.value.length > 0) {
-    selectedExistingBankId.value = existingCourseBanks.value[0].id;
+
+  if (formState.targetBankId) {
+    archiveMode.value = 'EXISTING_BANK';
+    selectedExistingBankId.value = formState.targetBankId;
+  } else {
+    archiveMode.value = 'NEW_BANK';
+    selectedExistingBankId.value = undefined;
+    if (existingCourseBanks.value.length > 0) {
+      selectedExistingBankId.value = existingCourseBanks.value[0].id;
+    }
   }
   saveDialogVisible.value = true;
 }

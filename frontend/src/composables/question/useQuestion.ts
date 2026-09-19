@@ -9,12 +9,23 @@ import {
 import { getCourseList } from '@/api/course/course';
 import { QuestionItem } from '@/types/question/question';
 import type { Course } from '@/types/course/course';
-import { normalizeQuestion, normalizeQuestionList } from '@/utils/question/normalize-question';
+import {
+  normalizeQuestion,
+  normalizeQuestionList,
+  serializeQuestionForApi
+} from '@/utils/question/normalize-question';
 import { isGarbageQuestionStem } from '@/utils/question/is-garbage-question-stem';
+import { normalizeCourseListFromApi, getCourseDisplayName } from '@/utils/course/course-display';
 
 export async function fetchCoursesForForm(pageSize = 50): Promise<Course[]> {
   const res = await getCourseList({ page: 1, pageSize });
-  return res.data?.list || [];
+  const rawList = res.data?.list || [];
+  return rawList.map((c: any) => ({
+    ...c,
+    id: Number(c.id),
+    name: c.name || c.title || `课程 #${c.id}`,
+    title: c.name || c.title || `课程 #${c.id}`
+  })) as unknown as Course[];
 }
 
 export function useQuestion() {
@@ -57,11 +68,13 @@ export function useQuestion() {
   }
 
   async function saveQuestion(data: Partial<QuestionItem>, id?: number | string) {
+    const payload = serializeQuestionForApi(data);
     if (id) {
-      await updateQuestion(id, data);
-    } else {
-      await createQuestion(data);
+      await updateQuestion(id, payload);
+      return id;
     }
+    const res = await createQuestion(payload);
+    return res.data;
   }
 
   async function removeQuestion(id: number | string) {

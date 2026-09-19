@@ -30,7 +30,9 @@
         <hutool.version>5.8.28</hutool.version>
         <minio.version>8.5.10</minio.version>
         <bouncycastle.version>1.78.1</bouncycastle.version>
-        <pdfbox.version>3.0.2</pdfbox.version>
+        <pdfbox.version>2.0.31</pdfbox.version>
+        <openhtmltopdf.version>1.0.10</openhtmltopdf.version>
+        <jlatexmath.version>1.0.7</jlatexmath.version>
         <poi.version>5.2.5</poi.version>
         <edumind.version>1.0.0-SNAPSHOT</edumind.version>
         <redisson.version>3.34.1</redisson.version>
@@ -198,6 +200,16 @@
                 <groupId>org.apache.pdfbox</groupId>
                 <artifactId>pdfbox</artifactId>
                 <version>${pdfbox.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openhtmltopdf</groupId>
+                <artifactId>openhtmltopdf-pdfbox</artifactId>
+                <version>${openhtmltopdf.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.scilab.forge</groupId>
+                <artifactId>jlatexmath</artifactId>
+                <version>${jlatexmath.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.poi</groupId>

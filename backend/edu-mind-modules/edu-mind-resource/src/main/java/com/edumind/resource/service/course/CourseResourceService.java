@@ -13,7 +13,8 @@ public interface CourseResourceService {
 
     Long addResource(Long courseId, com.edumind.resource.dto.course.CourseResourceCreateDTO dto);
 
-    Long uploadResource(Long courseId, MultipartFile file, String title, String resourceType, Long chapterId);
+    Long uploadResource(Long courseId, MultipartFile file, String title, String resourceType, Long chapterId,
+                        boolean syncToKnowledgeBase);
 
     void deleteResource(Long resourceId);
 }

@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 @RequiredArgsConstructor
 public class LoggingLlmClient implements LlmClient {
@@ -76,6 +77,46 @@ public class LoggingLlmClient implements LlmClient {
         assertQuota();
         long start = System.currentTimeMillis();
         delegate.streamChatWithHistory(systemPrompt, messages, new StreamCallback() {
+            private final StringBuilder buffer = new StringBuilder();
+
+            @Override
+            public void onReasoning(String content) {
+                callback.onReasoning(content);
+            }
+
+            @Override
+            public void onChunk(String content) {
+                buffer.append(content);
+                callback.onChunk(content);
+            }
+
+            @Override
+            public void onStatus(String phase, String message) {
+                callback.onStatus(phase, message);
+            }
+
+            @Override
+            public void onComplete() {
+                aiCallAuditService.recordEstimated("CHAT", null, null, start,
+                        joinHistoryPrompt(systemPrompt, messages), buffer.toString());
+                callback.onComplete();
+            }
+
+            @Override
+            public void onError(String message) {
+                aiCallAuditService.recordEstimated("CHAT", null, null, start,
+                        joinHistoryPrompt(systemPrompt, messages), buffer.toString());
+                callback.onError(message);
+            }
+        });
+    }
+
+    @Override
+    public void streamChatWithHistory(String systemPrompt, List<LlmChatMessage> messages,
+                                      BooleanSupplier cancelled, StreamCallback callback) {
+        assertQuota();
+        long start = System.currentTimeMillis();
+        delegate.streamChatWithHistory(systemPrompt, messages, cancelled, new StreamCallback() {
             private final StringBuilder buffer = new StringBuilder();
 
             @Override

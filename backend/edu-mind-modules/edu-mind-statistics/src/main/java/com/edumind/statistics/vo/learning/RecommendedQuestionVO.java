@@ -9,4 +9,9 @@ public class RecommendedQuestionVO {
     private String type;
     private Integer difficulty;
     private Long courseId;
+    private String courseName;
+    private Long knowledgePointId;
+    private String knowledgePointName;
+    private Integer matchScore;
+    private String reason;
 }

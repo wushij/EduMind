@@ -10,6 +10,7 @@ import com.edumind.ai.service.audit.AiCallAuditContext;
 import com.edumind.ai.service.prompt.PromptService;
 import com.edumind.ai.service.question.QuestionGenerateService;
 import com.edumind.common.context.TenantContext;
+import com.edumind.common.api.ResultCode;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.common.model.UserContext;
 import com.edumind.course.api.CourseQueryApi;
@@ -75,11 +76,22 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
                 if (!parsed.isEmpty()) {
                     return parsed;
                 }
+                log.warn("AI 出题 JSON 解析结果为空，raw 前 800 字：{}",
+                        json != null && json.length() > 800 ? json.substring(0, 800) + "…" : json);
+                if (dto.getPromptDirective() != null && !dto.getPromptDirective().isBlank()) {
+                    throw aiAssistFailed("AI 返回内容无法解析为试题 JSON，请稍后重试或简化题干后重试");
+                }
+            } catch (BusinessException ex) {
+                throw ex;
             } catch (Exception ex) {
-                log.warn("大模型生成题目调用或解析异常，启动高质量兜底引擎：{}", ex.getMessage());
+                log.warn("大模型生成题目调用或解析异常", ex);
+                if (dto.getPromptDirective() != null && !dto.getPromptDirective().isBlank()) {
+                    String detail = ex.getMessage() != null ? ex.getMessage() : "未知错误";
+                    throw aiAssistFailed("AI 命题调用失败：" + detail);
+                }
             }
 
-            // 兜底引擎保障返回高真实度教学题目
+            // 批量出题场景：大模型不可用时使用教学模板兜底（录题页带 promptDirective 时已在上文直接报错）
             return fallbackEngine.generateHighQualityQuestions(
                     dto,
                     context.courseName(),
@@ -89,6 +101,19 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
         } finally {
             aiSessionCacheService.finishGenerating("question", userId);
         }
+    }
+
+    @Override
+    public void cancelActiveGeneration() {
+        Long userId = UserContext.getUserId();
+        if (userId == null) {
+            return;
+        }
+        aiSessionCacheService.finishGenerating("question", userId);
+    }
+
+    private BusinessException aiAssistFailed(String message) {
+        return new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), message);
     }
 
     private CourseContext loadCourseContext(QuestionGenerateDTO dto) {
@@ -222,6 +247,10 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
                 if (questions == null) {
                     questions = root.getJSONArray("data");
                 }
+                if (questions == null && root.containsKey("stem")) {
+                    questions = new JSONArray();
+                    questions.add(root);
+                }
             } else if (parsed instanceof JSONArray arr) {
                 questions = arr;
             }
@@ -238,31 +267,143 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
             if (item == null) continue;
             QuestionVO vo = new QuestionVO();
             vo.setCourseId(dto.getCourseId());
-            vo.setType(item.getString("type") != null ? item.getString("type") : "SINGLE_CHOICE");
-            vo.setStem(item.getString("stem"));
+            vo.setType(normalizeQuestionType(item.getString("type"), dto));
+            vo.setStem(firstNonBlank(
+                    item.getString("stem"),
+                    item.getString("题干"),
+                    item.getString("title"),
+                    item.getString("question")
+            ));
             if (QuestionStemValidator.isGarbageStem(vo.getStem())) {
                 continue;
             }
 
             Object optsObj = item.get("options");
+            if (optsObj == null) {
+                optsObj = item.get("选项");
+            }
+            if (optsObj == null) {
+                optsObj = item.get("choices");
+            }
             if (optsObj instanceof String s) {
                 vo.setOptions(s);
+            } else if (optsObj instanceof JSONArray arr) {
+                vo.setOptions(JSON.toJSONString(arr));
+            } else if (optsObj instanceof JSONObject jo) {
+                vo.setOptions(JSON.toJSONString(convertOptionObjectToArray(jo)));
             } else if (optsObj != null) {
                 vo.setOptions(JSON.toJSONString(optsObj));
             } else {
                 vo.setOptions("[]");
             }
 
-            vo.setAnswer(item.getString("answer"));
-            vo.setAnalysis(item.getString("analysis"));
-            vo.setDistractorAnalysis(item.getString("distractorAnalysis"));
-            vo.setKnowledgePointName(item.getString("knowledgePointName"));
+            String analysis = firstNonBlank(item.getString("analysis"), item.getString("解析"));
+            String distractor = item.getString("distractorAnalysis");
+            if (distractor != null && !distractor.isBlank()) {
+                analysis = (analysis != null && !analysis.isBlank())
+                        ? analysis + "\n\n" + distractor.trim()
+                        : distractor.trim();
+            }
+            vo.setAnswer(firstNonBlank(
+                    item.getString("answer"),
+                    item.getString("correctAnswer"),
+                    item.getString("答案")
+            ));
+            vo.setAnalysis(analysis);
+            vo.setDistractorAnalysis(distractor);
+            vo.setKnowledgePointName(firstNonBlank(
+                    item.getString("knowledgePointName"),
+                    item.getString("knowledgePoint"),
+                    item.getString("考点")
+            ));
             vo.setCognitiveLevel(item.getString("cognitiveLevel"));
-            vo.setDifficulty(item.getInteger("difficulty") != null ? item.getInteger("difficulty") : 3);
+            vo.setDifficulty(mapDifficultyValue(item.get("difficulty")));
             vo.setScore(item.getInteger("score") != null ? item.getInteger("score") : scoreEach);
             list.add(vo);
         }
         return list;
+    }
+
+    private String normalizeQuestionType(String rawType, QuestionGenerateDTO dto) {
+        if (rawType != null && !rawType.isBlank()) {
+            String upper = rawType.trim().toUpperCase(Locale.ROOT);
+            if (upper.contains("MULTIPLE") || upper.contains("多选")) {
+                return "MULTIPLE_CHOICE";
+            }
+            if (upper.contains("TRUE") || upper.contains("判断")) {
+                return "TRUE_FALSE";
+            }
+            if (upper.contains("FILL") || upper.contains("填空")) {
+                return "FILL_BLANK";
+            }
+            if (upper.contains("SHORT") || upper.contains("简答") || upper.contains("主观")) {
+                return "SHORT_ANSWER";
+            }
+            if (upper.contains("SINGLE") || upper.contains("单选")) {
+                return "SINGLE_CHOICE";
+            }
+            return upper.replace(' ', '_');
+        }
+        if (dto.getQuestionTypes() != null && !dto.getQuestionTypes().isEmpty()) {
+            return dto.getQuestionTypes().get(0);
+        }
+        return "SINGLE_CHOICE";
+    }
+
+    private int mapDifficultyValue(Object raw) {
+        if (raw instanceof Number number) {
+            return number.intValue();
+        }
+        if (raw instanceof String s) {
+            String upper = s.trim().toUpperCase(Locale.ROOT);
+            if ("EASY".equals(upper) || upper.contains("易") || upper.contains("简单")) {
+                return 2;
+            }
+            if ("HARD".equals(upper) || upper.contains("难")) {
+                return 4;
+            }
+            if ("MEDIUM".equals(upper) || upper.contains("中")) {
+                return 3;
+            }
+            try {
+                return Integer.parseInt(s.trim());
+            } catch (NumberFormatException ignored) {
+                return 3;
+            }
+        }
+        return 3;
+    }
+
+    private JSONArray convertOptionObjectToArray(JSONObject jo) {
+        JSONArray arr = new JSONArray();
+        List<String> keys = new ArrayList<>(jo.keySet());
+        keys.sort(String::compareToIgnoreCase);
+        for (String key : keys) {
+            if (key == null || key.isBlank()) {
+                continue;
+            }
+            String letter = key.trim().toUpperCase(Locale.ROOT);
+            if (!letter.matches("[A-H]")) {
+                continue;
+            }
+            JSONObject opt = new JSONObject();
+            opt.put("key", letter);
+            opt.put("content", String.valueOf(jo.get(key)));
+            arr.add(opt);
+        }
+        return arr;
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String v : values) {
+            if (v != null && !v.isBlank()) {
+                return v.trim();
+            }
+        }
+        return null;
     }
 
     private String extractPureJson(String raw) {

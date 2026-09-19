@@ -137,8 +137,9 @@ const publishStatus = defineModel<'DRAFT' | 'PUBLISHED'>('publishStatus', { requ
 
 <style scoped lang="scss">
 .review-paper-wrapper {
-  max-width: 960px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
 
   .paper-sheet {
     background: #ffffff;

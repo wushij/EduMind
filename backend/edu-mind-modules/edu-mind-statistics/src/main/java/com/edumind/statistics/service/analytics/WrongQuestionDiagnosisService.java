@@ -12,11 +12,12 @@ import com.edumind.question.vo.question.QuestionBatchSaveVO;
 import com.edumind.question.vo.question.QuestionVO;
 import com.edumind.statistics.dao.WrongQuestionRecordDao;
 import com.edumind.statistics.entity.WrongQuestionRecordEntity;
+import com.edumind.statistics.enums.WrongErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -32,7 +33,7 @@ public class WrongQuestionDiagnosisService {
 
     public String diagnose(String questionStem, String studentAnswer, String correctAnswer) {
         String prompt = "题目：" + questionStem + "\n学生答案：" + studentAnswer + "\n正确答案：" + correctAnswer
-                + "\n请用一句话诊断错因，并标注类型 CONCEPT/LOGIC/CALC 之一。";
+                + "\n请用一句话诊断错因，并标注类型 CONCEPT/LOGIC/CALC/READING 之一。";
         try {
             return aiChatApi.chat("GRADING", "你是错题诊断助手。", prompt);
         } catch (Exception ex) {
@@ -42,6 +43,29 @@ public class WrongQuestionDiagnosisService {
 
     public void recordWrong(Long studentId, Long courseId, Long questionId, Long knowledgePointId,
                             String diagnosis) {
+        recordWrong(studentId, courseId, questionId, knowledgePointId, diagnosis, null);
+    }
+
+    public void recordWrong(Long studentId, Long courseId, Long questionId, Long knowledgePointId,
+                            String diagnosis, String lastStudentAnswer) {
+        WrongQuestionRecordEntity existing = wrongQuestionRecordDao.findByStudentAndQuestion(studentId, questionId);
+        if (existing != null) {
+            existing.setWrongCount(existing.getWrongCount() != null ? existing.getWrongCount() + 1 : 2);
+            if (StringUtils.hasText(diagnosis)) {
+                existing.setDiagnosis(diagnosis);
+                existing.setErrorTypes(extractTypes(diagnosis));
+            }
+            if (StringUtils.hasText(lastStudentAnswer)) {
+                existing.setLastStudentAnswer(trimAnswer(lastStudentAnswer));
+            }
+            if (knowledgePointId != null) {
+                existing.setKnowledgePointId(knowledgePointId);
+            }
+            existing.setStatus(0);
+            existing.setMasteredTime(null);
+            wrongQuestionRecordDao.updateById(existing);
+            return;
+        }
         WrongQuestionRecordEntity entity = new WrongQuestionRecordEntity();
         entity.setStudentId(studentId);
         entity.setCourseId(courseId);
@@ -49,8 +73,17 @@ public class WrongQuestionDiagnosisService {
         entity.setKnowledgePointId(knowledgePointId);
         entity.setDiagnosis(diagnosis);
         entity.setErrorTypes(extractTypes(diagnosis));
+        entity.setLastStudentAnswer(trimAnswer(lastStudentAnswer));
         entity.setWrongCount(1);
+        entity.setStatus(0);
         wrongQuestionRecordDao.insert(entity);
+    }
+
+    private static String trimAnswer(String answer) {
+        if (answer == null) {
+            return null;
+        }
+        return answer.length() > 1024 ? answer.substring(0, 1024) : answer;
     }
 
     public WrongQuestionRecordEntity diagnoseRecord(Long recordId) {
@@ -62,7 +95,9 @@ public class WrongQuestionDiagnosisService {
         if (question == null) {
             throw new BusinessException("题目不存在");
         }
-        String diagnosis = diagnose(question.getStem(), "", question.getAnswer());
+        String studentAnswer = StringUtils.hasText(entity.getLastStudentAnswer())
+                ? entity.getLastStudentAnswer() : "";
+        String diagnosis = diagnose(question.getStem(), studentAnswer, question.getAnswer());
         entity.setDiagnosis(diagnosis);
         entity.setErrorTypes(extractTypes(diagnosis));
 
@@ -109,12 +144,6 @@ public class WrongQuestionDiagnosisService {
     }
 
     private String extractTypes(String diagnosis) {
-        List<String> types = Arrays.asList("CONCEPT", "LOGIC", "CALC");
-        for (String t : types) {
-            if (diagnosis != null && diagnosis.contains(t)) {
-                return t;
-            }
-        }
-        return "CONCEPT";
+        return WrongErrorType.extractCodeFromDiagnosis(diagnosis);
     }
 }

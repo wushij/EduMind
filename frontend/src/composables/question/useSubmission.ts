@@ -6,10 +6,13 @@ import {
   getSubmissionGrading,
   gradeSubmission,
   reviewGrading,
-  getSubmissionsByAssignment
+  getSubmissionsPage,
+  getSubmissionStats,
+  batchGradeSubmissions
 } from '@/api/question/submission';
-import { getAssignments } from '@/api/question/assignment';
 import { getCourseList } from '@/api/course/course';
+import { normalizeCourseListFromApi } from '@/utils/course/course-display';
+import type { SubmissionItem, SubmissionOverviewStats } from '@/types/question/submission';
 import type { Course } from '@/types/course/course';
 import type { QuestionType } from '@/types/question/question';
 
@@ -41,23 +44,24 @@ export function buildGradingItems(sub: any, gList: any[]): GradingItem[] {
   }
 
   return gList.map((g: any, idx: number) => {
-    const qid = g.questionId || (idx + 1);
+    const qid = g.questionId || idx + 1;
     const stuAns = answersMap.get(qid) || '';
-    const isObj = g.isCorrect !== undefined;
+    const isObj = g.isCorrect !== undefined && g.isCorrect !== null;
+    const type = g.type || (isObj ? 'SINGLE_CHOICE' : 'SHORT_ANSWER');
 
     return {
       questionId: qid,
-      type: isObj ? 'SINGLE_CHOICE' : 'SHORT_ANSWER',
-      stem: g.stem || `答卷试题 #${qid} 评分考查点`,
-      maxScore: g.maxScore || 10,
-      studentAnswer: stuAns || '（考生作答内容）',
-      standardAnswer: g.standardAnswer || '标准参考答案与评分细则',
-      analysis: g.analysis || '考查知识体系掌握与解题规范程度。',
+      type,
+      stem: g.stem || `试题 #${qid}`,
+      maxScore: g.maxScore ?? 10,
+      studentAnswer: stuAns || '（未作答）',
+      standardAnswer: g.standardAnswer || '—',
+      analysis: g.analysis || '—',
       isObjective: isObj,
       isCorrect: g.isCorrect ?? (g.score === g.maxScore),
-      aiScore: g.score !== undefined ? g.score : 0,
-      aiComment: g.aiComment || 'AI智能辅助评阅已完成。',
-      teacherScore: g.score !== undefined ? g.score : 0,
+      aiScore: g.score !== undefined && g.score !== null ? g.score : 0,
+      aiComment: g.aiComment || '',
+      teacherScore: g.score !== undefined && g.score !== null ? g.score : 0,
       teacherComment: g.teacherComment || ''
     };
   });
@@ -173,7 +177,7 @@ export function useSubmission() {
 
       await reviewGrading(submissionId.value, payload);
       if (submissionData.value) {
-        submissionData.value.status = 'GRADED';
+        submissionData.value.status = 'REVIEWED';
       }
       ElMessage.success('评阅成绩已正式确认并发布！总成绩：' + calculatedTotalScore.value + ' 分');
       setTimeout(() => {
@@ -213,86 +217,74 @@ export function useSubmissionList() {
   const loading = ref(false);
   const batchLoading = ref(false);
   const courses = ref<Course[]>([]);
-  const allSubmissions = ref<any[]>([]);
+  const allSubmissions = ref<SubmissionItem[]>([]);
+  const total = ref(0);
+  const stats = ref<SubmissionOverviewStats>({});
 
   async function loadCourses() {
     try {
       const res = await getCourseList({ page: 1, pageSize: 50 });
-      courses.value = res.data?.list || [
-        { id: 101, title: '数据结构与算法' } as Course,
-        { id: 102, title: 'Java程序设计' } as Course,
-        { id: 103, title: '大学数学：高等数学（上）' } as Course
-      ];
+      const list = res.data?.list || [];
+      courses.value = normalizeCourseListFromApi(list as unknown as Record<string, unknown>[]) as unknown as Course[];
     } catch {
-      courses.value = [
-        { id: 101, title: '数据结构与算法' } as Course,
-        { id: 102, title: 'Java程序设计' } as Course,
-        { id: 103, title: '大学数学：高等数学（上）' } as Course
-      ];
+      courses.value = [];
     }
     return courses.value;
   }
 
-  async function fetchAllSubmissions() {
+  async function fetchAllSubmissions(params: {
+    courseId?: number | null;
+    status?: string;
+    keyword?: string;
+    page?: number;
+    pageSize?: number;
+  } = {}) {
     loading.value = true;
     try {
-      const aRes = await getAssignments({ page: 1, pageSize: 50 });
-      const assignments = aRes.data?.list || [];
-      const aggregated: any[] = [];
-
-      for (const a of assignments) {
-        try {
-          const sRes = await getSubmissionsByAssignment(a.id);
-          const subs = sRes.data || [];
-          for (const sub of subs) {
-            aggregated.push({
-              id: sub.id,
-              studentNo: sub.studentNo || `2024010${sub.studentId || 1}`,
-              studentName: sub.studentName || (sub.studentId === 2 ? '李梦琪' : '张子轩'),
-              courseId: a.courseId,
-              courseName: a.courseName || '数据结构与算法',
-              assignmentId: a.id,
-              assignmentTitle: a.title,
-              submitTime: sub.submitTime ? String(sub.submitTime).replace('T', ' ').slice(0, 19) : '2026-09-11 12:00',
-              aiScore: sub.totalScore !== undefined ? sub.totalScore : null,
-              finalScore: sub.status === 'GRADED' ? sub.totalScore : null,
-              status: sub.status || 'PENDING'
-            });
-          }
-        } catch (subErr) {
-          console.warn(`获取作业 #${a.id} 答卷列表异常:`, subErr);
-        }
-      }
-
-      allSubmissions.value = aggregated;
-      return aggregated;
-    } catch (err: any) {
-      ElMessage.error(err?.message || '获取提交列表失败');
+      const [pageRes, statsRes] = await Promise.all([
+        getSubmissionsPage({
+          courseId: params.courseId ?? undefined,
+          status: params.status || undefined,
+          keyword: params.keyword?.trim() || undefined,
+          page: params.page ?? 1,
+          pageSize: params.pageSize ?? 20
+        }),
+        getSubmissionStats({
+          courseId: params.courseId ?? undefined
+        })
+      ]);
+      const list = pageRes.data?.list || [];
+      allSubmissions.value = list.map((sub) => ({
+        ...sub,
+        aiScore: sub.totalScore,
+        finalScore: sub.status === 'REVIEWED' ? sub.totalScore : undefined
+      }));
+      total.value = pageRes.data?.total ?? list.length;
+      stats.value = statsRes.data || {};
+      return allSubmissions.value;
+    } catch (err: unknown) {
+      ElMessage.error(err instanceof Error ? err.message : '获取提交列表失败');
       allSubmissions.value = [];
+      total.value = 0;
       throw err;
     } finally {
       loading.value = false;
     }
   }
 
-  async function batchGradePending() {
+  async function batchGradePending(courseId?: number | null) {
     batchLoading.value = true;
-    let successCount = 0;
-    for (const s of allSubmissions.value) {
-      if (s.status === 'PENDING') {
-        try {
-          await gradeSubmission(s.id);
-          s.status = 'AI_GRADED';
-          if (!s.aiScore) s.aiScore = Math.floor(Math.random() * 15) + 80;
-          successCount++;
-        } catch (err) {
-          console.warn(`评阅答卷 #${s.id} 异常:`, err);
-        }
-      }
+    try {
+      const res = await batchGradeSubmissions({ courseId: courseId ?? undefined });
+      const successCount = res.data?.successCount ?? 0;
+      ElMessage.success(`全队列批改完成，共成功处理 ${successCount} 份待评答卷`);
+      return successCount;
+    } catch (err: unknown) {
+      ElMessage.error(err instanceof Error ? err.message : '批量批改失败');
+      return 0;
+    } finally {
+      batchLoading.value = false;
     }
-    batchLoading.value = false;
-    ElMessage.success(`全队列批改完成，共成功智能预评 ${successCount} 份待评答卷！`);
-    return successCount;
   }
 
   return {
@@ -300,6 +292,8 @@ export function useSubmissionList() {
     batchLoading,
     courses,
     allSubmissions,
+    total,
+    stats,
     loadCourses,
     fetchAllSubmissions,
     batchGradePending

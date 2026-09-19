@@ -3,12 +3,19 @@ export interface PaperExportRequest {
   paperTitle: string;
   paperSubtitle?: string;
   paperSize: 'A4' | 'B4';
+  confidentialLevel?: string;
+  showSealingLine?: boolean;
   showWatermark: boolean;
   watermarkText?: string;
   showAnswerSheet: boolean;
   showAnalysis: boolean;
   showStudentInfo: boolean;
   showScoreGrid: boolean;
+  showNoticeBar?: boolean;
+  showPointBadge?: boolean;
+  fontFamily?: string;
+  lineSpacing?: string;
+  optionLayout?: string;
 }
 
 export interface ExportTaskVO {
@@ -24,4 +31,11 @@ export interface ExportTaskVO {
   exportParams?: string;
   paperTitle?: string;
   createTime?: string;
+}
+
+export interface ExamOptionItem {
+  id: number;
+  title: string;
+  courseName?: string;
+  totalScore?: number;
 }

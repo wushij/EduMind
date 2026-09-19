@@ -14,6 +14,18 @@ export const learningRoutes: RouteRecordRaw[] = [
     meta: { title: '待办学习任务', requiresAuth: true }
   },
   {
+    path: '/learning/assignments/:id/take',
+    name: 'AssignmentTake',
+    component: () => import('@/views/learning/AssignmentTake.vue'),
+    meta: { title: '作业作答', requiresAuth: true }
+  },
+  {
+    path: '/learning/assignments/:id/result',
+    name: 'AssignmentResult',
+    component: () => import('@/views/learning/AssignmentResult.vue'),
+    meta: { title: '作业结果', requiresAuth: true }
+  },
+  {
     path: '/learning/practice',
     name: 'LearningPractice',
     component: () => import('@/views/learning/AIPractice.vue'),

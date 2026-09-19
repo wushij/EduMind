@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 @RequiredArgsConstructor
 public class MockLlmClient implements LlmClient {
@@ -266,6 +267,12 @@ public class MockLlmClient implements LlmClient {
 
     @Override
     public void streamChatWithHistory(String systemPrompt, List<LlmChatMessage> messages, StreamCallback callback) {
+        streamChatWithHistory(systemPrompt, messages, null, callback);
+    }
+
+    @Override
+    public void streamChatWithHistory(String systemPrompt, List<LlmChatMessage> messages,
+                                      BooleanSupplier cancelled, StreamCallback callback) {
         if (!Boolean.TRUE.equals(llmProperties.getMockEnabled())) {
             callback.onError("Mock LLM 未启用");
             return;
@@ -276,6 +283,10 @@ public class MockLlmClient implements LlmClient {
                     "\n规划：要点梳理 + 代码示例 + 学习建议"
             };
             for (String step : reasoningSteps) {
+                if (cancelled != null && cancelled.getAsBoolean()) {
+                    callback.onComplete();
+                    return;
+                }
                 callback.onReasoning(step);
                 Thread.sleep(50);
             }
@@ -284,6 +295,10 @@ public class MockLlmClient implements LlmClient {
             String reply = chatWithHistory(systemPrompt, messages);
             int chunkSize = 3;
             for (int i = 0; i < reply.length(); i += chunkSize) {
+                if (cancelled != null && cancelled.getAsBoolean()) {
+                    callback.onComplete();
+                    return;
+                }
                 int end = Math.min(i + chunkSize, reply.length());
                 callback.onChunk(reply.substring(i, end));
                 Thread.sleep(28);

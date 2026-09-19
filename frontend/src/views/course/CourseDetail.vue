@@ -147,8 +147,8 @@
           <span class="stat-label">AI 助教累计问答</span>
         </div>
         <div v-else-if="currentCourse?.knowledgeBaseId" class="hero-stat-card">
-          <span class="stat-num text-info">RAG</span>
-          <span class="stat-label">知识库已挂载</span>
+          <span class="stat-num text-info">{{ kbMountDocCount }}</span>
+          <span class="stat-label">知识库文档 · {{ kbMountChunkCount }} 向量切片</span>
         </div>
       </div>
     </div>
@@ -198,6 +198,7 @@ import { useCourseEditable, courseDetailInjectionKey } from '@/composables/cours
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { useCourse } from '@/composables/course/useCourse';
+import { getKnowledgeBaseDetail } from '@/api/knowledge/knowledge-base';
 import CourseEditDrawer from '@/components/course/CourseEditDrawer.vue';
 import {
   Reading,
@@ -206,7 +207,8 @@ import {
   FolderOpened,
   Service,
   User,
-  EditPen
+  EditPen,
+  Notebook
 } from '@element-plus/icons-vue';
 
 const route = useRoute();
@@ -223,11 +225,31 @@ async function handleArchiveCourse() {
   );
 }
 const showEditDrawer = ref(false);
+const kbMountDocCount = ref(0);
+const kbMountChunkCount = ref(0);
+
+async function refreshKnowledgeMountSummary() {
+  const kbId = currentCourse.value?.knowledgeBaseId;
+  if (!kbId) {
+    kbMountDocCount.value = 0;
+    kbMountChunkCount.value = 0;
+    return;
+  }
+  try {
+    const kb = await getKnowledgeBaseDetail(kbId);
+    kbMountDocCount.value = kb.documentCount ?? 0;
+    kbMountChunkCount.value = kb.chunkCount ?? 0;
+  } catch {
+    kbMountDocCount.value = 0;
+    kbMountChunkCount.value = 0;
+  }
+}
 
 function handleCourseSaved(updated: any) {
   if (currentCourse.value) {
     Object.assign(currentCourse.value, updated);
   }
+  void refreshKnowledgeMountSummary();
 }
 
 const courseId = computed(() => (route.params.id ? String(route.params.id) : ''));
@@ -263,6 +285,7 @@ const subTabs = computed(() => [
   { label: '大纲与章节', path: `/course/${courseId.value}/chapters`, icon: Document },
   { label: '知识点图谱', path: `/course/${courseId.value}/knowledge-points`, icon: Connection },
   { label: '课件与教学资料', path: `/course/${courseId.value}/resources`, icon: FolderOpened },
+  { label: '课程作业', path: `/course/${courseId.value}/assignments`, icon: Notebook },
   { label: '课程 AI 助教', path: `/course/${courseId.value}/ai`, icon: Service },
   { label: '选课班级成员', path: `/course/${courseId.value}/members`, icon: User }
 ]);
@@ -288,6 +311,7 @@ async function loadCourse(id: string) {
     if (course?.id) {
       localStorage.setItem('edumind_last_course_id', String(course.id));
     }
+    await refreshKnowledgeMountSummary();
   } catch {
     // 错误处理已在全局拦截器捕获
   }
@@ -300,6 +324,13 @@ watch(
     if (newId && newId !== oldId && (!currentCourse.value || String(currentCourse.value.id) !== String(newId))) {
       void loadCourse(String(newId));
     }
+  }
+);
+
+watch(
+  () => currentCourse.value?.knowledgeBaseId,
+  () => {
+    void refreshKnowledgeMountSummary();
   }
 );
 

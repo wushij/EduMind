@@ -16,7 +16,7 @@ export const createCourseResource = (courseId: number, data: {
 export const uploadCourseResource = async (
   courseId: number,
   file: File,
-  data: { title: string; resourceType?: string; chapterId?: number }
+  data: { title: string; resourceType?: string; chapterId?: number; syncToKnowledgeBase?: boolean }
 ) => {
   const formData = new FormData();
   formData.append('file', file);
@@ -26,6 +26,9 @@ export const uploadCourseResource = async (
   }
   if (data.chapterId != null) {
     formData.append('chapterId', String(data.chapterId));
+  }
+  if (data.syncToKnowledgeBase != null) {
+    formData.append('syncToKnowledgeBase', String(data.syncToKnowledgeBase));
   }
   const res = await axiosInstance.post(`/courses/${courseId}/resources/upload`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }

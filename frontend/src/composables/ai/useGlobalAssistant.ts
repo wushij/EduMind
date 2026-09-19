@@ -5,6 +5,8 @@ import { SSEClient } from '@/core/sse/client';
 import { streamGlobalAssistantChat } from '@/services/ai/copilot-sse-stream';
 import { useAIStreamScrollFollow } from '@/composables/ai/useAIStreamScrollFollow';
 import { askGlobalAssistant } from '@/api/ai/assistant';
+import { cancelChatStream } from '@/api/ai/chat';
+import { cancelChatStream } from '@/api/ai/chat';
 import {
   getMessages,
   deleteConversation,
@@ -273,6 +275,18 @@ export function useGlobalAssistant() {
   const teachingCopilotStore = useTeachingCopilotStore();
   const router = useRouter();
   const sseClient = new SSEClient();
+  let activeChatStreamId = '';
+
+  async function notifyBackendStreamCancel() {
+    const id = activeChatStreamId;
+    activeChatStreamId = '';
+    if (!id) return;
+    try {
+      await cancelChatStream(id);
+    } catch {
+      // ignore
+    }
+  }
 
   const drawerVisible = ref(false);
   const inputContent = ref('');
@@ -746,6 +760,7 @@ export function useGlobalAssistant() {
   function stopStreaming() {
     if (!isStreaming.value) return;
     userStoppedGeneration.value = true;
+    void notifyBackendStreamCancel();
     sseClient.stop();
     isStreaming.value = false;
 
@@ -765,7 +780,7 @@ export function useGlobalAssistant() {
 
     resetStreamingState();
     saveCurrentSessionToHistory();
-    ElMessage.info('已停止生成');
+    ElMessage.info('已停止生成（后续 Token 将尽快停止计费）');
     nextTick(() => bindMarkdownCodeCopy(messagesScrollRef.value));
   }
 
@@ -814,6 +829,10 @@ export function useGlobalAssistant() {
       buildAssistantRequestBase(),
       streamingContent,
       {
+        isStopped: () => userStoppedGeneration.value,
+        onStreamId: (streamId) => {
+          activeChatStreamId = streamId;
+        },
         onIntent: (data) => applyIntentEvent(data as GlobalAssistantIntentEvent),
         onStatus: (message, phase) => {
           streamPhaseMessage.value = message;

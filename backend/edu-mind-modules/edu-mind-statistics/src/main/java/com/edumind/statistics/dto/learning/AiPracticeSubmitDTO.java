@@ -8,6 +8,8 @@ import java.util.List;
 public class AiPracticeSubmitDTO {
     private Long courseId;
     private String sessionId;
+    /** 客户端统计用时（秒），服务端会做合理上限校验 */
+    private Integer durationSeconds;
     private List<AnswerItem> answers;
 
     @Data

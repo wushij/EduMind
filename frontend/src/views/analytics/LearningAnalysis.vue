@@ -186,7 +186,7 @@ async function reload() {
   const queryStudentId = Number(route.query.studentId);
   if (queryStudentId && personalTabEnabled.value && enrolledStudents.value.some((s) => s.studentId === queryStudentId)) {
     activeTab.value = 'personal';
-    await fetchStudentPortrait(courseId.value, queryStudentId);
+    await fetchStudentPortrait(courseId.value, queryStudentId, range.value);
   } else if (activeTab.value === 'personal') {
     if (!personalTabEnabled.value) {
       activeTab.value = 'overall';
@@ -196,7 +196,7 @@ async function reload() {
     } else {
       const targetId = resolvePortraitStudentId();
       if (targetId) {
-        await fetchStudentPortrait(courseId.value, targetId);
+        await fetchStudentPortrait(courseId.value, targetId, range.value);
       }
     }
   } else {
@@ -239,7 +239,7 @@ function handleTabChange(tab: 'overall' | 'personal') {
   if (tab === 'personal') {
     const targetId = resolvePortraitStudentId();
     if (targetId) {
-      fetchStudentPortrait(courseId.value, targetId);
+      fetchStudentPortrait(courseId.value, targetId, range.value);
     }
   } else {
     loadStoredAdvice(courseId.value, null);
@@ -249,12 +249,12 @@ function handleTabChange(tab: 'overall' | 'personal') {
 
 async function handleViewStudentPortrait(studentId: number) {
   activeTab.value = 'personal';
-  await fetchStudentPortrait(courseId.value, studentId);
+  await fetchStudentPortrait(courseId.value, studentId, range.value);
   syncUrlQuery();
 }
 
 async function handleSwitchStudent(studentId: number) {
-  await fetchStudentPortrait(courseId.value, studentId);
+  await fetchStudentPortrait(courseId.value, studentId, range.value);
   syncUrlQuery();
 }
 
@@ -352,7 +352,7 @@ watch(
       const sid = Number(query.studentId);
       if (personalTabEnabled.value && enrolledStudents.value.some((s) => s.studentId === sid)) {
         activeTab.value = 'personal';
-        fetchStudentPortrait(courseId.value, sid);
+        fetchStudentPortrait(courseId.value, sid, range.value);
       } else {
         activeTab.value = 'overall';
       }

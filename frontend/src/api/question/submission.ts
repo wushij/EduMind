@@ -1,16 +1,38 @@
 import { get, post, put } from '@/core/http/request';
+import type { PageResult } from '@/types/common/api';
+import type { SubmissionItem, SubmissionOverviewStats } from '@/types/question/submission';
 
 export const createSubmission = (assignmentId: number, answers: Array<{ questionId: number; answer: string }>) =>
   post<number>(`/submissions/assignments/${assignmentId}`, { answers });
 
-export const getSubmissionDetail = (id: number) => get<any>(`/submissions/${id}`);
+export const getSubmissionDetail = (id: number) => get<SubmissionItem>(`/submissions/${id}`);
 
-export const getSubmissionGrading = (id: number) => get<any>(`/submissions/${id}/grading`);
+export const getSubmissionGrading = (id: number) => get<SubmissionItem['gradingItems']>(`/submissions/${id}/grading`);
 
-export const gradeSubmission = (id: number) => post<any>(`/submissions/${id}/grade`);
+export const gradeSubmission = (id: number) => post<void>(`/submissions/${id}/grade`);
 
-export const reviewGrading = (id: number, items: Array<{ questionId: number; score: number; teacherComment?: string }>) =>
-  put<void>(`/submissions/${id}/grading/review`, { items });
+export const reviewGrading = (
+  id: number,
+  items: Array<{ questionId: number; score: number; teacherComment?: string }>
+) => put<void>(`/submissions/${id}/grading/review`, { items });
 
 export const getSubmissionsByAssignment = (assignmentId: number) =>
-  get<any[]>(`/submissions/assignments/${assignmentId}`);
+  get<SubmissionItem[]>(`/submissions/assignments/${assignmentId}`);
+
+export const getSubmissionsPage = (params?: {
+  courseId?: number;
+  assignmentId?: number;
+  status?: string;
+  keyword?: string;
+  page?: number;
+  pageSize?: number;
+}) => get<PageResult<SubmissionItem>>('/submissions', params);
+
+export const getSubmissionStats = (params?: { courseId?: number; assignmentId?: number }) =>
+  get<SubmissionOverviewStats>('/submissions/stats', params);
+
+export const batchGradeSubmissions = (body: {
+  courseId?: number;
+  assignmentId?: number;
+  submissionIds?: number[];
+}) => post<{ successCount: number }>('/submissions/batch-grade', body);

@@ -1,6 +1,6 @@
 <template>
   <div class="ai-cognitive-thinking">
-    <div class="thinking-radar-box" :class="{ 'is-paused': isPaused }">
+    <div class="thinking-radar-box">
       <div class="pulse-ring ring-1"></div>
       <div class="pulse-ring ring-2"></div>
       <div class="pulse-ring ring-3"></div>
@@ -61,10 +61,10 @@
 
     <div class="thinking-header">
       <h4 class="thinking-title">
-        {{ isPaused ? pausedTitle : title }}
+        {{ title }}
       </h4>
-      <span class="thinking-timer" :class="{ 'timer-paused': isPaused }">
-        {{ isPaused ? '已暂停 ' + elapsedTimeText : elapsedTimeText }}
+      <span class="thinking-timer">
+        {{ elapsedTimeText }}
       </span>
     </div>
 
@@ -84,15 +84,6 @@
     </div>
 
     <div v-if="showFooterActions" class="thinking-action-buttons">
-      <button
-        type="button"
-        class="pill-ctrl-btn pause-btn"
-        :class="{ 'pause-btn--resume': isPaused }"
-        @click="togglePause"
-      >
-        <el-icon><VideoPlay v-if="isPaused" /><VideoPause v-else /></el-icon>
-        <span>{{ isPaused ? '继续推演' : '暂停推演' }}</span>
-      </button>
       <button type="button" class="pill-ctrl-btn abort-btn" @click="$emit('abort')">
         <el-icon><Close /></el-icon>
         <span>{{ abortLabel }}</span>
@@ -103,20 +94,18 @@
 
 <script setup lang="ts">
 import { computed, toRef, useId } from 'vue';
-import { Close, VideoPause, VideoPlay } from '@element-plus/icons-vue';
+import { Close } from '@element-plus/icons-vue';
 import { useAiThinkingTimer } from '@/composables/ai/useAiThinkingTimer';
 
 const props = withDefaults(
   defineProps<{
     active: boolean;
     title: string;
-    pausedTitle?: string;
     steps?: string[];
     showFooterActions?: boolean;
     abortLabel?: string;
   }>(),
   {
-    pausedTitle: 'AI 推演已暂停',
     steps: () => [],
     showFooterActions: false,
     abortLabel: '中止并退出'
@@ -133,7 +122,7 @@ const gradNorth = computed(() => `aiNorthGrad${uid}`);
 const gradInner = computed(() => `aiInnerGrad${uid}`);
 const gradGlow = computed(() => `aiStarGlow${uid}`);
 
-const { currentStep, isPaused, elapsedTimeText, togglePause } = useAiThinkingTimer(toRef(props, 'active'), {
+const { currentStep, elapsedTimeText } = useAiThinkingTimer(toRef(props, 'active'), {
   stepCount: props.steps.length || 3
 });
 </script>
@@ -182,14 +171,6 @@ const { currentStep, isPaused, elapsedTimeText, togglePause } = useAiThinkingTim
     .compass-star {
       transform-origin: center;
       animation: starGlowBreath 3.5s ease-in-out infinite;
-    }
-  }
-
-  &.is-paused {
-    .compass-dial,
-    .compass-star,
-    .pulse-ring {
-      animation-play-state: paused !important;
     }
   }
 
@@ -242,12 +223,6 @@ const { currentStep, isPaused, elapsedTimeText, togglePause } = useAiThinkingTim
     border-radius: 9999px;
     padding: 2px 10px;
     transition: all 0.3s ease;
-
-    &.timer-paused {
-      color: #d97706;
-      background: #fffbeb;
-      border-color: #fde68a;
-    }
   }
 }
 
@@ -353,32 +328,6 @@ const { currentStep, isPaused, elapsedTimeText, togglePause } = useAiThinkingTim
 
     &:active {
       transform: scale(0.98);
-    }
-  }
-
-  .pause-btn {
-    background: #fffbeb;
-    border-color: #fcd34d;
-    color: #b45309;
-
-    &:hover {
-      background: #fef3c7;
-      border-color: #f59e0b;
-      color: #92400e;
-      box-shadow: 0 2px 10px rgba(245, 158, 11, 0.22);
-    }
-
-    &--resume {
-      background: #eff6ff;
-      border-color: #93c5fd;
-      color: #1d4ed8;
-
-      &:hover {
-        background: #dbeafe;
-        border-color: #3b82f6;
-        color: #1e40af;
-        box-shadow: 0 2px 10px rgba(37, 99, 235, 0.18);
-      }
     }
   }
 

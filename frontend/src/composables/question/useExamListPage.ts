@@ -54,7 +54,10 @@ export function useExamListPage() {
   }
 
   function handleExportPdf(exam: ExamPaper) {
-    ElMessage.success(`试卷《${exam.title}》已生成排版，准备导出 PDF...`);
+    router.push({
+      path: '/question/exports',
+      query: { examId: String(exam.id) }
+    });
   }
 
   function handlePublish(exam: ExamPaper) {

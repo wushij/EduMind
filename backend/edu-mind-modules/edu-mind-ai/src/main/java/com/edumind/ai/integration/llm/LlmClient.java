@@ -2,6 +2,7 @@ package com.edumind.ai.integration.llm;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 public interface LlmClient {
 
@@ -45,6 +46,11 @@ public interface LlmClient {
     }
 
     void streamChatWithHistory(String systemPrompt, List<LlmChatMessage> messages, StreamCallback callback);
+
+    default void streamChatWithHistory(String systemPrompt, List<LlmChatMessage> messages,
+                                       BooleanSupplier cancelled, StreamCallback callback) {
+        streamChatWithHistory(systemPrompt, messages, callback);
+    }
 
     interface StreamCallback {
         /** 正文 token */

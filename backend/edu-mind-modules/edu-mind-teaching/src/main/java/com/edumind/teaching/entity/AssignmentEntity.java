@@ -18,6 +18,9 @@ public class AssignmentEntity implements Serializable {
     private String title;
     private String description;
     private LocalDateTime deadline;
+    private Integer totalScore;
+    private Integer passScore;
+    private String settingsJson;
     private String status;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

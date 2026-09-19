@@ -44,4 +44,9 @@ public interface AiAuditQueryApi {
      * 按课程 ID 列表批量统计 AI 调用量
      */
     Map<Long, Long> countCallsByCourseBatch(List<Long> courseIds, LocalDateTime since);
+
+    /**
+     * 按课程、用户及起始时间统计 AI 调用量
+     */
+    long countCallsByCourseAndUser(Long courseId, Long userId, LocalDateTime since);
 }

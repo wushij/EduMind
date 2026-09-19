@@ -5,6 +5,7 @@ import com.edumind.question.integration.export.PaperExportEngine;
 import com.edumind.question.integration.export.PaperExportRequest;
 import com.edumind.question.integration.export.PaperExportResult;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,7 @@ import java.nio.charset.StandardCharsets;
  */
 @Slf4j
 @Primary
+@Profile("test")
 @Component
 public class MockPaperExportEngine implements PaperExportEngine {
 

@@ -34,4 +34,9 @@ public class KnowledgeQueryApiImpl implements KnowledgeQueryApi {
     public String getDocumentText(Long documentId) {
         return knowledgeQueryService.getDocumentText(documentId);
     }
+
+    @Override
+    public KnowledgeDocumentVO getDocumentById(Long documentId) {
+        return knowledgeQueryService.getDocumentById(documentId);
+    }
 }

@@ -2,17 +2,23 @@ package com.edumind.teaching.controller.submission;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.edumind.common.api.ApiResult;
+import com.edumind.common.api.PageResult;
 import com.edumind.teaching.dto.submission.GradingReviewDTO;
+import com.edumind.teaching.dto.submission.SubmissionBatchGradeDTO;
 import com.edumind.teaching.dto.submission.SubmissionCreateDTO;
 import com.edumind.teaching.service.grading.GradingService;
+import com.edumind.teaching.service.submission.SubmissionOverviewService;
 import com.edumind.teaching.service.submission.SubmissionService;
 import com.edumind.teaching.vo.submission.GradingItemVO;
+import com.edumind.teaching.vo.submission.SubmissionListItemVO;
+import com.edumind.teaching.vo.submission.SubmissionOverviewStatsVO;
 import com.edumind.teaching.vo.submission.SubmissionVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/submissions")
@@ -21,6 +27,35 @@ public class SubmissionController {
 
     private final SubmissionService submissionService;
     private final GradingService gradingService;
+    private final SubmissionOverviewService submissionOverviewService;
+
+    @SaCheckPermission("assignment:view")
+    @GetMapping
+    public ApiResult<PageResult<SubmissionListItemVO>> pageQuery(
+            @RequestParam(value = "courseId", required = false) Long courseId,
+            @RequestParam(value = "assignmentId", required = false) Long assignmentId,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "page", defaultValue = "1") Long page,
+            @RequestParam(value = "pageSize", defaultValue = "10") Long pageSize) {
+        return ApiResult.success(submissionOverviewService.pageQuery(
+                courseId, assignmentId, status, keyword, page, pageSize));
+    }
+
+    @SaCheckPermission("assignment:view")
+    @GetMapping("/stats")
+    public ApiResult<SubmissionOverviewStatsVO> stats(
+            @RequestParam(value = "courseId", required = false) Long courseId,
+            @RequestParam(value = "assignmentId", required = false) Long assignmentId) {
+        return ApiResult.success(submissionOverviewService.getStats(courseId, assignmentId));
+    }
+
+    @SaCheckPermission("ai:grading")
+    @PostMapping("/batch-grade")
+    public ApiResult<Map<String, Integer>> batchGrade(@RequestBody SubmissionBatchGradeDTO dto) {
+        int count = submissionOverviewService.batchGrade(dto);
+        return ApiResult.success(Map.of("successCount", count));
+    }
 
     @SaCheckPermission("assignment:view")
     @PostMapping("/assignments/{assignmentId}")

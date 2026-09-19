@@ -9,5 +9,8 @@ public interface RecommendationService {
 
     List<RecommendedQuestionVO> recommendQuestions(Long courseId, Long chapterId, Integer limit);
 
+    List<RecommendedQuestionVO> recommendQuestionsForStudent(
+            Long courseId, Long chapterId, Integer limit, Long studentId);
+
     List<RecommendedResourceVO> recommendResources(Long courseId, Long chapterId, Integer limit);
 }

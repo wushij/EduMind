@@ -2,14 +2,12 @@
 
 export interface AiCognitiveThinkingPreset {
   title: string;
-  pausedTitle: string;
   steps: string[];
 }
 
 export const AI_COGNITIVE_THINKING_PRESETS = {
   memoryExtract: {
     title: 'AI 认知引擎正在深度推演分析中...',
-    pausedTitle: 'AI 认知引擎推演已暂停',
     steps: [
       '检索本空间师生问答交互与错题日志',
       '调用认知心理学模型推导多维学习风格与薄弱点',
@@ -18,7 +16,6 @@ export const AI_COGNITIVE_THINKING_PRESETS = {
   },
   courseObjectives: {
     title: 'AI 教学引擎正在推演课程教学目标...',
-    pausedTitle: '教学目标推演已暂停',
     steps: [
       '汇总课程章节结构与已关联知识点',
       '通过 AI 网关调用大模型生成可评价目标',
@@ -27,7 +24,6 @@ export const AI_COGNITIVE_THINKING_PRESETS = {
   },
   courseDescription: {
     title: 'AI 文案引擎正在撰写课程简介...',
-    pausedTitle: '简介撰写推演已暂停',
     steps: [
       '汇总章节大纲、学分学时与学科门类信息',
       '结合教学目标与修读要求生成结构化表述',
@@ -36,7 +32,6 @@ export const AI_COGNITIVE_THINKING_PRESETS = {
   },
   knowledgePointSuggest: {
     title: 'AI 知识图谱引擎正在提炼考点体系...',
-    pausedTitle: '考点提炼推演已暂停',
     steps: [
       '研读章节大纲与已有考点去重边界',
       '结合布鲁姆认知维度生成结构化考点',
@@ -45,7 +40,6 @@ export const AI_COGNITIVE_THINKING_PRESETS = {
   },
   chapterMicroLesson: {
     title: 'AI 教学大纲引擎正在规划微课节体系...',
-    pausedTitle: '微课节规划推演已暂停',
     steps: [
       '研读本章教学目标与布鲁姆认知递进关系',
       '拆解讲授、演练与诊断自测等微课节组合',
@@ -54,7 +48,6 @@ export const AI_COGNITIVE_THINKING_PRESETS = {
   },
   courseChapterOutline: {
     title: 'AI 课程引擎正在推导章节大纲...',
-    pausedTitle: '章节大纲推演已暂停',
     steps: [
       '分析课程学科门类与学时学分约束',
       '匹配标准教学模板与知识递进路径',
@@ -63,12 +56,53 @@ export const AI_COGNITIVE_THINKING_PRESETS = {
   },
   questionGenerate: {
     title: 'AI 命题引擎正在深度推演分析中...',
-    pausedTitle: 'AI 命题引擎推演已暂停',
     steps: [
       '解析知识点考纲与布鲁姆认知层级约束',
       '激活专属教研 Prompt 模板与试题场景化建模',
       '调用大模型推理生成题干、强诱惑干扰项与深度题解',
       '执行 LaTeX 科学公式排版校验与结构化题库规整'
+    ]
+  },
+  questionFullAuto: {
+    title: 'AI 命题引擎正在全套智能出题装配中...',
+    steps: [
+      '研读试题考查要点并学术规范化润色题干',
+      '提炼考点图谱并智能评定难度与分值',
+      '生成高质量正确选项与典型思维陷阱干扰项',
+      '深度推导解题依据、考点解析与避坑指南'
+    ]
+  },
+  questionAiTutor: {
+    title: 'AI 命题助教正在推演教学诊断与优化建议...',
+    steps: [
+      '全面剖析试题题干与设问严密性',
+      '对标课程教学大纲与考点掌握梯度',
+      '诊断选项干扰度与思维陷阱有效性',
+      '生成试题优化意见与高质量改进建议'
+    ]
+  },
+  questionOptions: {
+    title: 'AI 命题引擎正在推演选项与典型干扰项...',
+    steps: [
+      '分析题干核心考查目标与考点边界',
+      '设计符合教学认知的一致性正确答案',
+      '推演针对学生常见认知盲区的典型陷阱干扰项'
+    ]
+  },
+  questionAnalysis: {
+    title: 'AI 教学引擎正在推演考点深度解析...',
+    steps: [
+      '提取核心考察知识点与解题关键链路',
+      '梳理公式推导与严谨答题逻辑步骤',
+      '总结典型易错思维误区与避坑指南'
+    ]
+  },
+  questionPolish: {
+    title: 'AI 语言模型正在学术规范化润色题干...',
+    steps: [
+      '检查题干语法规范与设问歧义排查',
+      '对齐学科专业术语与括号表达标准',
+      '优化问法引导并输出高标准题干'
     ]
   }
 } as const satisfies Record<string, AiCognitiveThinkingPreset>;

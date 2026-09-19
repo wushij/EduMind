@@ -4,13 +4,17 @@ import { ElMessage } from 'element-plus';
 import type { Question, QuestionType, Difficulty } from '@/types/question/question';
 import type { KnowledgePointItem } from '@/components/ai/generation/question-generate-types';
 import { MOCK_COURSES } from '@/mock/courses';
-import { generateQuestions } from '@/api/ai/generation';
+import { generateQuestions, cancelQuestionGenerate } from '@/api/ai/generation';
 import { loadGenerationCourseOptions } from '@/services/ai/generation-service';
 import { batchSaveQuestions } from '@/api/question/question';
 import { getQuestionBanks, createQuestionBank, addQuestionsToBank } from '@/api/question/question-bank';
 import { getChapters } from '@/api/course/chapter';
 import { getCourseKnowledgePoints } from '@/api/course/knowledge-point';
-import { normalizeQuestionList, normalizeQuestion } from '@/utils/question/normalize-question';
+import {
+  normalizeQuestionList,
+  normalizeQuestion,
+  serializeQuestionForApi
+} from '@/utils/question/normalize-question';
 import { isGarbageQuestionStem } from '@/utils/question/is-garbage-question-stem';
 
 export interface BatchSaveOptions {
@@ -42,12 +46,17 @@ function readStoredQuestions(): Question[] {
 const initialForm = readStoredFormState();
 
 const generatedQuestions = ref<Question[]>(readStoredQuestions());
+/** 与 generatedQuestions 同级共享，保证命题页 / 预览页「换一题」弹窗与中止状态一致 */
+const generating = ref(false);
+const regeneratingIndex = ref<number | null>(null);
 const globalCourses = ref<any[]>([]);
 const globalCourseChapters = ref<any[]>([]);
 const globalCourseKnowledgePoints = ref<KnowledgePointItem[]>([]);
 
 const formState = reactive({
   courseId: initialForm?.courseId || 0,
+  targetBankId: (initialForm?.targetBankId || undefined) as number | string | undefined,
+  targetBankName: (initialForm?.targetBankName || '') as string,
   chapterIds: (initialForm?.chapterIds || []) as number[],
   knowledgePointIds: (initialForm?.knowledgePointIds || []) as number[],
   knowledgePointNames: (initialForm?.knowledgePointNames || []) as string[],
@@ -84,8 +93,6 @@ export function useQuestionGenerate() {
   const router = useRouter();
   const route = useRoute();
   const currentStep = ref(1);
-  const generating = ref(false);
-  const regeneratingIndex = ref<number | null>(null);
   const courses = globalCourses;
   const courseChapters = globalCourseChapters;
   const courseKnowledgePoints = globalCourseKnowledgePoints;
@@ -282,35 +289,49 @@ export function useQuestionGenerate() {
   }
 
   let isAborted = false;
+  let generateRunSeq = 0;
+  let generateAbortController: AbortController | null = null;
 
   function abortGeneration() {
     isAborted = true;
+    generateRunSeq += 1;
     generating.value = false;
-    ElMessage.info('已中止本次 AI 命题推演');
+    regeneratingIndex.value = null;
+    generateAbortController?.abort();
+    generateAbortController = null;
+    void cancelQuestionGenerate();
+    ElMessage.info('已中止本次 AI 命题（将停止继续计费）');
   }
 
   async function generate() {
     isAborted = false;
+    const runId = ++generateRunSeq;
+    generateAbortController?.abort();
+    generateAbortController = new AbortController();
+    const signal = generateAbortController.signal;
     generating.value = true;
     try {
       const fullDirective = [formState.promptDirective, formState.customInstruction]
         .filter(Boolean)
         .join('；');
 
-      const res = await generateQuestions({
-        courseId: formState.courseId,
-        chapterIds: formState.chapterIds,
-        knowledgePointIds: formState.knowledgePointIds,
-        knowledgePointNames: formState.knowledgePointNames,
-        questionTypes: formState.questionTypes,
-        difficulty: formState.difficulty,
-        count: formState.count,
-        scorePerQuestion: formState.scorePerQuestion,
-        promptDirective: fullDirective,
-        questionScene: formState.questionScene
-      });
+      const res = await generateQuestions(
+        {
+          courseId: formState.courseId,
+          chapterIds: formState.chapterIds,
+          knowledgePointIds: formState.knowledgePointIds,
+          knowledgePointNames: formState.knowledgePointNames,
+          questionTypes: formState.questionTypes,
+          difficulty: formState.difficulty,
+          count: formState.count,
+          scorePerQuestion: formState.scorePerQuestion,
+          promptDirective: fullDirective,
+          questionScene: formState.questionScene
+        },
+        { signal }
+      );
 
-      if (isAborted) {
+      if (isAborted || runId !== generateRunSeq) {
         return;
       }
 
@@ -326,18 +347,31 @@ export function useQuestionGenerate() {
         throw new Error('未返回有效题目');
       }
     } catch {
-      if (!isAborted) {
-        ElMessage.error('AI 命题生成服务异常，请稍后重试');
+      if (isAborted || signal.aborted || runId !== generateRunSeq) {
+        return;
       }
+      ElMessage.error('AI 命题生成服务异常，请稍后重试');
     } finally {
-      generating.value = false;
+      if (runId === generateRunSeq) {
+        generating.value = false;
+      }
     }
   }
 
-  // 单题一键 AI 换一题 / 重新生成变式
+  // 单题一键 AI 换一题 / 重新生成变式（与批量生成共用推演弹窗 + 中止）
   async function regenerateSingleQuestion(index: number) {
     const target = generatedQuestions.value[index];
     if (!target) return;
+    if (generating.value || regeneratingIndex.value !== null) {
+      ElMessage.warning('当前已有 AI 生成任务进行中，请先中止或等待完成');
+      return;
+    }
+
+    isAborted = false;
+    const runId = ++generateRunSeq;
+    generateAbortController?.abort();
+    generateAbortController = new AbortController();
+    const signal = generateAbortController.signal;
     regeneratingIndex.value = index;
 
     try {
@@ -347,16 +381,23 @@ export function useQuestionGenerate() {
         `请为考点「${kpName}」重新生成一道高质量同级变式题，更换应用情境与背景数据`
       ].filter(Boolean).join('；');
 
-      const res = await generateQuestions({
-        courseId: formState.courseId,
-        questionTypes: [target.type],
-        difficulty: target.difficulty,
-        count: 1,
-        scorePerQuestion: target.score,
-        knowledgePointNames: [kpName],
-        promptDirective: fullDirective,
-        questionScene: formState.questionScene
-      });
+      const res = await generateQuestions(
+        {
+          courseId: formState.courseId,
+          questionTypes: [target.type],
+          difficulty: target.difficulty,
+          count: 1,
+          scorePerQuestion: target.score,
+          knowledgePointNames: [kpName],
+          promptDirective: fullDirective,
+          questionScene: formState.questionScene
+        },
+        { signal }
+      );
+
+      if (isAborted || runId !== generateRunSeq) {
+        return;
+      }
 
       if (res.data && res.data.length > 0) {
         const fresh = normalizeQuestion(res.data[0]);
@@ -373,9 +414,15 @@ export function useQuestionGenerate() {
         ElMessage.warning('未能生成新题目，已保留原题');
       }
     } catch {
+      if (isAborted || signal.aborted || runId !== generateRunSeq) {
+        return;
+      }
       ElMessage.error('重新生成该题失败');
     } finally {
-      regeneratingIndex.value = null;
+      if (runId === generateRunSeq) {
+        regeneratingIndex.value = null;
+        generateAbortController = null;
+      }
     }
   }
 
@@ -420,30 +467,15 @@ export function useQuestionGenerate() {
       // 严格转换为后端 QuestionBatchCreateDTO 要求的数据格式
       const formatted = generatedQuestions.value
         .filter((q) => !isGarbageQuestionStem(q.stem))
-        .map(q => {
-        let diffNum = 3;
-        if (q.difficulty === 'EASY') diffNum = 2;
-        else if (q.difficulty === 'HARD') diffNum = 4;
-
-        let optionsStr = '[]';
-        if (Array.isArray(q.options)) {
-          optionsStr = JSON.stringify(q.options);
-        } else if (typeof q.options === 'string') {
-          optionsStr = q.options;
-        }
-
-        return {
+        .map((q) => ({
+          ...serializeQuestionForApi({
+            ...q,
+            score: q.score || formState.scorePerQuestion || 5
+          }),
           courseId: targetCourseId,
-          knowledgePointId: q.knowledgePointId || undefined,
-          stem: q.stem || '',
-          type: q.type,
-          options: optionsStr,
-          answer: q.correctAnswer || (q as any).answer || 'A',
-          analysis: q.analysis || '',
-          difficulty: diffNum,
-          score: q.score || formState.scorePerQuestion || 5
-        };
-      });
+          answer:
+            String(q.correctAnswer || (q as { answer?: string }).answer || 'A').trim() || 'A'
+        }));
 
       const res = await batchSaveQuestions(targetCourseId, formatted as any);
       const savedCount = res.data?.savedCount ?? generatedQuestions.value.length;

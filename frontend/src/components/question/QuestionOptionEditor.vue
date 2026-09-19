@@ -32,13 +32,12 @@
         </div>
 
         <div class="opt-input-wrapper">
-          <el-input
+          <QuestionLatexEditor
             v-model="opt.content"
-            type="textarea"
             :rows="2"
-            :placeholder="`请输入选项 ${opt.key} 的具体内容，支持公式或代码`"
-            class="option-content-input"
-            @input="emitOptions"
+            :placeholder="`请输入选项 ${opt.key} 的具体内容，支持 LaTeX...`"
+            input-class="option-content-input"
+            @update:model-value="emitOptions"
           />
         </div>
 
@@ -47,7 +46,7 @@
             type="danger"
             link
             :disabled="options.length <= 2"
-            @click="removeOption(index)"
+            @click="confirmRemoveOption(index)"
           >
             <el-icon><Delete /></el-icon>
           </el-button>
@@ -111,6 +110,8 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
 import { Plus, Delete, Check, Close } from '@element-plus/icons-vue';
+import { ElMessageBox } from 'element-plus';
+import QuestionLatexEditor from './common/QuestionLatexEditor.vue';
 import type { QuestionType, QuestionOption } from '@/types/question/question';
 
 const props = defineProps<{
@@ -130,15 +131,24 @@ const singleAnswer = computed(() => props.correctAnswer || '');
 const OPTION_KEYS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 watch(
-  () => props.modelValue,
-  (newVal) => {
+  () => JSON.stringify(props.modelValue ?? []),
+  () => {
+    const newVal = props.modelValue;
     if (newVal && newVal.length > 0) {
-      options.value = JSON.parse(JSON.stringify(newVal));
-    } else if (props.type === 'SINGLE_CHOICE' || props.type === 'MULTIPLE_CHOICE') {
-      initDefaultOptions();
+      options.value = newVal.map((o) => ({
+        key: o.key,
+        content: o.content,
+        isCorrect: !!o.isCorrect
+      }));
+      return;
+    }
+    if (props.type === 'SINGLE_CHOICE' || props.type === 'MULTIPLE_CHOICE') {
+      if (options.value.length === 0) {
+        initDefaultOptions();
+      }
     }
   },
-  { immediate: true, deep: true }
+  { immediate: true }
 );
 
 function initDefaultOptions() {
@@ -194,6 +204,29 @@ function addOption() {
   const nextKey = OPTION_KEYS[options.value.length];
   options.value.push({ key: nextKey, content: '', isCorrect: false });
   emitOptions();
+}
+
+async function confirmRemoveOption(idx: number) {
+  if (options.value.length <= 2) return;
+  const opt = options.value[idx];
+  const key = opt?.key || OPTION_KEYS[idx] || String(idx + 1);
+  const raw = (opt?.content || '').replace(/\s+/g, ' ').trim();
+  const preview = raw ? `（${raw.slice(0, 36)}${raw.length > 36 ? '…' : ''}）` : '';
+  try {
+    await ElMessageBox.confirm(
+      `确定删除选项 ${key} 吗？${preview} 删除后不可恢复。`,
+      '删除选项确认',
+      {
+        type: 'warning',
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        distinguishCancelAndClose: true
+      }
+    );
+    removeOption(idx);
+  } catch {
+    // 用户取消
+  }
 }
 
 function removeOption(idx: number) {

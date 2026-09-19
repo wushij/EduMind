@@ -1,5 +1,5 @@
 <template>
-  <div class="assignment-detail-container">
+  <div class="assignment-detail-container question-module-page">
     <!-- 顶部面包屑与导航条 -->
     <div class="top-nav-bar">
       <el-button :icon="ArrowLeft" link class="back-link" @click="handleBack">
@@ -122,9 +122,9 @@ const {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/question/module-page-shell.scss';
+
 .assignment-detail-container {
-  padding: 24px;
-  background: #f8fafc;
   .top-nav-bar {
     display: flex;
     align-items: center;

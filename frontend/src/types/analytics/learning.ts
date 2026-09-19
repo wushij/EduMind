@@ -54,6 +54,7 @@ export interface StudentPortraitStudentInfo {
 
 export interface StudentPortraitSummary {
   totalStudyMinutes: number;
+  totalStudyMinutesAllTime?: number;
   classAvgStudyMinutes: number;
   avgScore: number;
   classAvgScore: number;
@@ -157,6 +158,7 @@ export interface LearningAnalyticsQuery {
 export interface StudentPortraitQuery {
   courseId: number;
   studentId?: number;
+  range?: string;
 }
 
 export interface AiUsageAnalyticsQuery {

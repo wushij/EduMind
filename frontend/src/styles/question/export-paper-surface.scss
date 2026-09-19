@@ -1,0 +1,314 @@
+/**
+ * 试卷导出卷面全局样式（打印弹窗 / iframe 打印与右侧预览解耦，不依赖 .paper-scroll-wrapper 祖先）
+ */
+.export-paper-root {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  color: #000;
+  box-sizing: border-box;
+
+  &.font-SimSun {
+    font-family: 'Times New Roman', SimSun, 'Songti SC', serif;
+  }
+
+  &.spacing-compact .mock-q-item {
+    margin-bottom: 10px;
+  }
+
+  &.spacing-relaxed .draft-answer-box {
+    min-height: 140px;
+  }
+
+  .simulated-sheet {
+    width: min(740px, 100%);
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    min-height: 900px;
+    background: #ffffff;
+    box-shadow: none;
+    border-bottom: 1px dashed #e2e8f0;
+    padding: 36px 32px 36px 28px;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    position: relative;
+    color: #000;
+    box-sizing: border-box;
+    margin: 0 auto;
+    isolation: isolate;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  /* 水印仅作半透明叠层，不占卷面排版高度（打印克隆 / iframe 依赖全局样式） */
+  .watermark-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    overflow: hidden;
+
+    .watermark-text {
+      font-size: 28px;
+      font-weight: 700;
+      color: rgba(148, 163, 184, 0.16);
+      transform: rotate(-28deg);
+      white-space: nowrap;
+      user-select: none;
+      max-width: 90%;
+      text-align: center;
+      line-height: 1.2;
+    }
+  }
+
+  .sheet-main-content {
+    flex: 1;
+    min-width: 0;
+    z-index: 2;
+    background: #ffffff;
+  }
+
+  .sheet-header {
+    text-align: center;
+    margin-bottom: 14px;
+  }
+
+  .confidential-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    min-height: 18px;
+  }
+
+  .conf-placeholder {
+    visibility: hidden;
+  }
+
+  .paper-main-title {
+    font-size: 21px;
+    font-weight: bold;
+    margin: 0 0 6px;
+  }
+
+  .paper-sub-title {
+    font-size: 13.5px;
+    margin: 0 0 8px;
+  }
+
+  .paper-rules-bar {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 12px;
+    border-top: 1.5px solid #000;
+    border-bottom: 1.5px solid #000;
+    padding: 4px 0;
+  }
+
+  .exam-notice-box {
+    border: 1px solid #000;
+    padding: 10px 16px 10px 18px;
+    font-size: 11px;
+    margin-bottom: 12px;
+    line-height: 1.55;
+
+    .notice-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .notice-list {
+      margin: 0;
+      padding-left: 1.35em;
+
+      li {
+        margin: 0 0 4px;
+        padding-left: 0.25em;
+
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
+
+  .candidate-info-box {
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+
+  .paper-lite-info {
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid #000;
+    line-height: 1.55;
+    font-size: 11px;
+    background: #fafafa;
+  }
+
+  .score-grid-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: center;
+    font-size: 12px;
+    margin-bottom: 14px;
+    table-layout: fixed;
+
+    th,
+    td {
+      border: 1px solid #000;
+      height: 26px;
+      padding: 2px;
+    }
+  }
+
+  .sheet-footer {
+    margin-top: 24px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #64748b;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 8px;
+  }
+
+  .answer-sheet-container {
+    width: 100%;
+    padding: 12px 8px;
+    box-sizing: border-box;
+  }
+
+  .analysis-page {
+    min-height: auto;
+
+    .analysis-content {
+      .analysis-line {
+        margin: 0 0 8px;
+        line-height: 1.75;
+        text-align: left;
+        word-break: normal;
+
+        .math-text {
+          word-break: normal;
+
+          .katex,
+          .katex * {
+            word-break: normal;
+            overflow-wrap: normal;
+          }
+
+          .katex .mspace.newline {
+            display: inline !important;
+            padding: 0 4px !important;
+          }
+        }
+      }
+    }
+  }
+
+  .exam-paper-body.skin-export {
+    .section-heading {
+      font-size: 14px;
+      font-weight: 700;
+      margin: 8px 0 4px;
+      color: #000;
+    }
+
+    .section-notice {
+      font-size: 12px;
+      line-height: 1.55;
+      margin-bottom: 10px;
+      color: #222;
+    }
+
+    .mock-q-item {
+      margin-bottom: 16px;
+      page-break-inside: avoid;
+    }
+
+    .q-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .q-text {
+      flex: 1;
+      font-size: 13px;
+      line-height: 1.75;
+      color: #000;
+      text-align: justify;
+    }
+
+    .q-options.layout-horizontal {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      column-gap: 10px;
+      row-gap: 6px;
+      margin: 8px 0 0 1.6em;
+      font-size: 12.5px;
+    }
+
+    .q-options.layout-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 16px;
+      row-gap: 6px;
+      margin: 8px 0 0 1.6em;
+    }
+
+    .q-options.layout-vertical {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin: 8px 0 0 1.6em;
+    }
+
+    .opt-cell {
+      display: flex;
+      align-items: flex-start;
+      gap: 4px;
+    }
+  }
+}
+
+@media print {
+  .export-paper-root {
+    width: 100% !important;
+    max-width: 178mm !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    gap: 0 !important;
+
+    .simulated-sheet {
+      min-height: auto !important;
+      height: auto !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      margin: 0 auto !important;
+      padding: 0 !important;
+      box-shadow: none !important;
+      border: none !important;
+      border-bottom: none !important;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    .simulated-sheet:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+  }
+}

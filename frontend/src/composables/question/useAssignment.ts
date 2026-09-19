@@ -8,15 +8,21 @@ import {
   publishAssignment,
   deleteAssignment,
   submitAssignment,
-  getAssignmentSubmissions
+  getAssignmentSubmissions,
+  remindAssignment
 } from '@/api/question/assignment';
 import { getSubmissionsByAssignment, gradeSubmission } from '@/api/question/submission';
 import { getCourseList } from '@/api/course/course';
+import { normalizeCourseListFromApi } from '@/utils/course/course-display';
 import { getExams, getExamDetail } from '@/api/question/exam';
 import { Assignment } from '@/types/question/assignment';
 import type { Course } from '@/types/course/course';
 import type { QuestionItem, QuestionType } from '@/types/question/question';
 import { normalizeQuestionList } from '@/utils/question/normalize-question';
+import {
+  SUBMISSION_STATUS_LABEL,
+  SUBMISSION_STATUS_TAG
+} from '@/constants/question/assignment';
 
 export function useAssignment() {
   const assignments = ref<Assignment[]>([]);
@@ -79,23 +85,16 @@ export function useAssignment() {
   async function loadCourses() {
     try {
       const res = await getCourseList({ page: 1, pageSize: 50 });
-      return res.data?.list || [
-        { id: 101, title: '数据结构与算法' } as Course,
-        { id: 102, title: 'Java程序设计' } as Course,
-        { id: 103, title: '高等数学（上）' } as Course
-      ];
+      const list = res.data?.list || [];
+      return normalizeCourseListFromApi(list as unknown as Record<string, unknown>[]) as unknown as Course[];
     } catch {
-      return [
-        { id: 101, title: '数据结构与算法' } as Course,
-        { id: 102, title: 'Java程序设计' } as Course,
-        { id: 103, title: '高等数学（上）' } as Course
-      ];
+      return [];
     }
   }
 
   async function gradePendingSubmissions(assignmentId: number) {
     const sRes = await getSubmissionsByAssignment(assignmentId);
-    const pendingSubs = (sRes.data || []).filter((s: any) => s.status === 'PENDING');
+    const pendingSubs = (sRes.data || []).filter((s: any) => s.status === 'SUBMITTED');
     for (const sub of pendingSubs) {
       await gradeSubmission(sub.id);
     }
@@ -172,21 +171,11 @@ export function calculateSelectedQuestionsScore(questions: QuestionItem[]) {
 /* ── Pure helpers (detail) ── */
 
 export function getSubmissionStatusLabel(status: string) {
-  const map: Record<string, string> = {
-    GRADED: '批改完成',
-    AI_GRADED: 'AI已预评',
-    PENDING: '待教师终审'
-  };
-  return map[status] || '待批改';
+  return SUBMISSION_STATUS_LABEL[status] || '待批改';
 }
 
 export function getSubmissionStatusType(status: string) {
-  const map: Record<string, string> = {
-    GRADED: 'success',
-    AI_GRADED: 'primary',
-    PENDING: 'warning'
-  };
-  return (map[status] as any) || 'info';
+  return (SUBMISSION_STATUS_TAG[status] as any) || 'info';
 }
 
 export function getAssignmentDetailTypeLabel(type: QuestionType | string) {
@@ -240,13 +229,23 @@ export function calculateSubmissionRate(submittedCount: number, totalStudentsCou
 }
 
 export function countPendingReview(submissions: any[]) {
-  return submissions.filter(s => s.status !== 'GRADED').length;
+  return submissions.filter(s => s.status === 'SUBMITTED').length;
 }
 
 export function calculateAverageScore(submissions: any[]) {
-  const scored = submissions.filter(s => s.finalScore !== null);
-  if (!scored.length) return '88.5';
-  const sum = scored.reduce((acc, s) => acc + s.finalScore, 0);
+  const scored = submissions.filter(
+    s =>
+      s.totalScore !== null &&
+      s.totalScore !== undefined &&
+      (s.status === 'GRADED' || s.status === 'REVIEWED')
+  );
+  if (!scored.length) {
+    const alt = submissions.filter(s => s.finalScore !== null && s.finalScore !== undefined);
+    if (!alt.length) return '—';
+    const sumAlt = alt.reduce((acc, s) => acc + s.finalScore, 0);
+    return (sumAlt / alt.length).toFixed(1);
+  }
+  const sum = scored.reduce((acc, s) => acc + (s.totalScore ?? 0), 0);
   return (sum / scored.length).toFixed(1);
 }
 
@@ -264,8 +263,8 @@ export function useAssignmentCreate() {
 
   const formData = reactive({
     title: '',
-    courseId: 101 as number | undefined,
-    deadline: '2026-09-30 23:59:59',
+    courseId: undefined as number | undefined,
+    deadline: '',
     totalScore: 100,
     passScore: 60,
     examId: undefined as number | undefined,
@@ -376,12 +375,6 @@ export function useAssignmentCreate() {
       if (route.query.courseId) formData.courseId = Number(route.query.courseId);
       if (route.query.title) formData.title = `${route.query.title} - 课堂作业测验`;
       handleExamSelected(formData.examId);
-    } else {
-      if (examOptions.value.length > 0) {
-        formData.examId = examOptions.value[0].id;
-        formData.title = '第三周：二叉树遍历与递归算法平时作业';
-        handleExamSelected(formData.examId);
-      }
     }
   });
 
@@ -480,11 +473,12 @@ export function useAssignmentDetail() {
 
   async function triggerSingleAIGrade(row: any) {
     try {
-      const res = await gradeSubmission(row.id);
+      await gradeSubmission(row.id);
       row.aiGraded = true;
-      row.aiScore = res.data?.totalScore ?? res.data?.score ?? 88;
-      row.status = 'AI_GRADED';
-      ElMessage.success(`学生 ${row.studentName} 的答卷已完成AI智能预批！得分：${row.aiScore}分`);
+      row.status = 'GRADED';
+      ElMessage.success(
+        `学生 ${row.studentName} 的答卷已完成智能评阅${row.aiScore != null ? `，得分：${row.aiScore} 分` : ''}`
+      );
     } catch (err: any) {
       ElMessage.error(err?.message || 'AI批改请求失败，请检查服务连接');
     }
@@ -493,7 +487,7 @@ export function useAssignmentDetail() {
   async function handleBatchAIGrade() {
     batchAILoading.value = true;
     try {
-      const pendings = submissionsList.value.filter(s => s.status === 'PENDING' || !s.aiGraded);
+      const pendings = submissionsList.value.filter(s => s.status === 'SUBMITTED');
       if (!pendings.length) {
         ElMessage.info('当前暂无待AI预评的答卷');
         return;
@@ -501,10 +495,9 @@ export function useAssignmentDetail() {
       let successCount = 0;
       for (const sub of pendings) {
         try {
-          const res = await gradeSubmission(sub.id);
+          await gradeSubmission(sub.id);
           sub.aiGraded = true;
-          sub.aiScore = res.data?.totalScore ?? res.data?.score ?? 85;
-          sub.status = 'AI_GRADED';
+          sub.status = 'GRADED';
           successCount++;
         } catch (subErr) {
           console.warn(`批改答卷 #${sub.id} 失败`, subErr);
@@ -522,8 +515,18 @@ export function useAssignmentDetail() {
     }
   }
 
-  function handleRemindUnsubmitted() {
-    ElMessage.success('已通过系统站内信与移动端向 4 位尚未提交作业的同学发送催交提醒！');
+  async function handleRemindUnsubmitted() {
+    try {
+      const res = await remindAssignment(assignmentId.value);
+      const count = res.data?.remindedCount ?? 0;
+      if (count > 0) {
+        ElMessage.success(`已向 ${count} 位尚未提交的同学发送催交提醒`);
+      } else {
+        ElMessage.info('当前没有需要催交的学生');
+      }
+    } catch (err: unknown) {
+      ElMessage.error(err instanceof Error ? err.message : '催交提醒发送失败');
+    }
   }
 
   function handleBack() {

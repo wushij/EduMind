@@ -1,6 +1,8 @@
 package com.edumind.question.service.export.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.edumind.common.api.PageResult;
 import com.edumind.common.api.ResultCode;
 import com.edumind.common.constant.SecurityConstant;
 import com.edumind.common.context.TenantContext;
@@ -16,6 +18,7 @@ import com.edumind.question.service.export.ExportTaskDispatcher;
 import com.edumind.question.service.export.ExportTaskService;
 import com.edumind.question.vo.export.ExportTaskVO;
 import com.edumind.security.context.LoginUserResolver;
+import com.edumind.teaching.api.ExamQueryApi;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -47,6 +50,7 @@ public class ExportTaskServiceImpl implements ExportTaskService {
     private final ExportTaskDispatcher exportTaskDispatcher;
     private final FileStorageService fileStorageService;
     private final ObjectMapper objectMapper;
+    private final ExamQueryApi examQueryApi;
 
     @Value("${minio.bucketName:edumind}")
     private String bucketName;
@@ -58,6 +62,9 @@ public class ExportTaskServiceImpl implements ExportTaskService {
 
         if (dto == null || dto.getExamId() == null) {
             throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "试卷 ID 不能为空");
+        }
+        if (examQueryApi.getExamById(dto.getExamId()) == null) {
+            throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "试卷不存在或无权访问");
         }
 
         String paramsJson = null;
@@ -73,6 +80,7 @@ public class ExportTaskServiceImpl implements ExportTaskService {
         entity.setBizType("EXAM_PAPER");
         entity.setBizId(dto.getExamId());
         entity.setStatus("PENDING");
+        entity.setProgress(0);
         entity.setExportParams(paramsJson);
         entity.setExpireTime(LocalDateTime.now().plusDays(7));
         entity.setCreateTime(LocalDateTime.now());
@@ -89,26 +97,37 @@ public class ExportTaskServiceImpl implements ExportTaskService {
         return toVO(entity);
     }
 
+    private static final int STALE_EXPORT_MINUTES = 8;
+
     @Override
     public ExportTaskVO getTaskStatus(Long taskId) {
         ExportTaskEntity entity = requireAccessibleTask(taskId);
+        reconcileStaleTask(entity);
         return toVO(entity);
     }
 
     @Override
-    public List<ExportTaskVO> listMyExportTasks() {
+    public PageResult<ExportTaskVO> pageMyExportTasks(Long page, Long pageSize) {
         Long tenantId = TenantContext.requireTenantId();
         Long userId = LoginUserResolver.requireUserId();
-        List<ExportTaskEntity> list = exportTaskDao.listByUserId(tenantId, userId);
-        return list.stream().map(this::toVO).collect(Collectors.toList());
+        long pageNum = page != null && page > 0 ? page : 1L;
+        long size = pageSize != null && pageSize > 0 ? Math.min(pageSize, 100L) : 10L;
+        Page<ExportTaskEntity> entityPage = exportTaskDao.pageByUserId(tenantId, userId, pageNum, size);
+        for (ExportTaskEntity entity : entityPage.getRecords()) {
+            reconcileStaleTask(entity);
+        }
+        List<ExportTaskVO> list = entityPage.getRecords().stream().map(this::toVO).collect(Collectors.toList());
+        return PageResult.<ExportTaskVO>builder()
+                .total(entityPage.getTotal())
+                .pageNum(pageNum)
+                .pageSize(size)
+                .list(list)
+                .build();
     }
 
     @Override
     public void deleteMyTask(Long taskId) {
         ExportTaskEntity task = requireAccessibleTask(taskId);
-        if ("PROCESSING".equalsIgnoreCase(task.getStatus()) || "PENDING".equalsIgnoreCase(task.getStatus())) {
-            throw new BusinessException(ResultCode.VALIDATE_FAILED.getCode(), "任务生成中，请稍后再删除");
-        }
         if (StringUtils.hasText(task.getObjectKey())) {
             try {
                 if (TenantObjectKeyBuilder.validateTenantOwnership(task.getTenantId(), task.getObjectKey())) {
@@ -203,6 +222,27 @@ public class ExportTaskServiceImpl implements ExportTaskService {
         return false;
     }
 
+    /**
+     * 将长时间未完成的排队/生成任务标记为失败，避免列表永久卡在「生成中」。
+     */
+    private void reconcileStaleTask(ExportTaskEntity entity) {
+        if (entity == null || entity.getCreateTime() == null) {
+            return;
+        }
+        String status = entity.getStatus();
+        if (!"PENDING".equalsIgnoreCase(status) && !"PROCESSING".equalsIgnoreCase(status)) {
+            return;
+        }
+        if (entity.getCreateTime().isAfter(LocalDateTime.now().minusMinutes(STALE_EXPORT_MINUTES))) {
+            return;
+        }
+        entity.setStatus("FAILED");
+        entity.setProgress(0);
+        entity.setErrorMsg("导出超时或后台任务异常终止，请删除记录后重新点击「生成 PDF」");
+        exportTaskDao.updateById(entity);
+        log.warn("[试卷导出] 任务 {} 超过 {} 分钟未完成，已自动标记为 FAILED", entity.getId(), STALE_EXPORT_MINUTES);
+    }
+
     private ExportTaskVO toVO(ExportTaskEntity entity) {
         ExportTaskVO vo = new ExportTaskVO();
         vo.setTaskId(String.valueOf(entity.getId()));
@@ -213,13 +253,11 @@ public class ExportTaskServiceImpl implements ExportTaskService {
         vo.setStatus(entity.getStatus());
         vo.setErrorMsg(entity.getErrorMsg());
 
-        int progress = 0;
+        int progress = entity.getProgress() != null ? entity.getProgress() : 0;
         if ("SUCCESS".equalsIgnoreCase(entity.getStatus())) {
             progress = 100;
-        } else if ("PROCESSING".equalsIgnoreCase(entity.getStatus())) {
-            progress = 50;
-        } else {
-            progress = 0;
+        } else if ("FAILED".equalsIgnoreCase(entity.getStatus())) {
+            progress = Math.min(progress, 99);
         }
         vo.setProgress(progress);
 

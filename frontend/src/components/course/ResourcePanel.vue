@@ -572,7 +572,14 @@ function formatResourceListedTime(value?: string): string {
 
 const pdfCount = computed(() => resources.value.filter(r => (r.resourceType || '').toUpperCase() === 'PDF').length);
 const pptCount = computed(() => resources.value.filter(r => (r.resourceType || '').toUpperCase() === 'PPT').length);
-const ragIndexedCount = computed(() => resources.value.length);
+const ragIndexedCount = computed(
+  () =>
+    resources.value.filter(
+      (r) =>
+        r.documentId != null &&
+        (r.knowledgeParseStatus === 'SUCCESS' || (r.knowledgeChunkCount != null && r.knowledgeChunkCount > 0))
+    ).length
+);
 
 const typeTabs = computed(() => [
   { label: '全部资料', value: 'ALL', count: resources.value.length },
@@ -761,7 +768,8 @@ async function handleUploadSubmit() {
       await uploadResource(file, {
         title,
         resourceType,
-        chapterId: selectedChapterId.value
+        chapterId: selectedChapterId.value,
+        syncToKnowledgeBase: autoSyncRag.value
       });
       result.succeeded += 1;
 

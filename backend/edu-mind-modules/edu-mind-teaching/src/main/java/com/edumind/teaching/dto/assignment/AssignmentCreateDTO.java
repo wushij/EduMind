@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class AssignmentCreateDTO {
@@ -15,4 +16,8 @@ public class AssignmentCreateDTO {
     private String title;
     private String description;
     private LocalDateTime deadline;
+    private Integer totalScore;
+    private Integer passScore;
+    private List<Long> questionIds;
+    private AssignmentSettingsDTO settings;
 }

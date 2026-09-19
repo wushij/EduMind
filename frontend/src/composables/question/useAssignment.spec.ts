@@ -52,7 +52,7 @@ const sampleSubmissions = [
     id: 2,
     studentNo: '2024002',
     studentName: '李四',
-    status: 'PENDING',
+    status: 'SUBMITTED',
     finalScore: null,
     aiGraded: false
   },
@@ -93,9 +93,10 @@ describe('calculateSelectedQuestionsScore', () => {
 
 describe('getSubmissionStatusLabel', () => {
   it('maps submission status labels', () => {
-    expect(getSubmissionStatusLabel('GRADED')).toBe('批改完成');
-    expect(getSubmissionStatusLabel('AI_GRADED')).toBe('AI已预评');
-    expect(getSubmissionStatusLabel('PENDING')).toBe('待教师终审');
+    expect(getSubmissionStatusLabel('REVIEWED')).toBe('批改完成');
+    expect(getSubmissionStatusLabel('GRADED')).toBe('AI 已评 · 待确认');
+    expect(getSubmissionStatusLabel('AI_GRADED')).toBe('AI 已评 · 待确认');
+    expect(getSubmissionStatusLabel('SUBMITTED')).toBe('待批改');
     expect(getSubmissionStatusLabel('OTHER')).toBe('待批改');
   });
 });
@@ -142,7 +143,7 @@ describe('filterSubmissions', () => {
   });
 
   it('combines status and search filters', () => {
-    const result = filterSubmissions(sampleSubmissions, 'AI_GRADED', '王');
+    const result = filterSubmissions(sampleSubmissions, 'AI_GRADED', '王'); // legacy display status
     expect(result).toHaveLength(1);
     expect(result[0].studentName).toBe('王五');
   });
@@ -167,14 +168,14 @@ describe('calculateSubmissionRate', () => {
 });
 
 describe('countPendingReview', () => {
-  it('counts non-graded submissions', () => {
-    expect(countPendingReview(sampleSubmissions)).toBe(2);
+  it('counts submitted awaiting review', () => {
+    expect(countPendingReview(sampleSubmissions)).toBe(1);
   });
 });
 
 describe('calculateAverageScore', () => {
-  it('returns default when no scored submissions', () => {
-    expect(calculateAverageScore([{ finalScore: null }])).toBe('88.5');
+  it('returns dash when no scored submissions', () => {
+    expect(calculateAverageScore([{ finalScore: null }])).toBe('—');
   });
 
   it('calculates average of scored submissions', () => {

@@ -1,4 +1,4 @@
-import { get, post, del } from '@/core/http/request';
+import { get, post, put, del } from '@/core/http/request';
 import { PageResult } from '@/types/common/api';
 
 export const getQuestionBanks = (params?: Record<string, any>) =>
@@ -8,6 +8,9 @@ export const getQuestionBankDetail = (id: number | string) => get<any>(`/questio
 
 export const createQuestionBank = (data: Record<string, any>) => post<number | string>('/question-banks', data);
 
+export const updateQuestionBank = (id: number | string, data: Record<string, any>) =>
+  put<void>(`/question-banks/${id}`, data);
+
 export const addQuestionsToBank = (bankId: number | string, questionIds: (number | string)[]) =>
   post<void>(`/question-banks/${bankId}/questions`, { questionIds });
 
@@ -15,4 +18,5 @@ export const removeQuestionFromBank = (bankId: number | string, questionId: numb
   del<void>(`/question-banks/${bankId}/questions/${questionId}`);
 
 export const deleteQuestionBank = (id: number | string) => del<void>(`/question-banks/${id}`);
+
 

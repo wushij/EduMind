@@ -50,6 +50,13 @@ public class CourseResourceDao {
         return courseResourceMapper.insert(entity);
     }
 
+    public int updateById(CourseResourceEntity entity) {
+        if (entity == null || entity.getId() == null) {
+            return 0;
+        }
+        return courseResourceMapper.updateById(entity);
+    }
+
     public int deleteById(Long id) {
         if (id == null) {
             return 0;

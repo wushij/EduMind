@@ -63,8 +63,8 @@ describe('buildGradingItems', () => {
 
   it('falls back to generated stem and default answers', () => {
     const items = buildGradingItems({}, [{ maxScore: 6, score: 4 }]);
-    expect(items[0].stem).toBe('答卷试题 #1 评分考查点');
-    expect(items[0].studentAnswer).toBe('（考生作答内容）');
+    expect(items[0].stem).toBe('试题 #1');
+    expect(items[0].studentAnswer).toBe('（未作答）');
     expect(items[0].teacherScore).toBe(4);
   });
 });

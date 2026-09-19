@@ -14,5 +14,8 @@ public class CourseResourceVO {
     private String resourceType;
     private Long chapterId;
     private String downloadUrl;
+    /** 关联知识库文档解析状态（PENDING/PARSING/SUCCESS/FAILED） */
+    private String knowledgeParseStatus;
+    private Integer knowledgeChunkCount;
     private LocalDateTime createTime;
 }

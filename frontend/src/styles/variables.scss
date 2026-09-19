@@ -34,8 +34,8 @@ $control-height-sm: 32px;
 $control-height-base: 40px;
 $control-height-lg: 48px;
 
-// 页面底部留白（主内容区统一，与首页一致）
-$page-bottom-spacing: 48px;
+// 页面底部留白（主内容区 padding-bottom；不宜过大，否则短列表页分页下方空一大块）
+$page-bottom-spacing: 24px;
 
 // 全局 AI 副驾驶悬浮钮占位（分页/卡片局部使用，勿与 $page-bottom-spacing 叠加到主内容 padding）
 $copilot-safe-bottom: 76px;

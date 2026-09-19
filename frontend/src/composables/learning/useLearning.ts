@@ -1,17 +1,37 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { getLearningPath } from '@/api/learning/learning-path';
-import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
+import { getLearningHomeOverview } from '@/api/learning/home';
 import { useAuthStore } from '@/stores/auth/auth';
 import type { LearningPathVO } from '@/types/learning/learning-path';
 
-export function useLearning(defaultCourseId = 102) {
-  const { courseOptions, courseId } = useTeacherCourses(defaultCourseId);
+export function useLearning(defaultCourseId?: number) {
+  const courseOptions = ref<Array<{ id: number; name: string }>>([]);
+  const courseId = ref(defaultCourseId ?? 0);
   const authStore = useAuthStore();
   const loading = ref(false);
   const path = ref<LearningPathVO | null>(null);
 
+  async function loadCourses() {
+    try {
+      const res = await getLearningHomeOverview();
+      const list = res.data?.courses ?? [];
+      courseOptions.value = list.map((c) => ({
+        id: c.courseId,
+        name: c.courseName || `课程 #${c.courseId}`
+      }));
+      if (!courseId.value && res.data?.primaryCourseId) {
+        courseId.value = res.data.primaryCourseId;
+      } else if (!courseId.value && courseOptions.value.length) {
+        courseId.value = courseOptions.value[0].id;
+      }
+    } catch {
+      courseOptions.value = [];
+    }
+  }
+
   async function loadPath() {
+    if (!courseId.value) return;
     loading.value = true;
     try {
       const studentId = authStore.currentUser?.id;
@@ -25,14 +45,18 @@ export function useLearning(defaultCourseId = 102) {
     }
   }
 
-  onMounted(loadPath);
+  onMounted(async () => {
+    await loadCourses();
+    await loadPath();
+  });
 
   return {
     courseOptions,
     courseId,
     loading,
     path,
-    loadPath
+    loadPath,
+    loadCourses
   };
 }
 

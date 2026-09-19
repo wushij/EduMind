@@ -14,9 +14,15 @@ export function useRecommendations() {
   const usedMockFallback = ref(false);
 
   async function fetchRecommendations(courseId?: number, chapterId?: number) {
+    if (courseId == null) {
+      items.value = [];
+      questions.value = [];
+      resources.value = [];
+      return;
+    }
     loading.value = true;
     usedMockFallback.value = false;
-    const targetCourseId = courseId || 101;
+    const targetCourseId = courseId;
     try {
       const [qRes, rRes] = await Promise.all([
         getQuestionRecommendations({ courseId: targetCourseId, chapterId, limit: 10 }),

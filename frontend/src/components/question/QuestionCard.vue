@@ -75,7 +75,7 @@
           title="从题库中移除此题"
           @click="confirmDelete"
         >
-          <span>删除</span>
+          <span>{{ deleteActionLabel }}</span>
         </button>
       </div>
     </div>
@@ -214,6 +214,9 @@ const props = withDefaults(
     allowRegenerate?: boolean;
     allowAiTutor?: boolean;
     isRegenerating?: boolean;
+    /** 删除确认场景：题库列表永久删除 / 题库详情仅移出当前题库 */
+    deleteScope?: 'question' | 'bank';
+    deleteActionLabel?: string;
     /** 初始是否展开选项/参考答案；题库列表建议 false */
     defaultBodyExpanded?: boolean;
     /** 初始是否展开解析；题库列表建议 false */
@@ -235,7 +238,9 @@ const props = withDefaults(
     defaultAnalysisExpanded: true,
     bulkExpandBody: false,
     bulkExpandAnalysis: false,
-    expandSyncKey: undefined
+    expandSyncKey: undefined,
+    deleteScope: 'question',
+    deleteActionLabel: '删除'
   }
 );
 
@@ -344,16 +349,18 @@ async function confirmDelete() {
   const stemPreview = stemRaw.slice(0, 60);
   const hint = stemRaw ? `「${stemPreview}${stemRaw.length > 60 ? '…' : ''}」` : '该试题';
   try {
-    await ElMessageBox.confirm(
-      `${hint} 将从题库中永久移除，此操作不可撤销。确定删除吗？`,
-      '删除确认',
-      {
-        type: 'warning',
-        confirmButtonText: '确认删除',
-        cancelButtonText: '取消',
-        distinguishCancelAndClose: true
-      }
-    );
+    const confirmBody =
+      props.deleteScope === 'bank'
+        ? `${hint} 将从当前题库移出（公共试题不会被删除）。确定移出吗？`
+        : `${hint} 将从题库中永久移除，此操作不可撤销。确定删除吗？`;
+    const confirmTitle = props.deleteScope === 'bank' ? '移出题库确认' : '删除确认';
+    const confirmBtn = props.deleteScope === 'bank' ? '确认移出' : '确认删除';
+    await ElMessageBox.confirm(confirmBody, confirmTitle, {
+      type: 'warning',
+      confirmButtonText: confirmBtn,
+      cancelButtonText: '取消',
+      distinguishCancelAndClose: true
+    });
     const rawId = localQuestion.value.id;
     if (rawId === undefined || rawId === null || rawId === '' || rawId === 0) {
       ElMessage.warning('题目标识无效，无法删除');

@@ -24,8 +24,15 @@ const html = computed(() => renderMathText(props.text || ''));
 
 <style lang="scss">
 .math-text {
-  line-height: 1.6;
-  word-break: break-word;
+  line-height: 1.75;
+  overflow-wrap: break-word;
+  word-break: normal;
+
+  .katex,
+  .katex * {
+    word-break: normal;
+    overflow-wrap: normal;
+  }
 
   .katex {
     font-size: 1.05em;

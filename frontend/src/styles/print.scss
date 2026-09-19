@@ -6,6 +6,9 @@
   // 1. 彻底隐藏全局系统外壳、导航条、侧边栏、悬浮窗、通用按钮与非打印内容
   .app-header,
   .app-sidebar,
+  .sidebar,
+  .layout-body > header,
+  .broadcast-marquee-banner,
   .global-assistant-drawer,
   .page-hero-banner,
   .no-print,
@@ -43,7 +46,61 @@
 
   // 3. 页面打印尺寸标准配置
   @page {
-    size: auto;
-    margin: 8mm 12mm 8mm 12mm;
+    size: A4 portrait;
+    margin: 18mm 16mm 16mm 16mm;
+  }
+
+  // 试卷导出中心 · 纯净打印：无水印、仅打印当前选中的卷面页
+  html.export-paper-print {
+    .watermark-layer {
+      display: none !important;
+    }
+
+    .simulated-sheet {
+      color: #000 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .sheet-main-content,
+    .q-text,
+    .opt-cell {
+      opacity: 1 !important;
+    }
+  }
+
+  html.export-paper-print-current {
+    .simulated-sheet:not(.is-print-active) {
+      display: none !important;
+    }
+  }
+
+  // 兜底：若仍走 window.print()，只输出试卷节点
+  html.export-paper-print {
+    body * {
+      visibility: hidden !important;
+    }
+
+    #printable-exam-paper,
+    #printable-exam-paper * {
+      visibility: visible !important;
+    }
+
+    #printable-exam-paper {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      transform: none !important;
+      z-index: 2147483647 !important;
+      background: #ffffff !important;
+    }
+
+    .paper-scaler,
+    .paper-scroll-wrapper {
+      transform: none !important;
+      overflow: visible !important;
+    }
   }
 }

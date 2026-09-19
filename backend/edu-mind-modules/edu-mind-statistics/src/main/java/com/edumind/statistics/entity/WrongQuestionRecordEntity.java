@@ -21,6 +21,11 @@ public class WrongQuestionRecordEntity implements Serializable {
     private String diagnosis;
     private String variantQuestionIds;
     private Integer wrongCount;
+    /** 最近一次错误作答 */
+    private String lastStudentAnswer;
+    /** 0=待攻坚 1=已攻克 */
+    private Integer status;
+    private LocalDateTime masteredTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

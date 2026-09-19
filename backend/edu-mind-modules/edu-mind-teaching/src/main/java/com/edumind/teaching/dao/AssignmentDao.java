@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
+import java.util.List;
+
 @Repository
 @RequiredArgsConstructor
 public class AssignmentDao {
@@ -18,7 +20,7 @@ public class AssignmentDao {
         return assignmentMapper.selectById(id);
     }
 
-    public Page<AssignmentEntity> pageQuery(Long courseId, String status, long pageNum, long pageSize) {
+    public Page<AssignmentEntity> pageQuery(Long courseId, String status, String keyword, long pageNum, long pageSize) {
         Page<AssignmentEntity> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<AssignmentEntity> wrapper = new LambdaQueryWrapper<>();
         if (courseId != null) {
@@ -27,8 +29,23 @@ public class AssignmentDao {
         if (StringUtils.hasText(status)) {
             wrapper.eq(AssignmentEntity::getStatus, status);
         }
+        if (StringUtils.hasText(keyword)) {
+            wrapper.like(AssignmentEntity::getTitle, keyword.trim());
+        }
         wrapper.orderByDesc(AssignmentEntity::getCreateTime);
         return assignmentMapper.selectPage(page, wrapper);
+    }
+
+    public List<AssignmentEntity> listPublishedByCourseIds(List<Long> courseIds) {
+        if (courseIds == null || courseIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return assignmentMapper.selectList(
+                new LambdaQueryWrapper<AssignmentEntity>()
+                        .in(AssignmentEntity::getCourseId, courseIds)
+                        .eq(AssignmentEntity::getStatus, "PUBLISHED")
+                        .orderByDesc(AssignmentEntity::getDeadline)
+        );
     }
 
     public int insert(AssignmentEntity entity) {

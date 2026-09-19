@@ -6,6 +6,8 @@ server:
 spring:
   profiles:
     active: dev
+  main:
+    allow-circular-references: true
   application:
     name: edu-mind-backend
   mvc:

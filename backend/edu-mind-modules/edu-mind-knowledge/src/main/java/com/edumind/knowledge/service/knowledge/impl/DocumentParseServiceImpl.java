@@ -1,7 +1,6 @@
 package com.edumind.knowledge.service.knowledge.impl;
 
 import com.edumind.knowledge.service.knowledge.DocumentParseService;
-import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
@@ -37,7 +36,7 @@ public class DocumentParseServiceImpl implements DocumentParseService {
     }
 
     private String extractPdfText(byte[] fileBytes) {
-        try (PDDocument document = Loader.loadPDF(fileBytes)) {
+        try (PDDocument document = PDDocument.load(fileBytes)) {
             PDFTextStripper stripper = new PDFTextStripper();
             return stripper.getText(document);
         } catch (Exception ex) {

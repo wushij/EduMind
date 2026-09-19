@@ -7,5 +7,5 @@ public interface LearningAnalyticsService {
 
     LearningAnalyticsVO getLearningAnalytics(Long courseId, String range, Long classId);
 
-    StudentPortraitVO getStudentPortrait(Long courseId, Long studentId);
+    StudentPortraitVO getStudentPortrait(Long courseId, Long studentId, String range);
 }

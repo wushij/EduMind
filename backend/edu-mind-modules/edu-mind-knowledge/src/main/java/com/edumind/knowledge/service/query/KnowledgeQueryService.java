@@ -14,4 +14,6 @@ public interface KnowledgeQueryService {
     List<KnowledgeDocumentVO> listDocumentsByKnowledgeBaseId(Long knowledgeBaseId);
 
     String getDocumentText(Long documentId);
+
+    KnowledgeDocumentVO getDocumentById(Long documentId);
 }

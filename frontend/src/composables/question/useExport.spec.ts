@@ -4,15 +4,14 @@ import {
   createDefaultConfigForm,
   parseExportTaskTitle,
   mapExportTaskToHistoryItem,
-  applyPresetConfig,
-  DEFAULT_EXPORT_HISTORY
+  applyPresetConfig
 } from './useExport';
 import type { ExportTaskVO } from '@/types/question/export';
 
 describe('createDefaultConfigForm', () => {
-  it('returns form with expected default exam preset values', () => {
+  it('returns form with layout defaults and no hardcoded exam', () => {
     const form = createDefaultConfigForm();
-    expect(form.examId).toBe(101);
+    expect(form.examId).toBe(0);
     expect(form.paperSize).toBe('A4');
     expect(form.showSealingLine).toBe(true);
     expect(form.showAnswerSheet).toBe(true);
@@ -35,10 +34,11 @@ describe('PRESET_TEMPLATES', () => {
 });
 
 describe('applyPresetConfig', () => {
-  it('merges preset config into form', () => {
+  it('merges layout preset without overwriting titles by default', () => {
     const form = createDefaultConfigForm();
+    form.paperTitle = '我的试卷标题';
     applyPresetConfig(form, PRESET_TEMPLATES[1]);
-    expect(form.paperTitle).toContain('函数与导数');
+    expect(form.paperTitle).toBe('我的试卷标题');
     expect(form.showSealingLine).toBe(false);
     expect(form.lineSpacing).toBe('compact');
   });
@@ -101,12 +101,5 @@ describe('mapExportTaskToHistoryItem', () => {
       createTime: '2026-09-15 12:00:00',
       downloadUrl: undefined
     });
-  });
-});
-
-describe('DEFAULT_EXPORT_HISTORY', () => {
-  it('includes sample successful export tasks', () => {
-    expect(DEFAULT_EXPORT_HISTORY.length).toBeGreaterThanOrEqual(3);
-    expect(DEFAULT_EXPORT_HISTORY[0].status).toBe('SUCCESS');
   });
 });

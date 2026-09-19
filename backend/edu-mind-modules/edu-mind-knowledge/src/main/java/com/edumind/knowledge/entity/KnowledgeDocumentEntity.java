@@ -17,6 +17,7 @@ public class KnowledgeDocumentEntity implements Serializable {
     /** UPLOAD | LESSON */
     private String sourceType;
     private Long courseId;
+    private Long courseResourceId;
     private Long lessonChapterId;
     private String contentHash;
     private String fileName;

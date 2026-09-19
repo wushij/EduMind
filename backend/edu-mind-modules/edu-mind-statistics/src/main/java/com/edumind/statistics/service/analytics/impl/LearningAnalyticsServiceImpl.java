@@ -130,12 +130,12 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         }
 
         // 组装班级选课学生学情明细列表 (供班级整体分析学生榜单)
-        vo.setStudents(buildStudentRoster(courseId, vo, submissionStats));
+        vo.setStudents(buildStudentRoster(courseId, submissionStats, since));
 
         return vo;
     }
 
-    private List<StudentLearningItemVO> buildStudentRoster(Long courseId, LearningAnalyticsVO vo, SubmissionStatsVO submissionStats) {
+    private List<StudentLearningItemVO> buildStudentRoster(Long courseId, SubmissionStatsVO submissionStats, LocalDateTime since) {
         if (courseId == null) {
             return Collections.emptyList();
         }
@@ -190,7 +190,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
             long wrongCount = wrongQuestionRecordDao.countByStudentAndCourse(sId, courseId);
             item.setWrongCount((int) wrongCount);
 
-            item.setAiUsageCount(0);
+            item.setAiUsageCount((int) resolveStudentAiUsageCount(courseId, sId, since));
 
             if (item.getAvgScore() >= 85 && item.getMasteryScore() >= 80) {
                 item.setStatus("EXCELLENT");
@@ -207,7 +207,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
     }
 
     @Override
-    public StudentPortraitVO getStudentPortrait(Long courseId, Long studentId) {
+    public StudentPortraitVO getStudentPortrait(Long courseId, Long studentId, String range) {
         if (courseId == null || studentId == null) {
             throw new BusinessException("课程或学员参数无效");
         }
@@ -215,6 +215,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
             throw new BusinessException("该学员未加入本课程，无法查看学情画像");
         }
 
+        LocalDateTime since = resolveSince(range);
         StudentPortraitVO vo = new StudentPortraitVO();
         List<Long> enrolledIds = courseQueryApi.listStudentUserIdsByCourseId(courseId);
 
@@ -253,8 +254,9 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
 
         // 2. 核心 KPI 汇总
         StudentPortraitVO.PortraitSummaryVO summary = vo.getSummary();
-        summary.setTotalStudyMinutes(learningRecordDao.getTotalDuration(courseId, studentId));
-        summary.setClassAvgStudyMinutes(computeClassAvgStudyMinutes(courseId, enrolledIds));
+        summary.setTotalStudyMinutesAllTime(learningRecordDao.getTotalDuration(courseId, studentId));
+        summary.setTotalStudyMinutes(learningRecordDao.getTotalDurationSince(courseId, studentId, since));
+        summary.setClassAvgStudyMinutes(computeClassAvgStudyMinutes(courseId, enrolledIds, since));
 
         SubmissionStatsVO submissionStats = submissionQueryApi.getCourseSubmissionStats(courseId);
         double classAvgScore = submissionStats.getAvgScore() != null ? submissionStats.getAvgScore() : 0;
@@ -278,7 +280,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
 
         long wrongCount = wrongQuestionRecordDao.countByStudentAndCourse(studentId, courseId);
         summary.setWrongQuestionCount((int) wrongCount);
-        summary.setAiUsageCount(0);
+        summary.setAiUsageCount((int) resolveStudentAiUsageCount(courseId, studentId, since));
         if (personalAvgScore > 0) {
             summary.setLearningPace(personalAvgScore >= 85 ? "FAST" : (personalAvgScore >= 70 ? "STEADY" : "LAGGING"));
         }
@@ -289,6 +291,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         radar.setDimensions(masteryVO.getDimensions());
         radar.setPersonalScores(masteryVO.getPersonal());
         radar.setClassAvgScores(masteryVO.getClassAvg());
+        compactRadarForDisplay(radar);
 
         // 计算整体掌握度
         if (!masteryVO.getPersonal().isEmpty()) {
@@ -381,15 +384,102 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         return vo;
     }
 
-    private double computeClassAvgStudyMinutes(Long courseId, List<Long> studentIds) {
+    private double computeClassAvgStudyMinutes(Long courseId, List<Long> studentIds, LocalDateTime since) {
         if (courseId == null || studentIds == null || studentIds.isEmpty()) {
             return 0;
         }
         int total = 0;
         for (Long sid : studentIds) {
-            total += learningRecordDao.getTotalDuration(courseId, sid);
+            total += since != null
+                    ? learningRecordDao.getTotalDurationSince(courseId, sid, since)
+                    : learningRecordDao.getTotalDuration(courseId, sid);
         }
         return total / (double) studentIds.size();
+    }
+
+    private long resolveStudentAiUsageCount(Long courseId, Long studentId, LocalDateTime since) {
+        if (courseId == null || studentId == null) {
+            return 0L;
+        }
+        long direct = aiAuditQueryApi.countCallsByCourseAndUser(courseId, studentId, since);
+        if (direct > 0) {
+            return direct;
+        }
+        List<Long> kbIds = knowledgeQueryApi.listKnowledgeBasesByCourseId(courseId).stream()
+                .map(KnowledgeBaseVO::getId)
+                .collect(Collectors.toList());
+        if (kbIds.isEmpty()) {
+            return 0L;
+        }
+        return aiAuditQueryApi.countCallsByKnowledgeBases(kbIds);
+    }
+
+    private static final int RADAR_MAX_DIMENSIONS = 8;
+    private static final String RADAR_OTHER_LABEL = "其他考点";
+
+    /**
+     * 知识点过多时压缩雷达维度，避免长标题占满图表。
+     */
+    private void compactRadarForDisplay(StudentPortraitVO.RadarDataVO radar) {
+        if (radar == null || radar.getDimensions() == null || radar.getDimensions().size() <= RADAR_MAX_DIMENSIONS) {
+            return;
+        }
+        List<String> dims = radar.getDimensions();
+        List<Integer> personal = radar.getPersonalScores();
+        List<Integer> classAvg = radar.getClassAvgScores();
+        int n = dims.size();
+
+        List<Integer> indices = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            indices.add(i);
+        }
+        indices.sort((a, b) -> {
+            int pa = a < personal.size() ? personal.get(a) : 0;
+            int pb = b < personal.size() ? personal.get(b) : 0;
+            boolean testedA = pa > 0;
+            boolean testedB = pb > 0;
+            if (testedA != testedB) {
+                return testedB ? 1 : -1;
+            }
+            return Integer.compare(pa, pb);
+        });
+
+        Set<Integer> picked = new LinkedHashSet<>();
+        for (int idx : indices) {
+            if (picked.size() >= RADAR_MAX_DIMENSIONS) {
+                break;
+            }
+            picked.add(idx);
+        }
+
+        List<String> newDims = new ArrayList<>();
+        List<Integer> newPersonal = new ArrayList<>();
+        List<Integer> newClass = new ArrayList<>();
+        double otherPersonalSum = 0;
+        double otherClassSum = 0;
+        int otherCount = 0;
+
+        for (int i = 0; i < n; i++) {
+            int p = i < personal.size() ? personal.get(i) : 0;
+            int c = i < classAvg.size() ? classAvg.get(i) : 0;
+            if (picked.contains(i)) {
+                newDims.add(dims.get(i));
+                newPersonal.add(p);
+                newClass.add(c);
+            } else {
+                otherPersonalSum += p;
+                otherClassSum += c;
+                otherCount++;
+            }
+        }
+        if (otherCount > 0) {
+            newDims.add(RADAR_OTHER_LABEL);
+            newPersonal.add((int) Math.round(otherPersonalSum / otherCount));
+            newClass.add((int) Math.round(otherClassSum / otherCount));
+        }
+        radar.setDimensions(newDims);
+        radar.setPersonalScores(newPersonal);
+        radar.setClassAvgScores(newClass);
     }
 
     private void buildTrends(LearningAnalyticsVO vo,

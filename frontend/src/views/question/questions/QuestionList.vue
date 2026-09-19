@@ -1,46 +1,54 @@
 <template>
   <div class="question-list-page-container">
-    <!-- 1. 顶部操作头区 (Pill Header Dock) -->
+    <!-- 1. 顶部操作头区 (Hero Header Dock) -->
     <div class="question-header-dock">
-      <div class="header-left">
+      <div class="header-main">
         <div class="title-with-icon">
-          <el-icon class="header-icon text-blue-600"><Reading /></el-icon>
-          <h1 class="main-title">智能题库管理中心</h1>
-          <span class="capsule-count-tag">已收录 {{ total }} 道精选试题</span>
+          <div class="icon-orb" aria-hidden="true">
+            <el-icon class="header-icon"><Reading /></el-icon>
+          </div>
+          <div class="title-meta-col">
+            <div class="title-badges-row">
+              <h1 class="main-title">智能题库管理中心</h1>
+              <span class="capsule-count-tag">已收录 {{ total }} 道精选试题</span>
+            </div>
+            <p class="sub-desc">
+              覆盖单选、多选、判断与主观推导大题，支持基于课程知识大纲的试题检索、原位精修与 AI 智能批量入库。
+            </p>
+          </div>
         </div>
-        <p class="sub-desc">
-          覆盖单选、多选、判断与主观推导大题，支持基于课程知识大纲的试题检索、原位精修与 AI 智能批量入库。
-        </p>
       </div>
 
       <div class="header-right-actions">
-        <button
-          type="button"
-          class="capsule-btn capsule-btn--ai"
-          @click="router.push('/ai/question/generate')"
-        >
-          <el-icon class="sparkle-icon"><MagicStick /></el-icon>
-          <span>AI 智能出题</span>
-          <span class="pill-bubble">秒级出题</span>
-        </button>
+        <div class="action-toolbar">
+          <button
+            type="button"
+            class="capsule-btn capsule-btn--ai"
+            @click="router.push('/ai/question/generate')"
+          >
+            <el-icon class="sparkle-icon"><MagicStick /></el-icon>
+            <span>AI 智能出题</span>
+            <span class="pill-bubble">秒级出题</span>
+          </button>
 
-        <button
-          type="button"
-          class="capsule-btn capsule-btn--primary"
-          @click="router.push('/question/create')"
-        >
-          <el-icon><Plus /></el-icon>
-          <span>录入新题</span>
-        </button>
+          <button
+            type="button"
+            class="capsule-btn capsule-btn--primary"
+            @click="router.push('/question/create')"
+          >
+            <el-icon><Plus /></el-icon>
+            <span>录入新题</span>
+          </button>
 
-        <button
-          type="button"
-          class="capsule-btn capsule-btn--secondary"
-          @click="router.push('/ai/exam/generate')"
-        >
-          <el-icon><Tickets /></el-icon>
-          <span>一键智能组卷</span>
-        </button>
+          <button
+            type="button"
+            class="capsule-btn capsule-btn--secondary"
+            @click="router.push('/ai/exam/generate')"
+          >
+            <el-icon><Tickets /></el-icon>
+            <span>一键智能组卷</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -405,63 +413,127 @@ async function handleUpdateQuestion(updated: Question) {
 
   // 1. 顶部操作坞
   .question-header-dock {
-    background: #FFFFFF;
-    border-radius: 18px;
-    padding: 24px 28px;
-    border: 1px solid #E2E8F0;
-    box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
-    display: flex;
-    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 55%, #f0f7ff 100%);
+    border-radius: 20px;
+    padding: 22px 28px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 22px rgba(30, 80, 160, 0.06);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 24px;
-    flex-wrap: wrap;
+    gap: 20px 28px;
 
-    .header-left {
-      max-width: 680px;
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #2563eb 0%, #6366f1 45%, #7c3aed 100%);
+      opacity: 0.85;
+    }
 
-      .title-with-icon {
+    @media (max-width: 960px) {
+      grid-template-columns: 1fr;
+      align-items: stretch;
+
+      .header-right-actions {
+        justify-content: flex-start;
+      }
+    }
+
+    .header-main {
+      min-width: 0;
+    }
+
+    .title-with-icon {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+
+      .icon-orb {
+        flex-shrink: 0;
+        width: 52px;
+        height: 52px;
+        border-radius: 16px;
+        background: linear-gradient(145deg, #eff6ff 0%, #dbeafe 100%);
+        border: 1px solid #bfdbfe;
         display: flex;
         align-items: center;
-        gap: 10px;
-        margin-bottom: 8px;
-        flex-wrap: wrap;
+        justify-content: center;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.12);
 
         .header-icon {
-          font-size: 22px;
-        }
-
-        .main-title {
-          margin: 0;
-          font-size: 20px;
-          font-weight: 700;
-          color: #0F172A;
-          letter-spacing: -0.3px;
-        }
-
-        .capsule-count-tag {
-          padding: 2px 12px;
-          border-radius: 9999px; // 长圆
-          background: #EFF6FF;
-          border: 1px solid #BFDBFE;
-          color: #1677FF;
-          font-size: 11.5px;
-          font-weight: 600;
+          font-size: 26px;
+          color: #2563eb;
         }
       }
 
-      .sub-desc {
-        margin: 0;
-        font-size: 13.5px;
-        color: #64748B;
-        line-height: 1.6;
+      .title-meta-col {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding-top: 2px;
+
+        .title-badges-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+
+          .main-title {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+            line-height: 1.25;
+          }
+
+          .capsule-count-tag {
+            padding: 3px 12px;
+            border-radius: 9999px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #2563eb;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+          }
+        }
+
+        .sub-desc {
+          margin: 0;
+          font-size: 13.5px;
+          color: #64748b;
+          line-height: 1.65;
+          max-width: 640px;
+        }
       }
     }
 
     .header-right-actions {
       display: flex;
       align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
+      justify-content: flex-end;
+
+      .action-toolbar {
+        display: inline-flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+        backdrop-filter: blur(6px);
+      }
     }
   }
 
@@ -471,9 +543,9 @@ async function handleUpdateQuestion(updated: Question) {
     align-items: center;
     gap: 7px;
     height: 40px;
-    padding: 0 20px;
+    padding: 0 18px;
     border-radius: 9999px;
-    font-size: 13.5px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     border: none;
@@ -607,25 +679,33 @@ async function handleUpdateQuestion(updated: Question) {
         margin-top: 4px;
         padding-top: 14px;
         border-top: 1px solid #F1F5F9;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        column-gap: 16px;
 
         .filter-left-col {
           display: flex;
           align-items: center;
           gap: 14px;
+          min-width: 0;
+          flex-wrap: nowrap;
         }
 
         .filter-right-search {
           display: flex;
           align-items: center;
           gap: 10px;
-          flex-wrap: wrap;
+          flex-wrap: nowrap;
           justify-content: flex-end;
+          flex-shrink: 0;
 
           .list-expand-actions {
             display: flex;
             align-items: center;
             gap: 8px;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            flex-shrink: 0;
           }
 
           .list-expand-toggle-btn {
@@ -666,9 +746,12 @@ async function handleUpdateQuestion(updated: Question) {
           .capsule-search-box {
             display: flex;
             align-items: center;
-            width: 320px;
+            width: 260px;
+            max-width: 36vw;
+            min-width: 200px;
             height: 38px;
             padding: 0 14px;
+            flex-shrink: 1;
             border-radius: 9999px; // 长圆输入框
             border: 1.5px solid #E2E8F0;
             background: #FFFFFF;

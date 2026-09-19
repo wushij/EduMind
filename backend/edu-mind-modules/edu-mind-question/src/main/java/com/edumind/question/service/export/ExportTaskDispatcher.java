@@ -16,6 +16,12 @@ import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * 试卷导出任务异步调度器 (状态机: PENDING -> PROCESSING -> SUCCESS / FAILED)
@@ -32,25 +38,15 @@ public class ExportTaskDispatcher {
     @Value("${minio.bucketName:edumind}")
     private String bucketName;
 
+    private static final long EXPORT_TIMEOUT_MINUTES = 5;
+
     @Async("questionTaskExecutor")
     public void dispatchAsync(Long taskId, Long tenantId) {
         if (tenantId != null) {
             TenantContext.setTenantId(tenantId);
         }
         try {
-            ExportTaskEntity task = null;
-            for (int i = 0; i < 5; i++) {
-                task = exportTaskDao.findById(taskId);
-                if (task != null) {
-                    break;
-                }
-                try {
-                    Thread.sleep(50);
-                } catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
+            ExportTaskEntity task = waitForTask(taskId);
             if (task == null) {
                 log.warn("[Export Dispatcher] Task not found: {}", taskId);
                 return;
@@ -60,11 +56,8 @@ public class ExportTaskDispatcher {
                 return;
             }
 
-            // 1. 转为 PROCESSING 状态
-            task.setStatus("PROCESSING");
-            exportTaskDao.updateById(task);
+            markProgress(task, "PROCESSING", 10);
 
-            // 2. 构造请求调用引擎适配器
             PaperExportRequest req = PaperExportRequest.builder()
                     .taskId(task.getId())
                     .tenantId(task.getTenantId())
@@ -73,43 +66,114 @@ public class ExportTaskDispatcher {
                     .exportParamsJson(task.getExportParams())
                     .build();
 
-            PaperExportResult result = paperExportEngine.export(req);
+            Long exportTenantId = task.getTenantId();
+            PaperExportResult result = runWithTimeout(
+                    () -> paperExportEngine.export(req),
+                    EXPORT_TIMEOUT_MINUTES,
+                    TimeUnit.MINUTES,
+                    "PDF 排版超时（超过 " + EXPORT_TIMEOUT_MINUTES + " 分钟），请减少题量或关闭答题卡/解析后重试",
+                    exportTenantId
+            );
 
-            // 3. 上传 OSS 对象存储
+            markProgress(task, "PROCESSING", 75);
+
             String objectKey = TenantObjectKeyBuilder.exportFile(tenantId, task.getId(), result.getFilename());
-            try (ByteArrayInputStream is = new ByteArrayInputStream(result.getFileBytes())) {
-                fileStorageService.uploadFile(bucketName, objectKey, is, result.getContentType());
-            }
+            byte[] fileBytes = result.getFileBytes();
+            runWithTimeout(
+                    () -> {
+                        try (ByteArrayInputStream is = new ByteArrayInputStream(fileBytes)) {
+                            fileStorageService.uploadFile(bucketName, objectKey, is, result.getContentType());
+                        }
+                        return null;
+                    },
+                    2,
+                    TimeUnit.MINUTES,
+                    "文件上传超时，请检查 MinIO/本地存储配置",
+                    exportTenantId
+            );
 
-            // 4. 生成鉴权短链并持久化
+            markProgress(task, "PROCESSING", 95);
+
             String downloadToken = UUID.randomUUID().toString().replace("-", "");
             String downloadUrl = "/api/question/exports/" + task.getId() + "/download?token=" + downloadToken;
 
             task.setDownloadToken(downloadToken);
             task.setObjectKey(objectKey);
             task.setFileUrl(downloadUrl);
-            task.setStatus("SUCCESS");
-            exportTaskDao.updateById(task);
+            markProgress(task, "SUCCESS", 100);
 
             log.info("[Export Dispatcher] Task {} export completed successfully, objectKey: {}", taskId, objectKey);
 
         } catch (Exception e) {
             log.error("[Export Dispatcher] Task {} export failed: {}", taskId, e.getMessage(), e);
-            try {
-                ExportTaskEntity task = exportTaskDao.findById(taskId);
-                if (task != null) {
-                    task.setStatus("FAILED");
-                    String msg = e.getMessage();
-                    task.setErrorMsg(msg != null ? (msg.length() > 500 ? msg.substring(0, 500) : msg) : "试卷导出处理异常");
-                    exportTaskDao.updateById(task);
-                }
-            } catch (Exception ex) {
-                log.error("[Export Dispatcher] Failed to mark task {} as FAILED: {}", taskId, ex.getMessage());
-            }
+            markFailed(taskId, e);
         } finally {
-            if (tenantId != null) {
-                TenantContext.clear();
+            TenantContext.clear();
+        }
+    }
+
+    private ExportTaskEntity waitForTask(Long taskId) throws InterruptedException {
+        for (int i = 0; i < 5; i++) {
+            ExportTaskEntity task = exportTaskDao.findByIdIgnoreTenant(taskId);
+            if (task != null) {
+                return task;
             }
+            Thread.sleep(50);
+        }
+        return exportTaskDao.findByIdIgnoreTenant(taskId);
+    }
+
+    private void markProgress(ExportTaskEntity task, String status, int progress) {
+        task.setStatus(status);
+        task.setProgress(Math.max(0, Math.min(progress, 100)));
+        exportTaskDao.updateById(task);
+    }
+
+    private void markFailed(Long taskId, Exception e) {
+        try {
+            ExportTaskEntity task = exportTaskDao.findByIdIgnoreTenant(taskId);
+            if (task != null) {
+                task.setStatus("FAILED");
+                String msg = e.getMessage();
+                task.setErrorMsg(msg != null ? (msg.length() > 500 ? msg.substring(0, 500) : msg) : "试卷导出处理异常");
+                exportTaskDao.updateById(task);
+            }
+        } catch (Exception ex) {
+            log.error("[Export Dispatcher] Failed to mark task {} as FAILED: {}", taskId, ex.getMessage());
+        }
+    }
+
+    /**
+     * 导出引擎/上传在独立线程执行，必须传递租户上下文，否则 ExamQueryApi 查不到试卷。
+     */
+    private <T> T runWithTimeout(
+            Callable<T> callable,
+            long timeout,
+            TimeUnit unit,
+            String timeoutMessage,
+            Long tenantId
+    ) throws Exception {
+        ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "export-worker-" + System.nanoTime());
+            t.setDaemon(true);
+            return t;
+        });
+        try {
+            Future<T> future = executor.submit(() -> {
+                if (tenantId != null) {
+                    TenantContext.setTenantId(tenantId);
+                }
+                try {
+                    return callable.call();
+                } finally {
+                    TenantContext.clear();
+                }
+            });
+            return future.get(timeout, unit);
+        } catch (TimeoutException te) {
+            throw new IllegalStateException(timeoutMessage);
+        } finally {
+            executor.shutdownNow();
         }
     }
 }

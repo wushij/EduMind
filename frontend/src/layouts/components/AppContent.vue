@@ -29,6 +29,9 @@ const isFullHeight = computed(
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   padding: 20px calc(24px + #{$copilot-safe-right}) $page-bottom-spacing;
   background-color: #F5F8FC;
   box-sizing: border-box;
@@ -52,6 +55,7 @@ const isFullHeight = computed(
   .app-content-body {
     width: 100%;
     min-width: 0;
+    flex: 0 0 auto;
   }
 }
 </style>

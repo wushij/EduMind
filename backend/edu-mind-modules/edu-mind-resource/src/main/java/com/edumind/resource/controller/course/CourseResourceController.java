@@ -40,8 +40,11 @@ public class CourseResourceController {
                                                 @org.springframework.web.bind.annotation.RequestParam("file") MultipartFile file,
                                                 @org.springframework.web.bind.annotation.RequestParam(value = "title", required = false) String title,
                                                 @org.springframework.web.bind.annotation.RequestParam(value = "resourceType", required = false) String resourceType,
-                                                @org.springframework.web.bind.annotation.RequestParam(value = "chapterId", required = false) Long chapterId) {
-        return ApiResult.success(courseResourceService.uploadResource(courseId, file, title, resourceType, chapterId));
+                                                @org.springframework.web.bind.annotation.RequestParam(value = "chapterId", required = false) Long chapterId,
+                                                @org.springframework.web.bind.annotation.RequestParam(value = "syncToKnowledgeBase", defaultValue = "true")
+                                                boolean syncToKnowledgeBase) {
+        return ApiResult.success(
+                courseResourceService.uploadResource(courseId, file, title, resourceType, chapterId, syncToKnowledgeBase));
     }
 
     @SaCheckPermission("course:edit")

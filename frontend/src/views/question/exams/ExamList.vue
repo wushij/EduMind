@@ -1,8 +1,6 @@
 <template>
   <div class="exam-list-page-container">
-    <ExamListHeader :page-ready="pageReady" :total="total" />
-
-    <ExamListStatsBar
+    <ExamListHeader
       :page-ready="pageReady"
       :total="total"
       :exam-count="exams.length"
@@ -34,7 +32,6 @@
 
 <script setup lang="ts">
 import ExamListHeader from '@/components/question/exam/ExamListHeader.vue';
-import ExamListStatsBar from '@/components/question/exam/ExamListStatsBar.vue';
 import ExamListFilterBar from '@/components/question/exam/ExamListFilterBar.vue';
 import ExamListTable from '@/components/question/exam/ExamListTable.vue';
 import { useExamListPage } from '@/composables/question/useExamListPage';
@@ -66,5 +63,11 @@ const {
   flex-direction: column;
   gap: 20px;
   width: 100%;
+  padding-bottom: 4px;
+  box-sizing: border-box;
+
+  > * {
+    flex: 0 0 auto;
+  }
 }
 </style>

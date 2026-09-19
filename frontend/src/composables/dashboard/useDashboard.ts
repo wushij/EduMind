@@ -226,9 +226,9 @@ export function useDashboard(options?: { enableCharts?: boolean }) {
           questionCount: 128,
           examCount: 5,
           aiConversationCount: 12,
-          assignmentCount: 8,
-          pendingGradingCount: 3,
-          pendingAssignmentCount: 2,
+          assignmentCount: 0,
+          pendingGradingCount: 0,
+          pendingAssignmentCount: 0,
           recentCourses: MOCK_DASHBOARD_DATA.kpiStats.ADMIN.length
             ? [
                 { id: 101, name: '高等数学（上）' },

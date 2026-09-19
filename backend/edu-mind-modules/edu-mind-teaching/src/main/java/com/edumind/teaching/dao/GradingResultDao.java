@@ -43,4 +43,14 @@ public class GradingResultDao {
                         .eq(GradingResultEntity::getQuestionId, questionId)
         );
     }
+
+    public int deleteBySubmissionId(Long submissionId) {
+        if (submissionId == null) {
+            return 0;
+        }
+        return gradingResultMapper.delete(
+                new LambdaQueryWrapper<GradingResultEntity>()
+                        .eq(GradingResultEntity::getSubmissionId, submissionId)
+        );
+    }
 }

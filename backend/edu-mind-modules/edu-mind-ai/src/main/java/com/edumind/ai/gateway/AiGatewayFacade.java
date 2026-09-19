@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -191,13 +192,19 @@ public class AiGatewayFacade {
 
     public void streamChat(String scene, String modelKey, String systemPrompt, List<LlmChatMessage> messages,
                            AiCallAuditContext auditContext, LlmClient.StreamCallback callback) {
+        streamChat(scene, modelKey, systemPrompt, messages, auditContext, null, callback);
+    }
+
+    public void streamChat(String scene, String modelKey, String systemPrompt, List<LlmChatMessage> messages,
+                           AiCallAuditContext auditContext, BooleanSupplier cancelled,
+                           LlmClient.StreamCallback callback) {
         checkRateLimit(scene != null ? scene : "stream", DEFAULT_RATE_LIMIT);
         totalRequests.incrementAndGet();
         long start = System.currentTimeMillis();
         String primary = modelRouter.resolveModelKey(scene, modelKey);
 
         if (resilienceStore.isCircuitOpen(primary)) {
-            streamFallback(scene, primary, systemPrompt, messages, auditContext, start, callback,
+            streamFallback(scene, primary, systemPrompt, messages, auditContext, start, cancelled, callback,
                     new IllegalStateException("模型熔断保护中，请稍后重试"));
             return;
         }
@@ -207,24 +214,26 @@ public class AiGatewayFacade {
                 throw new IllegalStateException("Mock gateway stream failure for " + primary);
             }
             llmClientRegistry.get(primary).streamChatWithHistory(
-                    systemPrompt, messages, wrapStreamAudit(scene, primary, auditContext, start, systemPrompt, messages, callback));
+                    systemPrompt, messages, cancelled,
+                    wrapStreamAudit(scene, primary, auditContext, start, systemPrompt, messages, callback));
             resilienceStore.recordSuccess(primary);
         } catch (Exception ex) {
             log.warn("Gateway stream primary failed for {}: {}", primary, ex.getMessage());
             resilienceStore.recordRetry();
             resilienceStore.recordFailure(primary);
-            streamFallback(scene, primary, systemPrompt, messages, auditContext, start, callback, ex);
+            streamFallback(scene, primary, systemPrompt, messages, auditContext, start, cancelled, callback, ex);
         }
     }
 
     private void streamFallback(String scene, String primary, String systemPrompt, List<LlmChatMessage> messages,
-                                AiCallAuditContext auditContext, long start, LlmClient.StreamCallback callback,
-                                Exception cause) {
+                                AiCallAuditContext auditContext, long start, BooleanSupplier cancelled,
+                                LlmClient.StreamCallback callback, Exception cause) {
         String fallback = modelRouter.resolveFallback(primary);
         if (fallback != null && !fallback.equals(primary)) {
             resilienceStore.recordFallback();
             llmClientRegistry.get(fallback).streamChatWithHistory(
-                    systemPrompt, messages, wrapStreamAudit(scene, fallback, auditContext, start, systemPrompt, messages, callback));
+                    systemPrompt, messages, cancelled,
+                    wrapStreamAudit(scene, fallback, auditContext, start, systemPrompt, messages, callback));
             return;
         }
         resilienceStore.recordFailed();

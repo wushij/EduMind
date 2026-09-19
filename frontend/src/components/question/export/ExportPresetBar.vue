@@ -77,8 +77,8 @@ defineProps<{
 
   .preset-cards-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
 
     @media (max-width: 1200px) {
       grid-template-columns: repeat(2, 1fr);
@@ -91,24 +91,29 @@ defineProps<{
       display: flex;
       align-items: flex-start;
       gap: 12px;
-      padding: 14px;
-      border-radius: 12px;
-      border: 1.5px solid #E2E8F0;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid #E2E8F0;
       background: #F8FAFC;
       cursor: pointer;
-      transition: all 0.2s ease;
+      box-sizing: border-box;
+      min-width: 0;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+      outline: none;
 
       &:hover {
-        border-color: #93C5FD;
+        border-color: #CBD5E1;
         background: #FFFFFF;
-        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.08);
-        transform: translateY(-2px);
       }
 
       &.active {
         border-color: #2563EB;
-        background: #EFF6FF;
-        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.12);
+        background: #F8FAFC;
+      }
+
+      &:focus-visible {
+        outline: 1px solid #2563EB;
+        outline-offset: 0;
       }
 
       .preset-icon-badge {
@@ -129,17 +134,26 @@ defineProps<{
         .preset-name-row {
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          gap: 6px;
+          flex-wrap: wrap;
+          gap: 4px 6px;
           margin-bottom: 4px;
 
           .preset-name {
             font-size: 13px;
             font-weight: 600;
             color: #1E293B;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            line-height: 1.3;
+            min-width: 0;
+            flex: 1 1 auto;
+          }
+
+          :deep(.el-tag) {
+            flex-shrink: 0;
+            max-width: 100%;
+            height: 20px;
+            padding: 0 6px;
+            font-size: 10px;
+            line-height: 18px;
           }
         }
 

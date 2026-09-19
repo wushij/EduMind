@@ -479,6 +479,9 @@ CREATE TABLE IF NOT EXISTS assignment (
     title       VARCHAR(128) NOT NULL COMMENT '作业标题',
     description TEXT         DEFAULT NULL COMMENT '作业说明与要求',
     deadline    DATETIME     DEFAULT NULL COMMENT '截止提交时间',
+    total_score INT          DEFAULT NULL COMMENT '卷面总分',
+    pass_score  INT          DEFAULT NULL COMMENT '合格分',
+    settings_json TEXT       DEFAULT NULL COMMENT '作业设置 JSON',
     status      VARCHAR(16)  DEFAULT 'DRAFT' COMMENT '状态（DRAFT/PUBLISHED/CLOSED）',
     create_time DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -561,6 +564,7 @@ CREATE TABLE IF NOT EXISTS knowledge_document (
     knowledge_base_id BIGINT       NOT NULL COMMENT '所属知识库ID',
     source_type       VARCHAR(16)  NOT NULL DEFAULT 'UPLOAD' COMMENT 'UPLOAD|LESSON',
     course_id         BIGINT       DEFAULT NULL COMMENT '课程ID(课节虚拟文档)',
+    course_resource_id BIGINT      DEFAULT NULL COMMENT '关联 course_resource.id',
     lesson_chapter_id BIGINT       DEFAULT NULL COMMENT '微课节章节ID',
     content_hash      VARCHAR(64)  DEFAULT NULL COMMENT '讲义内容哈希(增量索引)',
     file_name         VARCHAR(256) NOT NULL COMMENT '文件名称',
@@ -575,6 +579,7 @@ CREATE TABLE IF NOT EXISTS knowledge_document (
     KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_kb_id (knowledge_base_id),
+    KEY idx_knowledge_doc_course_resource (course_resource_id),
     UNIQUE KEY uk_lesson_chapter_doc (lesson_chapter_id, source_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库文档表';
 
@@ -894,6 +899,9 @@ CREATE TABLE IF NOT EXISTS wrong_question_record (
     diagnosis           VARCHAR(512) DEFAULT NULL COMMENT '错因诊断',
     variant_question_ids VARCHAR(256) DEFAULT NULL COMMENT '变式题ID列表',
     wrong_count         INT          NOT NULL DEFAULT 1 COMMENT '累计错误次数',
+    last_student_answer VARCHAR(1024) DEFAULT NULL COMMENT '最近一次错误作答',
+    status              TINYINT      NOT NULL DEFAULT 0 COMMENT '0=待攻坚 1=已攻克',
+    mastered_time       DATETIME     DEFAULT NULL COMMENT '标记已攻克时间',
     create_time         DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time         DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     KEY idx_tenant_id (tenant_id),
@@ -1220,6 +1228,7 @@ CREATE TABLE IF NOT EXISTS export_task (
     biz_type       VARCHAR(32)  NOT NULL COMMENT '业务类型(EXAM_PAPER/TEACHING_REPORT)',
     biz_id         BIGINT       NOT NULL COMMENT '业务对象ID',
     status         VARCHAR(32)  NOT NULL DEFAULT 'PENDING' COMMENT '状态(PENDING/PROCESSING/SUCCESS/FAILED)',
+    progress       TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '任务进度0-100',
     error_msg      VARCHAR(512) DEFAULT NULL COMMENT '失败原因',
     file_url       VARCHAR(512) DEFAULT NULL COMMENT '临时预签名下载地址',
     download_token VARCHAR(64)  DEFAULT NULL COMMENT '下载鉴权令牌',
@@ -1731,8 +1740,8 @@ INSERT IGNORE INTO question_bank (id, name, course_id, description, question_cou
 -- 11. 试题明细（演示种子共 3 道：1001 / 1003 / 1007）
 INSERT IGNORE INTO edu_question (id, bank_id, course_id, knowledge_point_id, stem, type, options, answer, analysis, difficulty, score, status, deleted) VALUES
 (1001, 3, 103, 17, '当 $x \\to 0$ 时，下列无穷小量中与 $x$ 等价的无穷小量是（ ）。', 'SINGLE_CHOICE',
- '[{"key":"A","content":"$\\\\sin 2x$"},{"key":"B","content":"$\\\\ln(1 + x)$"},{"key":"C","content":"$1 - \\\\cos x$"},{"key":"D","content":"$e^x - 1 - x$"}]',
- 'B', '根据等价无穷小基本公式，当 $x \\to 0$ 时，$\\\\ln(1+x) \\sim x$；而 $\\\\sin 2x \\sim 2x$，$1-\\\\cos x \\sim \\\\frac{1}{2}x^2$。故正确答案为 B。', 3, 5, 1, 0),
+ '[{"key":"A","content":"$\\sin 2x$"},{"key":"B","content":"$\\ln(1 + x)$"},{"key":"C","content":"$1 - \\cos x$"},{"key":"D","content":"$e^x - 1 - x$"}]',
+ 'B', '根据等价无穷小基本公式，当 $x \\to 0$ 时，\\ln(1+x) \\sim x；而 \\sin 2x \\sim 2x，$1-\\cos x \\sim \\frac{1}{2}x^2$。故正确答案为 B。', 3, 5, 1, 0),
 
 (1003, 1, 101, 10, '已知一个栈的入栈序列为 1, 2, 3, 4, 5，则不可能得到的出栈序列是（ ）。', 'SINGLE_CHOICE',
  '[{"key":"A","content":"$4, 5, 3, 2, 1$"},{"key":"B","content":"$4, 3, 5, 1, 2$"},{"key":"C","content":"$1, 5, 4, 2, 3$"},{"key":"D","content":"$3, 4, 2, 1, 5$"}]',
@@ -1765,7 +1774,7 @@ INSERT IGNORE INTO question_bank_item (bank_id, question_id) VALUES
 
 -- 14. 试卷
 INSERT IGNORE INTO teaching_exam (id, course_id, title, total_score, pass_score, duration_minutes, start_time, end_time, status, deleted) VALUES
-(501, 103, '2025秋季学期高等数学期中统一水平测试卷', 100, 60, 90,  '2025-10-15 09:00:00', '2025-10-15 10:30:00', 1, 0),
+(501, 103, '2026秋季学期高等数学期中统一水平测试卷', 100, 60, 90,  '2026-10-15 09:00:00', '2026-10-15 10:30:00', 1, 0),
 (502, 101, '数据结构与算法分析阶段性上机诊断试卷', 100, 60, 100, '2025-10-20 14:00:00', '2025-10-20 15:40:00', 1, 0);
 
 -- 15. 试卷试题关联
@@ -1774,18 +1783,21 @@ INSERT IGNORE INTO exam_question (exam_id, question_id, score, sort_order) VALUE
 (502, 1003, 10, 1);
 
 -- 16. 作业任务
-INSERT IGNORE INTO assignment (id, course_id, exam_id, title, description, deadline, status) VALUES
-(201, 101, NULL, '第一单元：线性表与链表编程作业', '请完成单链表的基本操作及逆置算法设计，按要求提交核心复杂度分析。', '2025-10-25 23:59:59', 'PUBLISHED'),
-(202, 103, 501,  '高数第三周同步随堂小测',       '函数极限计算与等价无穷小代换小测验，共2道题，限时45分钟。',         '2025-10-18 23:59:59', 'PUBLISHED');
+INSERT IGNORE INTO assignment (id, course_id, exam_id, title, description, deadline, status, total_score, pass_score, settings_json) VALUES
+(201, 101, 502, '第一单元：线性表与链表编程作业', '请完成单链表的基本操作及逆置算法设计，按要求提交核心复杂度分析。', '2026-12-25 23:59:59', 'PUBLISHED', 10, 6, '{"aiGradingEnabled":true,"allowLate":false,"instantFeedback":true}'),
+(202, 103, 501,  '高数第三周同步随堂小测',       '函数极限计算与等价无穷小代换小测验，共2道题，限时45分钟。',         '2026-12-18 23:59:59', 'PUBLISHED', 10, 6, '{"aiGradingEnabled":true,"allowLate":true,"instantFeedback":true}');
 
 -- 17. 学生作业提交
 INSERT IGNORE INTO assignment_submission (id, assignment_id, student_id, status, total_score, max_score, submit_time) VALUES
 (301, 201, 3, 'GRADED',    92, 100, '2025-10-20 16:30:00'),
-(302, 201, 4, 'SUBMITTED', NULL, 100, '2025-10-21 11:15:00');
+(302, 201, 4, 'SUBMITTED', NULL, 100, '2025-10-21 11:15:00'),
+(303, 202, 3, 'GRADED',    8, 10, '2025-10-17 14:20:00');
 
 -- 18. 学生作答记录
 INSERT IGNORE INTO submission_answer (id, submission_id, question_id, answer) VALUES
-(401, 301, 1003, 'B');
+(401, 301, 1003, 'B'),
+(402, 302, 1003, 'A'),
+(403, 303, 1001, 'B');
 
 -- 19. 批改结果
 INSERT IGNORE INTO grading_result (id, submission_id, question_id, score, max_score, is_correct, ai_comment, teacher_comment, status) VALUES
@@ -1884,25 +1896,35 @@ INSERT IGNORE INTO ai_gateway_route (scene, primary_model_key, fallback_model_ke
 ('AGENT', 'deepseek-chat', 'mock'),
 ('GRADING', 'deepseek-chat', 'mock');
 
--- 31. V1.0 学情与掌握度样本（课程 102 Java，供学情分析与 Gate G 演示）
+-- 31. 学情掌握度、错题本与学习记录（对齐演示题 1001/1003/1007 与学情画像）
+INSERT IGNORE INTO course_member (course_id, user_id, member_role) VALUES (102, 1, 'STUDENT');
+
 INSERT IGNORE INTO knowledge_mastery (student_id, course_id, knowledge_point_id, mastery_score, sample_count, last_assessed_at) VALUES
 (3, 102, 14, 0.8500, 5, NOW()),
 (3, 102, 15, 0.6400, 4, NOW()),
 (3, 102, 16, 0.7800, 3, NOW()),
+(3, 101, 10, 0.7200, 4, NOW()),
+(3, 101, 12, 0.8800, 5, NOW()),
 (4, 102, 14, 0.8200, 4, NOW()),
 (4, 102, 15, 0.7000, 3, NOW()),
 (4, 102, 16, 0.7500, 3, NOW());
 
 INSERT IGNORE INTO knowledge_point_relation (source_knowledge_point_id, target_knowledge_point_id, relation_type) VALUES
-(15, 14, 'prerequisite');
+(15, 14, 'prerequisite'),
+(16, 15, 'prerequisite');
 
-INSERT IGNORE INTO wrong_question_record (student_id, course_id, question_id, knowledge_point_id, error_types, diagnosis, wrong_count) VALUES
-(3, 102, 1007, 16, 'CONCEPT,LOGIC', '混淆编译期与运行期绑定', 3);
+INSERT IGNORE INTO wrong_question_record (student_id, course_id, question_id, knowledge_point_id, error_types, diagnosis, wrong_count, last_student_answer, status) VALUES
+(3, 102, 1007, 16, 'CONCEPT', 'CONCEPT: 混淆 ArrayList 与 LinkedList 的随机访问时间复杂度', 2, 'B', 0),
+(3, 101, 1003, 10, 'LOGIC',   'LOGIC: 栈出栈序列合法性判断失误', 1, 'A', 0),
+(3, 103, 1001, 17, 'CALC',    'CALC: 等价无穷小代换条件应用错误', 1, 'A', 0),
+(4, 102, 1007, 16, 'READING', 'READING: 审题不清，误选 LinkedList 内存占用描述', 1, 'D', 0),
+(1, 102, 1007, 16, 'CONCEPT', 'CONCEPT: 演示账号错题：集合框架特性辨析', 1, 'C', 0);
 
 INSERT IGNORE INTO learning_record (student_id, course_id, action_type, duration_minutes, create_time) VALUES
-(3, 102, 'STUDY',   45, DATE_SUB(NOW(), INTERVAL 2 DAY)),
-(4, 102, 'STUDY',   60, DATE_SUB(NOW(), INTERVAL 1 DAY)),
-(3, 102, 'AI_CHAT', 15, DATE_SUB(NOW(), INTERVAL 1 DAY));
+(3, 102, 'STUDY',   45, DATE_SUB(NOW(), INTERVAL 5 DAY)),
+(4, 102, 'STUDY',   60, DATE_SUB(NOW(), INTERVAL 3 DAY)),
+(3, 102, 'STUDY',   38, DATE_SUB(NOW(), INTERVAL 2 DAY)),
+(3, 102, 'AI_CHAT', 25, DATE_SUB(NOW(), INTERVAL 1 DAY));
 
 -- 32. V1.1 课程学情日聚合样本（供报表与 Gate V1.1 演示）
 INSERT IGNORE INTO course_statistics (course_id, stat_date, student_count, avg_score, mastery_avg, ai_call_count, wrong_count) VALUES

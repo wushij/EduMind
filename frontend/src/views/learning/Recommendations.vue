@@ -1,12 +1,9 @@
 <template>
   <div class="recommendations-page-container">
     <!-- 1. 顶部轻量 Banner（学习中心子页） -->
-    <PageHeroBanner
+    <LearningSubpageHero
       title="学习推荐"
       subtitle="根据薄弱考点与学习进度，为你推荐巩固练习与拓展资源"
-      :background-image="learningBannerImg"
-      background-variant="learning"
-      :show-illustration="false"
     >
       <template #actions>
         <button
@@ -18,7 +15,17 @@
           <span>返回我的学习</span>
         </button>
       </template>
-    </PageHeroBanner>
+      <template #toolbar>
+        <el-select
+          v-model="selectedCourseId"
+          placeholder="选择课程"
+          style="width: 220px"
+          @change="onCourseChange"
+        >
+          <el-option v-for="c in courseListOptions" :key="c.id" :label="c.name" :value="c.id" />
+        </el-select>
+      </template>
+    </LearningSubpageHero>
 
     <!-- 2. 长圆跑道分类 Tabs (Pill Tabs) -->
     <div class="recommend-tabs-bar">
@@ -72,7 +79,7 @@
         <span class="filter-title">所属课程：</span>
         <div class="pill-options-row">
           <span
-            v-for="c in courseOptions"
+            v-for="c in courseFilterOptions"
             :key="c"
             class="filter-pill-opt"
             :class="{ active: selectedCourse === c }"
@@ -142,18 +149,31 @@ import {
   Search,
   RefreshRight
 } from '@element-plus/icons-vue';
-import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
+import LearningSubpageHero from '@/components/learning/LearningSubpageHero.vue';
 import RecommendationCard from '@/components/learning/RecommendationCard.vue';
 import { useRecommendations } from '@/composables/learning/useRecommendations';
+import { useLearningHome } from '@/composables/learning/useLearningHome';
+import { resolveCourseRoute } from '@/utils/learning/course-route';
 import type { RecommendationItem } from '@/types/learning/recommendation';
-import learningBannerImg from '@/assets/images/学习中心banner.png';
 
 const router = useRouter();
-const { items, fetchRecommendations } = useRecommendations();
+const { items, loading, fetchRecommendations } = useRecommendations();
+const { courseOptions, primaryCourseId, refresh } = useLearningHome();
 
-onMounted(() => {
-  fetchRecommendations();
+const selectedCourseId = ref<number | null>(null);
+const courseListOptions = computed(() => courseOptions.value);
+
+onMounted(async () => {
+  await refresh();
+  selectedCourseId.value = primaryCourseId.value;
+  if (selectedCourseId.value != null) {
+    await fetchRecommendations(selectedCourseId.value);
+  }
 });
+
+function onCourseChange(courseId: number) {
+  void fetchRecommendations(courseId);
+}
 
 const selectedCategory = ref<string>('ALL');
 const selectedCourse = ref<string>('全部课程');
@@ -169,7 +189,7 @@ const categoryTabs = [
   { label: '拔高进阶挑战', value: '拓展进阶', icon: Top }
 ];
 
-const courseOptions = ['全部课程', '高等数学（上）', '数据结构与算法'];
+const courseFilterOptions = computed(() => ['全部课程', ...courseListOptions.value.map((c) => c.name)]);
 
 const difficultyOptions = [
   { label: '全部难度', value: 'ALL' },
@@ -230,21 +250,22 @@ function resetFilters() {
 }
 
 function handleStart(item: RecommendationItem) {
+  const courseId = item.courseId ?? selectedCourseId.value;
   if (item.type === 'exercise') {
     router.push({
-      path: '/ai/question/generate',
-      query: {
-        subject: item.courseName,
-        knowledgePoint: item.knowledgePoint
-      }
+      path: '/learning/practice',
+      query: courseId != null ? { courseId: String(courseId) } : undefined
     });
-  } else {
-    router.push('/course/101/resources');
+  } else if (courseId != null) {
+    router.push(resolveCourseRoute(courseId, 'resources'));
   }
 }
 
 function handleDiscuss(item: RecommendationItem) {
-  router.push('/course/101/ai');
+  const courseId = item.courseId ?? selectedCourseId.value;
+  if (courseId != null) {
+    router.push(resolveCourseRoute(courseId, 'ai'));
+  }
 }
 </script>
 

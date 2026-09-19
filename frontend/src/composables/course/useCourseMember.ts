@@ -64,7 +64,7 @@ export function useCourseMember(courseId: number) {
 
   async function uploadResource(
     file: File,
-    data: { title: string; resourceType?: string; chapterId?: number }
+    data: { title: string; resourceType?: string; chapterId?: number; syncToKnowledgeBase?: boolean }
   ) {
     await uploadCourseResource(courseId, file, data);
     await fetchResources();

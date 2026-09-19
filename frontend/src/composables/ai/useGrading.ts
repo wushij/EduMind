@@ -87,7 +87,10 @@ export function useGrading() {
           subs = [];
         }
         const total = subs.length || a.submissionCount || 0;
-        const graded = subs.filter((s: any) => s.status === 'GRADED' || s.status === 'AI_GRADED').length;
+        const graded = subs.filter(
+          (s: { status?: string }) =>
+            s.status === 'GRADED' || s.status === 'REVIEWED' || s.status === 'AI_GRADED'
+        ).length;
         const prog = total > 0 ? Math.round((graded / total) * 100) : (a.status === 'GRADED' ? 100 : 0);
 
         taskRows.push({

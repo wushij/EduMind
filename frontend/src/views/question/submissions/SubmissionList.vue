@@ -1,147 +1,181 @@
 <template>
-  <div class="submission-list-container">
-    <!-- 顶部操作头区 -->
-    <div class="submission-header-dock">
-      <div class="header-left">
-        <div class="title-with-icon">
-          <el-icon class="header-icon"><Document /></el-icon>
-          <h1 class="main-title">学生作业答卷与批改总览</h1>
-          <span class="capsule-count-tag">已收录 {{ filteredSubmissions.length }} 份答卷</span>
-        </div>
-        <p class="sub-desc">
-          汇聚全校各门课程学生在线提交的试卷与作业答卷，支持教师在线人工打分、AI智能辅助预批改与批改溯源。
-        </p>
-      </div>
-
-      <div class="header-right-actions">
-        <el-button
-          type="primary"
-          class="capsule-btn-primary"
-          :loading="batchLoading"
+  <div class="question-module-page submission-list-page">
+    <ModulePageHeroHeader
+      :icon="Document"
+      title="学生作业答卷与批改总览"
+      :badge="`当前 ${total} 份答卷`"
+      description="汇聚各课程在线提交的作业答卷，支持教师终审、AI 辅助预批改与评阅溯源。"
+    >
+      <template #stats>
+        <SubmissionListStatsBar
+          :total="stats.total ?? total"
+          :pending-count="stats.submittedCount ?? 0"
+          :ai-graded-count="stats.gradedCount ?? 0"
+          :graded-count="stats.reviewedCount ?? 0"
+        />
+      </template>
+      <template #actions>
+        <button
+          type="button"
+          class="module-capsule-btn module-capsule-btn--ai"
+          :disabled="batchLoading"
           @click="handleBatchAIGrading"
         >
-          <el-icon><Service /></el-icon>
-          <span>启动全队列 AI 智能批改</span>
-        </el-button>
-      </div>
-    </div>
+          <el-icon><MagicStick /></el-icon>
+          <span>{{ batchLoading ? '队列批改中…' : '启动全队列 AI 批改' }}</span>
+        </button>
+      </template>
+    </ModulePageHeroHeader>
 
-    <!-- 筛选过滤行 -->
     <div class="filter-capsule-card">
-      <div class="filter-left">
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索学生姓名、学号、作业名称..."
-          clearable
-          class="search-input"
-          :prefix-icon="Search"
-        />
-        <el-select v-model="selectedCourseId" placeholder="所属课程" clearable class="filter-select">
+      <div class="submission-filter-row">
+        <div class="capsule-search-box">
+          <el-icon class="search-icon"><Search /></el-icon>
+          <input
+            v-model="searchKeyword"
+            type="text"
+            class="capsule-search-input"
+            placeholder="搜索学生姓名、学号、作业名称..."
+            @keyup.enter="reloadList"
+          />
+          <button v-if="searchKeyword" type="button" class="clear-btn" @click="clearSearch">
+            <el-icon><Close /></el-icon>
+          </button>
+        </div>
+        <el-select v-model="selectedCourseId" placeholder="所属课程" clearable class="filter-select" @change="reloadList">
           <el-option label="全部课程" :value="null" />
           <el-option
             v-for="c in courses"
             :key="c.id"
-            :label="c.title"
+            :label="c.title || c.name"
             :value="c.id"
           />
         </el-select>
-        <el-select v-model="selectedStatus" placeholder="批改状态" clearable class="filter-select">
+        <el-select v-model="selectedStatus" placeholder="批改状态" clearable class="filter-select" @change="reloadList">
           <el-option label="全部状态" value="" />
-          <el-option label="待教师终审" value="PENDING" />
-          <el-option label="AI已预批" value="AI_GRADED" />
-          <el-option label="批改完成" value="GRADED" />
+          <el-option label="待批改" :value="SUBMISSION_STATUS.SUBMITTED" />
+          <el-option label="AI 已评 · 待确认" :value="SUBMISSION_STATUS.GRADED" />
+          <el-option label="批改完成" :value="SUBMISSION_STATUS.REVIEWED" />
         </el-select>
       </div>
     </div>
 
-    <!-- 答卷总览表格 -->
-    <div v-loading="loading" class="submissions-table-card">
-      <el-table :data="filteredSubmissions" stripe class="main-table">
-        <el-table-column label="学号" prop="studentNo" width="130">
-          <template #default="{ row }">
-            <span class="font-mono text-slate-600 font-semibold">{{ row.studentNo || '20240101' }}</span>
-          </template>
-        </el-table-column>
+    <div v-loading="loading" class="questions-list-card submissions-table-wrap">
+      <div class="submissions-table-toolbar">
+        <span class="list-title">答卷列表</span>
+        <span class="list-count-badge">共 {{ total }} 份</span>
+      </div>
 
-        <el-table-column label="学生姓名" prop="studentName" width="130">
-          <template #default="{ row }">
-            <div class="student-name-cell">
-              <span class="avatar-dot"></span>
-              <span class="font-medium text-slate-800">{{ row.studentName || '张子轩' }}</span>
-            </div>
-          </template>
-        </el-table-column>
+      <div class="submissions-table-body">
+        <el-table :data="allSubmissions" stripe class="main-table">
+          <el-table-column label="学号" prop="studentNo" width="130">
+            <template #default="{ row }">
+              <span class="font-mono text-slate-600 font-semibold">{{ row.studentNo || '—' }}</span>
+            </template>
+          </el-table-column>
 
-        <el-table-column label="所属课程" prop="courseName" width="180">
-          <template #default="{ row }">
-            <el-tag size="small" type="info">{{ row.courseName || '数据结构与算法' }}</el-tag>
-          </template>
-        </el-table-column>
+          <el-table-column label="学生姓名" prop="studentName" width="130">
+            <template #default="{ row }">
+              <div class="student-name-cell">
+                <span class="avatar-dot"></span>
+                <span class="font-medium text-slate-800">{{ row.studentName || '—' }}</span>
+              </div>
+            </template>
+          </el-table-column>
 
-        <el-table-column label="对应作业任务" prop="assignmentTitle" min-width="220">
-          <template #default="{ row }">
-            <span class="font-semibold text-slate-700 hover:text-blue-600 cursor-pointer" @click="router.push(`/question/submissions/${row.id}`)">
-              {{ row.assignmentTitle || '课程课后巩固测试' }}
-            </span>
-          </template>
-        </el-table-column>
+          <el-table-column label="所属课程" prop="courseName" width="180">
+            <template #default="{ row }">
+              <span class="pill-badge pill-badge--type">{{ row.courseName || '—' }}</span>
+            </template>
+          </el-table-column>
 
-        <el-table-column label="提交时间" prop="submitTime" width="170">
-          <template #default="{ row }">
-            <span class="text-xs text-slate-500">{{ row.submitTime || '2026-09-11 12:00' }}</span>
-          </template>
-        </el-table-column>
+          <el-table-column label="对应作业任务" prop="assignmentTitle" min-width="220">
+            <template #default="{ row }">
+              <span
+                class="font-semibold text-slate-700 hover:text-blue-600 cursor-pointer"
+                @click="router.push(`/question/submissions/${row.id}`)"
+              >
+                {{ row.assignmentTitle || '—' }}
+              </span>
+            </template>
+          </el-table-column>
 
-        <el-table-column label="AI智能预评" width="130">
-          <template #default="{ row }">
-            <span v-if="row.aiScore !== null && row.aiScore !== undefined" class="text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded font-semibold border border-purple-200 inline-flex items-center gap-1">
-              <el-icon><Cpu /></el-icon>
-              <span>{{ row.aiScore }} 分</span>
-            </span>
-            <span v-else class="text-xs text-slate-400">未调用</span>
-          </template>
-        </el-table-column>
+          <el-table-column label="提交时间" prop="submitTime" width="170">
+            <template #default="{ row }">
+              <span class="text-xs text-slate-500">{{ formatTime(row.submitTime) }}</span>
+            </template>
+          </el-table-column>
 
-        <el-table-column label="最终实得分" width="120">
-          <template #default="{ row }">
-            <span v-if="row.finalScore !== null && row.finalScore !== undefined" class="font-bold text-base text-blue-600">
-              {{ row.finalScore }} 分
-            </span>
-            <span v-else class="text-xs text-slate-400 italic">待终评</span>
-          </template>
-        </el-table-column>
+          <el-table-column label="AI 预评" width="120">
+            <template #default="{ row }">
+              <span
+                v-if="row.totalScore !== null && row.totalScore !== undefined && row.status !== 'SUBMITTED'"
+                class="pill-badge pill-badge--ai"
+              >
+                {{ row.totalScore }} 分
+              </span>
+              <span v-else class="text-xs text-slate-400">未调用</span>
+            </template>
+          </el-table-column>
 
-        <el-table-column label="状态" width="120">
-          <template #default="{ row }">
-            <el-tag :type="getStatusTagType(row.status)" size="small">
-              {{ getStatusLabel(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
+          <el-table-column label="最终得分" width="110">
+            <template #default="{ row }">
+              <span v-if="row.status === 'REVIEWED' && row.totalScore != null" class="font-bold text-blue-600">
+                {{ row.totalScore }} 分
+              </span>
+              <span v-else class="text-xs text-slate-400">待终评</span>
+            </template>
+          </el-table-column>
 
-        <el-table-column label="操作" width="160" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              type="primary"
-              link
-              size="small"
-              @click="router.push(`/question/submissions/${row.id}`)"
-            >
-              {{ row.status === 'GRADED' ? '查看答卷详情' : '进入评阅打分' }}
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+          <el-table-column label="状态" width="130">
+            <template #default="{ row }">
+              <el-tag :type="getStatusTagType(row.status)" size="small" round effect="light">
+                {{ getStatusLabel(row.status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="操作" width="150" fixed="right">
+            <template #default="{ row }">
+              <button
+                type="button"
+                class="table-action-link"
+                @click="router.push(`/question/submissions/${row.id}`)"
+              >
+                {{ row.status === 'REVIEWED' ? '查看详情' : '进入评阅' }}
+              </button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="pagination-row">
+          <el-pagination
+            v-model:current-page="pageNum"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-sizes="[10, 20, 50]"
+            layout="total, sizes, prev, pager, next"
+            @current-change="reloadList"
+            @size-change="reloadList"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
-import { Search, Document, Service, Cpu } from '@element-plus/icons-vue';
+import { Search, Document, MagicStick, Close } from '@element-plus/icons-vue';
+import ModulePageHeroHeader from '@/components/question/common/ModulePageHeroHeader.vue';
+import SubmissionListStatsBar from '@/components/question/submission/SubmissionListStatsBar.vue';
 import { useSubmissionList } from '@/composables/question/useSubmission';
+import {
+  SUBMISSION_STATUS,
+  SUBMISSION_STATUS_LABEL,
+  SUBMISSION_STATUS_TAG
+} from '@/constants/question/assignment';
 
 const router = useRouter();
 const {
@@ -149,6 +183,8 @@ const {
   batchLoading,
   courses,
   allSubmissions,
+  total,
+  stats,
   loadCourses,
   fetchAllSubmissions,
   batchGradePending
@@ -157,163 +193,92 @@ const {
 const searchKeyword = ref('');
 const selectedCourseId = ref<number | null>(null);
 const selectedStatus = ref('');
+const pageNum = ref(1);
+const pageSize = ref(20);
 
 onMounted(async () => {
-  await Promise.all([loadCourses(), fetchAllSubmissions()]);
+  await loadCourses();
+  await reloadList();
 });
 
-const filteredSubmissions = computed(() => {
-  return allSubmissions.value.filter(s => {
-    if (selectedCourseId.value && s.courseId !== selectedCourseId.value) return false;
-    if (selectedStatus.value && s.status !== selectedStatus.value) return false;
-    if (searchKeyword.value.trim()) {
-      const kw = searchKeyword.value.trim().toLowerCase();
-      const matchName = String(s.studentName || '').toLowerCase().includes(kw);
-      const matchNo = String(s.studentNo || '').includes(kw);
-      const matchTitle = String(s.assignmentTitle || '').toLowerCase().includes(kw);
-      if (!matchName && !matchNo && !matchTitle) return false;
-    }
-    return true;
+async function reloadList() {
+  await fetchAllSubmissions({
+    courseId: selectedCourseId.value,
+    status: selectedStatus.value,
+    keyword: searchKeyword.value,
+    page: pageNum.value,
+    pageSize: pageSize.value
   });
-});
+}
+
+function clearSearch() {
+  searchKeyword.value = '';
+  pageNum.value = 1;
+  reloadList();
+}
+
+function formatTime(val: unknown) {
+  if (!val) return '—';
+  return String(val).replace('T', ' ').slice(0, 16);
+}
 
 function getStatusLabel(status: string) {
-  const map: Record<string, string> = {
-    GRADED: '已批改',
-    AI_GRADED: 'AI已预批',
-    PENDING: '待教师终审'
-  };
-  return map[status] || '待批改';
+  return SUBMISSION_STATUS_LABEL[status] || status || '—';
 }
 
 function getStatusTagType(status: string) {
-  const map: Record<string, string> = {
-    GRADED: 'success',
-    AI_GRADED: 'primary',
-    PENDING: 'warning'
-  };
-  return (map[status] as any) || 'info';
+  return SUBMISSION_STATUS_TAG[status] || 'info';
 }
 
 async function handleBatchAIGrading() {
-  await batchGradePending();
+  await batchGradePending(selectedCourseId.value);
+  await reloadList();
 }
 </script>
 
 <style scoped lang="scss">
-.submission-list-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  width: 100%;
+@use '@/styles/question/module-page-shell.scss';
+@use '@/styles/question/question-list-panel.scss';
+@use '@/styles/question/submission-panel.scss';
 
-  .submission-header-dock {
-    background: #ffffff;
-    border-radius: 18px;
-    padding: 24px 28px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
+.submission-list-page {
+  .list-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-right: 8px;
+  }
+
+  .list-count-badge {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1677ff;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    padding: 2px 10px;
+    border-radius: 9999px;
+  }
+
+  .pagination-row {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
-
-    .header-left {
-      .title-with-icon {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-
-        .header-icon {
-          font-size: 26px;
-          color: #2563eb;
-          display: inline-flex;
-          align-items: center;
-        }
-
-        .main-title {
-          font-size: 22px;
-          font-weight: 800;
-          color: #0f172a;
-          margin: 0;
-        }
-
-        .capsule-count-tag {
-          font-size: 12px;
-          background: #eff6ff;
-          color: #2563eb;
-          border: 1px solid #bfdbfe;
-          border-radius: 9999px;
-          padding: 2px 10px;
-          font-weight: 500;
-        }
-      }
-
-      .sub-desc {
-        margin: 6px 0 0;
-        font-size: 14px;
-        color: #64748b;
-      }
-    }
-
-    .header-right-actions {
-      .capsule-btn-primary {
-        border-radius: 9999px;
-        font-weight: 600;
-        padding: 9px 22px;
-      }
-    }
+    justify-content: flex-end;
+    padding: 16px 8px 8px;
   }
 
-  .filter-capsule-card {
-    width: 100%;
-    box-sizing: border-box;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 18px;
-    padding: 18px 24px;
-    box-shadow: 0 2px 12px rgba(30, 80, 150, 0.03);
+  .pill-badge {
+    padding: 3px 11px;
+    border-radius: 9999px;
+    font-size: 11.5px;
+    font-weight: 600;
 
-    .filter-left {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-      width: 100%;
-
-      .search-input {
-        flex: 1;
-        min-width: 280px;
-      }
-
-      .filter-select {
-        width: 180px;
-        flex-shrink: 0;
-      }
+    &--type {
+      background: #f1f5f9;
+      color: #475569;
     }
-  }
 
-  .submissions-table-card {
-    width: 100%;
-    box-sizing: border-box;
-    background: #ffffff;
-    border-radius: 18px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
-    padding: 16px 20px;
-
-    .student-name-cell {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-
-      .avatar-dot {
-        width: 8px;
-        height: 8px;
-        background: #3b82f6;
-        border-radius: 50%;
-      }
+    &--ai {
+      background: #f5f3ff;
+      color: #6d28d9;
     }
   }
 }

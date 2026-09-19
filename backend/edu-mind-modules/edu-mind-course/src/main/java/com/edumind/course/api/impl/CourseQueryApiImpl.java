@@ -7,16 +7,23 @@ import com.edumind.course.vo.chapter.ChapterTreeVO;
 import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.course.vo.course.CourseVO;
 import com.edumind.course.vo.knowledge.KnowledgePointVO;
-import lombok.RequiredArgsConstructor;
+import com.edumind.course.vo.lesson.CourseLessonProgressSummaryVO;
+import com.edumind.course.service.lesson.LessonService;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class CourseQueryApiImpl implements CourseQueryApi {
 
     private final CourseQueryService courseQueryService;
+    private final LessonService lessonService;
+
+    public CourseQueryApiImpl(CourseQueryService courseQueryService, @Lazy LessonService lessonService) {
+        this.courseQueryService = courseQueryService;
+        this.lessonService = lessonService;
+    }
 
     @Override
     public CourseDetailVO getCourseById(Long courseId) {
@@ -66,5 +73,10 @@ public class CourseQueryApiImpl implements CourseQueryApi {
     @Override
     public List<Long> listStudentUserIdsByCourseId(Long courseId) {
         return courseQueryService.listStudentUserIdsByCourseId(courseId);
+    }
+
+    @Override
+    public CourseLessonProgressSummaryVO getLessonProgressSummary(Long courseId, Long studentId) {
+        return lessonService.getProgressSummaryForStudent(courseId, studentId);
     }
 }

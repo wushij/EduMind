@@ -44,6 +44,24 @@ public class LearningRecordDao {
 
     public int getTotalDuration(Long courseId, Long studentId) {
         List<LearningRecordEntity> list = listByCourseAndStudent(courseId, studentId);
+        return sumDuration(list);
+    }
+
+    public int getTotalDurationSince(Long courseId, Long studentId, LocalDateTime since) {
+        List<LearningRecordEntity> list = listByCourseAndStudentSince(courseId, studentId, since);
+        return sumDuration(list);
+    }
+
+    public List<LearningRecordEntity> listByCourseAndStudentSince(Long courseId, Long studentId, LocalDateTime since) {
+        return learningRecordMapper.selectList(
+                new LambdaQueryWrapper<LearningRecordEntity>()
+                        .eq(LearningRecordEntity::getCourseId, courseId)
+                        .eq(LearningRecordEntity::getStudentId, studentId)
+                        .ge(since != null, LearningRecordEntity::getCreateTime, since)
+        );
+    }
+
+    private int sumDuration(List<LearningRecordEntity> list) {
         return list.stream()
                 .mapToInt(r -> r.getDurationMinutes() != null ? r.getDurationMinutes() : 0)
                 .sum();

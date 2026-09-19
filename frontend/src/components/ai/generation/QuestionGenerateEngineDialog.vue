@@ -7,7 +7,7 @@
     destroy-on-close
     :close-on-click-modal="false"
     :show-close="true"
-    @close="$emit('abort')"
+    @close="handleDialogClose"
   >
     <AiCognitiveThinkingPanel
       :active="visible"
@@ -22,13 +22,20 @@
 import AiCognitiveThinkingPanel from '@/components/ai/common/AiCognitiveThinkingPanel.vue';
 import { AI_COGNITIVE_THINKING_PRESETS } from '@/constants/ai/cognitive-thinking';
 
-defineProps<{
+const props = defineProps<{
   visible: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'abort'): void;
 }>();
+
+/** 仅用户主动关窗时中止，避免请求结束后 visible=false 误触发 cancel */
+function handleDialogClose() {
+  if (props.visible) {
+    emit('abort');
+  }
+}
 </script>
 
 <style scoped lang="scss">

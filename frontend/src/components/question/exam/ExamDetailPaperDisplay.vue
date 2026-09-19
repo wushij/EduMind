@@ -49,96 +49,21 @@
             </div>
           </div>
 
-          <!-- 各大题试题流 -->
           <div class="sheet-body">
-            <template v-if="groupedSections.length > 0">
-              <div
-                v-for="(sec, sIdx) in groupedSections"
-                :key="sec.type"
-                class="sheet-section-block"
-              >
-                <div class="section-title-line">
-                  <span class="sec-number">{{ getChineseNumber(sIdx + 1) }}、{{ sec.title }}</span>
-                  <span class="sec-score-info">
-                    （共 {{ sec.questions.length }} 小题，合计 {{ sec.totalScore }} 分）
-                  </span>
-                </div>
-
-                <div class="section-questions">
-                  <div
-                    v-for="(q, qIdx) in sec.questions"
-                    :key="q.id"
-                    class="paper-question-card"
-                  >
-                    <div class="stem-line">
-                      <span class="q-index">{{ qIdx + 1 }}.</span>
-                      <span class="q-stem-text">{{ q.stem }}</span>
-                      <span class="q-score-tag">（{{ q.score || 5 }}分）</span>
-                    </div>
-
-                    <!-- 选项列表 -->
-                    <div v-if="q.options && q.options.length" class="options-grid">
-                      <div
-                        v-for="opt in q.options"
-                        :key="opt.key"
-                        class="option-item"
-                        :class="{
-                          'is-correct-answer': viewMode === 'ANSWER_KEY' && (opt.isCorrect || opt.key === q.correctAnswer)
-                        }"
-                      >
-                        <span class="opt-key">{{ opt.key }}.</span>
-                        <span class="opt-content">{{ opt.content }}</span>
-                        <span
-                          v-if="viewMode === 'ANSWER_KEY' && (opt.isCorrect || opt.key === q.correctAnswer)"
-                          class="correct-badge"
-                        >
-                          <el-icon><Check /></el-icon> 正确选项
-                        </span>
-                      </div>
-                    </div>
-
-                    <!-- 教师答案及解析模式 -->
-                    <div v-if="viewMode === 'ANSWER_KEY'" class="answer-key-box">
-                      <div class="ans-row">
-                        <span class="ans-title">【标准答案】：</span>
-                        <span class="ans-text text-emerald-600 font-bold">{{ q.correctAnswer || '略' }}</span>
-                      </div>
-                      <div class="ans-row">
-                        <span class="ans-title">【试题解析】：</span>
-                        <span class="ans-text">{{ q.analysis || '暂无详细文字解析' }}</span>
-                      </div>
-                      <div v-if="q.knowledgePointNames && q.knowledgePointNames.length" class="ans-row">
-                        <span class="ans-title">【考查考点】：</span>
-                        <div class="kps-tags">
-                          <span v-for="kp in q.knowledgePointNames" :key="kp" class="kp-pill">{{ kp }}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- 考生答题留白（非答案模式且是简答填空） -->
-                    <div
-                      v-else-if="q.type === 'SHORT_ANSWER' || q.type === 'FILL_BLANK'"
-                      class="student-blank-area"
-                    >
-                      <div class="answer-guide">考生答题区：</div>
-                      <div class="ruled-lines">
-                        <div class="line"></div>
-                        <div class="line"></div>
-                        <div class="line"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-            <el-empty v-else description="当前试卷暂无试题数据，可前往重新组卷或挑选题目" />
+            <ExamPaperBody
+              :grouped-sections="groupedSections"
+              :view-mode="viewMode"
+              skin="detail"
+              :show-point-badge="true"
+            />
           </div>
         </div>
       </div>
 </template>
 
 <script setup lang="ts">
-import { Document, View, Printer, Check } from '@element-plus/icons-vue';
+import { Document, View, Printer } from '@element-plus/icons-vue';
+import ExamPaperBody from '@/components/question/paper/ExamPaperBody.vue';
 import type { ExamPaper } from '@/types/question/exam';
 import type { GroupedSection } from '@/composables/question/useExam';
 

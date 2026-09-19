@@ -26,7 +26,7 @@
       @generate="generate"
     />
 
-    <!-- AI 智能命题推演引擎交互弹窗（雷达脉冲动效、秒数计时、流水线步骤与暂停/中止控制） -->
+    <!-- AI 智能命题推演引擎交互弹窗（雷达脉冲动效、秒数计时、流水线步骤与中止控制） -->
     <QuestionGenerateEngineDialog
       :visible="generating"
       @abort="abortGeneration"
@@ -36,7 +36,7 @@
 
 <script setup lang="ts">
 import { onMounted, markRaw } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import {
   CircleCheck,
   Finished,
@@ -50,6 +50,7 @@ import QuestionGenerateEngineDialog from '@/components/ai/generation/QuestionGen
 import type { QuestionType, Difficulty } from '@/types/question/question';
 
 const router = useRouter();
+const route = useRoute();
 const {
   currentStep,
   generating,
@@ -74,8 +75,20 @@ const {
   abortGeneration
 } = useQuestionGenerate();
 
-onMounted(() => {
-  loadCourseOptions();
+onMounted(async () => {
+  await loadCourseOptions();
+  if (route.query.courseId) {
+    formState.courseId = Number(route.query.courseId);
+  }
+  if (route.query.targetBankId) {
+    formState.targetBankId = String(route.query.targetBankId);
+    if (route.query.bankName) {
+      formState.targetBankName = decodeURIComponent(String(route.query.bankName));
+    }
+    if (currentStep.value === 1 && formState.courseId) {
+      currentStep.value = 2;
+    }
+  }
 });
 
 const steps = [

@@ -84,6 +84,12 @@ export const courseRoutes: RouteRecordRaw[] = [
         name: 'CourseMembers',
         component: () => import('@/views/course/detail/Members.vue'),
         meta: { title: '课程成员', requiresAuth: true }
+      },
+      {
+        path: 'assignments',
+        name: 'CourseAssignments',
+        component: () => import('@/views/course/detail/Assignments.vue'),
+        meta: { title: '课程作业', requiresAuth: true }
       }
     ]
   }

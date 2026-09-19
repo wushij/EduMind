@@ -8,4 +8,6 @@ export interface CourseResourceItem {
   createTime?: string;
   size?: string;
   downloadUrl?: string;
+  knowledgeParseStatus?: string;
+  knowledgeChunkCount?: number;
 }

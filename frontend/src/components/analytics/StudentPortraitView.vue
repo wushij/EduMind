@@ -27,7 +27,7 @@
         </div>
       </div>
 
-      <div class="hero-right-controls">
+      <div v-if="isTeacherVariant" class="hero-right-controls">
         <div class="student-switch-box">
           <span class="switch-label">切换诊断学员：</span>
           <el-select
@@ -57,6 +57,15 @@
           <span>返回班级整体分析</span>
         </button>
       </div>
+
+      <div v-else class="hero-right-controls student-action-row">
+        <button type="button" class="capsule-btn capsule-btn--default" @click="emit('go-wrong-book')">
+          <span>错题本</span>
+        </button>
+        <button type="button" class="capsule-btn capsule-btn--primary" @click="emit('go-practice')">
+          <span>AI 练习</span>
+        </button>
+      </div>
     </div>
 
     <!-- 个人 4 项核心 KPI 指标卡片 -->
@@ -69,11 +78,14 @@
         </div>
         <div class="kpi-sub-tip">
           <span>班级均值：{{ portrait?.summary.classAvgStudyMinutes?.toFixed(0) ?? 80 }} 分钟</span>
+          <span v-if="portrait?.summary.totalStudyMinutesAllTime != null">
+            · 累计 {{ portrait.summary.totalStudyMinutesAllTime }} 分钟
+          </span>
         </div>
       </div>
 
       <div class="portrait-kpi-card">
-        <span class="kpi-tag">平时测验均分</span>
+        <span class="kpi-tag">作业平均得分</span>
         <div class="kpi-val-row">
           <strong class="kpi-val text-success">{{ portrait?.summary.avgScore?.toFixed(1) ?? '-' }}</strong>
           <span class="kpi-unit">分</span>
@@ -103,6 +115,17 @@
           <span>当前累计错题：{{ portrait?.summary.wrongQuestionCount ?? 0 }} 题</span>
         </div>
       </div>
+    </div>
+
+    <div v-if="!isTeacherVariant && personalTrends" class="content-panel trend-panel">
+      <div class="panel-header">
+        <div class="header-title-group">
+          <span class="title-decor-pill title-decor-pill--green"></span>
+          <h3 class="panel-title">个人学习趋势</h3>
+        </div>
+        <span class="panel-tag">区间内学习分钟与作业均分</span>
+      </div>
+      <LearningChart mode="personal" :personal-trends="personalTrends" height="320px" />
     </div>
 
     <!-- 知识体系雷达与薄弱点突破 -->
@@ -322,14 +345,30 @@
 import { computed } from 'vue';
 import { ElMessageBox } from 'element-plus';
 import KnowledgeRadar from '@/components/analytics/KnowledgeRadar.vue';
+import LearningChart from '@/components/analytics/LearningChart.vue';
 import type { StudentPortraitVO, StudentLearningItemVO } from '@/types/analytics/learning';
 import type { KnowledgeMasteryVO } from '@/types/analytics/mastery';
+import type { LearningReportTrendsVO } from '@/types/learning/report';
 
-const props = defineProps<{
-  portrait: StudentPortraitVO | null;
-  studentOptions: StudentLearningItemVO[];
-  adviceLoading?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    portrait: StudentPortraitVO | null;
+    studentOptions?: StudentLearningItemVO[];
+    adviceLoading?: boolean;
+    variant?: 'teacher' | 'student';
+    personalTrends?: LearningReportTrendsVO | null;
+    reportCode?: string;
+  }>(),
+  {
+    studentOptions: () => [],
+    adviceLoading: false,
+    variant: 'teacher',
+    personalTrends: null,
+    reportCode: ''
+  }
+);
+
+const isTeacherVariant = computed(() => props.variant === 'teacher');
 
 const emit = defineEmits<{
   (e: 'switch-student', studentId: number): void;
@@ -338,6 +377,8 @@ const emit = defineEmits<{
   (e: 'clear-advice'): void;
   (e: 'open-diagnosis-drawer'): void;
   (e: 'stop-advice'): void;
+  (e: 'go-practice'): void;
+  (e: 'go-wrong-book'): void;
 }>();
 
 function handleClearAdvice() {
@@ -395,6 +436,18 @@ function formatErrorTypes(types?: string) {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.student-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.trend-panel {
+  margin-top: 0;
 }
 
 // 学生头部卡片

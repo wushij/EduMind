@@ -38,6 +38,8 @@ public class StudentPortraitVO implements Serializable {
     @Data
     public static class PortraitSummaryVO implements Serializable {
         private Integer totalStudyMinutes = 0;
+        /** 累计学时（不受 range 筛选影响） */
+        private Integer totalStudyMinutesAllTime = 0;
         private Double classAvgStudyMinutes = 0.0;
         private Double avgScore = 0.0;
         private Double classAvgScore = 0.0;

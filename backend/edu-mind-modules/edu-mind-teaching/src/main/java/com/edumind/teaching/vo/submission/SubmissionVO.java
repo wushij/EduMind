@@ -14,6 +14,9 @@ public class SubmissionVO {
     private Integer totalScore;
     private Integer maxScore;
     private LocalDateTime submitTime;
+    private String studentName;
+    private String studentNo;
+    private String assignmentTitle;
     private List<SubmissionAnswerVO> answers;
     private List<GradingItemVO> gradingItems;
 }

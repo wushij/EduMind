@@ -168,8 +168,8 @@ INSERT IGNORE INTO question_bank (id, name, course_id, description, question_cou
 
 INSERT IGNORE INTO edu_question (id, bank_id, course_id, knowledge_point_id, stem, type, options, answer, analysis, difficulty, score, status, deleted) VALUES
 (1001, 3, 103, 17, '当 $x \\to 0$ 时，下列无穷小量中与 $x$ 等价的无穷小量是（ ）。', 'SINGLE_CHOICE',
- '[{"key":"A","content":"$\\\\sin 2x$"},{"key":"B","content":"$\\\\ln(1 + x)$"},{"key":"C","content":"$1 - \\\\cos x$"},{"key":"D","content":"$e^x - 1 - x$"}]',
- 'B', '根据等价无穷小基本公式，当 $x \\to 0$ 时，$\\\\ln(1+x) \\sim x$；而 $\\\\sin 2x \\sim 2x$，$1-\\\\cos x \\sim \\\\frac{1}{2}x^2$。故正确答案为 B。', 3, 5, 1, 0),
+ '[{"key":"A","content":"$\\sin 2x$"},{"key":"B","content":"$\\ln(1 + x)$"},{"key":"C","content":"$1 - \\cos x$"},{"key":"D","content":"$e^x - 1 - x$"}]',
+ 'B', '根据等价无穷小基本公式，当 $x \\to 0$ 时，\\ln(1+x) \\sim x；而 \\sin 2x \\sim 2x，$1-\\cos x \\sim \\frac{1}{2}x^2$。故正确答案为 B。', 3, 5, 1, 0),
 
 (1003, 1, 101, 10, '已知一个栈的入栈序列为 1, 2, 3, 4, 5，则不可能得到的出栈序列是（ ）。', 'SINGLE_CHOICE',
  '[{"key":"A","content":"$4, 5, 3, 2, 1$"},{"key":"B","content":"$4, 3, 5, 1, 2$"},{"key":"C","content":"$1, 5, 4, 2, 3$"},{"key":"D","content":"$3, 4, 2, 1, 5$"}]',
@@ -204,8 +204,15 @@ INSERT IGNORE INTO question_bank_item (bank_id, question_id) VALUES
 -- 6. 试卷与试题关联
 -- -----------------------------------------------------------------------------
 INSERT IGNORE INTO teaching_exam (id, course_id, title, total_score, pass_score, duration_minutes, start_time, end_time, status, deleted) VALUES
-(501, 103, '2025秋季学期高等数学期中统一水平测试卷', 100, 60, 90,  '2025-10-15 09:00:00', '2025-10-15 10:30:00', 1, 0),
+(501, 103, '2026秋季学期高等数学期中统一水平测试卷', 100, 60, 90,  '2026-10-15 09:00:00', '2026-10-15 10:30:00', 1, 0),
 (502, 101, '数据结构与算法分析阶段性上机诊断试卷', 100, 60, 100, '2025-10-20 14:00:00', '2025-10-20 15:40:00', 1, 0);
+
+-- INSERT IGNORE 不会更新已插入行；演示试卷标题/时间以种子为准时可重复执行本段
+UPDATE teaching_exam
+SET title = '2026秋季学期高等数学期中统一水平测试卷',
+    start_time = '2026-10-15 09:00:00',
+    end_time = '2026-10-15 10:30:00'
+WHERE id = 501;
 
 INSERT IGNORE INTO exam_question (exam_id, question_id, score, sort_order) VALUES
 (501, 1001, 10, 1),
@@ -214,16 +221,27 @@ INSERT IGNORE INTO exam_question (exam_id, question_id, score, sort_order) VALUE
 -- -----------------------------------------------------------------------------
 -- 7. 教学作业、提交与批改结果
 -- -----------------------------------------------------------------------------
-INSERT IGNORE INTO assignment (id, course_id, exam_id, title, description, deadline, status) VALUES
-(201, 101, NULL, '第一单元：线性表与链表编程作业', '请完成单链表的基本操作及逆置算法设计，按要求提交核心复杂度分析。', '2025-10-25 23:59:59', 'PUBLISHED'),
-(202, 103, 501,  '高数第三周同步随堂小测',       '函数极限计算与等价无穷小代换小测验，共2道题，限时45分钟。',         '2025-10-18 23:59:59', 'PUBLISHED');
+INSERT IGNORE INTO assignment (id, course_id, exam_id, title, description, deadline, status, total_score, pass_score, settings_json) VALUES
+(201, 101, 502, '第一单元：线性表与链表编程作业', '请完成单链表的基本操作及逆置算法设计，按要求提交核心复杂度分析。', '2026-12-25 23:59:59', 'PUBLISHED', 10, 6, '{"aiGradingEnabled":true,"allowLate":false,"instantFeedback":true}'),
+(202, 103, 501,  '高数第三周同步随堂小测',       '函数极限计算与等价无穷小代换小测验，共2道题，限时45分钟。',         '2026-12-18 23:59:59', 'PUBLISHED', 10, 6, '{"aiGradingEnabled":true,"allowLate":true,"instantFeedback":true}');
+
+UPDATE assignment SET exam_id = 502, total_score = 10, pass_score = 6, deadline = '2026-12-25 23:59:59',
+  settings_json = '{"aiGradingEnabled":true,"allowLate":false,"instantFeedback":true}'
+WHERE id = 201 AND (exam_id IS NULL OR exam_id = 0);
+
+UPDATE assignment SET total_score = 10, pass_score = 6, deadline = '2026-12-18 23:59:59',
+  settings_json = '{"aiGradingEnabled":true,"allowLate":true,"instantFeedback":true}'
+WHERE id = 202;
 
 INSERT IGNORE INTO assignment_submission (id, assignment_id, student_id, status, total_score, max_score, submit_time) VALUES
 (301, 201, 3, 'GRADED',    92, 100, '2025-10-20 16:30:00'),
-(302, 201, 4, 'SUBMITTED', NULL, 100, '2025-10-21 11:15:00');
+(302, 201, 4, 'SUBMITTED', NULL, 100, '2025-10-21 11:15:00'),
+(303, 202, 3, 'GRADED',    8, 10, '2025-10-17 14:20:00');
 
 INSERT IGNORE INTO submission_answer (id, submission_id, question_id, answer) VALUES
-(401, 301, 1003, 'B');
+(401, 301, 1003, 'B'),
+(402, 302, 1003, 'A'),
+(403, 303, 1001, 'B');
 
 INSERT IGNORE INTO grading_result (id, submission_id, question_id, score, max_score, is_correct, ai_comment, teacher_comment, status) VALUES
 (501, 301, 1003, 5,  5,  1, '作答完全正确，清晰理解了栈后进先出的约束条件。', '优秀', 'CONFIRMED');
@@ -293,6 +311,77 @@ ON DUPLICATE KEY UPDATE
   status = VALUES(status);
 
 -- -----------------------------------------------------------------------------
+-- 10.5 个人错题本演示数据（对齐三道演示题 1001/1003/1007）
+-- -----------------------------------------------------------------------------
+INSERT INTO wrong_question_record (student_id, course_id, question_id, knowledge_point_id, error_types, diagnosis, wrong_count, last_student_answer, status)
+SELECT 3, 102, 1007, 16, 'CONCEPT', 'CONCEPT: 混淆 ArrayList 与 LinkedList 的随机访问时间复杂度', 2, 'B', 0
+WHERE NOT EXISTS (SELECT 1 FROM wrong_question_record WHERE student_id = 3 AND question_id = 1007);
+
+INSERT INTO wrong_question_record (student_id, course_id, question_id, knowledge_point_id, error_types, diagnosis, wrong_count, last_student_answer, status)
+SELECT 3, 101, 1003, 10, 'LOGIC', 'LOGIC: 栈出栈序列合法性判断失误', 1, 'A', 0
+WHERE NOT EXISTS (SELECT 1 FROM wrong_question_record WHERE student_id = 3 AND question_id = 1003);
+
+INSERT INTO wrong_question_record (student_id, course_id, question_id, knowledge_point_id, error_types, diagnosis, wrong_count, last_student_answer, status)
+SELECT 3, 103, 1001, 17, 'CALC', 'CALC: 等价无穷小代换条件应用错误', 1, 'A', 0
+WHERE NOT EXISTS (SELECT 1 FROM wrong_question_record WHERE student_id = 3 AND question_id = 1001);
+
+INSERT INTO wrong_question_record (student_id, course_id, question_id, knowledge_point_id, error_types, diagnosis, wrong_count, last_student_answer, status)
+SELECT 4, 102, 1007, 16, 'READING', 'READING: 审题不清，误选 LinkedList 内存占用描述', 1, 'D', 0
+WHERE NOT EXISTS (SELECT 1 FROM wrong_question_record WHERE student_id = 4 AND question_id = 1007);
+
+INSERT IGNORE INTO course_member (course_id, user_id, member_role) VALUES (102, 1, 'STUDENT');
+
+INSERT INTO wrong_question_record (student_id, course_id, question_id, knowledge_point_id, error_types, diagnosis, wrong_count, last_student_answer, status)
+SELECT 1, 102, 1007, 16, 'CONCEPT', 'CONCEPT: 演示账号错题：集合框架特性辨析', 1, 'C', 0
+WHERE NOT EXISTS (SELECT 1 FROM wrong_question_record WHERE student_id = 1 AND question_id = 1007);
+
+INSERT IGNORE INTO knowledge_point_relation (source_knowledge_point_id, target_knowledge_point_id, relation_type) VALUES
+(16, 15, 'prerequisite');
+
+-- -----------------------------------------------------------------------------
+-- 10.6 学情掌握度与学习记录（学生报告 / 画像演示）
+-- -----------------------------------------------------------------------------
+INSERT INTO knowledge_mastery (student_id, course_id, knowledge_point_id, mastery_score, sample_count, last_assessed_at)
+SELECT 3, 102, 14, 0.8500, 5, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM knowledge_mastery WHERE student_id = 3 AND course_id = 102 AND knowledge_point_id = 14);
+
+INSERT INTO knowledge_mastery (student_id, course_id, knowledge_point_id, mastery_score, sample_count, last_assessed_at)
+SELECT 3, 102, 15, 0.6400, 4, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM knowledge_mastery WHERE student_id = 3 AND course_id = 102 AND knowledge_point_id = 15);
+
+INSERT INTO knowledge_mastery (student_id, course_id, knowledge_point_id, mastery_score, sample_count, last_assessed_at)
+SELECT 3, 102, 16, 0.7800, 3, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM knowledge_mastery WHERE student_id = 3 AND course_id = 102 AND knowledge_point_id = 16);
+
+INSERT INTO knowledge_mastery (student_id, course_id, knowledge_point_id, mastery_score, sample_count, last_assessed_at)
+SELECT 3, 101, 10, 0.7200, 4, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM knowledge_mastery WHERE student_id = 3 AND course_id = 101 AND knowledge_point_id = 10);
+
+INSERT INTO knowledge_mastery (student_id, course_id, knowledge_point_id, mastery_score, sample_count, last_assessed_at)
+SELECT 3, 101, 12, 0.8800, 5, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM knowledge_mastery WHERE student_id = 3 AND course_id = 101 AND knowledge_point_id = 12);
+
+INSERT INTO knowledge_mastery (student_id, course_id, knowledge_point_id, mastery_score, sample_count, last_assessed_at)
+SELECT 4, 102, 14, 0.8200, 4, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM knowledge_mastery WHERE student_id = 4 AND course_id = 102 AND knowledge_point_id = 14);
+
+INSERT INTO learning_record (student_id, course_id, action_type, duration_minutes, create_time)
+SELECT 3, 102, 'STUDY', 45, DATE_SUB(NOW(), INTERVAL 5 DAY)
+WHERE NOT EXISTS (SELECT 1 FROM learning_record WHERE student_id = 3 AND course_id = 102 AND action_type = 'STUDY' LIMIT 1);
+
+INSERT INTO learning_record (student_id, course_id, action_type, duration_minutes, create_time)
+SELECT 3, 102, 'STUDY', 38, DATE_SUB(NOW(), INTERVAL 2 DAY)
+WHERE NOT EXISTS (SELECT 1 FROM learning_record WHERE student_id = 3 AND course_id = 102 AND action_type = 'STUDY' AND duration_minutes = 38 LIMIT 1);
+
+INSERT INTO learning_record (student_id, course_id, action_type, duration_minutes, create_time)
+SELECT 3, 102, 'AI_CHAT', 25, DATE_SUB(NOW(), INTERVAL 1 DAY)
+WHERE NOT EXISTS (SELECT 1 FROM learning_record WHERE student_id = 3 AND course_id = 102 AND action_type = 'AI_CHAT' LIMIT 1);
+
+INSERT INTO learning_record (student_id, course_id, action_type, duration_minutes, create_time)
+SELECT 4, 102, 'STUDY', 60, DATE_SUB(NOW(), INTERVAL 3 DAY)
+WHERE NOT EXISTS (SELECT 1 FROM learning_record WHERE student_id = 4 AND course_id = 102 AND action_type = 'STUDY' LIMIT 1);
+
+-- -----------------------------------------------------------------------------
 -- 11. AI 示例会话与调用日志
 -- -----------------------------------------------------------------------------
 INSERT IGNORE INTO ai_conversation (id, user_id, course_id, title, message_count, total_tokens, deleted) VALUES
@@ -305,9 +394,10 @@ INSERT IGNORE INTO ai_message (id, conversation_id, role, content, token_count) 
 ('msg_s_01', 'conv_student_001', 'user', '助教你好，请问在做单链表就地逆置时，为什么必须先用临时指针保存 next 节点？', 60),
 ('msg_s_02', 'conv_student_001', 'assistant', '同学你好！在单链表就地逆置时，当我们执行 `curr->next = prev;` 反转当前节点的指针指向后，原有的后续节点链条就会断开。如果不提前使用 `temp = curr->next;` 记录后续节点地址，将无法继续遍历剩余链表，造成链表丢失（内存泄漏或无法循环）。', 560);
 
-INSERT IGNORE INTO ai_call_log (id, user_id, model, prompt_tokens, completion_tokens, latency_ms, scene) VALUES
-(1, 2, 'deepseek-chat', 320, 530, 1250, 'QUESTION_GEN'),
-(2, 3, 'deepseek-chat', 180, 440, 890,  'AI_CHAT');
+INSERT IGNORE INTO ai_call_log (id, user_id, course_id, model, prompt_tokens, completion_tokens, latency_ms, scene, create_time) VALUES
+(1, 2, 101, 'deepseek-chat', 320, 530, 1250, 'QUESTION_GEN', NOW()),
+(2, 3, 102, 'deepseek-chat', 180, 440, 890,  'AI_CHAT', DATE_SUB(NOW(), INTERVAL 1 DAY)),
+(3, 3, 102, 'deepseek-chat', 95, 120, 520, 'AI_CHAT', DATE_SUB(NOW(), INTERVAL 3 DAY));
 
 -- -----------------------------------------------------------------------------
 -- 12. 每日学情统计快照（近 7 天历史趋势数据，供仪表盘与大屏图表渲染）

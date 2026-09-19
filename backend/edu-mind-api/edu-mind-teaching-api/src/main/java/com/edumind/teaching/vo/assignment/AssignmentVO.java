@@ -14,4 +14,12 @@ public class AssignmentVO {
     private LocalDateTime deadline;
     private String status;
     private LocalDateTime createTime;
+    private Integer totalScore;
+    private Integer passScore;
+    private AssignmentSettingsVO settings;
+    private String courseName;
+    private Integer submissionCount;
+    private Integer submittedCount;
+    private Integer pendingGradingCount;
+    private Integer studentCount;
 }

@@ -23,4 +23,6 @@ public interface LessonService {
     LessonProgressVO updateProgress(Long courseId, Long lessonId, LessonProgressUpdateDTO dto);
 
     CourseLessonProgressSummaryVO getProgressSummary(Long courseId);
+
+    CourseLessonProgressSummaryVO getProgressSummaryForStudent(Long courseId, Long studentId);
 }

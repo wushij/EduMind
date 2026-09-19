@@ -5,9 +5,15 @@ import com.edumind.common.exception.BusinessException;
 import com.edumind.common.model.UserContext;
 import com.edumind.infrastructure.redis.DistributedLockService;
 import com.edumind.infrastructure.redis.RedisKeyBuilder;
+import com.edumind.system.api.OrganizationQueryApi;
+import com.edumind.system.api.UserQueryApi;
+import com.edumind.system.vo.tenant.MemberOrgBriefVO;
+import com.edumind.system.vo.user.UserBriefVO;
+import com.edumind.teaching.converter.AssignmentConverter;
 import com.edumind.teaching.dao.AssignmentDao;
 import com.edumind.teaching.dao.SubmissionAnswerDao;
 import com.edumind.teaching.dao.SubmissionDao;
+import com.edumind.teaching.vo.assignment.AssignmentSettingsVO;
 import com.edumind.teaching.dto.submission.SubmissionAnswerItemDTO;
 import com.edumind.teaching.dto.submission.SubmissionCreateDTO;
 import com.edumind.teaching.entity.AssignmentEntity;
@@ -37,6 +43,11 @@ public class SubmissionServiceImpl implements SubmissionService {
     private final DistributedLockService distributedLockService;
     private final TransactionTemplate transactionTemplate;
     private final ApplicationEventPublisher eventPublisher;
+    private final AssignmentConverter assignmentConverter;
+    private final UserQueryApi userQueryApi;
+    private final OrganizationQueryApi organizationQueryApi;
+
+    private static final long DEFAULT_TENANT_ID = 1L;
 
     @Override
     public SubmissionVO submit(Long assignmentId, SubmissionCreateDTO dto) {
@@ -53,6 +64,12 @@ public class SubmissionServiceImpl implements SubmissionService {
         }
         if (!"PUBLISHED".equals(assignment.getStatus())) {
             throw new BusinessException("作业未发布，无法提交");
+        }
+        if (assignment.getDeadline() != null && LocalDateTime.now().isAfter(assignment.getDeadline())) {
+            AssignmentSettingsVO settings = assignmentConverter.parseSettings(assignment.getSettingsJson());
+            if (settings == null || !Boolean.TRUE.equals(settings.getAllowLate())) {
+                throw new BusinessException("已超过截止时间，无法提交");
+            }
         }
 
         SubmissionEntity submission = submissionDao.findByAssignmentAndStudent(assignmentId, studentId);
@@ -104,7 +121,28 @@ public class SubmissionServiceImpl implements SubmissionService {
             return item;
         }).collect(Collectors.toList()));
         vo.setGradingItems(gradingService.getGradingResults(id));
+        enrichStudentInfo(vo);
+        AssignmentEntity assignment = assignmentDao.findById(entity.getAssignmentId());
+        if (assignment != null) {
+            vo.setAssignmentTitle(assignment.getTitle());
+        }
         return vo;
+    }
+
+    private void enrichStudentInfo(SubmissionVO vo) {
+        if (vo.getStudentId() == null) {
+            return;
+        }
+        UserBriefVO user = userQueryApi.getUserById(vo.getStudentId());
+        if (user != null) {
+            vo.setStudentName(user.getRealName() != null ? user.getRealName() : user.getUsername());
+        }
+        MemberOrgBriefVO org = organizationQueryApi.getPrimaryClassByUserId(DEFAULT_TENANT_ID, vo.getStudentId());
+        if (org != null && org.getMemberNo() != null) {
+            vo.setStudentNo(org.getMemberNo());
+        } else if (user != null) {
+            vo.setStudentNo(user.getUsername());
+        }
     }
 
     @Override

@@ -1,5 +1,5 @@
 <template>
-  <div class="exam-detail-container">
+  <div class="exam-detail-container question-module-page">
     <ExamDetailHeroSection
       :router="router"
       :loading="loading"
@@ -30,25 +30,6 @@
       />
     </div>
 
-    <el-dialog v-model="exportDialogVisible" title="试卷数据导出" width="580px" destroy-on-close>
-      <div v-loading="exportLoading" class="export-dialog-body">
-        <p class="export-tip">
-          您可以复制以下标准化试卷 JSON 结构用于系统间数据迁移或在线题库交换：
-        </p>
-        <el-input
-          type="textarea"
-          :rows="12"
-          readonly
-          :value="exportDataJson"
-        />
-      </div>
-      <template #footer>
-        <el-button @click="exportDialogVisible = false">关闭</el-button>
-        <el-button type="primary" :disabled="!exportDataJson" @click="handleCopyExportJson">
-          复制 JSON 到剪贴板
-        </el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -63,9 +44,6 @@ const {
   loading,
   examData,
   viewMode,
-  exportDialogVisible,
-  exportLoading,
-  exportDataJson,
   groupedSections,
   totalQuestionsCount,
   difficultyCounts,
@@ -73,7 +51,6 @@ const {
   coveredKnowledgePoints,
   handlePublishAsAssignment,
   handleExportPaper,
-  handleCopyExportJson,
   printPaper,
   getChineseNumber,
   getStatusLabel,
@@ -83,23 +60,15 @@ const {
 </script>
 
 <style scoped lang="scss">
-.exam-detail-container {
-  padding: 24px;
-  background: #f8fafc;
+@use '@/styles/question/module-page-shell.scss';
 
+.exam-detail-container {
   .main-content-layout {
     display: flex;
     gap: 24px;
     align-items: flex-start;
   }
 
-  .export-dialog-body {
-    .export-tip {
-      font-size: 13px;
-      color: #64748b;
-      margin-bottom: 12px;
-    }
-  }
 }
 </style>
 

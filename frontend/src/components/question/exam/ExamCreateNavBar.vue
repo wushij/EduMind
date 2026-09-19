@@ -1,54 +1,66 @@
 <template>
-  <div class="top-nav-bar">
-    <el-button :icon="ArrowLeft" link class="back-link" @click="$emit('cancel')">
-      返回试卷列表
-    </el-button>
-    <div class="step-progress-wrapper">
-      <el-steps :active="currentStep" finish-status="success" simple>
-        <el-step title="1. 试卷基本信息" :icon="Document" />
-        <el-step title="2. 编排大题与选题" :icon="Setting" />
-        <el-step title="3. 卷面审阅与发布" :icon="Finished" />
-      </el-steps>
+  <div class="module-page-hero exam-create-hero">
+    <div class="module-page-hero__nav">
+      <div class="module-page-hero__nav-inner">
+        <button type="button" class="module-page-back" @click="$emit('cancel')">
+          <el-icon><ArrowLeft /></el-icon>
+          <span>返回试卷列表</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="module-page-hero__content">
+      <div class="exam-create-hero__head">
+        <div class="exam-create-hero__intro">
+          <h1 class="exam-create-hero__title">创建试卷</h1>
+          <p class="exam-create-hero__desc">
+            三步完成基本信息、大题编排与卷面审阅，保存后可发布为在线作业或导出打印。
+          </p>
+        </div>
+
+        <ol class="exam-create-hero__steps" aria-label="组卷步骤">
+          <li
+            v-for="(step, index) in steps"
+            :key="step.key"
+            class="exam-create-hero__step"
+            :class="stepClass(index)"
+          >
+            <span class="exam-create-hero__step-num">{{ index + 1 }}</span>
+            <div class="exam-create-hero__step-text">
+              <strong>{{ step.title }}</strong>
+              <span>{{ step.subtitle }}</span>
+            </div>
+          </li>
+        </ol>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ArrowLeft, Document, Setting, Finished } from '@element-plus/icons-vue';
+import { ArrowLeft } from '@element-plus/icons-vue';
 
-defineProps<{
+const props = defineProps<{
   currentStep: number;
 }>();
 
 defineEmits<{
   cancel: [];
 }>();
+
+const steps = [
+  { key: 'basic', title: '试卷基本信息', subtitle: '名称、课程、时限与及格线' },
+  { key: 'sections', title: '编排大题与选题', subtitle: '分大题、挑题与配分' },
+  { key: 'review', title: '卷面审阅与发布', subtitle: '预览卷面并保存发布' }
+] as const;
+
+function stepClass(index: number) {
+  if (index === props.currentStep) return 'exam-create-hero__step--active';
+  if (index < props.currentStep) return 'exam-create-hero__step--done';
+  return '';
+}
 </script>
 
 <style scoped lang="scss">
-.top-nav-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 24px;
-
-  .back-link {
-    font-size: 14px;
-    font-weight: 500;
-    color: #3b82f6;
-  }
-
-  .step-progress-wrapper {
-    flex: 1;
-    max-width: 680px;
-
-    :deep(.el-steps--simple) {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 10px 16px;
-    }
-  }
-}
+@use '@/styles/question/module-page-shell.scss';
 </style>

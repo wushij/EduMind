@@ -49,8 +49,8 @@
           <el-icon><CircleCheck /></el-icon>
         </div>
         <div class="metric-info">
-          <span class="val">96.4%</span>
-          <span class="label">知识点判准置信度</span>
+          <span class="val">{{ pendingReviewCount }}</span>
+          <span class="label">待教师确认（已 AI 预评）</span>
         </div>
       </div>
 
@@ -59,8 +59,8 @@
           <el-icon><Clock /></el-icon>
         </div>
         <div class="metric-info">
-          <span class="val">78% ↓</span>
-          <span class="label">教师批改用时缩减</span>
+          <span class="val">{{ reviewedCount }}</span>
+          <span class="label">教师已复核发布</span>
         </div>
       </div>
     </div>
@@ -183,9 +183,16 @@ import {
 } from '@element-plus/icons-vue';
 import { useGrading, type GradingTaskRow } from '@/composables/ai/useGrading';
 import ProfilePageHero from '@/components/profile/ProfilePageHero.vue';
+import { getSubmissionStats } from '@/api/question/submission';
 
 const router = useRouter();
 const { startGrading, batchGrade, loadGradingTasks, loading: gradingLoading } = useGrading();
+
+const overviewStats = ref({
+  submittedCount: 0,
+  gradedCount: 0,
+  reviewedCount: 0
+});
 
 const selectedModel = ref('deepseek-v3');
 const strictness = ref('NORMAL');
@@ -196,8 +203,21 @@ const loadingTasks = ref(false);
 const gradingTasks = ref<GradingTaskRow[]>([]);
 
 onMounted(async () => {
-  await loadRealTasks();
+  await Promise.all([loadRealTasks(), loadOverviewStats()]);
 });
+
+async function loadOverviewStats() {
+  try {
+    const res = await getSubmissionStats();
+    overviewStats.value = {
+      submittedCount: res.data?.submittedCount ?? 0,
+      gradedCount: res.data?.gradedCount ?? 0,
+      reviewedCount: res.data?.reviewedCount ?? 0
+    };
+  } catch {
+    overviewStats.value = { submittedCount: 0, gradedCount: 0, reviewedCount: 0 };
+  }
+}
 
 async function loadRealTasks() {
   loadingTasks.value = true;
@@ -215,11 +235,11 @@ const totalSubmissionsCount = computed(() => {
   return gradingTasks.value.reduce((acc, t) => acc + (t.submissionCount || 0), 0);
 });
 
-const aiGradedCount = computed(() => {
-  return gradingTasks.value.reduce((acc, t) => {
-    return acc + Math.round(((t.submissionCount || 0) * (t.progress || 0)) / 100);
-  }, 0);
-});
+const aiGradedCount = computed(() => overviewStats.value.gradedCount ?? 0);
+
+const pendingReviewCount = computed(() => overviewStats.value.submittedCount ?? 0);
+
+const reviewedCount = computed(() => overviewStats.value.reviewedCount ?? 0);
 
 async function handleRunAllPending() {
   batchRunning.value = true;

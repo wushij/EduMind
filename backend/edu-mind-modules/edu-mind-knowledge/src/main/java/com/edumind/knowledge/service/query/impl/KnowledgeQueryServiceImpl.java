@@ -2,8 +2,10 @@ package com.edumind.knowledge.service.query.impl;
 
 import com.edumind.knowledge.converter.KnowledgeBaseConverter;
 import com.edumind.knowledge.dao.KnowledgeBaseDao;
+import com.edumind.knowledge.dao.KnowledgeDocumentChunkDao;
 import com.edumind.knowledge.dao.KnowledgeDocumentDao;
 import com.edumind.knowledge.dao.KnowledgeDocumentTextDao;
+import com.edumind.knowledge.entity.KnowledgeDocumentEntity;
 import com.edumind.knowledge.entity.KnowledgeDocumentTextEntity;
 import com.edumind.knowledge.service.query.KnowledgeQueryService;
 import com.edumind.knowledge.vo.knowledge.KnowledgeBaseVO;
@@ -21,6 +23,7 @@ public class KnowledgeQueryServiceImpl implements KnowledgeQueryService {
 
     private final KnowledgeBaseDao knowledgeBaseDao;
     private final KnowledgeDocumentDao knowledgeDocumentDao;
+    private final KnowledgeDocumentChunkDao knowledgeDocumentChunkDao;
     private final KnowledgeDocumentTextDao knowledgeDocumentTextDao;
     private final KnowledgeBaseConverter knowledgeBaseConverter;
 
@@ -53,5 +56,18 @@ public class KnowledgeQueryServiceImpl implements KnowledgeQueryService {
     public String getDocumentText(Long documentId) {
         KnowledgeDocumentTextEntity textEntity = knowledgeDocumentTextDao.findByDocumentId(documentId);
         return textEntity != null ? textEntity.getContent() : null;
+    }
+
+    @Override
+    public KnowledgeDocumentVO getDocumentById(Long documentId) {
+        if (documentId == null) {
+            return null;
+        }
+        KnowledgeDocumentEntity entity = knowledgeDocumentDao.findById(documentId);
+        KnowledgeDocumentVO vo = knowledgeBaseConverter.toDocumentVO(entity);
+        if (vo != null) {
+            vo.setChunkCount((int) knowledgeDocumentChunkDao.countByDocumentId(documentId));
+        }
+        return vo;
     }
 }

@@ -1,6 +1,7 @@
 package com.edumind.question.dao.export;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.edumind.common.context.TenantContext;
 import com.edumind.question.entity.export.ExportTaskEntity;
 import com.edumind.question.mapper.export.ExportTaskMapper;
@@ -37,6 +38,14 @@ public class ExportTaskDao {
 
     public List<ExportTaskEntity> listByUserId(Long tenantId, Long userId) {
         return exportTaskMapper.selectList(new LambdaQueryWrapper<ExportTaskEntity>()
+                .eq(ExportTaskEntity::getTenantId, tenantId)
+                .eq(ExportTaskEntity::getUserId, userId)
+                .orderByDesc(ExportTaskEntity::getCreateTime));
+    }
+
+    public Page<ExportTaskEntity> pageByUserId(Long tenantId, Long userId, long pageNum, long pageSize) {
+        Page<ExportTaskEntity> page = new Page<>(pageNum, pageSize);
+        return exportTaskMapper.selectPage(page, new LambdaQueryWrapper<ExportTaskEntity>()
                 .eq(ExportTaskEntity::getTenantId, tenantId)
                 .eq(ExportTaskEntity::getUserId, userId)
                 .orderByDesc(ExportTaskEntity::getCreateTime));

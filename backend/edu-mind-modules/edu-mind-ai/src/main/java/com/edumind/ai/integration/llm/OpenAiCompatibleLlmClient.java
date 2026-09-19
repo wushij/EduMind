@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -51,8 +52,28 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
 
     @Override
     public String generateQuestions(String prompt, Map<String, Object> params) {
-        String userPrompt = prompt + "\n请以 JSON 格式返回，包含 questions 数组。";
-        return chat("你是专业的教学出题助手，请严格输出 JSON。", userPrompt);
+        String suffix = "\n请严格只输出一个 JSON 对象，包含 questions 数组（至少 1 题），不要 Markdown 说明或代码围栏外的文字。";
+        String marker = "【出题任务目标】";
+        int idx = prompt != null ? prompt.indexOf(marker) : -1;
+        if (idx > 40) {
+            String systemPart = prompt.substring(0, idx).trim();
+            String userPart = prompt.substring(idx).trim() + suffix;
+            return chat(systemPart, userPart, questionGenerateOptions());
+        }
+        return chat(
+                "你是 EduMind 专业命题助手，请严格按用户要求输出 JSON。",
+                (prompt != null ? prompt : "") + suffix,
+                questionGenerateOptions()
+        );
+    }
+
+    private LlmChatOptions questionGenerateOptions() {
+        return LlmChatOptions.builder()
+                .temperature(0.3)
+                .maxTokens(properties.getMaxTokens() != null && properties.getMaxTokens() > 0
+                        ? Math.min(properties.getMaxTokens(), 8192)
+                        : 8192)
+                .build();
     }
 
     @Override
@@ -86,14 +107,25 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         streamChatWithHistory(systemPrompt, messages, LlmChatOptions.empty(), callback);
     }
 
+    @Override
+    public void streamChatWithHistory(String systemPrompt, List<LlmChatMessage> messages,
+                                      BooleanSupplier cancelled, StreamCallback callback) {
+        streamChatWithHistory(systemPrompt, messages, LlmChatOptions.empty(), cancelled, callback);
+    }
+
     public void streamChatWithHistory(String systemPrompt, List<LlmChatMessage> messages,
                                     LlmChatOptions options, StreamCallback callback) {
+        streamChatWithHistory(systemPrompt, messages, options, null, callback);
+    }
+
+    public void streamChatWithHistory(String systemPrompt, List<LlmChatMessage> messages,
+                                    LlmChatOptions options, BooleanSupplier cancelled, StreamCallback callback) {
         if (!Boolean.TRUE.equals(properties.getStreamEnabled())) {
-            pseudoStream(systemPrompt, messages, options, callback);
+            pseudoStream(systemPrompt, messages, options, cancelled, callback);
             return;
         }
         try {
-            streamFromUpstream(systemPrompt, messages, options, callback);
+            streamFromUpstream(systemPrompt, messages, options, cancelled, callback);
             callback.onComplete();
         } catch (Exception ex) {
             log.warn("LLM stream failed: {}", ex.getMessage());
@@ -102,7 +134,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     }
 
     private void streamFromUpstream(String systemPrompt, List<LlmChatMessage> messages,
-                                    LlmChatOptions options, StreamCallback callback) throws Exception {
+                                    LlmChatOptions options, BooleanSupplier cancelled, StreamCallback callback) throws Exception {
         Map<String, Object> body = buildChatBody(systemPrompt, messages, true, options);
         String json = JSON.toJSONString(body);
         String url = normalizeBaseUrl() + "/chat/completions";
@@ -136,6 +168,9 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
                 new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
+                if (cancelled != null && cancelled.getAsBoolean()) {
+                    break;
+                }
                 line = line.trim();
                 if (line.isEmpty() || line.startsWith(":")) {
                     continue;
@@ -181,7 +216,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     }
 
     private void pseudoStream(String systemPrompt, List<LlmChatMessage> messages,
-                              LlmChatOptions options, StreamCallback callback) {
+                              LlmChatOptions options, BooleanSupplier cancelled, StreamCallback callback) {
         try {
             Map<String, Object> body = buildChatBody(systemPrompt, messages, false, options);
             HttpClient client = HttpClient.newBuilder()
@@ -196,9 +231,16 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
                 builder.header("Authorization", "Bearer " + properties.getApiKey());
             }
             HttpResponse<String> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            if (cancelled != null && cancelled.getAsBoolean()) {
+                callback.onComplete();
+                return;
+            }
             JSONObject json = JSON.parseObject(response.body());
             String content = extractContent(json);
             for (char c : content.toCharArray()) {
+                if (cancelled != null && cancelled.getAsBoolean()) {
+                    break;
+                }
                 callback.onChunk(String.valueOf(c));
             }
             callback.onComplete();

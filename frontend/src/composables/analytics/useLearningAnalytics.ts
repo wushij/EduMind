@@ -144,12 +144,12 @@ export function useLearningAnalytics() {
     }
   }
 
-  async function fetchStudentPortrait(courseId: number, studentId: number) {
+  async function fetchStudentPortrait(courseId: number, studentId: number, range = '30d') {
     loading.value = true;
     usedMockFallback.value = false;
     selectedStudentId.value = studentId;
     try {
-      const res = await getStudentPortrait({ courseId, studentId });
+      const res = await getStudentPortrait({ courseId, studentId, range });
       portraitData.value = res.data;
     } catch (err: unknown) {
       portraitData.value = null;

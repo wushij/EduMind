@@ -1,12 +1,14 @@
 <template>
-  <div class="bank-detail-container">
+  <div class="bank-detail-container question-module-page">
     <BankDetailHeader
       :router="router"
       :loading="loading"
       :bank-info="bankInfo"
       :question-count="bankQuestions.length"
       :total-score="totalScore"
+      :questions="bankQuestions"
       :on-open-add-drawer="openAddDrawer"
+      :on-create-new-question="handleCreateNewQuestion"
       :on-fast-compose-exam="handleFastComposeExam"
       :on-export-markdown="exportBankMarkdown"
       :on-ai-expand="handleAiExpand"
@@ -18,22 +20,17 @@
       :filter-type="filterType"
       :filter-difficulty="filterDifficulty"
       :selected-row-keys="selectedRowKeys"
-      :expanded-analyses="expandedAnalyses"
       :drawer-visible="drawerVisible"
       :drawer-search="drawerSearch"
       :drawer-type="drawerType"
       :selected-candidate-ids="selectedCandidateIds"
       :adding-loading="addingLoading"
-      :detail-modal-visible="detailModalVisible"
-      :active-question="activeQuestion"
       :filtered-questions="filteredQuestions"
       :candidate-questions="candidateQuestions"
       :on-search-keyword-change="(v) => { searchKeyword = v }"
       :on-filter-type-change="(v) => { filterType = v }"
       :on-filter-difficulty-change="(v) => { filterDifficulty = v }"
       :on-toggle-select-row="toggleSelectRow"
-      :on-toggle-expand-analysis="toggleExpandAnalysis"
-      :on-view-detail-dialog="viewDetailDialog"
       :on-remove-question="handleRemoveQuestion"
       :on-batch-remove="handleBatchRemove"
       :on-open-add-drawer="openAddDrawer"
@@ -42,7 +39,6 @@
       :on-drawer-type-change="(v) => { drawerType = v }"
       :on-toggle-candidate-select="toggleCandidateSelect"
       :on-confirm-add-questions="confirmAddQuestions"
-      :on-detail-modal-visible-change="(v) => { detailModalVisible = v }"
       :get-type-label="getTypeLabel"
       :get-type-tag-type="getTypeTagType"
       :get-difficulty-label="getDifficultyLabel"
@@ -65,26 +61,22 @@ const {
   filterType,
   filterDifficulty,
   selectedRowKeys,
-  expandedAnalyses,
   drawerVisible,
   drawerSearch,
   drawerType,
   selectedCandidateIds,
   addingLoading,
-  detailModalVisible,
-  activeQuestion,
   totalScore,
   filteredQuestions,
   candidateQuestions,
   toggleSelectRow,
-  toggleExpandAnalysis,
-  viewDetailDialog,
   handleRemoveQuestion,
   handleBatchRemove,
   openAddDrawer,
   toggleCandidateSelect,
   confirmAddQuestions,
   handleFastComposeExam,
+  handleCreateNewQuestion,
   handleDeleteBank,
   exportBankMarkdown,
   handleAiExpand,
@@ -96,8 +88,5 @@ const {
 </script>
 
 <style scoped lang="scss">
-.bank-detail-container {
-  padding: 24px;
-  background-color: #f8fafc;
-}
+@use '@/styles/question/module-page-shell.scss';
 </style>

@@ -42,7 +42,7 @@
                 <el-option
                   v-for="c in courses"
                   :key="c.id"
-                  :label="c.title"
+                  :label="c.title || c.name"
                   :value="c.id"
                 />
               </el-select>
@@ -254,15 +254,15 @@ function bindFormRef(el: FormInstance | null) {
 
 <style scoped lang="scss">
 .form-wrapper {
-  max-width: 900px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
 
   .main-card {
     background: #ffffff;
-    border-radius: 16px;
+    border-radius: 20px;
     border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
-    padding: 16px 24px;
+    box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
+    padding: 24px 28px;
 
     .card-header-title {
       display: flex;

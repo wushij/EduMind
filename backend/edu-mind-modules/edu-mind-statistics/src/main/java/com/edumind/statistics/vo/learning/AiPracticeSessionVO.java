@@ -12,4 +12,8 @@ public class AiPracticeSessionVO {
     private Long courseId;
     private Integer questionCount;
     private List<QuestionVO> questions = new ArrayList<>();
+    private String weakPointHint;
+    private Integer estimatedMinutes;
+    private Integer weakKnowledgePointCount;
+    private Long pendingWrongQuestionCount;
 }

@@ -1,5 +1,5 @@
 <template>
-  <div class="assignment-create-container">
+  <div class="assignment-create-container question-module-page">
     <!-- 顶部返回与标题 -->
     <div class="top-nav-bar">
       <el-button :icon="ArrowLeft" link class="back-link" @click="handleCancel">
@@ -62,9 +62,9 @@ function setFormRef(el: FormInstance | undefined) {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/question/module-page-shell.scss';
+
 .assignment-create-container {
-  padding: 24px;
-  background: #f8fafc;
   .top-nav-bar {
     display: flex;
     align-items: center;

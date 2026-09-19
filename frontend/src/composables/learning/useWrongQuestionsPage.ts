@@ -1,61 +1,121 @@
 import { ref, onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
-import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
+import { useRouter, useRoute } from 'vue-router';
+import { getLearningHomeOverview } from '@/api/learning/home';
+import { getWrongBookDetail } from '@/api/learning/wrong-book';
 import { useWrongQuestions } from '@/composables/learning/useWrongQuestions';
-import type { WrongQuestionRecordItem } from '@/types/learning/wrong-question';
+import type { WrongBookDetailVO, WrongQuestionRecordItem } from '@/types/learning/wrong-question';
 
 export function useWrongQuestionsPage(defaultCourseId = 102) {
   const router = useRouter();
-  const { courseOptions, courseId: teacherCourseId } = useTeacherCourses(defaultCourseId);
+  const route = useRoute();
+
+  const courseOptions = ref<Array<{ id: number; name: string }>>([]);
+  const teacherCourseId = ref<number>(defaultCourseId);
+  const hasEnrolledCourses = ref(true);
+  const coursesLoading = ref(false);
 
   const {
     courseId,
     loading,
+    overviewLoading,
     page,
     pageSize,
     totalWrongQuestions,
-    weakPointCount,
-    masteredCount,
     selectedErrorType,
     wrongList,
+    overview,
     fetchList,
     loadDiagnosis,
     markMastered,
     formatQuestionType,
     getDifficultyType,
-    parsedOptions
-  } = useWrongQuestions(teacherCourseId.value);
+    parsedOptions,
+    displayErrorTags
+  } = useWrongQuestions(defaultCourseId);
 
   const drawerVisible = ref(false);
   const activeItem = ref<WrongQuestionRecordItem | null>(null);
+  const detailLoading = ref(false);
+  const detailExtra = ref<Pick<WrongBookDetailVO, 'prerequisiteNodes' | 'variantQuestions'>>({});
+
+  async function loadCourseOptions() {
+    coursesLoading.value = true;
+    try {
+      const res = await getLearningHomeOverview();
+      const courses = res.data?.courses ?? [];
+      if (courses.length > 0) {
+        courseOptions.value = courses.map((c) => ({
+          id: c.courseId,
+          name: c.courseName || `课程 #${c.courseId}`
+        }));
+        hasEnrolledCourses.value = true;
+        const queryCid = route.query.courseId ? Number(route.query.courseId) : null;
+        const kpQuery = route.query.knowledgePointId ? Number(route.query.knowledgePointId) : null;
+        if (queryCid && courseOptions.value.some((c) => c.id === queryCid)) {
+          teacherCourseId.value = queryCid;
+        } else if (!courseOptions.value.some((c) => c.id === teacherCourseId.value)) {
+          teacherCourseId.value = courseOptions.value[0].id;
+        }
+        courseId.value = teacherCourseId.value;
+        if (kpQuery) {
+          // knowledgePointId filter reserved for future API param wiring
+        }
+      } else {
+        hasEnrolledCourses.value = false;
+        courseOptions.value = [];
+      }
+    } catch {
+      hasEnrolledCourses.value = true;
+      courseOptions.value = [{ id: defaultCourseId, name: `课程 #${defaultCourseId}` }];
+      teacherCourseId.value = defaultCourseId;
+      courseId.value = defaultCourseId;
+    } finally {
+      coursesLoading.value = false;
+    }
+  }
 
   const handleCourseChange = () => {
     courseId.value = teacherCourseId.value;
     page.value = 1;
-    fetchList();
+    void fetchList();
   };
 
   watch(teacherCourseId, (id) => {
     courseId.value = id;
-    fetchList();
+    page.value = 1;
+    void fetchList();
   });
 
   const openDiagnosisDrawer = async (item: WrongQuestionRecordItem) => {
     activeItem.value = item;
     drawerVisible.value = true;
-    await loadDiagnosis(item);
+    detailLoading.value = true;
+    detailExtra.value = {};
+    try {
+      await loadDiagnosis(item);
+      const res = await getWrongBookDetail(item.id);
+      if (res?.data) {
+        activeItem.value = { ...item, ...res.data };
+        detailExtra.value = {
+          prerequisiteNodes: res.data.prerequisiteNodes,
+          variantQuestions: res.data.variantQuestions
+        };
+      }
+    } finally {
+      detailLoading.value = false;
+    }
   };
 
   const handleMarkMastered = (item: WrongQuestionRecordItem) => {
-    markMastered(item);
+    void markMastered(item);
   };
 
   const handleStartVariantPractice = (item: WrongQuestionRecordItem) => {
     router.push({
       path: '/learning/practice',
       query: {
-        courseId: courseId.value,
-        questionId: item.questionId,
+        courseId: String(courseId.value),
+        questionId: String(item.questionId),
         mode: 'VARIANT'
       }
     });
@@ -65,7 +125,7 @@ export function useWrongQuestionsPage(defaultCourseId = 102) {
     router.push({
       path: '/learning/practice',
       query: {
-        courseId: courseId.value,
+        courseId: String(courseId.value),
         mode: 'WRONG_BATCH'
       }
     });
@@ -76,8 +136,8 @@ export function useWrongQuestionsPage(defaultCourseId = 102) {
     router.push({
       path: '/learning/practice',
       query: {
-        courseId: courseId.value,
-        questionId: varId,
+        courseId: String(courseId.value),
+        questionId: String(varId),
         mode: 'SINGLE_VARIANT'
       }
     });
@@ -93,33 +153,44 @@ export function useWrongQuestionsPage(defaultCourseId = 102) {
   const handleGoToPractice = () => {
     router.push({
       path: '/learning/practice',
-      query: { courseId: courseId.value }
+      query: { courseId: String(courseId.value) }
     });
   };
 
-  onMounted(() => {
-    courseId.value = teacherCourseId.value;
-    fetchList();
+  const handleGoToCourseCenter = () => {
+    router.push('/course');
+  };
+
+  onMounted(async () => {
+    await loadCourseOptions();
+    if (hasEnrolledCourses.value) {
+      await fetchList();
+    }
   });
 
   return {
     courseOptions,
     teacherCourseId,
+    hasEnrolledCourses,
+    coursesLoading,
     courseId,
     loading,
+    overviewLoading,
     page,
     pageSize,
     totalWrongQuestions,
-    weakPointCount,
-    masteredCount,
     selectedErrorType,
     wrongList,
+    overview,
     drawerVisible,
     activeItem,
+    detailLoading,
+    detailExtra,
     fetchList,
     formatQuestionType,
     getDifficultyType,
     parsedOptions,
+    displayErrorTags,
     handleCourseChange,
     openDiagnosisDrawer,
     handleMarkMastered,
@@ -127,6 +198,7 @@ export function useWrongQuestionsPage(defaultCourseId = 102) {
     handleLaunchBatchPractice,
     handlePracticeSingleVariant,
     handleLaunchPracticeFromDrawer,
-    handleGoToPractice
+    handleGoToPractice,
+    handleGoToCourseCenter
   };
 }

@@ -1,18 +1,28 @@
 export interface RecommendationQuestion {
-  questionId: number;
+  id?: number;
+  questionId?: number;
   type: string;
-  difficulty: string;
+  difficulty: string | number;
   stem: string;
+  courseId?: number;
+  courseName?: string;
+  knowledgePointId?: number;
   knowledgePointName?: string;
+  matchScore?: number;
   reason?: string;
 }
 
 export interface RecommendationResource {
+  id?: number;
   resourceId?: number;
   documentId?: number;
   title: string;
   resourceType?: string;
+  courseId?: number;
+  courseName?: string;
+  matchScore?: number;
   reason?: string;
+  fileUrl?: string;
 }
 
 export interface RecommendationItem {
@@ -38,4 +48,5 @@ export interface RecommendationItem {
     format: string;
     fileSize: string;
   };
+  courseId?: number;
 }

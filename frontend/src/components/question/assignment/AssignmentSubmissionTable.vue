@@ -19,9 +19,9 @@
           @update:model-value="$emit('update:statusFilter', $event)"
         >
           <el-option label="全部状态" value="" />
-          <el-option label="待教师终审" value="PENDING" />
-          <el-option label="已批改完成" value="GRADED" />
-          <el-option label="AI已预批" value="AI_GRADED" />
+          <el-option label="待批改" value="SUBMITTED" />
+          <el-option label="AI 已评 · 待确认" value="GRADED" />
+          <el-option label="批改完成" value="REVIEWED" />
         </el-select>
       </div>
 

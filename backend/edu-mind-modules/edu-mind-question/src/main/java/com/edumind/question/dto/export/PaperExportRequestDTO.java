@@ -59,4 +59,18 @@ public class PaperExportRequestDTO {
      * 是否显示大题得分统分网格栏
      */
     private Boolean showScoreGrid;
+
+    private String confidentialLevel;
+
+    private Boolean showSealingLine;
+
+    private Boolean showNoticeBar;
+
+    private Boolean showPointBadge;
+
+    private String fontFamily;
+
+    private String lineSpacing;
+
+    private String optionLayout;
 }

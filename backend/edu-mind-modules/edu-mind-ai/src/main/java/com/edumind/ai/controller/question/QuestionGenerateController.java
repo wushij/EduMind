@@ -26,4 +26,11 @@ public class QuestionGenerateController {
     public ApiResult<List<QuestionVO>> generate(@Valid @RequestBody QuestionGenerateDTO dto) {
         return ApiResult.success(questionGenerateService.generate(dto));
     }
+
+    @SaCheckPermission("ai:question")
+    @PostMapping("/generate/cancel")
+    public ApiResult<Void> cancelGenerate() {
+        questionGenerateService.cancelActiveGeneration();
+        return ApiResult.success();
+    }
 }

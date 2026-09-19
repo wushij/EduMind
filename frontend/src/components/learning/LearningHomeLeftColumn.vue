@@ -6,7 +6,7 @@
             <div class="header-left">
               <el-icon class="header-icon icon-warning"><WarningFilled /></el-icon>
               <h3 class="header-title">AI 考点诊断预警与薄弱项攻坚</h3>
-              <span class="capsule-alert-pill">急需强化 3 项</span>
+              <span class="capsule-alert-pill">急需强化 {{ weakPoints.length }} 项</span>
             </div>
             <button
               type="button"
@@ -18,7 +18,10 @@
             </button>
           </div>
 
-          <div class="weakness-points-list">
+          <div v-if="loading" class="section-loading-hint">加载中...</div>
+          <el-empty v-else-if="!weakPoints.length" description="暂无薄弱考点，继续保持" />
+
+          <div v-else class="weakness-points-list">
             <div
               v-for="point in weakPoints"
               :key="point.id"
@@ -61,18 +64,20 @@
             <div class="header-left">
               <el-icon class="header-icon icon-tasks"><DocumentChecked /></el-icon>
               <h3 class="header-title">今日自适应学习计划</h3>
-              <span class="capsule-sub-badge">完成率 1/3</span>
+              <span class="capsule-sub-badge">完成率 {{ completionRate }}</span>
             </div>
           </div>
 
-          <div class="today-tasks-list">
+          <el-empty v-if="!loading && !todayTasks.length" description="今日暂无待办，可去任务中心查看全部" />
+
+          <div v-else class="today-tasks-list">
             <div
               v-for="task in todayTasks"
               :key="task.id"
               class="task-row-card"
               :class="{ completed: task.completed }"
             >
-              <div class="task-checkbox-col" @click="task.completed = !task.completed">
+              <div class="task-checkbox-col">
                 <span class="checkbox-circle" :class="{ checked: task.completed }">
                   <el-icon v-if="task.completed" :size="12"><Check /></el-icon>
                 </span>
@@ -121,33 +126,19 @@ import {
   Right
 } from '@element-plus/icons-vue';
 
-type WeakPoint = {
-  id: string;
-  name: string;
-  course: string;
-  mastery: number;
-  level: string;
-  reason: string;
-};
-
-type TodayTask = {
-  id: string;
-  title: string;
-  course: string;
-  type: string;
-  estimatedMinutes: number;
-  completed: boolean;
-};
+import type { LearningHomeTaskUI, LearningHomeWeakPointUI } from '@/types/learning/home';
 
 defineProps<{
-  weakPoints: WeakPoint[];
-  todayTasks: TodayTask[];
+  loading?: boolean;
+  weakPoints: LearningHomeWeakPointUI[];
+  todayTasks: LearningHomeTaskUI[];
+  completionRate: string;
 }>();
 
 const emit = defineEmits<{
   'generate-weak': [];
-  'study-point': [point: WeakPoint];
-  'execute-task': [task: TodayTask];
+  'study-point': [point: LearningHomeWeakPointUI];
+  'execute-task': [task: LearningHomeTaskUI];
 }>();
 </script>
 

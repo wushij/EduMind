@@ -6,6 +6,7 @@ import com.edumind.statistics.entity.WrongQuestionRecordEntity;
 import com.edumind.statistics.mapper.WrongQuestionRecordMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.StringUtils;
 
 @Repository
 @RequiredArgsConstructor
@@ -24,11 +25,42 @@ public class WrongQuestionRecordDao {
 
     public Page<WrongQuestionRecordEntity> pageByStudent(Page<WrongQuestionRecordEntity> page,
                                                          Long studentId, Long courseId) {
+        return pageByStudent(page, studentId, courseId, null, null, 0);
+    }
+
+    public Page<WrongQuestionRecordEntity> pageByStudent(Page<WrongQuestionRecordEntity> page,
+                                                         Long studentId, Long courseId,
+                                                         Long knowledgePointId, String errorTypeCode,
+                                                         Integer status) {
         LambdaQueryWrapper<WrongQuestionRecordEntity> wrapper = new LambdaQueryWrapper<WrongQuestionRecordEntity>()
                 .eq(WrongQuestionRecordEntity::getStudentId, studentId)
                 .eq(WrongQuestionRecordEntity::getCourseId, courseId)
+                .eq(knowledgePointId != null, WrongQuestionRecordEntity::getKnowledgePointId, knowledgePointId)
+                .eq(status != null, WrongQuestionRecordEntity::getStatus, status)
+                .like(StringUtils.hasText(errorTypeCode),
+                        WrongQuestionRecordEntity::getErrorTypes, errorTypeCode)
                 .orderByDesc(WrongQuestionRecordEntity::getWrongCount);
         return wrongQuestionRecordMapper.selectPage(page, wrapper);
+    }
+
+    public long countByStudentCourseAndStatus(Long studentId, Long courseId, Integer status) {
+        return wrongQuestionRecordMapper.selectCount(
+                new LambdaQueryWrapper<WrongQuestionRecordEntity>()
+                        .eq(WrongQuestionRecordEntity::getStudentId, studentId)
+                        .eq(WrongQuestionRecordEntity::getCourseId, courseId)
+                        .eq(status != null, WrongQuestionRecordEntity::getStatus, status)
+        );
+    }
+
+    public java.util.List<WrongQuestionRecordEntity> listActiveByStudentAndCourse(Long studentId, Long courseId, int limit) {
+        return wrongQuestionRecordMapper.selectList(
+                new LambdaQueryWrapper<WrongQuestionRecordEntity>()
+                        .eq(WrongQuestionRecordEntity::getStudentId, studentId)
+                        .eq(WrongQuestionRecordEntity::getCourseId, courseId)
+                        .eq(WrongQuestionRecordEntity::getStatus, 0)
+                        .orderByDesc(WrongQuestionRecordEntity::getWrongCount)
+                        .last(limit > 0 ? "LIMIT " + limit : "")
+        );
     }
 
     public int insert(WrongQuestionRecordEntity entity) {

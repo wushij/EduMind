@@ -40,4 +40,9 @@ public class AiAuditQueryApiImpl implements AiAuditQueryApi {
     public Map<Long, Long> countCallsByCourseBatch(List<Long> courseIds, LocalDateTime since) {
         return aiAuditQueryService.countCallsByCourseBatch(courseIds, since);
     }
+
+    @Override
+    public long countCallsByCourseAndUser(Long courseId, Long userId, LocalDateTime since) {
+        return aiAuditQueryService.countCallsByCourseAndUser(courseId, userId, since);
+    }
 }

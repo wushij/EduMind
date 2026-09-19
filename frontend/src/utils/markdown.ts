@@ -11,6 +11,7 @@ import {
   expandAsciiTreeToMultiline,
   looksLikeAsciiKnowledgeTree
 } from './ai/ascii-tree-graph';
+import { repairLatexDoubleEscapes } from './format/render-math';
 
 const FENCED_CODE_BLOCK_RE = /(```[\s\S]*?```)/g;
 
@@ -999,7 +1000,7 @@ function renderKatexHtml(formula: string, displayMode: boolean): string {
       ? `<pre class="math-raw">${md.utils.escapeHtml(formula)}</pre>`
       : `<code class="math-raw">${md.utils.escapeHtml(formula)}</code>`;
   }
-  const fixed = repairMalformedLeftRight(formula.trim());
+  const fixed = repairLatexDoubleEscapes(repairMalformedLeftRight(formula.trim()));
   const html = katex.renderToString(fixed, { displayMode, throwOnError: false, strict: 'ignore' });
   if (!html.includes('katex-error')) return html;
 

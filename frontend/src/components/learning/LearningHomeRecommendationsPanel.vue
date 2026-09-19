@@ -16,7 +16,8 @@
             </button>
           </div>
 
-          <div class="recommended-cards-stack">
+          <el-empty v-if="!loading && !topRecommendations.length" description="暂无推荐，请先选择课程" />
+          <div v-else class="recommended-cards-stack" v-loading="loading">
             <RecommendationCard
               v-for="item in topRecommendations"
               :key="item.id"
@@ -36,6 +37,7 @@ import type { RecommendationItem } from '@/types/learning/recommendation';
 import { useRouter } from 'vue-router';
 
 defineProps<{
+  loading?: boolean;
   topRecommendations: RecommendationItem[];
 }>();
 

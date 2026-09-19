@@ -250,6 +250,7 @@ public class ChatServiceImpl implements ChatService {
                             ? citationsForSave.size() : null)
                     .build();
             aiGatewayFacade.streamChat(auditScene, dto.getModelKey(), systemPrompt, chatHistory, auditContext,
+                    () -> chatStreamRegistry.isCancelled(streamId),
                     new LlmClient.StreamCallback() {
                 @Override
                 public void onReasoning(String content) {

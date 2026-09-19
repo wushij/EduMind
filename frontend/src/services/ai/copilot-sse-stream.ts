@@ -10,6 +10,7 @@ export type CopilotStreamProgress = {
 
 export type CopilotSseHandlers = {
   isStopped?: () => boolean;
+  onStreamId?: (streamId: string) => void;
   onIntent?: (data: unknown) => void;
   onStatus?: (message: string, phase?: string) => void;
   onReasoningChunk?: (chunk: string) => void;
@@ -46,7 +47,10 @@ export function handleCopilotSseEvent(
 ): void {
   if (handlers.isStopped?.()) return;
 
-  if (event === 'intent') {
+  if (event === 'stream') {
+    const streamId = String((data as { streamId?: string })?.streamId || '').trim();
+    if (streamId) handlers.onStreamId?.(streamId);
+  } else if (event === 'intent') {
     handlers.onIntent?.(data);
   } else if (event === 'status') {
     const s = data as { phase?: string; message?: string };

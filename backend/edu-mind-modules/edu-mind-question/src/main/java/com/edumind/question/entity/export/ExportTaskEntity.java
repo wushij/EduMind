@@ -38,6 +38,11 @@ public class ExportTaskEntity implements Serializable {
     private String status;
 
     /**
+     * 任务进度 0-100
+     */
+    private Integer progress;
+
+    /**
      * 任务失败原因
      */
     private String errorMsg;

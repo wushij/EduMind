@@ -8,6 +8,7 @@ import com.edumind.statistics.service.analytics.impl.KnowledgeMasteryServiceImpl
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 @Component
 @RequiredArgsConstructor
@@ -35,6 +36,13 @@ public class GradingAnalyticsListener {
                 event.getStudentId(), event.getQuestionId());
         if (existing != null) {
             existing.setWrongCount(existing.getWrongCount() + 1);
+            if (StringUtils.hasText(event.getStudentAnswer())) {
+                existing.setLastStudentAnswer(event.getStudentAnswer().length() > 1024
+                        ? event.getStudentAnswer().substring(0, 1024)
+                        : event.getStudentAnswer());
+            }
+            existing.setStatus(0);
+            existing.setMasteredTime(null);
             wrongQuestionRecordDao.updateById(existing);
             return;
         }
@@ -48,7 +56,8 @@ public class GradingAnalyticsListener {
                 event.getCourseId(),
                 event.getQuestionId(),
                 event.getKnowledgePointId(),
-                diagnosis
+                diagnosis,
+                event.getStudentAnswer()
         );
     }
 }

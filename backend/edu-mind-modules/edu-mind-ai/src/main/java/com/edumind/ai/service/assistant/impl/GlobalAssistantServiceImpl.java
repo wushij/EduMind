@@ -3,10 +3,12 @@ package com.edumind.ai.service.assistant.impl;
 import com.alibaba.fastjson2.JSON;
 import com.edumind.ai.dto.assistant.GlobalAssistantRequestDTO;
 import com.edumind.ai.gateway.AiGatewayFacade;
+import com.edumind.ai.integration.llm.LlmChatMessage;
 import com.edumind.ai.integration.llm.LlmClient;
 import com.edumind.ai.integration.llm.LlmStreamRelay;
 import com.edumind.ai.router.IntentRouter;
 import com.edumind.ai.service.assistant.GlobalAssistantService;
+import com.edumind.ai.service.chat.ChatStreamRegistry;
 import com.edumind.ai.service.audit.AiCallAuditContext;
 import com.edumind.ai.service.routing.CopilotRagPolicy;
 import com.edumind.ai.service.routing.IntentDispatchPlan;
@@ -47,6 +49,7 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
     private final LessonQueryApi lessonQueryApi;
     private final LessonContentIndexApi lessonContentIndexApi;
     private final LessonCopilotEnricher lessonCopilotEnricher;
+    private final ChatStreamRegistry chatStreamRegistry;
     private final java.util.concurrent.ExecutorService assistantExecutor = java.util.concurrent.Executors.newCachedThreadPool();
 
     @Override
@@ -71,7 +74,10 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                 .build();
 
         assistantExecutor.execute(() -> runWithContext(userId, tenantId, currentUser, () -> {
+            String streamId = chatStreamRegistry.register();
             try {
+                sendEvent(emitter, "stream", Map.of("streamId", streamId));
+
                 Map<String, Object> intentData = new HashMap<>();
                 intentData.put("route", plan.getRoute());
                 intentData.put("agentCode", plan.getAgentCode());
@@ -103,15 +109,27 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                         (eventName, payload) -> sendEvent(emitter, eventName, payload),
                         contentBuilder,
                         reasoningBuilder);
-                aiGatewayFacade.streamChat("global_assistant", null, plan.getSystemPrompt(), plan.getUserPrompt(),
-                        auditContext, new LlmClient.StreamCallback() {
+                aiGatewayFacade.streamChat(
+                        "global_assistant",
+                        null,
+                        plan.getSystemPrompt(),
+                        List.of(LlmChatMessage.user(plan.getUserPrompt())),
+                        auditContext,
+                        () -> chatStreamRegistry.isCancelled(streamId),
+                        new LlmClient.StreamCallback() {
                             @Override
                             public void onReasoning(String chunk) {
+                                if (chatStreamRegistry.isCancelled(streamId)) {
+                                    return;
+                                }
                                 relay.onReasoning(chunk);
                             }
 
                             @Override
                             public void onChunk(String chunk) {
+                                if (chatStreamRegistry.isCancelled(streamId)) {
+                                    return;
+                                }
                                 relay.onChunk(chunk);
                             }
 
@@ -122,6 +140,11 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
 
                             @Override
                             public void onComplete() {
+                                if (chatStreamRegistry.isCancelled(streamId)) {
+                                    emitter.complete();
+                                    chatStreamRegistry.remove(streamId);
+                                    return;
+                                }
                                 Map<String, Object> done = new HashMap<>();
                                 done.put("conversationId", convId);
                                 done.put("citations", plan.getCitations() != null ? plan.getCitations() : List.of());
@@ -133,6 +156,7 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                                 }
                                 sendEvent(emitter, "done", done);
                                 emitter.complete();
+                                chatStreamRegistry.remove(streamId);
                             }
 
                             @Override
@@ -140,12 +164,14 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                                 log.error("Global assistant stream error: {}", error);
                                 relay.onError(error);
                                 emitter.completeWithError(new RuntimeException(error));
+                                chatStreamRegistry.remove(streamId);
                             }
                         });
             } catch (Exception ex) {
                 log.error("Global assistant error", ex);
                 sendEvent(emitter, "error", Map.of("message", ex.getMessage()));
                 emitter.completeWithError(ex);
+                chatStreamRegistry.remove(streamId);
             }
         }));
 

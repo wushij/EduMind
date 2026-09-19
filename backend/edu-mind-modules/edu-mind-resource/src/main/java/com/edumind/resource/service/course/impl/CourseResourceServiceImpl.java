@@ -4,7 +4,14 @@ import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.common.utils.TenantObjectKeyBuilder;
 import com.edumind.course.api.CourseAccessApi;
+import com.edumind.course.api.CourseQueryApi;
+import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.infrastructure.oss.FileStorageService;
+import com.edumind.knowledge.api.CourseResourceKnowledgeSyncApi;
+import com.edumind.knowledge.api.KnowledgeQueryApi;
+import com.edumind.knowledge.dto.CourseResourceKnowledgeSyncDTO;
+import com.edumind.knowledge.support.CourseResourceKnowledgeSyncSupport;
+import com.edumind.knowledge.vo.knowledge.KnowledgeDocumentVO;
 import com.edumind.resource.dao.CourseResourceDao;
 import com.edumind.resource.dao.ResourceDao;
 import com.edumind.resource.dto.course.CourseResourceCreateDTO;
@@ -32,6 +39,9 @@ public class CourseResourceServiceImpl implements CourseResourceService {
     private final CourseResourceDao courseResourceDao;
     private final ResourceDao resourceDao;
     private final CourseAccessApi courseAccessApi;
+    private final CourseQueryApi courseQueryApi;
+    private final CourseResourceKnowledgeSyncApi courseResourceKnowledgeSyncApi;
+    private final KnowledgeQueryApi knowledgeQueryApi;
     private final FileStorageService fileStorageService;
 
     @Value("${minio.bucketName:edumind}")
@@ -71,7 +81,8 @@ public class CourseResourceServiceImpl implements CourseResourceService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Long uploadResource(Long courseId, MultipartFile file, String title, String resourceType, Long chapterId) {
+    public Long uploadResource(Long courseId, MultipartFile file, String title, String resourceType, Long chapterId,
+                               boolean syncToKnowledgeBase) {
         courseAccessApi.assertCanEdit(courseId);
         if (file == null || file.isEmpty()) {
             throw new BusinessException("上传文件不能为空");
@@ -108,7 +119,35 @@ public class CourseResourceServiceImpl implements CourseResourceService {
         courseResource.setResourceType(type);
         courseResource.setCreateTime(LocalDateTime.now());
         courseResourceDao.insert(courseResource);
+
+        if (syncToKnowledgeBase
+                && CourseResourceKnowledgeSyncSupport.isSyncableType(type, originalFilename)) {
+            syncUploadedResourceToKnowledge(courseId, courseResource.getId(), objectKey, originalFilename, type,
+                    file.getSize());
+        }
         return courseResource.getId();
+    }
+
+    private void syncUploadedResourceToKnowledge(Long courseId, Long courseResourceId, String objectKey,
+                                                 String fileName, String resourceType, long fileSize) {
+        CourseDetailVO course = courseQueryApi.getCourseById(courseId);
+        if (course == null || course.getKnowledgeBaseId() == null) {
+            throw new BusinessException("课程尚未关联知识库，无法同步 RAG 索引。请先在课程设置中挂载知识库，或取消「同步至知识库」");
+        }
+        CourseResourceKnowledgeSyncDTO dto = new CourseResourceKnowledgeSyncDTO();
+        dto.setKnowledgeBaseId(course.getKnowledgeBaseId());
+        dto.setCourseId(courseId);
+        dto.setCourseResourceId(courseResourceId);
+        dto.setObjectKey(objectKey);
+        dto.setFileName(fileName);
+        dto.setResourceType(resourceType);
+        dto.setFileSize(fileSize);
+        Long documentId = courseResourceKnowledgeSyncApi.syncCourseResource(dto);
+        CourseResourceEntity link = courseResourceDao.findById(courseResourceId);
+        if (link != null) {
+            link.setDocumentId(documentId);
+            courseResourceDao.updateById(link);
+        }
     }
 
     @Override
@@ -117,6 +156,9 @@ public class CourseResourceServiceImpl implements CourseResourceService {
         CourseResourceEntity existing = courseResourceDao.findById(resourceId);
         if (existing != null) {
             courseAccessApi.assertCanEdit(existing.getCourseId());
+            if (existing.getDocumentId() != null) {
+                courseResourceKnowledgeSyncApi.removeLinkedDocument(existing.getDocumentId());
+            }
             if (existing.getResourceId() != null) {
                 ResourceEntity linked = resourceDao.findById(existing.getResourceId());
                 if (linked != null) {
@@ -144,7 +186,20 @@ public class CourseResourceServiceImpl implements CourseResourceService {
                 vo.setDownloadUrl(resource.getFileUrl());
             }
         }
+        enrichKnowledgeFields(vo);
         return vo;
+    }
+
+    private void enrichKnowledgeFields(CourseResourceVO vo) {
+        if (vo.getDocumentId() == null) {
+            return;
+        }
+        KnowledgeDocumentVO doc = knowledgeQueryApi.getDocumentById(vo.getDocumentId());
+        if (doc == null) {
+            return;
+        }
+        vo.setKnowledgeParseStatus(doc.getParseStatus());
+        vo.setKnowledgeChunkCount(doc.getChunkCount());
     }
 
     private CourseResourceVO teachingToVO(ResourceEntity entity) {

@@ -12,20 +12,23 @@ function difficultyLabel(difficulty?: string): string {
 }
 
 export function mapQuestionRecommendation(item: RecommendationQuestion, index: number): RecommendationItem {
+  const qid = item.questionId ?? item.id ?? index;
+  const diffKey = String(item.difficulty ?? 'MEDIUM');
   return {
-    id: `q-${item.questionId}-${index}`,
+    id: `q-${qid}-${index}`,
     title: item.stem,
     type: 'exercise',
     typeLabel: '推荐练习',
     category: '核心必刷',
-    matchScore: Math.max(70, 95 - index * 3),
-    courseName: '当前课程',
+    matchScore: item.matchScore ?? Math.max(70, 95 - index * 3),
+    courseName: item.courseName || '当前课程',
+    courseId: item.courseId,
     knowledgePoint: item.knowledgePointName || '综合考点',
-    difficulty: (item.difficulty as RecommendationItem['difficulty']) || 'MEDIUM',
-    difficultyLabel: difficultyLabel(item.difficulty),
+    difficulty: (diffKey as RecommendationItem['difficulty']) || 'MEDIUM',
+    difficultyLabel: difficultyLabel(diffKey),
     estimatedMinutes: 15,
     description: item.reason || '基于近期学习轨迹的 AI 推荐题目。',
-    tags: [item.type, item.difficulty].filter(Boolean),
+    tags: [item.type, diffKey].filter(Boolean),
     exerciseMeta: {
       questionCount: 1,
       averageAccuracy: '—'
@@ -35,13 +38,14 @@ export function mapQuestionRecommendation(item: RecommendationQuestion, index: n
 
 export function mapResourceRecommendation(item: RecommendationResource, index: number): RecommendationItem {
   return {
-    id: `r-${item.resourceId || item.documentId || index}`,
+    id: `r-${item.resourceId || item.id || item.documentId || index}`,
     title: item.title,
     type: 'resource',
     typeLabel: item.resourceType || '学习资料',
     category: '精选课件',
-    matchScore: Math.max(68, 92 - index * 4),
-    courseName: '当前课程',
+    matchScore: item.matchScore ?? Math.max(68, 92 - index * 4),
+    courseName: item.courseName || '当前课程',
+    courseId: item.courseId,
     knowledgePoint: '拓展资料',
     difficulty: 'EASY',
     difficultyLabel: difficultyLabel('EASY'),

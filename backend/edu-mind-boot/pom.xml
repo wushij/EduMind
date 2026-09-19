@@ -88,6 +88,8 @@
                 <configuration>
                     <skip>false</skip>
                     <mainClass>com.edumind.EduMindApplication</mainClass>
+                    <!-- fork=true 时子进程日志在 Windows IDE 终端常不可见，仅见 Maven BUILD FAILURE -->
+                    <fork>false</fork>
                 </configuration>
             </plugin>
         </plugins>

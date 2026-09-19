@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.edumind.common.annotation.OperationLog;
 import com.edumind.common.api.ApiResult;
+import com.edumind.common.api.PageResult;
 import com.edumind.common.enums.BusinessType;
 import com.edumind.question.dto.export.PaperExportRequestDTO;
 import com.edumind.question.service.export.ExportTaskService;
@@ -21,8 +22,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /**
  * 试卷与文档导出控制器 (严格遵守 Controller -> DTO -> Service -> DAO -> Mapper -> Entity 分层规范)
@@ -43,8 +42,10 @@ public class ExportTaskController {
     }
 
     @GetMapping("/my")
-    public ApiResult<List<ExportTaskVO>> listMyExportTasks() {
-        return ApiResult.success(exportTaskService.listMyExportTasks());
+    public ApiResult<PageResult<ExportTaskVO>> pageMyExportTasks(
+            @RequestParam(required = false, defaultValue = "1") Long page,
+            @RequestParam(required = false, defaultValue = "10") Long pageSize) {
+        return ApiResult.success(exportTaskService.pageMyExportTasks(page, pageSize));
     }
 
     @GetMapping("/{taskId}")

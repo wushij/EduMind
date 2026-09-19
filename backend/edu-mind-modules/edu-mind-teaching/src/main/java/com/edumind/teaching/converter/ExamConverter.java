@@ -3,10 +3,8 @@ package com.edumind.teaching.converter;
 import com.edumind.question.api.QuestionQueryApi;
 import com.edumind.question.vo.question.QuestionVO;
 import com.edumind.teaching.dto.exam.ExamCreateDTO;
-import com.edumind.teaching.entity.AssignmentEntity;
 import com.edumind.teaching.entity.ExamEntity;
 import com.edumind.teaching.entity.ExamQuestionEntity;
-import com.edumind.teaching.vo.assignment.AssignmentVO;
 import com.edumind.teaching.vo.exam.ExamQuestionVO;
 import com.edumind.teaching.vo.exam.ExamVO;
 import lombok.RequiredArgsConstructor;
@@ -62,11 +60,5 @@ public class ExamConverter {
             result.add(vo);
         }
         return result;
-    }
-
-    public AssignmentVO toAssignmentVO(AssignmentEntity entity) {
-        AssignmentVO vo = new AssignmentVO();
-        BeanUtils.copyProperties(entity, vo);
-        return vo;
     }
 }

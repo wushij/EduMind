@@ -10,4 +10,7 @@ public class RecommendedResourceVO {
     private String fileUrl;
     private Long courseId;
     private Long chapterId;
+    private String courseName;
+    private Integer matchScore;
+    private String reason;
 }

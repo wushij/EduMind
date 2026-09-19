@@ -1,35 +1,59 @@
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { getWrongQuestionList, diagnoseWrongQuestion } from '@/api/learning/wrong-question';
-import type { WrongQuestionRecordItem } from '@/types/learning/wrong-question';
+import {
+  getWrongBook,
+  getWrongBookOverview,
+  diagnoseWrongBookItem,
+  masterWrongBookItem
+} from '@/api/learning/wrong-book';
+import type { WrongBookOverviewVO, WrongQuestionRecordItem } from '@/types/learning/wrong-question';
 
 export function useWrongQuestions(initialCourseId = 102) {
   const courseId = ref(initialCourseId);
   const loading = ref(false);
+  const overviewLoading = ref(false);
   const page = ref(1);
   const pageSize = ref(10);
   const totalWrongQuestions = ref(0);
   const selectedErrorType = ref('');
   const wrongList = ref<WrongQuestionRecordItem[]>([]);
   const loadError = ref<string | null>(null);
-  const masteredCount = ref(0);
-
-  const weakPointCount = computed(() => {
-    const kpSet = new Set<number>();
-    wrongList.value.forEach((item) => {
-      item.errorTypes?.forEach(() => kpSet.add(item.questionId));
-    });
-    return kpSet.size;
+  const overview = ref<WrongBookOverviewVO>({
+    pendingCount: 0,
+    weakKnowledgePointCount: 0,
+    masteredCount: 0,
+    variantConquerRatePercent: 0
   });
+
+  async function fetchOverview() {
+    overviewLoading.value = true;
+    try {
+      const res = await getWrongBookOverview(courseId.value);
+      if (res?.data) {
+        overview.value = res.data;
+      }
+    } catch {
+      overview.value = {
+        pendingCount: 0,
+        weakKnowledgePointCount: 0,
+        masteredCount: 0,
+        variantConquerRatePercent: 0
+      };
+    } finally {
+      overviewLoading.value = false;
+    }
+  }
 
   async function fetchList() {
     loading.value = true;
     loadError.value = null;
     try {
-      const res = await getWrongQuestionList({
+      const res = await getWrongBook({
         courseId: courseId.value,
         page: page.value,
-        pageSize: pageSize.value
+        pageSize: pageSize.value,
+        errorType: selectedErrorType.value || undefined,
+        status: 0
       });
       const data = res?.data;
       if (data?.list) {
@@ -39,6 +63,7 @@ export function useWrongQuestions(initialCourseId = 102) {
         wrongList.value = [];
         totalWrongQuestions.value = 0;
       }
+      await fetchOverview();
     } catch (err: unknown) {
       wrongList.value = [];
       totalWrongQuestions.value = 0;
@@ -50,12 +75,15 @@ export function useWrongQuestions(initialCourseId = 102) {
   }
 
   async function loadDiagnosis(item: WrongQuestionRecordItem) {
-    if (item.diagnosis && item.diagnosis.length >= 10) return;
+    if (item.diagnosis && item.diagnosis.length >= 10 && (item.variantQuestionIds?.length ?? 0) > 0) {
+      return;
+    }
     try {
-      const res = await diagnoseWrongQuestion(item.id);
+      const res = await diagnoseWrongBookItem(item.id);
       if (res?.data) {
         item.diagnosis = res.data.diagnosis ?? item.diagnosis;
         item.errorTypes = res.data.errorTypes ?? item.errorTypes;
+        item.errorTypeLabels = res.data.errorTypeLabels ?? item.errorTypeLabels;
         item.variantQuestionIds = res.data.variantQuestionIds ?? item.variantQuestionIds;
       }
     } catch {
@@ -63,16 +91,16 @@ export function useWrongQuestions(initialCourseId = 102) {
     }
   }
 
-  function markMastered(item: WrongQuestionRecordItem) {
-    wrongList.value = wrongList.value.filter((q) => q.id !== item.id);
-    totalWrongQuestions.value = Math.max(0, totalWrongQuestions.value - 1);
-    masteredCount.value += 1;
-    ElMessage.success(`已将题目 #${item.questionId} 标记为已攻克！`);
-  }
-
-  function handleCourseChange() {
-    page.value = 1;
-    fetchList();
+  async function markMastered(item: WrongQuestionRecordItem) {
+    try {
+      await masterWrongBookItem(item.id);
+      wrongList.value = wrongList.value.filter((q) => q.id !== item.id);
+      totalWrongQuestions.value = Math.max(0, totalWrongQuestions.value - 1);
+      await fetchOverview();
+      ElMessage.success(`已将题目 #${item.questionId} 标记为已攻克`);
+    } catch {
+      ElMessage.error('标记失败，请稍后重试');
+    }
   }
 
   function formatQuestionType(type?: string) {
@@ -102,23 +130,34 @@ export function useWrongQuestions(initialCourseId = 102) {
     }
   }
 
+  function displayErrorTags(item: WrongQuestionRecordItem) {
+    if (item.errorTypeLabels?.length) {
+      return item.errorTypeLabels;
+    }
+    if (item.errorTypes?.length) {
+      return item.errorTypes;
+    }
+    return [];
+  }
+
   return {
     courseId,
     loading,
+    overviewLoading,
     page,
     pageSize,
     totalWrongQuestions,
-    weakPointCount,
-    masteredCount,
     selectedErrorType,
     wrongList,
     loadError,
+    overview,
     fetchList,
+    fetchOverview,
     loadDiagnosis,
     markMastered,
-    handleCourseChange,
     formatQuestionType,
     getDifficultyType,
-    parsedOptions
+    parsedOptions,
+    displayErrorTags
   };
 }

@@ -1,30 +1,22 @@
 <template>
   <div class="bank-list-page-container">
-    <!-- 1. 顶部操作头区 (Hero Header Dock) -->
-    <div class="bank-header-dock">
-      <div class="header-left">
-        <div class="title-with-icon">
-          <div class="icon-orb">
-            <el-icon class="header-icon"><FolderOpened /></el-icon>
-          </div>
-          <div class="title-meta-col">
-            <div class="title-badges-row">
-              <h1 class="main-title">课程与通用题库中心</h1>
-              <span class="capsule-count-tag">共 {{ total }} 个精选题库</span>
-              <span class="capsule-count-tag capsule-count-tag--green">已收录 {{ totalQuestionsAcrossBanks }} 道试题</span>
-              <span class="capsule-count-tag capsule-count-tag--purple">涵盖 {{ courses.length }} 门核心课</span>
-            </div>
-            <p class="sub-desc">
-              归纳整理各课程专项试题集、历年统考与期中期末题库，全链路支持 AI 智能出题扩充、快捷组卷与导出排版。
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div class="header-right-actions">
+    <ModulePageHeroHeader
+      :icon="FolderOpened"
+      title="课程与通用题库中心"
+      :badge="`共 ${total} 个精选题库`"
+      description="归纳整理各课程专项试题集、历年统考与期中期末题库，全链路支持 AI 智能出题扩充、快捷组卷与导出排版。"
+    >
+      <template #stats>
+        <BankListStatsBar
+          :total="total"
+          :total-questions="totalQuestionsAcrossBanks"
+          :course-count="courses.length"
+        />
+      </template>
+      <template #actions>
         <button
           type="button"
-          class="capsule-btn capsule-btn--primary"
+          class="module-capsule-btn module-capsule-btn--primary"
           @click="showCreateDialog = true"
         >
           <el-icon><Plus /></el-icon>
@@ -33,7 +25,7 @@
 
         <button
           type="button"
-          class="capsule-btn capsule-btn--ai"
+          class="module-capsule-btn module-capsule-btn--ai"
           @click="router.push('/ai/question/generate')"
         >
           <el-icon><MagicStick /></el-icon>
@@ -43,17 +35,17 @@
 
         <button
           type="button"
-          class="capsule-btn capsule-btn--secondary"
+          class="module-capsule-btn module-capsule-btn--secondary"
           @click="router.push('/question/list')"
         >
           <el-icon><Reading /></el-icon>
           <span>管理试题大池</span>
         </button>
-      </div>
-    </div>
+      </template>
+    </ModulePageHeroHeader>
 
-    <!-- 2. 筛选与实时搜索工具栏 (Filter & Search Toolbar) -->
-    <div class="filter-capsule-card">
+    <!-- 筛选与实时搜索工具栏 -->
+    <div class="filter-capsule-card module-page-filter">
       <div class="filter-row filter-row--course-search">
         <span class="filter-label">所属课程：</span>
         <el-select
@@ -306,6 +298,8 @@ import {
 } from '@element-plus/icons-vue';
 import { useBankList } from '@/composables/question/useBank';
 import AppPagination from '@/components/common/AppPagination.vue';
+import ModulePageHeroHeader from '@/components/question/common/ModulePageHeroHeader.vue';
+import BankListStatsBar from '@/components/question/bank/BankListStatsBar.vue';
 import { computed } from 'vue';
 
 const {
@@ -362,6 +356,8 @@ function handleFastCompose(bank: any) {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/question/module-page-shell.scss';
+
 .bank-list-page-container {
   display: flex;
   flex-direction: column;
@@ -373,169 +369,10 @@ function handleFastCompose(bank: any) {
     margin-right: 4px;
   }
 
-  /* 1. 顶部操作头区 */
-  .bank-header-dock {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-    border: 1px solid #e2e8f0;
-    border-radius: 20px;
-    padding: 24px 28px;
-    box-shadow: 0 4px 20px rgba(30, 80, 160, 0.04);
-    gap: 20px;
-    flex-wrap: wrap;
-
-    .header-left {
-      flex: 1;
-
-      .title-with-icon {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-
-        .icon-orb {
-          width: 48px;
-          height: 48px;
-          border-radius: 14px;
-          background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border: 1px solid #bfdbfe;
-
-          .header-icon {
-            font-size: 26px;
-            color: #2563eb;
-          }
-        }
-
-        .title-meta-col {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-
-          .title-badges-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-
-            .main-title {
-              font-size: 22px;
-              font-weight: 800;
-              color: #0f172a;
-              margin: 0;
-              letter-spacing: -0.01em;
-            }
-
-            .capsule-count-tag {
-              font-size: 12px;
-              color: #2563eb;
-              background: #eff6ff;
-              border: 1px solid #dbeafe;
-              padding: 2px 10px;
-              border-radius: 9999px;
-              font-weight: 600;
-
-              &--green {
-                color: #059669;
-                background: #ecfdf5;
-                border-color: #a7f3d0;
-              }
-
-              &--purple {
-                color: #7c3aed;
-                background: #f5f3ff;
-                border-color: #ddd6fe;
-              }
-            }
-          }
-
-          .sub-desc {
-            margin: 0;
-            font-size: 13.5px;
-            color: #64748b;
-            line-height: 1.5;
-          }
-        }
-      }
-    }
-
-    .header-right-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-
-      .capsule-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 9px 18px;
-        border-radius: 9999px;
-        font-size: 13.5px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        border: none;
-
-        &--primary {
-          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-          color: #ffffff;
-          box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
-
-          &:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
-          }
-        }
-
-        &--ai {
-          background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-          color: #ffffff;
-          box-shadow: 0 4px 14px rgba(124, 58, 237, 0.28);
-          position: relative;
-
-          &:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 18px rgba(124, 58, 237, 0.35);
-          }
-
-          .pill-bubble {
-            background: rgba(255, 255, 255, 0.24);
-            font-size: 11px;
-            padding: 1px 6px;
-            border-radius: 9999px;
-            margin-left: 2px;
-          }
-        }
-
-        &--secondary {
-          background: #ffffff;
-          color: #334155;
-          border: 1px solid #cbd5e1;
-
-          &:hover {
-            background: #f8fafc;
-            border-color: #94a3b8;
-            color: #0f172a;
-          }
-        }
-      }
-    }
-  }
-
-  /* 2. 筛选与搜索卡片 */
   .filter-capsule-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 18px;
-    padding: 18px 24px;
-    box-shadow: 0 2px 12px rgba(30, 80, 150, 0.03);
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 0;
 
     .filter-row {
       display: flex;

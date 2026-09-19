@@ -17,4 +17,6 @@ public interface AiAuditQueryService {
     long countCallsByCourse(Long courseId, LocalDateTime since);
 
     Map<Long, Long> countCallsByCourseBatch(List<Long> courseIds, LocalDateTime since);
+
+    long countCallsByCourseAndUser(Long courseId, Long userId, LocalDateTime since);
 }

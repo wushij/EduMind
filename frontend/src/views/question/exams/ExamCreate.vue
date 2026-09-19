@@ -1,5 +1,5 @@
 <template>
-  <div class="exam-create-container">
+  <div class="exam-create-container question-module-page">
     <ExamCreateNavBar
       :current-step="currentStep"
       @cancel="handleCancel"
@@ -113,8 +113,5 @@ function setStep1FormRef(el: FormInstance | undefined) {
 </script>
 
 <style scoped lang="scss">
-.exam-create-container {
-  padding: 24px;
-  background: #f8fafc;
-}
+@use '@/styles/question/module-page-shell.scss';
 </style>

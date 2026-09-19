@@ -23,9 +23,9 @@ import com.edumind.knowledge.api.LessonContentIndexApi;
 import com.edumind.resource.api.ResourceQueryApi;
 import com.edumind.resource.vo.ResourceVO;
 import com.edumind.security.context.LoginUserResolver;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -36,7 +36,6 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class LessonServiceImpl implements LessonService {
 
     private final ChapterDao chapterDao;
@@ -48,6 +47,27 @@ public class LessonServiceImpl implements LessonService {
     private final ResourceQueryApi resourceQueryApi;
     private final ApplicationEventPublisher eventPublisher;
     private final LessonContentIndexApi lessonContentIndexApi;
+
+    public LessonServiceImpl(
+            ChapterDao chapterDao,
+            ChapterKnowledgePointDao chapterKnowledgePointDao,
+            KnowledgePointDao knowledgePointDao,
+            LessonProgressDao lessonProgressDao,
+            CourseConverter courseConverter,
+            CourseAccessService courseAccessService,
+            ResourceQueryApi resourceQueryApi,
+            ApplicationEventPublisher eventPublisher,
+            @Lazy LessonContentIndexApi lessonContentIndexApi) {
+        this.chapterDao = chapterDao;
+        this.chapterKnowledgePointDao = chapterKnowledgePointDao;
+        this.knowledgePointDao = knowledgePointDao;
+        this.lessonProgressDao = lessonProgressDao;
+        this.courseConverter = courseConverter;
+        this.courseAccessService = courseAccessService;
+        this.resourceQueryApi = resourceQueryApi;
+        this.eventPublisher = eventPublisher;
+        this.lessonContentIndexApi = lessonContentIndexApi;
+    }
 
     @Override
     public LessonDetailVO getLessonDetail(Long courseId, Long lessonId, boolean previewDraft) {
@@ -244,6 +264,24 @@ public class LessonServiceImpl implements LessonService {
         int total = lessonIds.size();
         int completed = 0;
         Long studentId = LoginUserResolver.resolveUserId();
+        if (studentId != null && !lessonIds.isEmpty()) {
+            completed = (int) lessonProgressDao.countCompletedLessons(courseId, studentId, lessonIds);
+        }
+        return CourseLessonProgressSummaryVO.builder()
+                .totalLessonCount(total)
+                .completedLessonCount(completed)
+                .build();
+    }
+
+    @Override
+    public CourseLessonProgressSummaryVO getProgressSummaryForStudent(Long courseId, Long studentId) {
+        List<ChapterEntity> chapters = chapterDao.findByCourseId(courseId);
+        List<Long> lessonIds = chapters.stream()
+                .filter(ChapterEntity::isLessonNode)
+                .map(ChapterEntity::getId)
+                .collect(Collectors.toList());
+        int total = lessonIds.size();
+        int completed = 0;
         if (studentId != null && !lessonIds.isEmpty()) {
             completed = (int) lessonProgressDao.countCompletedLessons(courseId, studentId, lessonIds);
         }

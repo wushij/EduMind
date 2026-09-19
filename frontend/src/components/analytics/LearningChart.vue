@@ -6,14 +6,19 @@
 import { ref, onMounted, onUnmounted, watch, shallowRef, nextTick } from 'vue';
 import * as echarts from 'echarts';
 import type { LearningTrendData } from '@/types/analytics/learning';
+import type { LearningReportTrendsVO } from '@/types/learning/report';
 
 const props = withDefaults(
   defineProps<{
     trends?: LearningTrendData | null;
+    personalTrends?: LearningReportTrendsVO | null;
+    mode?: 'class' | 'personal';
     height?: string;
   }>(),
   {
     trends: null,
+    personalTrends: null,
+    mode: 'class',
     height: '320px'
   }
 );
@@ -22,9 +27,18 @@ const chartRef = ref<HTMLElement | null>(null);
 const chartInstance = shallowRef<echarts.ECharts | null>(null);
 
 function buildOption(): echarts.EChartsOption {
-  const learning = props.trends?.learning ?? [];
-  const score = props.trends?.score ?? [];
-  const dates = learning.map((item) => item.date);
+  const isPersonal = props.mode === 'personal';
+  const study = isPersonal
+    ? (props.personalTrends?.studyMinutesByDate ?? [])
+    : (props.trends?.learning ?? []);
+  const score = isPersonal
+    ? (props.personalTrends?.scoreByDate ?? [])
+    : (props.trends?.score ?? []);
+  const dates = study.map((item) => item.date);
+  const barLabel = isPersonal ? '学习分钟' : '活跃学生';
+  const barData = isPersonal
+    ? study.map((item) => ('minutes' in item ? item.minutes : 0))
+    : study.map((item) => ('activeUsers' in item ? item.activeUsers : 0));
 
   return {
     grid: { left: '3%', right: '4%', top: '14%', bottom: '10%', containLabel: true },
@@ -36,7 +50,7 @@ function buildOption(): echarts.EChartsOption {
       textStyle: { color: '#1E293B', fontSize: 12 }
     },
     legend: {
-      data: ['活跃学生', '平均分'],
+      data: [barLabel, '平均分'],
       top: 0,
       textStyle: { color: '#64748B', fontSize: 12 }
     },
@@ -50,7 +64,7 @@ function buildOption(): echarts.EChartsOption {
     yAxis: [
       {
         type: 'value',
-        name: '人数',
+        name: isPersonal ? '分钟' : '人数',
         splitLine: { lineStyle: { color: '#F1F5F9', type: 'dashed' } },
         axisLabel: { color: '#94A3B8', fontSize: 11 }
       },
@@ -65,9 +79,9 @@ function buildOption(): echarts.EChartsOption {
     ],
     series: [
       {
-        name: '活跃学生',
+        name: barLabel,
         type: 'bar',
-        data: learning.map((item) => item.activeUsers),
+        data: barData,
         itemStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: '#38BDF8' },
@@ -103,7 +117,7 @@ function handleResize() {
 }
 
 watch(
-  () => props.trends,
+  () => [props.trends, props.personalTrends, props.mode],
   () => nextTick(renderChart),
   { deep: true }
 );

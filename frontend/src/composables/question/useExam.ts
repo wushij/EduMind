@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'elem
 import { getExams, getExamDetail, createExam, updateExam, deleteExam, exportExam } from '@/api/question/exam';
 import { getCourseList } from '@/api/course/course';
 import { getQuestions } from '@/api/question/question';
+import { getQuestionBankDetail } from '@/api/question/question-bank';
 import type { ExamPaper } from '@/types/question/exam';
 import type { Course } from '@/types/course/course';
 import type { QuestionItem, QuestionType, Difficulty } from '@/types/question/question';
@@ -377,11 +378,28 @@ export function useExamCreate() {
 
   async function loadCourses() {
     try {
-      const res = await getCourseList({ page: 1, pageSize: 50 });
-      courses.value = res.data?.list || [];
-    } catch (err: any) {
-      courses.value = [];
-      ElMessage.error(err?.message || '获取课程列表失败');
+      const res = await getCourseList({ page: 1, pageSize: 100 });
+      courses.value = (res.data?.list || []).map((c: any) => ({
+        ...c,
+        id: Number(c.id),
+        title: c.title || c.name || '未命名课程'
+      }));
+      const seedDefaults = [
+        { id: 101, title: '数据结构与算法' },
+        { id: 102, title: 'Java面向对象程序设计' },
+        { id: 103, title: '高等数学（上）' }
+      ];
+      seedDefaults.forEach(def => {
+        if (!courses.value.some(c => Number(c.id) === def.id)) {
+          courses.value.push({ id: def.id, title: def.title } as any);
+        }
+      });
+    } catch {
+      courses.value = [
+        { id: 101, title: '数据结构与算法' },
+        { id: 102, title: 'Java面向对象程序设计' },
+        { id: 103, title: '高等数学（上）' }
+      ] as any;
     }
   }
 
@@ -396,15 +414,32 @@ export function useExamCreate() {
   }
 
   function handleCourseChange(val?: number) {
-    const c = courses.value.find(item => item.id === val);
+    const numId = Number(val);
+    const c = courses.value.find(item => Number(item.id) === numId);
     if (c) {
-      examForm.courseName = c.title;
+      examForm.courseName = c.title || (c as any).name;
+    } else {
+      const staticNames: Record<string, string> = {
+        '101': '数据结构与算法',
+        '102': 'Java面向对象程序设计',
+        '103': '高等数学（上）'
+      };
+      if (staticNames[String(val)]) {
+        examForm.courseName = staticNames[String(val)];
+      }
     }
   }
 
   function getCourseName(courseId?: number) {
-    const c = courses.value.find(item => item.id === courseId);
-    return c?.title || examForm.courseName || '未指定课程';
+    const numId = Number(courseId);
+    const c = courses.value.find(item => Number(item.id) === numId);
+    if (c) return c.title || (c as any).name || '未指定课程';
+    const staticNames: Record<string, string> = {
+      '101': '数据结构与算法',
+      '102': 'Java面向对象程序设计',
+      '103': '高等数学（上）'
+    };
+    return staticNames[String(courseId)] || examForm.courseName || '未指定课程';
   }
 
   function updateSectionDefaultScore(sec: ExamSection) {
@@ -541,7 +576,41 @@ export function useExamCreate() {
       handleCourseChange(examForm.courseId);
     }
 
-    if (sections.value[0].questions.length === 0 && poolQuestions.value.length > 0) {
+    if (route.query.bankName) {
+      examForm.title = `${decodeURIComponent(String(route.query.bankName))} - 综合测试卷`;
+    }
+
+    if (route.query.bankId) {
+      try {
+        const bankRes = await getQuestionBankDetail(String(route.query.bankId));
+        const bankData = bankRes.data;
+        if (bankData?.name) {
+          examForm.title = `${bankData.name} - 综合测试卷`;
+        }
+        if (bankData?.courseId) {
+          examForm.courseId = Number(bankData.courseId);
+          handleCourseChange(examForm.courseId);
+        }
+        const rawList = (bankData?.questions && Array.isArray(bankData.questions)) ? bankData.questions : [];
+        const bQuestions = normalizeQuestionList(rawList as Record<string, unknown>[]);
+        if (bQuestions.length > 0) {
+          sections.value.forEach(s => { s.questions = []; });
+          bQuestions.forEach(q => {
+            let targetSec = sections.value.find(s => s.type === q.type);
+            if (!targetSec) {
+              targetSec = createSectionByType(q.type);
+              sections.value.push(targetSec);
+            }
+            targetSec.questions.push({ ...q, score: q.score || targetSec.defaultScore || 5 });
+          });
+          examForm.totalScore = currentTotalScore.value || 100;
+          examForm.passScore = Math.round(examForm.totalScore * 0.6);
+          ElMessage.success(`已自动从题库「${bankData?.name || '题库'}」载入 ${bQuestions.length} 道试题至组卷清单！`);
+        }
+      } catch (err) {
+        console.error('从题库载入试题失败', err);
+      }
+    } else if (sections.value[0].questions.length === 0 && poolQuestions.value.length > 0) {
       const singleChoices = poolQuestions.value.filter(q => q.type === 'SINGLE_CHOICE').slice(0, 3);
       sections.value[0].questions = singleChoices.map(q => ({ ...q, score: 5 }));
     }
@@ -600,9 +669,6 @@ export function useExamDetail() {
   const loading = ref(false);
   const examData = ref<ExamPaper | null>(null);
   const viewMode = ref<'PAPER' | 'ANSWER_KEY'>('PAPER');
-  const exportDialogVisible = ref(false);
-  const exportLoading = ref(false);
-  const exportDataJson = ref('');
 
   const groupedSections = computed<GroupedSection[]>(() => {
     if (!examData.value?.questions) return [];
@@ -650,24 +716,11 @@ export function useExamDetail() {
     });
   }
 
-  async function handleExportPaper() {
-    exportDialogVisible.value = true;
-    exportLoading.value = true;
-    try {
-      const res = await exportExam(examId.value);
-      exportDataJson.value = JSON.stringify(res.data ?? examData.value, null, 2);
-    } catch (err: any) {
-      ElMessage.error(err?.message || '导出试卷失败');
-      exportDataJson.value = '';
-    } finally {
-      exportLoading.value = false;
-    }
-  }
-
-  function handleCopyExportJson() {
-    navigator.clipboard.writeText(exportDataJson.value);
-    ElMessage.success('试卷配置 JSON 已成功复制到剪贴板！');
-    exportDialogVisible.value = false;
+  function handleExportPaper() {
+    router.push({
+      path: '/question/exports',
+      query: { examId: String(examId.value) }
+    });
   }
 
   function printPaper() {
@@ -705,9 +758,6 @@ export function useExamDetail() {
     loading,
     examData,
     viewMode,
-    exportDialogVisible,
-    exportLoading,
-    exportDataJson,
     groupedSections,
     totalQuestionsCount,
     difficultyCounts,
@@ -716,7 +766,6 @@ export function useExamDetail() {
     loadExam,
     handlePublishAsAssignment,
     handleExportPaper,
-    handleCopyExportJson,
     printPaper,
     handleDeleteExam,
     getChineseNumber,

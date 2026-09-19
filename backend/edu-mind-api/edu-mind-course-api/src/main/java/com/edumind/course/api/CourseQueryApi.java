@@ -5,6 +5,7 @@ import com.edumind.course.vo.chapter.ChapterTreeVO;
 import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.course.vo.course.CourseVO;
 import com.edumind.course.vo.knowledge.KnowledgePointVO;
+import com.edumind.course.vo.lesson.CourseLessonProgressSummaryVO;
 
 import java.util.List;
 
@@ -41,4 +42,9 @@ public interface CourseQueryApi {
      * 课程下学生成员 userId 列表（Beta 干预触达受众）
      */
     List<Long> listStudentUserIdsByCourseId(Long courseId);
+
+    /**
+     * 指定学生在某课程的课时完成进度摘要
+     */
+    CourseLessonProgressSummaryVO getLessonProgressSummary(Long courseId, Long studentId);
 }
