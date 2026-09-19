@@ -12,7 +12,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.edumind.course.vo.member.CourseMemberCandidateVO;
 
 import java.util.List;
 
@@ -27,6 +29,14 @@ public class CourseMemberController {
     @GetMapping
     public ApiResult<List<CourseMemberVO>> listMembers(@PathVariable("courseId") Long courseId) {
         return ApiResult.success(courseMemberService.listMembers(courseId));
+    }
+
+    @SaCheckPermission("course:edit")
+    @GetMapping("/candidates")
+    public ApiResult<List<CourseMemberCandidateVO>> searchCandidates(
+            @PathVariable("courseId") Long courseId,
+            @RequestParam(required = false) String keyword) {
+        return ApiResult.success(courseMemberService.searchCandidates(courseId, keyword));
     }
 
     @SaCheckPermission("course:edit")

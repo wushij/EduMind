@@ -124,6 +124,9 @@ export function normalizeQuestion(raw: any): Question {
       : raw.knowledgePointName
         ? [String(raw.knowledgePointName)]
         : [],
+    knowledgePointId: raw.knowledgePointId != null ? Number(raw.knowledgePointId) : undefined,
+    cognitiveLevel: raw.cognitiveLevel ? String(raw.cognitiveLevel) : undefined,
+    distractorAnalysis: raw.distractorAnalysis ? String(raw.distractorAnalysis) : undefined,
     createdAt: String(raw.createdAt ?? raw.createTime ?? '')
   };
 }

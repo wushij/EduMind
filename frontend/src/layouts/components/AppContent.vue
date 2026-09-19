@@ -15,7 +15,9 @@ import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 
 const route = useRoute();
-const isFullHeight = computed(() => !!route.meta?.fullHeight || route.path.startsWith('/course/ai'));
+const isFullHeight = computed(
+  () => !!route.meta?.fullHeight || route.path.startsWith('/course/ai') || route.path.endsWith('/ai')
+);
 </script>
 
 <style scoped lang="scss">

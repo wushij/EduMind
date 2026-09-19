@@ -47,4 +47,23 @@ public class KnowledgePointRelationDao {
     public int deleteById(Long id) {
         return relationMapper.deleteById(id);
     }
+
+    public int deletePrerequisitesForSource(Long sourceKnowledgePointId) {
+        if (sourceKnowledgePointId == null) {
+            return 0;
+        }
+        return relationMapper.delete(new LambdaQueryWrapper<KnowledgePointRelationEntity>()
+                .eq(KnowledgePointRelationEntity::getSourceKnowledgePointId, sourceKnowledgePointId)
+                .eq(KnowledgePointRelationEntity::getRelationType, "prerequisite"));
+    }
+
+    public int deleteAllForPoint(Long knowledgePointId) {
+        if (knowledgePointId == null) {
+            return 0;
+        }
+        return relationMapper.delete(new LambdaQueryWrapper<KnowledgePointRelationEntity>()
+                .eq(KnowledgePointRelationEntity::getSourceKnowledgePointId, knowledgePointId)
+                .or()
+                .eq(KnowledgePointRelationEntity::getTargetKnowledgePointId, knowledgePointId));
+    }
 }

@@ -301,7 +301,7 @@ defineProps<{
   currentTotalScore: number;
   currentTotalQuestions: number;
   activeSection: ExamSection | null;
-  selectedPickerIds: number[];
+  selectedPickerIds: (number | string)[];
   filteredCandidateQuestions: QuestionItem[];
   handleAddSection: (type: QuestionType) => void;
   updateSectionDefaultScore: (sec: ExamSection) => void;
@@ -309,7 +309,7 @@ defineProps<{
   removeSection: (idx: number) => void;
   removeQuestionFromSection: (sec: ExamSection, qIdx: number) => void;
   openQuestionPicker: (sec: ExamSection) => void;
-  togglePickerItem: (id: number) => void;
+  togglePickerItem: (id: number | string) => void;
   confirmAddPickedQuestions: () => void;
   getSectionScore: (sec: ExamSection) => number;
   getTypeLabel: (type: QuestionType | string) => string;

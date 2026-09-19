@@ -43,7 +43,7 @@
           <el-icon><MagicStick /></el-icon>
           <span>AI 提炼考点</span>
         </el-button>
-        <el-button v-if="editable" class="capsule-btn capsule-btn--primary" @click="showCreateDrawer = true">
+        <el-button v-if="editable" class="capsule-btn capsule-btn--primary" @click="openCreateDrawer">
           <el-icon><Plus /></el-icon>
           <span>新增知识点</span>
         </el-button>
@@ -53,77 +53,20 @@
     <!-- 知识点卡片与网格列表 -->
     <div v-loading="loading" class="kp-grid-wrapper">
       <div v-if="filteredPoints.length > 0" class="kp-cards-grid">
-        <div
-          v-for="(kp, index) in filteredPoints"
-          :key="kp.id || index"
-          class="kp-card-item"
-        >
-          <div class="card-head">
-            <div class="badge-row">
-              <span class="kp-code font-mono">{{ kp.code || `KP-${100 + (kp.id || index)}` }}</span>
-              <el-tag size="small" :type="getLevelTagType(kp.cognitiveDimension)">
-                {{ getLevelLabel(kp.cognitiveDimension) }}
-              </el-tag>
-            </div>
-            <div class="star-rating">
-              <span v-for="s in (kp.importance || 3)" :key="s" class="star">
-                <el-icon><StarFilled /></el-icon>
-              </span>
-            </div>
-          </div>
-
-          <h3 class="kp-name">{{ kp.title || kp.name }}</h3>
-          <p class="kp-desc">{{ kp.description || '本知识点为课程大纲的核心重点内容，涉及算法设计、概念理解与综合实战考查。' }}</p>
-
-          <div v-if="kp.prerequisites && kp.prerequisites.length" class="prereq-row">
-            <span class="prereq-label">前置要求：</span>
-            <div class="prereq-tags">
-              <span v-for="pre in kp.prerequisites" :key="pre" class="pre-tag">{{ pre }}</span>
-            </div>
-          </div>
-
-          <!-- 所属章节独立展示行 -->
-          <div class="card-chapter-row">
-            <el-icon class="chapter-icon"><Reading /></el-icon>
-            <span class="chapter-label">所属章节：</span>
-            <span class="chapter-title" :title="getChapterTitle(kp.chapterId)">
-              {{ getChapterTitle(kp.chapterId) }}
-            </span>
-          </div>
-
-          <!-- 底部专属操作按钮栏：独立新排整洁展示 -->
-          <div class="card-actions-bar">
-            <div class="actions-left">
-              <el-button
-                size="small"
-                class="card-action-btn card-action-btn--graph"
-                @click="openGraphDrawer(kp)"
-              >
-                <el-icon><Connection /></el-icon>
-                <span>关联图谱</span>
-              </el-button>
-              <el-button
-                size="small"
-                class="card-action-btn card-action-btn--ai"
-                title="AI 解析此考点（打开侧边栏助教）"
-                @click="handleAskAi(kp)"
-              >
-                <span class="card-action-gem-mark" aria-hidden="true">✦</span>
-                <span>AI解析</span>
-              </el-button>
-            </div>
-            <div v-if="editable" class="actions-right">
-              <el-button
-                size="small"
-                class="card-action-btn card-action-btn--danger"
-                @click="confirmDeleteKp(kp)"
-              >
-                <el-icon><Delete /></el-icon>
-                <span>删除</span>
-              </el-button>
-            </div>
-          </div>
-        </div>
+        <KnowledgePointCard
+          v-for="kp in filteredPoints"
+          :key="kp.id"
+          :kp="kp"
+          :editable="editable"
+          :chapter-title="getChapterTitle(kp.chapterId)"
+          :level-label="getLevelLabel(kp.cognitiveDimension)"
+          :level-tag-type="getLevelTagType(kp.cognitiveDimension)"
+          @open-detail="openDetailDrawer(kp)"
+          @open-graph="openGraphDrawer(kp)"
+          @ask-ai="handleAskAi(kp)"
+          @edit="openEditDrawer(kp)"
+          @delete="confirmDeleteKp(kp)"
+        />
       </div>
 
       <!-- 空状态 -->
@@ -195,7 +138,10 @@
             </el-tag>
           </div>
           <p class="active-desc">
-            {{ selectedGraphKp.description || '该知识点为所在章节的核心考查要点，直接关联课程期末诊断与作业训练。' }}
+            {{ selectedGraphKp.description || '暂无考点说明，请在知识点列表中编辑补充。' }}
+          </p>
+          <p v-if="selectedGraphKp.examFocus" class="active-desc active-desc--focus">
+            考查重点：{{ selectedGraphKp.examFocus }}
           </p>
           <div class="active-actions">
             <button
@@ -217,241 +163,84 @@
       </div>
     </el-drawer>
 
-    <!-- 录入知识点抽屉 -->
-    <el-drawer v-model="showCreateDrawer" title="录入课程核心知识点" size="540px" destroy-on-close class="kp-drawer">
-      <template #header>
-        <div class="drawer-header-flex">
-          <div class="header-icon-circle">
-            <el-icon><Connection /></el-icon>
-          </div>
-          <div>
-            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #0F172A;">录入课程核心考查知识点</h3>
-            <p style="margin: 2px 0 0 0; font-size: 12px; color: #64748B;">构建知识图谱拓扑节点，支持 AI 助教知识溯源与智能出题</p>
-          </div>
-        </div>
-      </template>
+    <KnowledgePointFormDrawer
+      v-model:visible="showFormDrawer"
+      :title="formDrawerTitle"
+      :form="newKp"
+      :chapters="chapters"
+      :prerequisite-options="prerequisiteOptions"
+      :saving="creating"
+      @save="handleSaveKp"
+      @open-ai="openAiSuggestModal"
+    />
 
-      <!-- AI 智能推荐横幅 -->
-      <div class="kp-ai-helper-banner" @click="openAiSuggestModal">
-        <div class="ai-spark-icon">
-          <el-icon><MagicStick /></el-icon>
-        </div>
-        <div class="ai-spark-meta">
-          <strong>使用 AI 辅助智能提炼核心考点</strong>
-          <p>基于当前章节大纲，AI 智能提炼核心概念、认知目标维度与考查要点</p>
-        </div>
-        <button type="button" class="spark-call-btn">AI提取</button>
-      </div>
+    <KnowledgePointDetailDrawer
+      v-model:visible="showDetailDrawer"
+      :kp="detailKp"
+      :editable="editable"
+      :chapter-title="detailKp ? getChapterTitle(detailKp.chapterId) : ''"
+      :level-label="detailKp ? getLevelLabel(detailKp.cognitiveDimension) : ''"
+      :level-tag-type="detailKp ? getLevelTagType(detailKp.cognitiveDimension) : 'info'"
+      @edit="detailKp && openEditDrawer(detailKp)"
+      @ask-ai="detailKp && handleAskAi(detailKp)"
+    />
 
-      <el-form label-position="top" class="kp-create-form">
-        <el-form-item label="知识点名称" required>
-          <el-input
-            v-model="newKp.title"
-            placeholder="例如：双向链表插入与删除节点算法"
-            maxlength="60"
-            show-word-limit
-          />
-        </el-form-item>
-
-        <div class="form-grid-2">
-          <el-form-item label="所属课程章节" required>
-            <el-select v-model="newKp.chapterId" placeholder="选择所属章节" class="w-full">
-              <el-option
-                v-for="(chap, idx) in chapters"
-                :key="chap.id"
-                :label="`第 ${idx + 1} 章：${chap.title}`"
-                :value="chap.id"
-              />
-            </el-select>
-          </el-form-item>
-
-          <el-form-item label="认知目标维度">
-            <el-select v-model="newKp.cognitiveDimension" class="w-full">
-              <el-option label="识记概念 (Remember)" value="REMEMBER" />
-              <el-option label="理解领会 (Understand)" value="UNDERSTAND" />
-              <el-option label="实践应用 (Apply)" value="APPLY" />
-              <el-option label="分析综合 (Analyze)" value="ANALYZE" />
-            </el-select>
-          </el-form-item>
-        </div>
-
-        <div class="form-grid-2">
-          <el-form-item label="核心考查重要度">
-            <el-rate v-model="newKp.importance" :max="5" />
-          </el-form-item>
-
-          <el-form-item label="考查易错陷阱与重点">
-            <el-input
-              v-model="newKp.examFocus"
-              placeholder="例如：边界指针判空、断链死循环"
-              maxlength="40"
-            />
-          </el-form-item>
-        </div>
-
-        <el-form-item label="核心考点与概念阐述">
-          <el-input
-            v-model="newKp.description"
-            type="textarea"
-            :rows="4"
-            placeholder="详细说明该知识点需掌握的概念、推导要求与代码实现细节..."
-            maxlength="300"
-            show-word-limit
-          />
-        </el-form-item>
-      </el-form>
-
-      <template #footer>
-        <div class="drawer-footer-actions">
-          <el-button class="capsule-btn capsule-btn--secondary" @click="showCreateDrawer = false">
-            取消
-          </el-button>
-          <el-button
-            type="primary"
-            class="capsule-btn capsule-btn--primary"
-            :loading="creating"
-            :disabled="creating || !newKp.title.trim()"
-            @click="handleSaveNewKp"
-          >
-            <span>{{ creating ? '保存入库中...' : '确认添加知识点' }}</span>
-          </el-button>
-        </div>
-      </template>
-    </el-drawer>
-
-    <!-- AI 知识点智能提炼与推荐弹窗 -->
-    <el-dialog
-      v-model="showAiSuggestModal"
-      title="AI 智能考点提炼与推荐"
-      width="640px"
-      append-to-body
-      destroy-on-close
-      class="ai-suggest-dialog"
-    >
-      <div class="ai-dialog-intro">
-        <div class="spark-badge">
-          <el-icon><MagicStick /></el-icon>
-          <span>AI 课程知识图谱引擎</span>
-        </div>
-        <p>
-          AI 已结合本课程大纲与高等教育教学大纲规范，为你智能提炼出以下核心考点。你可以选择单条一键回填到表单，或直接一键批量录入到知识图谱：
-        </p>
-      </div>
-
-      <div v-if="aiExtracting" class="ai-loading-box">
-        <el-icon class="is-loading"><Loading /></el-icon>
-        <span>AI 正在研读章节大纲并提炼考点体系...</span>
-      </div>
-
-      <div v-else class="ai-points-list">
-        <div
-          v-for="(p, pIdx) in aiSuggestedPoints"
-          :key="pIdx"
-          class="ai-point-card"
-        >
-          <div class="point-top-row">
-            <span class="point-num">考点 {{ pIdx + 1 }}</span>
-            <strong class="point-title">{{ p.title }}</strong>
-            <el-tag size="small" :type="getLevelTagType(p.cognitiveDimension)">
-              {{ getLevelLabel(p.cognitiveDimension) }}
-            </el-tag>
-          </div>
-
-          <p class="point-desc">{{ p.description }}</p>
-
-          <div class="point-meta-row">
-            <span v-if="p.examFocus" class="focus-tag">
-              考查重点：{{ p.examFocus }}
-            </span>
-            <div class="stars">
-              <span v-for="s in p.importance" :key="s">★</span>
-            </div>
-          </div>
-
-          <div class="card-apply-action">
-            <el-button
-              size="small"
-              class="point-apply-btn"
-              @click="applyAiSuggestedPoint(p)"
-            >
-              <el-icon><EditPen /></el-icon>
-              <span>采纳并编辑</span>
-            </el-button>
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="ai-modal-footer">
-          <el-button
-            class="capsule-btn capsule-btn--secondary"
-            :loading="aiExtracting"
-            :disabled="aiExtracting"
-            @click="generateAiSuggestedPoints"
-          >
-            <el-icon><Refresh /></el-icon>
-            <span>换一批考点</span>
-          </el-button>
-          <div class="right-group">
-            <el-button class="capsule-btn capsule-btn--secondary" @click="showAiSuggestModal = false">
-              关闭
-            </el-button>
-            <el-button
-              type="primary"
-              class="capsule-btn capsule-btn--ai"
-              :disabled="aiExtracting || aiSuggestedPoints.length === 0"
-              @click="batchImportAiPoints(aiSuggestedPoints)"
-            >
-              <span>一键批量导入所有考点 ({{ aiSuggestedPoints.length }})</span>
-            </el-button>
-          </div>
-        </div>
-      </template>
-    </el-dialog>
+    <KnowledgePointAiSuggestDialog
+      v-model:visible="showAiSuggestModal"
+      :loading="aiExtracting"
+      :points="aiSuggestedPoints"
+      @apply="applyAiSuggestedPoint"
+      @batch-import="batchImportAiPoints"
+      @refresh="generateAiSuggestedPoints"
+      @abort="abortAiSuggestedPoints"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import {
-  Search,
-  Plus,
-  StarFilled,
-  Opportunity,
-  Connection,
-  MagicStick,
-  Loading,
-  Refresh,
-  Reading,
-  Delete,
-  EditPen
-} from '@element-plus/icons-vue';
+import { Search, Plus, Opportunity, Connection, MagicStick } from '@element-plus/icons-vue';
+import { toRef } from 'vue';
+import type { Course } from '@/types/course/course';
 import { useKnowledgePoint } from '@/composables/course/useKnowledgePoint';
+import KnowledgePointCard from '@/components/course/knowledge-point/KnowledgePointCard.vue';
+import KnowledgePointFormDrawer from '@/components/course/knowledge-point/KnowledgePointFormDrawer.vue';
+import KnowledgePointDetailDrawer from '@/components/course/knowledge-point/KnowledgePointDetailDrawer.vue';
+import KnowledgePointAiSuggestDialog from '@/components/course/knowledge-point/KnowledgePointAiSuggestDialog.vue';
 
 const props = withDefaults(
   defineProps<{
     editable?: boolean;
+    course?: Course | null;
   }>(),
-  { editable: false }
+  { editable: false, course: null }
 );
 
 const {
   loading,
   creating,
-  showCreateDrawer,
+  showFormDrawer,
+  showDetailDrawer,
   showGraphDrawer,
   selectedGraphKp,
+  detailKp,
+  formDrawerTitle,
   searchKeyword,
   selectedChapterId,
   selectedLevel,
   chapters,
-  knowledgePoints,
   newKp,
+  prerequisiteOptions,
+  knowledgePoints,
   filteredPoints,
   showAiSuggestModal,
   aiExtracting,
   aiSuggestedPoints,
   openAiSuggestModal,
+  openCreateDrawer,
+  openEditDrawer,
+  openDetailDrawer,
   generateAiSuggestedPoints,
+  abortAiSuggestedPoints,
   applyAiSuggestedPoint,
   batchImportAiPoints,
   loadKnowledgePoints,
@@ -459,13 +248,12 @@ const {
   getPointsForChapter,
   getLevelLabel,
   getLevelTagType,
-  handleSaveNewKp,
+  handleSaveKp,
   openGraphDrawer,
   handleAskAi,
   handleGenerateQuizForKp,
-  handleDeleteKp,
-  confirmDeleteKp,
-} = useKnowledgePoint();
+  confirmDeleteKp
+} = useKnowledgePoint(toRef(props, 'course'));
 </script>
 
 <style scoped lang="scss">
@@ -570,202 +358,8 @@ const {
   .kp-grid-wrapper {
     .kp-cards-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 18px;
-
-      .kp-card-item {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 14px;
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        transition: all 0.2s ease;
-
-        &:hover {
-          border-color: #cbd5e1;
-          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
-        }
-
-        .card-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 10px;
-
-          .badge-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-
-            .kp-code {
-              font-size: 11px;
-              color: #64748b;
-              background: #f1f5f9;
-              padding: 2px 6px;
-              border-radius: 4px;
-            }
-          }
-
-          .star-rating {
-            color: #f59e0b;
-            font-size: 14px;
-          }
-        }
-
-        .kp-name {
-          font-size: 16px;
-          font-weight: 700;
-          color: #0f172a;
-          margin: 0 0 8px;
-          line-height: 1.4;
-        }
-
-        .kp-desc {
-          font-size: 13px;
-          color: #64748b;
-          line-height: 1.6;
-          margin: 0 0 14px;
-          display: -webkit-box;
-          -webkit-line-clamp: 3;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-
-        .prereq-row {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          margin-bottom: 12px;
-          font-size: 12px;
-
-          .prereq-label {
-            color: #94a3b8;
-          }
-
-          .prereq-tags {
-            display: flex;
-            gap: 4px;
-
-            .pre-tag {
-              background: #eff6ff;
-              color: #2563eb;
-              padding: 1px 6px;
-              border-radius: 4px;
-            }
-          }
-        }
-
-        .card-chapter-row {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding-top: 12px;
-          margin-top: auto;
-          border-top: 1px solid #f1f5f9;
-          min-width: 0;
-
-          .chapter-icon {
-            font-size: 14px;
-            color: #64748b;
-            flex-shrink: 0;
-          }
-
-          .chapter-label {
-            font-size: 12px;
-            color: #94a3b8;
-            flex-shrink: 0;
-          }
-
-          .chapter-title {
-            font-size: 12px;
-            color: #475569;
-            font-weight: 500;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            min-width: 0;
-          }
-        }
-
-        .card-actions-bar {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          margin-top: 10px;
-          padding-top: 10px;
-          border-top: 1px dashed #f1f5f9;
-
-          .actions-left {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-          }
-
-          .actions-right {
-            display: flex;
-            align-items: center;
-            flex-shrink: 0;
-          }
-
-          .card-action-btn {
-            height: 28px;
-            padding: 0 10px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 500;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            border: 1px solid transparent;
-            transition: all 0.2s ease;
-
-            &--graph {
-              background: #eff6ff;
-              border-color: #bfdbfe;
-              color: #1d4ed8;
-
-              &:hover {
-                background: #dbeafe;
-                border-color: #93c5fd;
-                color: #1e40af;
-              }
-            }
-
-            &--ai {
-              background: #faf5ff;
-              border-color: #e9d5ff;
-              color: #7c3aed;
-
-              &:hover {
-                background: #f3e8ff;
-                border-color: #d8b4fe;
-                color: #6d28d9;
-              }
-
-              .card-action-gem-mark {
-                font-size: 13px;
-                font-weight: 700;
-                line-height: 1;
-              }
-            }
-
-            &--danger {
-              background: #fff1f2;
-              border-color: #fecdd3;
-              color: #e11d48;
-
-              &:hover {
-                background: #ffe4e6;
-                border-color: #fda4af;
-                color: #be123c;
-              }
-            }
-          }
-        }
-      }
+      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+      gap: 16px;
     }
 
     .empty-state-panel {

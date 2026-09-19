@@ -5,6 +5,7 @@ import com.edumind.course.dto.course.CourseCreateDTO;
 import com.edumind.course.dto.course.CourseQueryDTO;
 import com.edumind.course.dto.course.CourseUpdateDTO;
 import com.edumind.course.dto.knowledge.KnowledgePointCreateDTO;
+import com.edumind.course.dto.knowledge.KnowledgePointUpdateDTO;
 import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.course.vo.course.CourseVO;
 import com.edumind.course.vo.knowledge.KnowledgePointVO;
@@ -25,7 +26,11 @@ public interface CourseService {
 
     List<KnowledgePointVO> listKnowledgePoints(Long courseId, Long chapterId);
 
+    KnowledgePointVO getKnowledgePoint(Long courseId, Long kpId);
+
     KnowledgePointVO createKnowledgePoint(Long courseId, KnowledgePointCreateDTO dto);
+
+    KnowledgePointVO updateKnowledgePoint(Long courseId, Long kpId, KnowledgePointUpdateDTO dto);
 
     void deleteKnowledgePoint(Long courseId, Long kpId);
 

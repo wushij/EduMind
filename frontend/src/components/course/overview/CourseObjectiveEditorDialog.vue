@@ -6,12 +6,16 @@
     destroy-on-close
     class="course-objective-editor-dialog"
   >
-    <div
-      v-loading="aiLoading"
-      class="dialog-body-wrap"
-      :element-loading-text="aiStepText"
-      element-loading-background="rgba(255,255,255,0.88)"
-    >
+    <AiCognitiveThinkingPanel
+      v-if="aiLoading"
+      :active="aiLoading"
+      v-bind="AI_COGNITIVE_THINKING_PRESETS.courseObjectives"
+      show-footer-actions
+      abort-label="中止生成"
+      @abort="abortAiSuggest"
+    />
+
+    <div v-else class="dialog-body-wrap">
       <div class="dialog-toolbar">
         <p class="hint">最多 6 条，按顺序展示在课程概览页。</p>
         <div class="toolbar-actions">
@@ -20,12 +24,10 @@
             v-if="courseId"
             type="button"
             class="ai-pill-btn"
-            :disabled="aiLoading"
             @click="handleAiSuggest"
           >
-            <el-icon v-if="aiLoading" class="is-loading"><Loading /></el-icon>
-            <el-icon v-else><MagicStick /></el-icon>
-            {{ aiLoading ? '推演中…' : 'AI 根据课程生成' }}
+            <el-icon><MagicStick /></el-icon>
+            AI 根据课程生成
           </button>
         </div>
       </div>
@@ -76,8 +78,10 @@
       </button>
     </div>
     <template #footer>
-      <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
+      <template v-if="!aiLoading">
+        <el-button @click="visible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
+      </template>
     </template>
   </el-dialog>
 </template>
@@ -85,9 +89,12 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Loading, MagicStick } from '@element-plus/icons-vue';
+import { MagicStick } from '@element-plus/icons-vue';
 import type { CourseObjectiveVO } from '@/types/course/overview';
 import { suggestCourseObjectives } from '@/api/ai/course-objectives';
+import AiCognitiveThinkingPanel from '@/components/ai/common/AiCognitiveThinkingPanel.vue';
+import { AI_COGNITIVE_THINKING_PRESETS } from '@/constants/ai/cognitive-thinking';
+import { isAxiosError } from 'axios';
 
 type EditorRow = { _key: string; title: string; description?: string };
 
@@ -106,15 +113,8 @@ const emit = defineEmits<{
 const visible = ref(props.modelValue);
 const rows = ref<EditorRow[]>([]);
 const aiLoading = ref(false);
-const aiStepText = ref('正在汇总课程章节与知识点…');
 const aiSourceLabel = ref('');
-let aiStepTimer: ReturnType<typeof setInterval> | null = null;
-
-const AI_STEP_MESSAGES = [
-  '正在汇总课程章节与知识点…',
-  '正在通过 AI 网关调用大模型…',
-  '正在解析教学目标结构化结果…'
-];
+let aiAbortController: AbortController | null = null;
 
 let keySeq = 0;
 function nextKey() {
@@ -138,27 +138,10 @@ watch(() => props.modelValue, (v) => {
       ? mapToRows(props.objectives)
       : [];
     aiSourceLabel.value = '';
+  } else {
+    abortAiSuggest();
   }
 });
-
-function startAiStepAnimation() {
-  let index = 0;
-  aiStepText.value = AI_STEP_MESSAGES[0];
-  if (aiStepTimer) {
-    clearInterval(aiStepTimer);
-  }
-  aiStepTimer = setInterval(() => {
-    index = (index + 1) % AI_STEP_MESSAGES.length;
-    aiStepText.value = AI_STEP_MESSAGES[index];
-  }, 900);
-}
-
-function stopAiStepAnimation() {
-  if (aiStepTimer) {
-    clearInterval(aiStepTimer);
-    aiStepTimer = null;
-  }
-}
 
 watch(visible, (v) => emit('update:modelValue', v));
 
@@ -182,15 +165,26 @@ async function removeRow(index: number) {
   rows.value.splice(index, 1);
 }
 
+function abortAiSuggest() {
+  if (aiAbortController) {
+    aiAbortController.abort();
+    aiAbortController = null;
+  }
+  aiLoading.value = false;
+}
+
 async function handleAiSuggest() {
   if (!props.courseId) {
     ElMessage.warning('课程信息未加载');
     return;
   }
+  abortAiSuggest();
+  aiAbortController = new AbortController();
   aiLoading.value = true;
-  startAiStepAnimation();
   try {
-    const res = await suggestCourseObjectives(props.courseId, 4);
+    const res = await suggestCourseObjectives(props.courseId, 4, {
+      signal: aiAbortController.signal
+    });
     const payload = res?.data;
     const suggested = payload?.objectives ?? [];
     if (!suggested.length) {
@@ -205,6 +199,9 @@ async function handleAiSuggest() {
         : '模型暂不可用，已使用课程上下文兜底生成，请确认后保存'
     );
   } catch (err: unknown) {
+    if (isAxiosError(err) && err.code === 'ERR_CANCELED') {
+      return;
+    }
     const msg =
       (err as { message?: string })?.message ||
       (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -212,7 +209,7 @@ async function handleAiSuggest() {
       ElMessage.error(msg);
     }
   } finally {
-    stopAiStepAnimation();
+    aiAbortController = null;
     aiLoading.value = false;
   }
 }

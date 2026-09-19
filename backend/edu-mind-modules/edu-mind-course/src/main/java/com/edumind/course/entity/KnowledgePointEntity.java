@@ -21,6 +21,7 @@ public class KnowledgePointEntity implements Serializable {
     private String description;
     private String cognitiveDimension;
     private Integer importance;
+    private String examFocus;
     private Integer sortOrder;
     private LocalDateTime createTime;
 }

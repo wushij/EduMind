@@ -1,7 +1,7 @@
 import axios from '@/core/http/axios';
 
 /** 将后端返回的 /api/... 规范为 axios baseURL(/api) 可用的相对路径 */
-function normalizeDownloadApiPath(apiPath: string): string {
+export function normalizeDownloadApiPath(apiPath: string): string {
   if (!apiPath) return apiPath;
   // 去掉 origin
   const pathOnly = apiPath.replace(/^https?:\/\/[^/]+/i, '');
@@ -44,4 +44,36 @@ export async function downloadByApiPath(apiPath: string, filename?: string) {
   a.download = filename || 'export.pdf';
   a.click();
   window.URL.revokeObjectURL(url);
+}
+
+/** 读取存储文件文本（Markdown / TXT 预览） */
+export async function fetchStorageText(apiPath: string): Promise<string> {
+  const requestPath = normalizeDownloadApiPath(apiPath);
+  const response: unknown = await axios.get(requestPath, { responseType: 'text' });
+  if (typeof response === 'string') {
+    return response;
+  }
+  if (response && typeof response === 'object' && 'data' in response) {
+    const data = (response as { data?: unknown }).data;
+    if (typeof data === 'string') {
+      return data;
+    }
+  }
+  return String(response ?? '');
+}
+
+/** 读取存储文件二进制（PDF 预览等） */
+export async function fetchStorageBlob(apiPath: string): Promise<Blob> {
+  const requestPath = normalizeDownloadApiPath(apiPath);
+  const response: unknown = await axios.get(requestPath, { responseType: 'blob' });
+  if (response instanceof Blob) {
+    return response;
+  }
+  if (response && typeof response === 'object' && 'data' in response) {
+    const data = (response as { data?: unknown }).data;
+    if (data instanceof Blob) {
+      return data;
+    }
+  }
+  return new Blob([response as BlobPart]);
 }

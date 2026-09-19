@@ -263,7 +263,7 @@ export function useExamGenerate() {
     }
   }
 
-  function swapQuestion(_questionId: number) {
+  function swapQuestion(_questionId: number | string) {
     ElMessage.info('已从题库抽取替补题目');
   }
 

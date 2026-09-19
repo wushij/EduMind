@@ -1,29 +1,41 @@
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, type Ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { getCourseKnowledgePoints, createKnowledgePoint, deleteKnowledgePoint } from '@/api/course/knowledge-point';
+import {
+  getCourseKnowledgePoints,
+  createKnowledgePoint,
+  updateKnowledgePoint,
+  deleteKnowledgePoint
+} from '@/api/course/knowledge-point';
+import { suggestCourseKnowledgePoints } from '@/api/ai/course-knowledge-points';
 import { getChapters } from '@/api/course/chapter';
-import { askGlobalAssistant } from '@/api/ai/assistant';
 import { useTeachingCopilotStore } from '@/stores/ai/teaching-copilot-context';
+import type { Course } from '@/types/course/course';
+import type { CourseKnowledgePointSuggestItem, KnowledgePoint } from '@/types/course/knowledge-point';
+import { mapSuggestItemToSave, resolvePrerequisiteIds } from '@/services/course/knowledge-point-import';
+import { isAxiosError } from 'axios';
 
-export function useKnowledgePoint() {
+export function useKnowledgePoint(courseRef?: Ref<Course | null | undefined>) {
   const route = useRoute();
   const router = useRouter();
   const teachingCopilotStore = useTeachingCopilotStore();
-  const courseId = computed(() => Number(route.params.id) || 101);
+  const courseId = computed(() => Number(route.params.id) || courseRef?.value?.id || 101);
 
   const loading = ref(false);
   const creating = ref(false);
-  const showCreateDrawer = ref(false);
+  const showFormDrawer = ref(false);
+  const showDetailDrawer = ref(false);
   const showGraphDrawer = ref(false);
-  const selectedGraphKp = ref<any>(null);
+  const selectedGraphKp = ref<KnowledgePoint | null>(null);
+  const detailKp = ref<KnowledgePoint | null>(null);
+  const editingKpId = ref<number | null>(null);
 
   const searchKeyword = ref('');
   const selectedChapterId = ref<number | undefined>(undefined);
   const selectedLevel = ref('');
 
   const chapters = ref<any[]>([]);
-  const knowledgePoints = ref<any[]>([]);
+  const knowledgePoints = ref<KnowledgePoint[]>([]);
 
   const newKp = reactive({
     title: '',
@@ -32,13 +44,16 @@ export function useKnowledgePoint() {
     cognitiveDimension: 'APPLY',
     importance: 4,
     description: '',
-    prerequisites: [] as string[],
+    prerequisiteIds: [] as number[],
     examFocus: ''
   });
 
   const showAiSuggestModal = ref(false);
   const aiExtracting = ref(false);
-  const aiSuggestedPoints = ref<any[]>([]);
+  const aiSuggestedPoints = ref<CourseKnowledgePointSuggestItem[]>([]);
+  let aiSuggestAbortController: AbortController | null = null;
+
+  const formDrawerTitle = computed(() => (editingKpId.value ? '编辑课程核心知识点' : '录入课程核心知识点'));
 
   onMounted(async () => {
     await Promise.all([loadChapters(), loadKnowledgePoints()]);
@@ -70,113 +85,122 @@ export function useKnowledgePoint() {
     }
   }
 
+  function resetForm() {
+    editingKpId.value = null;
+    newKp.title = '';
+    newKp.code = '';
+    newKp.cognitiveDimension = 'APPLY';
+    newKp.importance = 4;
+    newKp.description = '';
+    newKp.examFocus = '';
+    newKp.prerequisiteIds = [];
+    newKp.chapterId = chapters.value[0]?.id || selectedChapterId.value || 0;
+  }
+
+  function openCreateDrawer() {
+    resetForm();
+    showFormDrawer.value = true;
+  }
+
+  function openEditDrawer(kp: KnowledgePoint) {
+    editingKpId.value = kp.id;
+    newKp.title = kp.title || kp.name || '';
+    newKp.chapterId = kp.chapterId || chapters.value[0]?.id || 0;
+    newKp.code = kp.code || '';
+    newKp.cognitiveDimension = kp.cognitiveDimension || 'APPLY';
+    newKp.importance = kp.importance ?? 4;
+    newKp.description = kp.description || '';
+    newKp.examFocus = kp.examFocus || '';
+    newKp.prerequisiteIds = [...(kp.prerequisiteIds || kp.prerequisites?.map((p) => p.id) || [])];
+    showDetailDrawer.value = false;
+    showFormDrawer.value = true;
+  }
+
+  function openDetailDrawer(kp: KnowledgePoint) {
+    detailKp.value = kp;
+    showDetailDrawer.value = true;
+  }
+
   function openAiSuggestModal() {
     showAiSuggestModal.value = true;
     generateAiSuggestedPoints();
   }
 
-  function parseJsonArray<T = any>(rawText: string): T[] {
-    if (!rawText) return [];
-    let text = rawText.trim();
-    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-    if (codeBlockMatch) {
-      text = codeBlockMatch[1].trim();
+  function abortAiSuggestedPoints() {
+    if (aiSuggestAbortController) {
+      aiSuggestAbortController.abort();
+      aiSuggestAbortController = null;
     }
-    const startIdx = text.indexOf('[');
-    const endIdx = text.lastIndexOf(']');
-    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-      text = text.slice(startIdx, endIdx + 1);
-    }
-    try {
-      const parsed = JSON.parse(text);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      console.error('Failed to parse AI knowledge points JSON:', e, rawText);
-      return [];
-    }
+    aiExtracting.value = false;
   }
 
   async function generateAiSuggestedPoints() {
+    abortAiSuggestedPoints();
+    aiSuggestAbortController = new AbortController();
     aiExtracting.value = true;
     aiSuggestedPoints.value = [];
-    const targetChap = chapters.value.find(c => c.id === (newKp.chapterId || selectedChapterId.value)) || chapters.value[0];
-    const chapTitle = targetChap?.title || '核心课程大纲';
-
-    const prompt = `你是一名高校计算机专业课资深教研室主任及命题专家。请针对章节【${chapTitle}】，结合布鲁姆认知模型（识记/理解/应用/分析），提炼 3~4 个真实、具体、高频的核心考点/知识点。
-【严格要求】：
-1. 知识点名称必须针对【${chapTitle}】的具体专业学科内涵，严禁空泛通用的套话（例如切勿输出“状态迁移模型与拓扑演进”这种与本章无关的抽象名词）。
-如果章节是“Java学习概述与核心认知模型”，考点应如：“JVM内存结构与垃圾回收机制基础”、“JDK核心工具链（javac/java/javap）编译执行流程”、“Java跨平台特性与字节码WORA机制剖析”；
-如果章节涉及“数据结构与算法”，考点应如：“时间与空间渐进复杂度大O推导”、“双指针在有序数组中的移动策略与边界条件”等。
-2. 包含认知维度（严格限制只能是：REMEMBER, UNDERSTAND, APPLY, ANALYZE 之一）、重要星级（3-5分）、简要说明（40字左右）、前置依赖知识点数组、常见考试易错陷阱。
-3. 请严格以标准 JSON 数组格式直接返回，严禁任何代码块标记（不要输出 \`\`\`json ），格式如下：
-[
-  {
-    "title": "具体考点名称",
-    "cognitiveDimension": "APPLY",
-    "importance": 5,
-    "description": "考点内涵与掌握要求解析",
-    "prerequisites": ["前置知识A", "前置知识B"],
-    "examFocus": "常见考试题型与避坑重点"
-  }
-]`;
-
+    const targetChapterId = newKp.chapterId || selectedChapterId.value || chapters.value[0]?.id;
     try {
-      const res = await askGlobalAssistant({
-        message: prompt,
-        courseId: courseId.value
-      });
-      const rawContent = res.data?.content || '';
-      const parsed = parseJsonArray(rawContent);
-      if (parsed.length > 0) {
-        aiSuggestedPoints.value = parsed.map((item: any, idx: number) => ({
-          title: item.title || `${chapTitle} 核心考点 ${idx + 1}`,
-          chapterId: targetChap?.id || chapters.value[0]?.id || 1,
-          code: `KP-${Math.floor(1000 + Math.random() * 9000)}`,
-          cognitiveDimension: ['REMEMBER', 'UNDERSTAND', 'APPLY', 'ANALYZE'].includes(item.cognitiveDimension) ? item.cognitiveDimension : 'APPLY',
-          importance: Math.min(5, Math.max(1, Number(item.importance) || 4)),
-          description: item.description || '本章节高频核心考点，涉及原理推导与综合实践。',
-          prerequisites: Array.isArray(item.prerequisites) && item.prerequisites.length ? item.prerequisites : ['前置核心概念'],
-          examFocus: item.examFocus || '重点概念理解与综合实战推演'
-        }));
-        ElMessage.success(`AI 已针对【${chapTitle}】提炼出 ${aiSuggestedPoints.value.length} 个核心考点！`);
+      const res = await suggestCourseKnowledgePoints(
+        courseId.value,
+        targetChapterId,
+        4,
+        { signal: aiSuggestAbortController.signal }
+      );
+      const data = res.data;
+      if (data?.points?.length) {
+        aiSuggestedPoints.value = data.points;
+        const label = data.sourceLabel || (data.aiGenerated ? '模型推演已生成' : '智能兜底');
+        ElMessage.success(`${label}：共 ${data.points.length} 个考点`);
       } else {
-        throw new Error('未解析到结构化知识点数据');
+        throw new Error('未返回有效考点');
       }
-    } catch (err: any) {
-      console.warn('AI 提炼考点失败:', err);
+    } catch (err: unknown) {
+      if (isAxiosError(err) && err.code === 'ERR_CANCELED') {
+        return;
+      }
       aiSuggestedPoints.value = [];
-      ElMessage.error(err?.message || 'AI 考点提炼失败，请稍后重试');
+      const msg = err instanceof Error ? err.message : 'AI 考点提炼失败，请稍后重试';
+      ElMessage.error(msg);
     } finally {
+      aiSuggestAbortController = null;
       aiExtracting.value = false;
     }
   }
 
-  function applyAiSuggestedPoint(point: any) {
+  function applyAiSuggestedPoint(point: CourseKnowledgePointSuggestItem) {
+    const chapterId = newKp.chapterId || selectedChapterId.value || chapters.value[0]?.id || 0;
+    const prereqIds = resolvePrerequisiteIds(point.prerequisiteTitles, knowledgePoints.value);
     newKp.title = point.title;
-    newKp.chapterId = point.chapterId;
-    newKp.code = point.code;
-    newKp.cognitiveDimension = point.cognitiveDimension;
-    newKp.importance = point.importance;
-    newKp.description = point.description;
-    newKp.examFocus = point.examFocus;
-    newKp.prerequisites = [...(point.prerequisites || [])];
+    newKp.chapterId = chapterId;
+    newKp.code = '';
+    newKp.cognitiveDimension = point.cognitiveDimension || 'APPLY';
+    newKp.importance = point.importance ?? 4;
+    newKp.description = point.description || '';
+    newKp.examFocus = point.examFocus || '';
+    newKp.prerequisiteIds = prereqIds;
+    editingKpId.value = null;
     showAiSuggestModal.value = false;
-    showCreateDrawer.value = true;
-    ElMessage.success('已采纳推荐考点，可直接在表单中继续编辑细化！');
+    showFormDrawer.value = true;
+    ElMessage.success('已采纳推荐考点，可继续编辑后保存');
   }
 
-  async function batchImportAiPoints(points: any[]) {
-    if (!points || points.length === 0) return;
+  async function batchImportAiPoints(points: CourseKnowledgePointSuggestItem[]) {
+    if (!points?.length) return;
     creating.value = true;
+    const chapterId = newKp.chapterId || selectedChapterId.value || chapters.value[0]?.id || 0;
     try {
+      let imported = 0;
       for (const p of points) {
-        await createKnowledgePoint(courseId.value, {
-          chapterId: p.chapterId,
-          title: p.title,
-          sortOrder: p.importance || 1
-        });
+        await loadKnowledgePoints();
+        const prereqIds = resolvePrerequisiteIds(p.prerequisiteTitles, knowledgePoints.value);
+        await createKnowledgePoint(
+          courseId.value,
+          mapSuggestItemToSave(p, chapterId, prereqIds)
+        );
+        imported++;
       }
-      ElMessage.success(`AI 已一键持久化录入 ${points.length} 个核心考点！`);
+      ElMessage.success(`已入库 ${imported} 个核心考点`);
       showAiSuggestModal.value = false;
       await loadKnowledgePoints();
     } catch (err: any) {
@@ -186,87 +210,118 @@ export function useKnowledgePoint() {
     }
   }
 
+  const prerequisiteOptions = computed(() =>
+    knowledgePoints.value
+      .filter((kp) => kp.id !== editingKpId.value)
+      .map((kp) => ({
+        value: kp.id,
+        label: kp.title || kp.name || `知识点 ${kp.id}`
+      }))
+  );
+
   const filteredPoints = computed(() => {
-    return knowledgePoints.value.filter(kp => {
+    return knowledgePoints.value.filter((kp) => {
       if (selectedChapterId.value && kp.chapterId !== selectedChapterId.value) return false;
       if (selectedLevel.value && kp.cognitiveDimension !== selectedLevel.value) return false;
       if (searchKeyword.value.trim()) {
         const kw = searchKeyword.value.trim().toLowerCase();
         const inTitle = (kp.title || kp.name || '').toLowerCase().includes(kw);
         const inCode = (kp.code || '').toLowerCase().includes(kw);
-        if (!inTitle && !inCode) return false;
+        const inDesc = (kp.description || '').toLowerCase().includes(kw);
+        const inFocus = (kp.examFocus || '').toLowerCase().includes(kw);
+        if (!inTitle && !inCode && !inDesc && !inFocus) return false;
       }
       return true;
     });
   });
 
   function getChapterTitle(chapterId?: number) {
-    const c = chapters.value.find(item => item.id === chapterId);
-    return c?.title || '通用教学大纲';
+    const c = chapters.value.find((item) => item.id === chapterId);
+    return c?.title || '未指定章节';
   }
 
   function getPointsForChapter(chapterId: number) {
-    return knowledgePoints.value.filter(k => k.chapterId === chapterId || (!k.chapterId && chapterId === 1));
+    return knowledgePoints.value.filter((k) => k.chapterId === chapterId);
   }
 
   function getLevelLabel(level?: string) {
+    if (!level) return '未设置';
     const map: Record<string, string> = {
       REMEMBER: '识记概念',
       UNDERSTAND: '理解领会',
       APPLY: '实践应用',
       ANALYZE: '综合探究'
     };
-    return map[level || 'APPLY'] || '核心要点';
+    return map[level] || '核心要点';
   }
 
   function getLevelTagType(level?: string) {
+    if (!level) return 'info';
     const map: Record<string, string> = {
       REMEMBER: 'info',
       UNDERSTAND: 'primary',
       APPLY: 'success',
       ANALYZE: 'warning'
     };
-    return (map[level || 'APPLY'] as any) || '';
+    return (map[level] as any) || 'info';
   }
 
-  async function handleSaveNewKp() {
+  function buildSavePayload() {
+    return {
+      chapterId: newKp.chapterId,
+      title: newKp.title.trim(),
+      code: newKp.code.trim() || undefined,
+      description: newKp.description.trim() || undefined,
+      cognitiveDimension: newKp.cognitiveDimension,
+      importance: newKp.importance,
+      examFocus: newKp.examFocus.trim() || undefined,
+      sortOrder: newKp.importance || 0,
+      prerequisiteIds: newKp.prerequisiteIds
+    };
+  }
+
+  async function handleSaveKp() {
     if (!newKp.title.trim()) {
       ElMessage.warning('知识点名称不能为空');
       return;
     }
     creating.value = true;
     try {
-      await createKnowledgePoint(courseId.value, {
-        chapterId: newKp.chapterId,
-        title: newKp.title.trim(),
-        sortOrder: newKp.importance || 0
-      });
-      ElMessage.success('知识点录入成功并已持久化入库！');
-      showCreateDrawer.value = false;
-      newKp.title = '';
-      newKp.description = '';
+      const payload = buildSavePayload();
+      if (editingKpId.value) {
+        await updateKnowledgePoint(courseId.value, editingKpId.value, payload);
+        ElMessage.success('知识点已更新');
+      } else {
+        await createKnowledgePoint(courseId.value, payload);
+        ElMessage.success('知识点录入成功');
+      }
+      showFormDrawer.value = false;
+      resetForm();
       await loadKnowledgePoints();
     } catch (err: any) {
-      ElMessage.error(err?.message || '新增知识点失败，请稍后重试');
+      ElMessage.error(err?.message || '保存知识点失败');
     } finally {
       creating.value = false;
     }
   }
 
-  function openGraphDrawer(kp: any) {
+  function openGraphDrawer(kp: KnowledgePoint | null) {
     selectedGraphKp.value = kp || knowledgePoints.value[0] || null;
     showGraphDrawer.value = true;
   }
 
-  function handleAskAi(kp: any) {
+  function handleAskAi(kp: KnowledgePoint) {
+    showGraphDrawer.value = false;
     const title = kp.title || kp.name || '核心考点';
-    const prompt = `请结合本课程知识图谱，详细讲解核心考点【${title}】的定义、推导与常见考查题型。`;
+    const courseName = courseRef?.value?.title || courseRef?.value?.name || '';
+    const prompt = `请结合本课程${courseName ? `「${courseName}」` : ''}知识图谱，详细讲解核心考点【${title}】的定义、推导与常见考查题型。`;
     const excerpt = [
       `知识点：${title}`,
       kp.code ? `编码：${kp.code}` : '',
       `所属章节：${getChapterTitle(kp.chapterId)}`,
       kp.cognitiveDimension ? `认知维度：${getLevelLabel(kp.cognitiveDimension)}` : '',
-      kp.description ? `说明：${kp.description}` : ''
+      kp.description ? `说明：${kp.description}` : '',
+      kp.examFocus ? `考查重点：${kp.examFocus}` : ''
     ]
       .filter(Boolean)
       .join('\n');
@@ -284,21 +339,25 @@ export function useKnowledgePoint() {
     );
   }
 
-  function handleGenerateQuizForKp(kp: any) {
-    router.push(`/ai/question/generate?courseId=${courseId.value}&kp=${encodeURIComponent(kp.title || kp.name)}`);
+  function handleGenerateQuizForKp(kp: KnowledgePoint) {
+    router.push(`/ai/question/generate?courseId=${courseId.value}&kp=${encodeURIComponent(kp.title || kp.name || '')}`);
   }
 
-  async function handleDeleteKp(kp: any) {
+  async function handleDeleteKp(kp: KnowledgePoint) {
     try {
       await deleteKnowledgePoint(courseId.value, kp.id);
-      ElMessage.success(`知识点【${kp.title || kp.name}】已成功删除`);
+      ElMessage.success(`知识点「${kp.title || kp.name}」已删除`);
+      if (detailKp.value?.id === kp.id) {
+        showDetailDrawer.value = false;
+        detailKp.value = null;
+      }
       await loadKnowledgePoints();
     } catch (err: any) {
       ElMessage.error(err?.message || '删除知识点失败');
     }
   }
 
-  async function confirmDeleteKp(kp: any) {
+  async function confirmDeleteKp(kp: KnowledgePoint) {
     try {
       await ElMessageBox.confirm(
         `确定要删除核心考点「${kp.title || kp.name}」吗？删除后将从知识图谱与课程考点中移除。`,
@@ -313,28 +372,38 @@ export function useKnowledgePoint() {
       );
       await handleDeleteKp(kp);
     } catch {
-      // 用户取消
+      // cancel
     }
   }
 
   return {
+    courseId,
     loading,
     creating,
-    showCreateDrawer,
+    showFormDrawer,
+    showDetailDrawer,
     showGraphDrawer,
+    showCreateDrawer: showFormDrawer,
     selectedGraphKp,
+    detailKp,
+    formDrawerTitle,
     searchKeyword,
     selectedChapterId,
     selectedLevel,
     chapters,
     knowledgePoints,
     newKp,
+    prerequisiteOptions,
     filteredPoints,
     showAiSuggestModal,
     aiExtracting,
     aiSuggestedPoints,
     openAiSuggestModal,
+    openCreateDrawer,
+    openEditDrawer,
+    openDetailDrawer,
     generateAiSuggestedPoints,
+    abortAiSuggestedPoints,
     applyAiSuggestedPoint,
     batchImportAiPoints,
     loadKnowledgePoints,
@@ -342,7 +411,8 @@ export function useKnowledgePoint() {
     getPointsForChapter,
     getLevelLabel,
     getLevelTagType,
-    handleSaveNewKp,
+    handleSaveKp,
+    handleSaveNewKp: handleSaveKp,
     openGraphDrawer,
     handleAskAi,
     handleGenerateQuizForKp,

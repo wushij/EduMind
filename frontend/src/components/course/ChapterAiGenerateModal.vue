@@ -7,7 +7,7 @@
     append-to-body
     class="ai-generate-dialog"
   >
-    <div class="ai-modal-header-desc">
+    <div v-if="!generating" class="ai-modal-header-desc">
       <div class="ai-sparkle-badge">
         <el-icon><MagicStick /></el-icon>
         <span>EduMind 教学大纲智能拆解引擎</span>
@@ -17,13 +17,15 @@
       </p>
     </div>
 
-    <!-- AI 状态指示 -->
-    <div v-if="generating" class="ai-generating-state">
-      <el-icon class="is-loading ai-spin-icon"><Loading /></el-icon>
-      <span>AI 正在研读学科大纲并规划微课节与考点映射...</span>
-    </div>
+    <AiCognitiveThinkingPanel
+      v-if="generating"
+      :active="generating"
+      v-bind="AI_COGNITIVE_THINKING_PRESETS.chapterMicroLesson"
+      show-footer-actions
+      abort-label="中止规划"
+      @abort="abortGenerate"
+    />
 
-    <!-- 生成结果列表 -->
     <div v-else class="suggested-sections-list">
       <div
         v-for="(item, idx) in suggestedList"
@@ -66,7 +68,7 @@
       </div>
     </div>
 
-    <template #footer>
+    <template v-if="!generating" #footer>
       <div class="dialog-footer-actions">
         <button
           type="button"
@@ -95,9 +97,12 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { MagicStick, Loading, Clock, VideoPlay, EditPen, Connection, Refresh } from '@element-plus/icons-vue';
+import { MagicStick, Clock, VideoPlay, EditPen, Connection, Refresh } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
+import { isAxiosError } from 'axios';
 import { askGlobalAssistant } from '@/api/ai/assistant';
+import AiCognitiveThinkingPanel from '@/components/ai/common/AiCognitiveThinkingPanel.vue';
+import { AI_COGNITIVE_THINKING_PRESETS } from '@/constants/ai/cognitive-thinking';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -117,6 +122,7 @@ const visible = computed({
 
 const generating = ref(false);
 const suggestedList = ref<any[]>([]);
+let generateAbortController: AbortController | null = null;
 
 const selectedCount = computed(() => {
   return suggestedList.value.filter(s => s.checked).length;
@@ -127,9 +133,19 @@ watch(
   val => {
     if (val && props.chapter) {
       generateSuggestions();
+    } else if (!val) {
+      abortGenerate();
     }
   }
 );
+
+function abortGenerate() {
+  if (generateAbortController) {
+    generateAbortController.abort();
+    generateAbortController = null;
+  }
+  generating.value = false;
+}
 
 function parseJsonArray<T = any>(rawText: string): T[] {
   if (!rawText) return [];
@@ -228,6 +244,8 @@ function deriveFallbackSections(chapTitle: string) {
 }
 
 async function generateSuggestions() {
+  abortGenerate();
+  generateAbortController = new AbortController();
   generating.value = true;
   suggestedList.value = [];
   const title = props.chapter?.title || '本教学章节';
@@ -258,10 +276,13 @@ async function generateSuggestions() {
 ]`;
 
   try {
-    const res = await askGlobalAssistant({
-      message: prompt,
-      courseId: props.chapter?.courseId
-    });
+    const res = await askGlobalAssistant(
+      {
+        message: prompt,
+        courseId: props.chapter?.courseId
+      },
+      { signal: generateAbortController.signal }
+    );
     const rawContent = res.data?.content || '';
     const parsed = parseJsonArray(rawContent);
     if (parsed.length > 0) {
@@ -277,11 +298,15 @@ async function generateSuggestions() {
     } else {
       throw new Error('未解析到结构化微课节大纲');
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    if (isAxiosError(err) && err.code === 'ERR_CANCELED') {
+      return;
+    }
     console.warn('AI 生成微课节异常，使用学科语义推导:', err);
     suggestedList.value = deriveFallbackSections(title);
     ElMessage.info(`已基于《${title}》学科知识图谱生成专业微课节`);
   } finally {
+    generateAbortController = null;
     generating.value = false;
   }
 }
@@ -325,21 +350,6 @@ function handleApply() {
     strong {
       color: #0F172A;
     }
-  }
-}
-
-.ai-generating-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 40px 0;
-  color: #2563EB;
-  font-size: 14px;
-  font-weight: 500;
-
-  .ai-spin-icon {
-    font-size: 20px;
   }
 }
 

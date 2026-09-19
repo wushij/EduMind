@@ -8,6 +8,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 public final class CourseAiContextBuilder {
@@ -48,6 +49,61 @@ public final class CourseAiContextBuilder {
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * 针对指定章节的考点提炼上下文（含同章已有考点与全课考点去重列表）。
+     */
+    public static String buildChapterSuggestContext(
+            CourseDetailVO course,
+            List<ChapterTreeVO> chapters,
+            List<KnowledgePointVO> knowledgePoints,
+            Long chapterId) {
+        StringBuilder sb = new StringBuilder(buildContext(course, chapters, knowledgePoints));
+        String chapterTitle = resolveChapterTitle(chapters, chapterId);
+        if (StringUtils.hasText(chapterTitle)) {
+            sb.append("目标章节：").append(chapterTitle).append('\n');
+        }
+        if (chapterId != null && !CollectionUtils.isEmpty(knowledgePoints)) {
+            String sameChapter = knowledgePoints.stream()
+                    .filter(kp -> Objects.equals(kp.getChapterId(), chapterId))
+                    .map(KnowledgePointVO::getTitle)
+                    .filter(StringUtils::hasText)
+                    .collect(Collectors.joining("；"));
+            if (StringUtils.hasText(sameChapter)) {
+                sb.append("本章已有考点（请勿重复）：").append(sameChapter).append('\n');
+            }
+        }
+        if (!CollectionUtils.isEmpty(knowledgePoints)) {
+            String allTitles = knowledgePoints.stream()
+                    .map(KnowledgePointVO::getTitle)
+                    .filter(StringUtils::hasText)
+                    .distinct()
+                    .collect(Collectors.joining("；"));
+            if (StringUtils.hasText(allTitles)) {
+                sb.append("全课已有考点（前置可引用标题）：").append(allTitles).append('\n');
+            }
+        }
+        return sb.toString();
+    }
+
+    private static String resolveChapterTitle(List<ChapterTreeVO> chapters, Long chapterId) {
+        if (chapterId == null || chapters == null) {
+            return null;
+        }
+        for (ChapterTreeVO node : chapters) {
+            if (node == null) {
+                continue;
+            }
+            if (Objects.equals(node.getId(), chapterId) && StringUtils.hasText(node.getTitle())) {
+                return node.getTitle();
+            }
+            String nested = resolveChapterTitle(node.getChildren(), chapterId);
+            if (StringUtils.hasText(nested)) {
+                return nested;
+            }
+        }
+        return null;
     }
 
     public static List<String> flattenChapterTitles(List<ChapterTreeVO> nodes) {

@@ -18,5 +18,8 @@ public class QuestionVO {
     private Integer difficulty;
     private Integer score;
     private Integer status;
+    private String knowledgePointName;
+    private String cognitiveLevel;
+    private String distractorAnalysis;
     private LocalDateTime createTime;
 }

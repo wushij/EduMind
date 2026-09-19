@@ -6,6 +6,8 @@ import com.edumind.course.dao.CourseDao;
 import com.edumind.course.dao.CourseMemberDao;
 import com.edumind.course.dao.KnowledgePointDao;
 import com.edumind.course.entity.CourseEntity;
+import com.edumind.course.entity.KnowledgePointEntity;
+import com.edumind.course.service.knowledge.KnowledgePointService;
 import com.edumind.course.service.query.CourseQueryService;
 import com.edumind.course.vo.CourseBriefVO;
 import com.edumind.course.vo.chapter.ChapterTreeVO;
@@ -31,6 +33,7 @@ public class CourseQueryServiceImpl implements CourseQueryService {
     private final KnowledgePointDao knowledgePointDao;
     private final CourseConverter courseConverter;
     private final UserQueryApi userQueryApi;
+    private final KnowledgePointService knowledgePointService;
 
     @Override
     public CourseDetailVO getCourseById(Long courseId) {
@@ -75,12 +78,16 @@ public class CourseQueryServiceImpl implements CourseQueryService {
 
     @Override
     public List<KnowledgePointVO> listKnowledgePointsByCourseId(Long courseId) {
-        return courseConverter.toKnowledgePointVOList(knowledgePointDao.findByCourseId(courseId, null));
+        return knowledgePointService.listByCourse(courseId, null);
     }
 
     @Override
     public KnowledgePointVO getKnowledgePointById(Long id) {
-        return courseConverter.toKnowledgePointVO(knowledgePointDao.findById(id));
+        KnowledgePointEntity entity = knowledgePointDao.findById(id);
+        if (entity == null || entity.getCourseId() == null) {
+            return null;
+        }
+        return knowledgePointService.getById(entity.getCourseId(), id);
     }
 
     @Override

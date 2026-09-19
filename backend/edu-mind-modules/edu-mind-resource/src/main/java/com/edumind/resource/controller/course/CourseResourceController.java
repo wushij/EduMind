@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -31,6 +32,16 @@ public class CourseResourceController {
     public ApiResult<Long> addCourseResource(@PathVariable("id") Long courseId,
                                              @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody com.edumind.resource.dto.course.CourseResourceCreateDTO dto) {
         return ApiResult.success(courseResourceService.addResource(courseId, dto));
+    }
+
+    @SaCheckPermission("course:edit")
+    @org.springframework.web.bind.annotation.PostMapping(value = "/{id}/resources/upload", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResult<Long> uploadCourseResource(@PathVariable("id") Long courseId,
+                                                @org.springframework.web.bind.annotation.RequestParam("file") MultipartFile file,
+                                                @org.springframework.web.bind.annotation.RequestParam(value = "title", required = false) String title,
+                                                @org.springframework.web.bind.annotation.RequestParam(value = "resourceType", required = false) String resourceType,
+                                                @org.springframework.web.bind.annotation.RequestParam(value = "chapterId", required = false) Long chapterId) {
+        return ApiResult.success(courseResourceService.uploadResource(courseId, file, title, resourceType, chapterId));
     }
 
     @SaCheckPermission("course:edit")

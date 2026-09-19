@@ -8,6 +8,13 @@ import { KBDocument } from '@/types/knowledge/document';
 import type { DocumentChunk } from '@/types/knowledge/chunk';
 import { parseKnowledgeBaseId } from '@/composables/knowledge/useKnowledgeRoute';
 import { normalizeKBDocument } from '@/utils/knowledge/document';
+import {
+  batchUploadMessage,
+  emptyBatchUploadResult,
+  type BatchUploadResult
+} from '@/utils/upload/coalesce-upload-files';
+
+export type { BatchUploadResult };
 
 export function useDocumentUpload(kbIdInput: MaybeRef<number | undefined>) {
   const kbId = computed(() => parseKnowledgeBaseId(unref(kbIdInput)));
@@ -31,13 +38,38 @@ export function useDocumentUpload(kbIdInput: MaybeRef<number | undefined>) {
   }
 
   async function upload(file: File) {
+    const result = await uploadMany([file]);
+    if (result.failed > 0) {
+      throw new Error(result.failedNames[0] || '文档上传失败');
+    }
+    return result.lastUploaded;
+  }
+
+  async function uploadMany(files: File[]): Promise<BatchUploadResult & { lastUploaded?: unknown }> {
     const id = kbId.value;
-    if (!id) return;
+    if (!id || files.length === 0) {
+      return { ...emptyBatchUploadResult(), lastUploaded: undefined };
+    }
+
     uploading.value = true;
+    const result: BatchUploadResult & { lastUploaded?: unknown } = {
+      ...emptyBatchUploadResult(),
+      lastUploaded: undefined
+    };
+
     try {
-      const res = await uploadDocument(id, file);
+      for (const file of files) {
+        try {
+          const res = await uploadDocument(id, file);
+          result.succeeded += 1;
+          result.lastUploaded = res.data;
+        } catch {
+          result.failed += 1;
+          result.failedNames.push(file.name);
+        }
+      }
       await fetchDocuments();
-      return res.data;
+      return result;
     } finally {
       uploading.value = false;
     }
@@ -72,6 +104,7 @@ export function useDocumentUpload(kbIdInput: MaybeRef<number | undefined>) {
     loading,
     fetchDocuments,
     upload,
+    uploadMany,
     remove,
     triggerParse,
     triggerRechunk,

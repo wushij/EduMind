@@ -12,10 +12,17 @@ const FENCED_CODE_BLOCK_RE = /(```[\s\S]*?```)/g;
 function looksLikeProseNotCode(inner: string): boolean {
   const t = inner.trim();
   if (!t) return false;
+
+  // 1. ASCII 字符画、流程图、框线图、表格结构保护：含有 +---+、框线字符或 |...| 管道结构者绝非散文
+  if (/\+[-=]{3,}\+/.test(t) || /^[ \t]*\+[-=]+[ \t]*$/m.test(t)) return false;
+  if (/^[ \t]*[┌├└│─┼]/m.test(t)) return false;
+  const linesWithPipes = t.split('\n').filter((l) => /^[ \t]*\|.*\|[ \t]*$/.test(l));
+  if (linesWithPipes.length >= 2) return false;
+
   const cn = (t.match(/[\u4e00-\u9fa5]/g) || []).length;
+  // 2. 仅当内容明确具有大段 Markdown 章节标题、带加粗列表等散文排版结构时，才判定为被误套围栏的讲义
   if (/^#{1,6}\s/m.test(t) && cn > 15) return true;
   if (/^\s*[-*]\s+\*\*/m.test(t) && cn > 30) return true;
-  if (cn > 90 && (t.match(/\n/g) || []).length >= 2) return true;
   if (/^#{1,3}\s+[\d一二三四五六七八九十]/m.test(t)) return true;
   return false;
 }
@@ -25,6 +32,10 @@ function unwrapProseCodeFences(text: string): string {
   return text.replace(/```([a-zA-Z0-9+#-]*)\s*\n([\s\S]*?)```/g, (full, lang: string, inner: string) => {
     const langLower = (lang || '').trim().toLowerCase();
     if (langLower && !['markdown', 'md', 'text', 'txt'].includes(langLower)) {
+      return full;
+    }
+    // 未标注语言的通用围栏默认是代码/ASCII图，仅当内部以 # 标题开头时才考虑解包
+    if (!langLower && !/^#{1,6}\s/m.test(inner.trim())) {
       return full;
     }
     if (looksLikeProseNotCode(inner)) {
@@ -434,6 +445,14 @@ function splitProseFromCodeBlocks(text: string): string {
   return text.replace(
     /(```[a-zA-Z0-9+#-]*\n)([\s\S]*?)(```|$)/g,
     (full, openFence: string, body: string, _closeFence: string) => {
+      // 保护 ASCII 字符框线、树状图与流程框：绝不可在字符画内部强行拆分
+      if (
+        /\+[-=]{3,}\+/.test(body) ||
+        /^[ \t]*\+[-=]+[ \t]*$/m.test(body) ||
+        /^[ \t]*[┌├└│─┼]/m.test(body)
+      ) {
+        return full;
+      }
       const lines = body.split('\n');
       if (lines.length < 3) return full;
 

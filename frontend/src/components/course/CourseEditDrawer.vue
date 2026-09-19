@@ -124,16 +124,22 @@
               </button>
             </div>
           </template>
-          <el-input
-            v-model="formData.description"
-            v-loading="descAiLoading"
-            type="textarea"
-            :rows="4"
-            placeholder="说明课程重点培养目标、前置学科要求与学习建议..."
-            maxlength="500"
-            show-word-limit
-            element-loading-text="AI 正在根据课程大纲撰写简介…"
-          />
+          <AiCognitiveThinkingSlot
+            :active="descAiLoading"
+            preset-key="courseDescription"
+            show-footer-actions
+            abort-label="中止帮写"
+            @abort="abortDescAi"
+          >
+            <el-input
+              v-model="formData.description"
+              type="textarea"
+              :rows="4"
+              placeholder="说明课程重点培养目标、前置学科要求与学习建议..."
+              maxlength="500"
+              show-word-limit
+            />
+          </AiCognitiveThinkingSlot>
         </el-form-item>
       </div>
 
@@ -202,6 +208,13 @@ import { suggestCourseDescription } from '@/api/ai/course-profile';
 import type { Course } from '@/types/course/course';
 import { useCourse } from '@/composables/course/useCourse';
 import { COURSE_CATEGORY_PRESETS } from '@/constants/course';
+import {
+  COURSE_AI_PERSONA_OPTIONS,
+  normalizeCourseAiPersona,
+  type CourseAiPersonaId
+} from '@/constants/course/ai-persona';
+import AiCognitiveThinkingSlot from '@/components/ai/common/AiCognitiveThinkingSlot.vue';
+import { isAxiosError } from 'axios';
 
 const courseCategoryPresets = COURSE_CATEGORY_PRESETS;
 
@@ -219,6 +232,7 @@ const { saveCourse } = useCourse();
 const formRef = ref<FormInstance>();
 const saving = ref(false);
 const descAiLoading = ref(false);
+let descAiAbortController: AbortController | null = null;
 
 const visible = computed({
   get: () => props.modelValue,
@@ -234,7 +248,7 @@ const formData = reactive({
   plannedHours: 48,
   status: 'ACTIVE',
   description: '',
-  aiPersona: 'SOCRATIC',
+  aiPersona: 'socrates' as CourseAiPersonaId,
   welcomeMessage: ''
 });
 
@@ -242,50 +256,57 @@ const formRules: FormRules = {
   name: [{ required: true, message: '课程名称不能为空', trigger: 'blur' }]
 };
 
-const personaList = [
-  {
-    key: 'SOCRATIC',
-    icon: Opportunity,
-    name: '苏格拉底启发式助教',
-    desc: '善于通过多轮递进发问引导学生自主推导答案，培养批判性思维'
-  },
-  {
-    key: 'STRICT',
-    icon: Reading,
-    name: '严谨治学学术导师',
-    desc: '注重数学严密性、定理定义准确性与学术学术范式规范'
-  },
-  {
-    key: 'PRACTICAL',
-    icon: Tools,
-    name: '一线工程实战导师',
-    desc: '从工业界工程踩坑、并发高可用、代码架构等视角深度剖析'
-  },
-  {
-    key: 'GENTLE',
-    icon: Sunny,
-    name: '温和鼓励引路人',
-    desc: '通俗易懂拆解晦涩概念，步步正向激励，适合初学者破冰'
-  }
-];
+const personaIconMap: Record<CourseAiPersonaId, typeof Opportunity> = {
+  socrates: Opportunity,
+  academic: Reading,
+  engineer: Tools,
+  gentle: Sunny
+};
+
+const personaList = COURSE_AI_PERSONA_OPTIONS.map(p => ({
+  key: p.id,
+  name: p.name,
+  desc: p.desc,
+  icon: personaIconMap[p.id]
+}));
+
+function applyCourseToForm(newCourse: Course) {
+  formData.name = newCourse.title || newCourse.name || '';
+  formData.code = newCourse.code || '';
+  formData.semester = newCourse.semester || '2026年秋季学期';
+  formData.category = newCourse.category || '计算机与软件';
+  formData.credits = Number(newCourse.credits) || 3.0;
+  formData.plannedHours = Number(newCourse.plannedHours) || 48;
+  formData.status = (newCourse.status === 'ARCHIVED' || newCourse.status === 2) ? 'ARCHIVED' : 'ACTIVE';
+  formData.description = newCourse.description || '';
+  formData.aiPersona = normalizeCourseAiPersona(newCourse.aiPersona);
+  formData.welcomeMessage = newCourse.welcomeMessage || '';
+}
 
 watch(
   () => props.course,
   newCourse => {
     if (!newCourse) return;
-    formData.name = newCourse.title || newCourse.name || '';
-    formData.code = newCourse.code || '';
-    formData.semester = newCourse.semester || '2026年秋季学期';
-    formData.category = newCourse.category || '计算机与软件';
-    formData.credits = Number(newCourse.credits) || 3.0;
-    formData.plannedHours = Number(newCourse.plannedHours) || 48;
-    formData.status = (newCourse.status === 'ARCHIVED' || newCourse.status === 2) ? 'ARCHIVED' : 'ACTIVE';
-    formData.description = newCourse.description || '';
-    formData.aiPersona = newCourse.aiPersona || 'SOCRATIC';
-    formData.welcomeMessage = newCourse.welcomeMessage || '';
+    applyCourseToForm(newCourse);
   },
   { immediate: true }
 );
+
+watch(visible, open => {
+  if (open && props.course) {
+    applyCourseToForm(props.course);
+  } else if (!open) {
+    abortDescAi();
+  }
+});
+
+function abortDescAi() {
+  if (descAiAbortController) {
+    descAiAbortController.abort();
+    descAiAbortController = null;
+  }
+  descAiLoading.value = false;
+}
 
 async function handleAiDescription() {
   if (!props.course?.id) return;
@@ -300,9 +321,13 @@ async function handleAiDescription() {
       return;
     }
   }
+  abortDescAi();
+  descAiAbortController = new AbortController();
   descAiLoading.value = true;
   try {
-    const res = await suggestCourseDescription(props.course.id);
+    const res = await suggestCourseDescription(props.course.id, {
+      signal: descAiAbortController.signal
+    });
     const payload = res?.data;
     const text = payload?.text?.trim();
     if (!text) {
@@ -316,6 +341,9 @@ async function handleAiDescription() {
         : '模型暂不可用，已使用课程上下文兜底生成简介'
     );
   } catch (err: unknown) {
+    if (isAxiosError(err) && err.code === 'ERR_CANCELED') {
+      return;
+    }
     const msg =
       (err as { message?: string })?.message ||
       (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -323,6 +351,7 @@ async function handleAiDescription() {
       ElMessage.error(msg);
     }
   } finally {
+    descAiAbortController = null;
     descAiLoading.value = false;
   }
 }

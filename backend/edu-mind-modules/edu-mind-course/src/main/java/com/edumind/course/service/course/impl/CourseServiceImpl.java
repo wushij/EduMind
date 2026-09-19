@@ -13,6 +13,8 @@ import com.edumind.course.dto.course.CourseCreateDTO;
 import com.edumind.course.dto.course.CourseQueryDTO;
 import com.edumind.course.dto.course.CourseUpdateDTO;
 import com.edumind.course.dto.knowledge.KnowledgePointCreateDTO;
+import com.edumind.course.dto.knowledge.KnowledgePointUpdateDTO;
+import com.edumind.course.service.knowledge.KnowledgePointService;
 import com.edumind.course.entity.ChapterEntity;
 import com.edumind.course.entity.CourseEntity;
 import com.edumind.course.entity.CourseMemberEntity;
@@ -53,6 +55,7 @@ public class CourseServiceImpl implements CourseService {
     private final TenantDataScopeApi tenantDataScopeApi;
     private final OrganizationQueryApi organizationQueryApi;
     private final CourseAccessService courseAccessService;
+    private final KnowledgePointService knowledgePointService;
 
     @Override
     public PageResult<CourseVO> listCourses(CourseQueryDTO query) {
@@ -225,42 +228,27 @@ public class CourseServiceImpl implements CourseService {
 
     @Override
     public List<KnowledgePointVO> listKnowledgePoints(Long courseId, Long chapterId) {
-        CourseEntity course = courseDao.findById(courseId);
-        if (course == null) {
-            throw new BusinessException("课程不存在");
-        }
-        assertCourseAccessible(course);
-        return courseConverter.toKnowledgePointVOList(
-                knowledgePointDao.findByCourseId(courseId, chapterId));
+        return knowledgePointService.listByCourse(courseId, chapterId);
+    }
+
+    @Override
+    public KnowledgePointVO getKnowledgePoint(Long courseId, Long kpId) {
+        return knowledgePointService.getById(courseId, kpId);
     }
 
     @Override
     public KnowledgePointVO createKnowledgePoint(Long courseId, KnowledgePointCreateDTO dto) {
-        CourseEntity course = courseDao.findById(courseId);
-        if (course == null) {
-            throw new BusinessException("课程不存在");
-        }
-        assertCourseEditable(course);
+        return knowledgePointService.create(courseId, dto);
+    }
 
-        KnowledgePointEntity entity = new KnowledgePointEntity();
-        entity.setCourseId(courseId);
-        entity.setChapterId(dto.getChapterId());
-        entity.setTitle(dto.getTitle().trim());
-        entity.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
-        entity.setCreateTime(LocalDateTime.now());
-
-        knowledgePointDao.insert(entity);
-        return courseConverter.toKnowledgePointVO(entity);
+    @Override
+    public KnowledgePointVO updateKnowledgePoint(Long courseId, Long kpId, KnowledgePointUpdateDTO dto) {
+        return knowledgePointService.update(courseId, kpId, dto);
     }
 
     @Override
     public void deleteKnowledgePoint(Long courseId, Long kpId) {
-        CourseEntity course = courseDao.findById(courseId);
-        if (course == null) {
-            throw new BusinessException("课程不存在");
-        }
-        assertCourseEditable(course);
-        knowledgePointDao.deleteById(kpId);
+        knowledgePointService.delete(courseId, kpId);
     }
 
     @Override

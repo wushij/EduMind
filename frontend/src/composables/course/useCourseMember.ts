@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 import { getCourseMembers, addCourseMember, removeCourseMember } from '@/api/course/member';
-import { getCourseResources, createCourseResource, deleteCourseResource } from '@/api/course/resource';
+import { getCourseResources, createCourseResource, uploadCourseResource, deleteCourseResource } from '@/api/course/resource';
 import type { CourseMemberItem } from '@/types/course/member';
 import type { CourseResourceItem } from '@/types/course/resource';
 
@@ -62,6 +62,14 @@ export function useCourseMember(courseId: number) {
     await fetchResources();
   }
 
+  async function uploadResource(
+    file: File,
+    data: { title: string; resourceType?: string; chapterId?: number }
+  ) {
+    await uploadCourseResource(courseId, file, data);
+    await fetchResources();
+  }
+
   async function deleteResource(resourceId: number) {
     await deleteCourseResource(courseId, resourceId);
     resources.value = resources.value.filter(r => r.id !== resourceId);
@@ -77,6 +85,7 @@ export function useCourseMember(courseId: number) {
     removeMember,
     fetchResources,
     createResource,
+    uploadResource,
     deleteResource
   };
 }

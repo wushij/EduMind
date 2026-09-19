@@ -8,13 +8,18 @@ import com.edumind.course.entity.CourseEntity;
 import com.edumind.course.entity.CourseMemberEntity;
 import com.edumind.course.service.access.CourseAccessService;
 import com.edumind.course.service.member.CourseMemberService;
+import com.edumind.course.vo.member.CourseMemberCandidateVO;
 import com.edumind.course.vo.member.CourseMemberVO;
 import com.edumind.system.api.UserQueryApi;
 import com.edumind.system.vo.user.UserBriefVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,6 +40,47 @@ public class CourseMemberServiceImpl implements CourseMemberService {
         courseAccessService.assertCanView(course);
         return courseMemberDao.findByCourseId(courseId).stream()
                 .map(this::toMemberVO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<CourseMemberCandidateVO> searchCandidates(Long courseId, String keyword) {
+        CourseEntity course = courseDao.findById(courseId);
+        if (course == null) {
+            throw new BusinessException("课程不存在");
+        }
+        courseAccessService.assertCanEdit(course);
+        if (!StringUtils.hasText(keyword) || keyword.trim().length() < 1) {
+            return List.of();
+        }
+        String kw = keyword.trim();
+        List<Long> matchedIds = userQueryApi.findUserIdsByKeyword(kw);
+        if (matchedIds.isEmpty()) {
+            return List.of();
+        }
+        Long tenantId = course.getTenantId();
+        if (tenantId != null && tenantId > 0) {
+            Set<Long> tenantUserIds = new HashSet<>(userQueryApi.listActiveUserIdsByTenantId(tenantId));
+            matchedIds = matchedIds.stream()
+                    .filter(tenantUserIds::contains)
+                    .limit(20)
+                    .collect(Collectors.toList());
+        } else {
+            matchedIds = matchedIds.stream().limit(20).collect(Collectors.toList());
+        }
+        Set<Long> existingMemberUserIds = courseMemberDao.findByCourseId(courseId).stream()
+                .map(CourseMemberEntity::getUserId)
+                .collect(Collectors.toSet());
+        return matchedIds.stream()
+                .filter(id -> !existingMemberUserIds.contains(id))
+                .map(userQueryApi::getUserById)
+                .filter(Objects::nonNull)
+                .map(user -> CourseMemberCandidateVO.builder()
+                        .userId(user.getId())
+                        .username(user.getUsername())
+                        .realName(user.getRealName())
+                        .avatar(user.getAvatar())
+                        .build())
                 .collect(Collectors.toList());
     }
 

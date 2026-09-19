@@ -275,7 +275,32 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
             sb.append("\n\n").append(learn ? "学生提问: " : "教师提问: ").append(base);
             return sb.toString();
         }
+        if (isQuestionBankContext(module)) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("[题库题目辅导上下文]");
+            sb.append("\n说明: 用户正在针对下方完整试题进行学习或备课辅导。请结合题干、选项、参考答案与解析讲解思路；");
+            sb.append("若用户未明确要求对答案，优先引导思考而非直接报答案。");
+            if (dto.getQuestionId() != null) {
+                sb.append("\n题目ID: ").append(dto.getQuestionId());
+            }
+            if (dto.getCourseId() != null) {
+                sb.append("\n课程ID: ").append(dto.getCourseId());
+            }
+            String stemHint = StringUtils.hasText(dto.getDraftTitle()) ? dto.getDraftTitle() : dto.getDraftDescription();
+            if (StringUtils.hasText(stemHint)) {
+                sb.append("\n题干摘要: ").append(truncate(stemHint, 200));
+            }
+            if (StringUtils.hasText(dto.getDraftExcerpt())) {
+                sb.append("\n\n【完整题目信息】\n").append(dto.getDraftExcerpt().trim());
+            }
+            sb.append("\n\n用户提问: ").append(base);
+            return sb.toString();
+        }
         return base;
+    }
+
+    private boolean isQuestionBankContext(String module) {
+        return "question_bank".equalsIgnoreCase(module);
     }
 
     private boolean isLessonTeachingContext(String module) {

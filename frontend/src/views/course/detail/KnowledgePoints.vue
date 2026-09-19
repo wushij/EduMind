@@ -1,5 +1,5 @@
 <template>
-  <KnowledgePointPanel :editable="courseEditable" />
+  <KnowledgePointPanel :editable="courseEditable" :course="course" />
 </template>
 
 <script setup lang="ts">

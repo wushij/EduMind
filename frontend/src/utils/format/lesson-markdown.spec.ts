@@ -47,4 +47,24 @@ System.out.println("Hello, Java!");
     expect(html).toContain('<li>');
     expect(html).not.toMatch(/<p>- 能够/);
   });
+
+  it('preserves ASCII box diagrams in code fences without mangling into tables', () => {
+    const md = `\`\`\`
+JVM 运行时数据区域（Runtime Data Area）物理划分：
++-------------------------------------------------------------------------+
+|                              JVM 进程内存空间                            |
++-------------------------------------------------------------------------+
+| [线程共享区域]                                                           |
+|  1. 方法区 (Method Area / Metaspace) : 存储类元数据、常量池、静态变量    |
+|  2. 堆内存 (Heap Space)              : 存储全量 new 出来的对象实例与数组 |
+|     - 新生代 (Eden, Survivor S0, S1)                                    |
+|     - 老年代 (Tenured / Old Gen)                                        |
++-------------------------------------------------------------------------+
+\`\`\``;
+    const html = renderLessonMarkdown(md);
+    expect(html).toContain('<pre');
+    expect(html).toContain('JVM 进程内存空间');
+    // Must NOT be parsed into a <table>
+    expect(html).not.toContain('<table');
+  });
 });

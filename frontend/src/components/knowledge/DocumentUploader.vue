@@ -2,10 +2,12 @@
   <div class="document-uploader" :class="{ 'document-uploader--uploading': uploading }">
     <el-upload
       drag
+      multiple
       :auto-upload="false"
       :show-file-list="false"
       :disabled="uploading"
       :on-change="handleFileChange"
+      accept=".pdf,.doc,.docx,.md,.markdown,.txt"
       class="upload-dropzone"
     >
       <div class="upload-inner">
@@ -16,7 +18,9 @@
         <p class="upload-title">
           {{ uploading ? '正在上传文档…' : '拖拽文件到此处，或点击上传' }}
         </p>
-        <p class="upload-subtitle">支持 PDF / Word / Markdown，单文件建议不超过 50MB</p>
+        <p class="upload-subtitle">
+          支持 PDF / Word / Markdown，可多选或拖入多个文件，单文件建议不超过 50MB
+        </p>
       </div>
     </el-upload>
   </div>
@@ -25,16 +29,21 @@
 <script setup lang="ts">
 import { Loading, UploadFilled } from '@element-plus/icons-vue';
 import type { UploadFile } from 'element-plus';
+import { createUploadFileBatcher } from '@/utils/upload/coalesce-upload-files';
 
 defineProps<{
   uploading?: boolean;
 }>();
 
-const emit = defineEmits<{ 'select-file': [file: File] }>();
+const emit = defineEmits<{ 'select-files': [files: File[]] }>();
+
+const enqueueFiles = createUploadFileBatcher((files) => {
+  emit('select-files', files);
+});
 
 function handleFileChange(file: UploadFile) {
   if (!file.raw) return;
-  emit('select-file', file.raw);
+  enqueueFiles(file.raw);
 }
 </script>
 

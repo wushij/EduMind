@@ -10,6 +10,7 @@ import { getCourseList } from '@/api/course/course';
 import { QuestionItem } from '@/types/question/question';
 import type { Course } from '@/types/course/course';
 import { normalizeQuestion, normalizeQuestionList } from '@/utils/question/normalize-question';
+import { isGarbageQuestionStem } from '@/utils/question/is-garbage-question-stem';
 
 export async function fetchCoursesForForm(pageSize = 50): Promise<Course[]> {
   const res = await getCourseList({ page: 1, pageSize });
@@ -26,8 +27,12 @@ export function useQuestion() {
     loading.value = true;
     try {
       const res = await getQuestions(params);
-      questions.value = normalizeQuestionList(res.data?.list || []);
-      total.value = res.data?.total ?? questions.value.length;
+      const list = normalizeQuestionList(res.data?.list || []).filter(
+        (q) => !isGarbageQuestionStem(q.stem)
+      );
+      questions.value = list;
+      const apiTotal = Number(res.data?.total);
+      total.value = Number.isFinite(apiTotal) && apiTotal >= 0 ? apiTotal : questions.value.length;
     } catch (err) {
       questions.value = [];
       total.value = 0;
@@ -51,7 +56,7 @@ export function useQuestion() {
     return currentQuestion.value;
   }
 
-  async function saveQuestion(data: Partial<QuestionItem>, id?: number) {
+  async function saveQuestion(data: Partial<QuestionItem>, id?: number | string) {
     if (id) {
       await updateQuestion(id, data);
     } else {
@@ -59,10 +64,10 @@ export function useQuestion() {
     }
   }
 
-  async function removeQuestion(id: number) {
+  async function removeQuestion(id: number | string) {
     await deleteQuestion(id);
-    questions.value = questions.value.filter(q => q.id !== id);
-    total.value = questions.value.length;
+    questions.value = questions.value.filter(q => String(q.id) !== String(id));
+    total.value = Math.max(0, total.value - 1);
   }
 
   async function loadCourseOptions() {

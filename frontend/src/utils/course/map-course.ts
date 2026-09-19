@@ -1,4 +1,5 @@
 import { Course, CourseStatus } from '@/types/course/course';
+import { normalizeCourseAiPersona } from '@/constants/course/ai-persona';
 
 export function normalizeCourseStatus(status: unknown): CourseStatus {
   if (status === 1 || status === 'ACTIVE') {
@@ -53,7 +54,7 @@ export function mapCourse(raw: Record<string, any>): Course {
     category: raw.category || '计算机与软件',
     credits: raw.credits != null ? Number(raw.credits) : 3.0,
     plannedHours: raw.plannedHours != null ? Number(raw.plannedHours) : 48,
-    aiPersona: raw.aiPersona || 'socrates',
+    aiPersona: normalizeCourseAiPersona(raw.aiPersona as string | undefined),
     welcomeMessage: raw.welcomeMessage || '',
     description: raw.description,
     createdAt: raw.createdAt,

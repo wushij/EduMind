@@ -53,4 +53,18 @@ public class ResourceDao {
         }
         return resourceMapper.selectList(wrapper);
     }
+
+    public int insert(ResourceEntity entity) {
+        if (entity == null) {
+            return 0;
+        }
+        return resourceMapper.insert(entity);
+    }
+
+    public int deleteById(Long id) {
+        if (id == null) {
+            return 0;
+        }
+        return resourceMapper.deleteById(id);
+    }
 }

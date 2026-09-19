@@ -28,7 +28,7 @@
         <div id="kb-doc-upload">
           <DocumentUploader
             :uploading="uploading"
-            @select-file="handleUpload"
+            @select-files="handleUploadFiles"
           />
         </div>
 
@@ -59,17 +59,26 @@ import { Document, Refresh } from '@element-plus/icons-vue';
 import DocumentUploader from '@/components/knowledge/DocumentUploader.vue';
 import DocumentTable from '@/components/knowledge/DocumentTable.vue';
 import { useDocumentUpload } from '@/composables/knowledge/useDocumentUpload';
+import { batchUploadMessage } from '@/utils/upload/coalesce-upload-files';
 import { useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
 
 const router = useRouter();
 const { kbId } = useKnowledgeRoute();
-const { documents, loading, uploading, fetchDocuments, upload, remove, triggerParse, triggerRechunk } =
+const { documents, loading, uploading, fetchDocuments, uploadMany, remove, triggerParse, triggerRechunk } =
   useDocumentUpload(kbId);
 
-async function handleUpload(file: File) {
+async function handleUploadFiles(files: File[]) {
+  if (files.length === 0) return;
   try {
-    await upload(file);
-    ElMessage.success('文档上传成功');
+    const result = await uploadMany(files);
+    const { level, text } = batchUploadMessage(result, '文档');
+    if (level === 'success') {
+      ElMessage.success(text);
+    } else if (level === 'warning') {
+      ElMessage.warning(text);
+    } else {
+      ElMessage.error(text);
+    }
   } catch {
     ElMessage.error('文档上传失败');
   }

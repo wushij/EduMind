@@ -777,8 +777,16 @@ function looksLikePlainHierarchyDiagram(code: string): boolean {
   const t = code.trim();
   if (!t || /(?:^|\n)\s*(?:graph|flowchart)\s/im.test(t)) return false;
   if (/(?:-->|==>)/.test(t)) return false;
+  // ASCII 框线图、表格或流程框绝不属于平铺层级结构（应保留等宽代码框）
+  if (/\+[-=]{3,}\+/.test(t) || /^[ \t]*\|.*\|[ \t]*$/m.test(t)) return false;
+  if (/[┌├└│─┼]/.test(t)) return false;
+
   const lines = t.split('\n').map((l) => l.trim()).filter(Boolean);
   if (lines.length < 2 || lines.length > 24) return false;
+  // 必须具有子级列表缩进或连字符特征
+  const hasIndentOrBullet = lines.some((l) => /^[-*•]\s+/.test(l) || /^[ \t]{2,}/.test(l));
+  if (!hasIndentOrBullet) return false;
+
   const joined = lines.join(' ');
   return /(?:JDK|JRE|JVM|字节码)/.test(joined);
 }

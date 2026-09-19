@@ -700,9 +700,14 @@ onMounted(() => {
     box-sizing: border-box;
   }
 
-  // AI 助教页：精简顶栏并保留充足底部呼吸空间
+  // AI 助教页：精简顶栏并自适应撑满高度，消除底部多余空白
   &.course-detail-container--ai {
     gap: 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
 
     .course-hero-header {
       display: none;
@@ -713,8 +718,22 @@ onMounted(() => {
     }
 
     .course-subview-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      height: 100%;
       width: 100%;
       min-width: 0;
+
+      .course-subview-router,
+      .course-subview-inner {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+      }
     }
   }
 

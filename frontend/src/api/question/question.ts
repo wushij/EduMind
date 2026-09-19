@@ -5,14 +5,14 @@ import { PageResult } from '@/types/common/api';
 export const getQuestions = (params?: Record<string, any>) =>
   get<PageResult<QuestionItem>>('/questions', params);
 
-export const getQuestionDetail = (id: number) => get<QuestionItem>(`/questions/${id}`);
+export const getQuestionDetail = (id: number | string) => get<QuestionItem>(`/questions/${id}`);
 
-export const createQuestion = (data: Partial<QuestionItem>) => post<number>('/questions', data);
+export const createQuestion = (data: Partial<QuestionItem>) => post<number | string>('/questions', data);
 
-export const updateQuestion = (id: number, data: Partial<QuestionItem>) =>
+export const updateQuestion = (id: number | string, data: Partial<QuestionItem>) =>
   put<void>(`/questions/${id}`, data);
 
-export const deleteQuestion = (id: number) => del<void>(`/questions/${id}`);
+export const deleteQuestion = (id: number | string) => del<void>(`/questions/${id}`);
 
-export const batchSaveQuestions = (courseId: number, questions: Partial<QuestionItem>[]) =>
-  post<{ savedCount: number; questionIds: number[] }>('/questions/batch', { courseId, questions });
+export const batchSaveQuestions = (courseId: number | string, questions: Partial<QuestionItem>[]) =>
+  post<{ savedCount: number; questionIds: (number | string)[] }>('/questions/batch', { courseId, questions });

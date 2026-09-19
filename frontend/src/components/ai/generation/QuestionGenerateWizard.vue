@@ -19,7 +19,11 @@
         :form-state="formState"
         :current-course-chapters="currentCourseChapters"
         :available-knowledge-points="availableKnowledgePoints"
+        :loading-chapters="loadingChapters"
+        :loading-kps="loadingKps"
         @toggle-chapter="$emit('toggle-chapter', $event)"
+        @select-all-chapters="$emit('select-all-chapters')"
+        @clear-chapters="$emit('clear-chapters')"
         @toggle-kp="$emit('toggle-kp', $event)"
       />
 
@@ -62,7 +66,12 @@ import QuestionGenerateStepTypeDifficulty from './QuestionGenerateStepTypeDiffic
 import QuestionGenerateStepCount from './QuestionGenerateStepCount.vue';
 import QuestionGenerateStepConfirm from './QuestionGenerateStepConfirm.vue';
 import QuestionGenerateFooterNav from './QuestionGenerateFooterNav.vue';
-import type { DifficultyOption, QuestionGenerateFormState, QuestionTypeOption } from './question-generate-types';
+import type {
+  DifficultyOption,
+  QuestionGenerateFormState,
+  QuestionTypeOption,
+  KnowledgePointItem
+} from './question-generate-types';
 import type { QuestionType } from '@/mock/questions';
 
 defineProps<{
@@ -72,7 +81,9 @@ defineProps<{
   displayCourses: any[];
   formState: QuestionGenerateFormState;
   currentCourseChapters: any[];
-  availableKnowledgePoints: string[];
+  availableKnowledgePoints: KnowledgePointItem[];
+  loadingChapters?: boolean;
+  loadingKps?: boolean;
   typeOptions: QuestionTypeOption[];
   difficultyOptions: DifficultyOption[];
   selectedCourseName: string;
@@ -83,7 +94,9 @@ defineEmits<{
   back: [];
   'go-to-step': [index: number];
   'toggle-chapter': [id: number];
-  'toggle-kp': [kp: string];
+  'select-all-chapters': [];
+  'clear-chapters': [];
+  'toggle-kp': [kp: KnowledgePointItem];
   'toggle-type': [type: QuestionType];
   prev: [];
   next: [];
@@ -95,6 +108,10 @@ defineEmits<{
 @use '@/styles/ai-teaching-page-shell.scss';
 
 .wizard-body-card {
-  /* surface from ai-teaching-surface-card */
+  padding: 32px;
+  border-radius: 24px;
+  background: #FFFFFF;
+  border: 1px solid #EBF1F7;
+  box-shadow: 0 4px 24px rgba(30, 80, 160, 0.05);
 }
 </style>

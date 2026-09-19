@@ -17,6 +17,10 @@ import { getCourseResources } from '@/api/course/resource';
 import { resolveChatModels } from '@/services/ai/chat-service';
 import { useAIStream } from '@/composables/ai/useAIStream';
 import { usePreferenceStore } from '@/stores/user/preference';
+import {
+  getCourseAiPersonaPromptPrefix,
+  normalizeCourseAiPersona
+} from '@/constants/course/ai-persona';
 
 export interface ChapterNode {
   id: number;
@@ -347,7 +351,15 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
   const welcomeMessage = computed(() => {
     const custom = course.value?.welcomeMessage;
     const persona = course.value?.aiPersona;
-    const personaPrefix = persona === 'academic' ? '【严谨学术推导型】' : (persona === 'engineer' ? '【工程实战导师型】' : '【苏格拉底启发型】');
+    const personaId = normalizeCourseAiPersona(persona);
+    const personaPrefix =
+      personaId === 'academic'
+        ? '【严谨学术推导型】'
+        : personaId === 'engineer'
+          ? '【工程实战导师型】'
+          : personaId === 'gentle'
+            ? '【温和鼓励引路人】'
+            : '【苏格拉底启发型】';
     return {
       id: 'welcome',
       role: 'assistant' as const,
@@ -391,12 +403,7 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
   }
 
   function getPersonaPromptPrefix(persona?: string) {
-    if (persona === 'academic') {
-      return '[助教风格: 严谨学术推导型，强调数理严密性与学术定理推导] ';
-    } else if (persona === 'engineer') {
-      return '[助教风格: 工程实战导师型，强调工业落地、代码排错与系统架构] ';
-    }
-    return '[助教风格: 苏格拉底启发型，善用反问引导、步步启发自主思考] ';
+    return getCourseAiPersonaPromptPrefix(persona);
   }
 
   function handleSend(promptText: string) {

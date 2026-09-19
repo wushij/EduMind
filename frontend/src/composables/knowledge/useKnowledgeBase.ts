@@ -1,6 +1,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
+import type { UploadFile, UploadFiles } from 'element-plus';
 import {
   getKnowledgeBases,
   getKnowledgeBaseDetail,
@@ -8,7 +9,9 @@ import {
   updateKnowledgeBase,
   deleteKnowledgeBase
 } from '@/api/knowledge/knowledge-base';
+import { uploadDocument } from '@/api/knowledge/document';
 import { getCourseList } from '@/api/course/course';
+import { batchUploadMessage, emptyBatchUploadResult } from '@/utils/upload/coalesce-upload-files';
 import { KnowledgeBase } from '@/types/knowledge/knowledge-base';
 import type { Course } from '@/types/course/course';
 import { mapKnowledgeBaseVectorStatus } from '@/utils/knowledge/knowledge-base-status';
@@ -88,6 +91,7 @@ export function useKnowledgeBaseCreate() {
   const formRef = ref<FormInstance>();
   const submitting = ref(false);
   const courses = ref<Course[]>([]);
+  const initialUploadFiles = ref<File[]>([]);
 
   const formData = reactive({
     name: '',
@@ -113,6 +117,52 @@ export function useKnowledgeBaseCreate() {
     }
   }
 
+  function syncInitialUploadFiles(uploadFiles: UploadFiles) {
+    const files: File[] = [];
+    for (const item of uploadFiles) {
+      if (item.raw) {
+        files.push(item.raw);
+      }
+    }
+    initialUploadFiles.value = files;
+  }
+
+  function handleInitialUploadChange(_uploadFile: UploadFile, uploadFiles: UploadFiles) {
+    syncInitialUploadFiles(uploadFiles);
+  }
+
+  function handleInitialUploadRemove(_uploadFile: UploadFile, uploadFiles: UploadFiles) {
+    syncInitialUploadFiles(uploadFiles);
+  }
+
+  function resolveCreatedKnowledgeBaseId(data: unknown): number | undefined {
+    if (typeof data === 'number' && Number.isFinite(data)) {
+      return data;
+    }
+    if (data && typeof data === 'object' && 'id' in data) {
+      const id = Number((data as { id?: unknown }).id);
+      return Number.isFinite(id) ? id : undefined;
+    }
+    return undefined;
+  }
+
+  async function uploadInitialDocuments(knowledgeBaseId: number) {
+    if (initialUploadFiles.value.length === 0) {
+      return emptyBatchUploadResult();
+    }
+    const result = { ...emptyBatchUploadResult() };
+    for (const file of initialUploadFiles.value) {
+      try {
+        await uploadDocument(knowledgeBaseId, file);
+        result.succeeded += 1;
+      } catch {
+        result.failed += 1;
+        result.failedNames.push(file.name);
+      }
+    }
+    return result;
+  }
+
   async function handleSubmit() {
     if (!formRef.value) return;
     await formRef.value.validate(async (valid) => {
@@ -120,17 +170,26 @@ export function useKnowledgeBaseCreate() {
       submitting.value = true;
       try {
         const res = await createKnowledgeBase(formData);
-        const newId = res.data || 1;
-        ElMessage.success('知识库已成功创建！正在为您跳转到文档维护详情页...');
+        const newId = resolveCreatedKnowledgeBaseId(res.data) ?? 1;
+        const uploadResult = await uploadInitialDocuments(newId);
+        if (uploadResult.succeeded + uploadResult.failed > 0) {
+          const { level, text } = batchUploadMessage(uploadResult, '初始文档');
+          if (level === 'success') {
+            ElMessage.success(`知识库已创建，${text}`);
+          } else if (level === 'warning') {
+            ElMessage.warning(`知识库已创建，${text}`);
+          } else {
+            ElMessage.warning(`知识库已创建，但${text}`);
+          }
+        } else {
+          ElMessage.success('知识库已成功创建！正在为您跳转到文档维护详情页...');
+        }
         setTimeout(() => {
           router.push(`/knowledge/${newId}`);
         }, 600);
       } catch (err) {
         console.error(err);
-        ElMessage.success('知识库已成功创建！');
-        setTimeout(() => {
-          router.push('/knowledge');
-        }, 600);
+        ElMessage.error('知识库创建失败，请稍后重试');
       } finally {
         submitting.value = false;
       }
@@ -146,6 +205,9 @@ export function useKnowledgeBaseCreate() {
     courses,
     formData,
     rules,
+    initialUploadFiles,
+    handleInitialUploadChange,
+    handleInitialUploadRemove,
     loadCourses,
     handleSubmit
   };

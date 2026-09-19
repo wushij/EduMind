@@ -53,6 +53,7 @@ import { computed } from 'vue';
 import { Document, Reading } from '@element-plus/icons-vue';
 import type { Course } from '@/types/course/course';
 import type { CourseCapabilityTagVO } from '@/types/course/overview';
+import { getCourseAiPersonaLabel } from '@/constants/course/ai-persona';
 
 const props = defineProps<{
   course?: Course | null;
@@ -64,10 +65,8 @@ const emit = defineEmits<{ 'edit-profile': [] }>();
 
 const personaLabel = computed(() => {
   const p = props.course?.aiPersona;
-  if (p === 'academic') return '严谨学术推导型';
-  if (p === 'engineer') return '工程实战导师型';
-  if (p === 'socrates') return '苏格拉底启发型';
-  return '';
+  if (!p) return '';
+  return getCourseAiPersonaLabel(p);
 });
 
 function toneClass(tone?: string) {

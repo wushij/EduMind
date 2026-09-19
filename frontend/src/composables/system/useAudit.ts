@@ -44,7 +44,10 @@ export function getSceneLabel(scene?: string) {
     GRADING: '作业批改 (GRADING)',
     AGENT: '智能体协作 (AGENT)',
     GLOBAL_ASSISTANT: '全局助手 (ASSISTANT)',
-    QUESTION_GENERATE: '智能出题 (QUESTION)'
+    QUESTION_GENERATE: '智能出题 (QUESTION)',
+    COURSE_OBJECTIVE: '课程教学目标 AI 推荐',
+    COURSE_DESCRIPTION: '课程简介 AI 生成',
+    COURSE_KNOWLEDGE_POINT: '课程知识点 AI 推荐'
   };
   return map[s] || scene;
 }

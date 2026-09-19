@@ -130,6 +130,9 @@
             action="#"
             multiple
             :auto-upload="false"
+            :on-change="handleInitialUploadChange"
+            :on-remove="handleInitialUploadRemove"
+            accept=".pdf,.doc,.docx,.md,.markdown,.txt"
             class="kb-uploader"
           >
             <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
@@ -138,7 +141,7 @@
             </div>
             <template #tip>
               <div class="el-upload__tip">
-                支持 .pdf, .docx, .md, .txt 格式，单文件不超过 50MB。创建后系统将自动进行内容解析与向量化。
+                支持 .pdf、.docx、.md、.txt 等格式，可多选上传，单文件不超过 50MB。创建后将自动入库并开始解析与向量化。
               </div>
             </template>
           </el-upload>
@@ -167,7 +170,17 @@
 import { ArrowLeft, UploadFilled, Collection, Promotion } from '@element-plus/icons-vue';
 import { useKnowledgeBaseCreate } from '@/composables/knowledge/useKnowledgeBase';
 
-const { router, formRef, submitting, courses, formData, rules, handleSubmit } = useKnowledgeBaseCreate();
+const {
+  router,
+  formRef,
+  submitting,
+  courses,
+  formData,
+  rules,
+  handleInitialUploadChange,
+  handleInitialUploadRemove,
+  handleSubmit
+} = useKnowledgeBaseCreate();
 </script>
 
 <style scoped lang="scss">

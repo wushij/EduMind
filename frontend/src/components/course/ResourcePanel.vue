@@ -1,7 +1,8 @@
 <template>
   <div class="course-resources-page">
-    <!-- 1. 顶部指标概览栏 (长圆指标卡片) -->
-    <div class="resources-stat-overview">
+    <div class="resources-panel-card">
+      <!-- 1. 顶部指标概览栏 -->
+      <div class="resources-stat-overview">
       <div class="stat-capsule-card">
         <div class="stat-icon-circle stat-icon-circle--blue">
           <el-icon><FolderOpened /></el-icon>
@@ -41,10 +42,12 @@
           <span class="stat-desc">已入 RAG 向量知识库</span>
         </div>
       </div>
-    </div>
+      </div>
 
-    <!-- 2. 长圆跑道工具栏与胶囊分类筛选 -->
-    <div class="resources-toolbar-panel">
+      <div class="resources-panel-divider" aria-hidden="true" />
+
+      <!-- 2. 筛选工具栏 -->
+      <div class="resources-toolbar-panel">
       <!-- 胶囊分类选择器 -->
       <div class="pill-filter-tabs">
         <button
@@ -88,37 +91,37 @@
           <span>上传教学课件</span>
         </button>
       </div>
-    </div>
+      </div>
 
-    <!-- 3. 资源卡片网格列表 -->
-    <div v-loading="resourceLoading" class="resources-list-container">
-      <div v-if="filteredResources.length > 0" class="resources-grid">
-        <div
-          v-for="item in filteredResources"
-          :key="item.id"
-          class="resource-card"
-        >
-          <div class="card-left-badge" :class="`badge-type--${(item.resourceType || 'DOC').toLowerCase()}`">
-            <span class="ext-label">{{ item.resourceType || 'PDF' }}</span>
+      <div class="resources-panel-divider" aria-hidden="true" />
+
+      <!-- 3. 资源列表 -->
+      <div v-loading="resourceLoading" class="resources-list-container">
+        <div v-if="pagedResources.length > 0" class="resources-grid">
+          <div
+            v-for="item in pagedResources"
+            :key="item.id"
+            class="resource-card"
+          >
+          <div class="card-left-badge" :class="`badge-type--${itemResourceType(item).toLowerCase()}`">
+            <span class="ext-label">{{ resourceTypeShortLabel(itemResourceType(item), item.title) }}</span>
           </div>
 
-          <div class="card-center-info">
-            <h4 class="resource-title" :title="item.title" @click="handlePreview(item)">
-              {{ item.title }}
-            </h4>
-            <div class="resource-meta-row">
-              <span class="pill-sub-tag">
-                <el-icon><Clock /></el-icon>
-                {{ item.createTime || '2025-09-10' }}
-              </span>
-              <span class="pill-sub-tag">
-                {{ item.size || '3.5 MB' }}
-              </span>
-              <span class="pill-sub-tag pill-sub-tag--rag">
-                <el-icon><Check /></el-icon>
-                已入 RAG 问答
-              </span>
-            </div>
+          <h4 class="resource-title" :title="item.title" @click="handlePreview(item)">
+            {{ item.title }}
+          </h4>
+
+          <div class="resource-meta-row">
+            <span class="pill-sub-tag pill-sub-tag--time">
+              {{ formatResourceListedTime(item.createTime) }}
+            </span>
+            <span v-if="item.size" class="pill-sub-tag">
+              {{ item.size }}
+            </span>
+            <span v-if="item.documentId" class="pill-sub-tag pill-sub-tag--rag">
+              <el-icon><Check /></el-icon>
+              已入 RAG
+            </span>
           </div>
 
           <div class="card-actions-row">
@@ -141,33 +144,36 @@
               <span>下载</span>
             </button>
             <button
-              type="button"
-              class="action-pill-btn action-pill-btn--ai"
-              title="针对此课件向助教提问"
-              @click="handleAskAiAboutDoc(item)"
-            >
-              <span>AI导读</span>
-            </button>
-            <button
               v-if="editable"
               type="button"
               class="action-pill-btn action-pill-btn--del"
               title="删除课件资料"
+              aria-label="删除课件资料"
               @click.stop="confirmDeleteResource(item)"
             >
               <el-icon><Delete /></el-icon>
             </button>
           </div>
         </div>
-      </div>
-
-      <!-- 空状态 -->
-      <div v-else class="empty-resources-box">
-        <div class="empty-icon-circle">
-          <el-icon><FolderOpened /></el-icon>
         </div>
-        <h4>暂无符合条件的课程资料</h4>
-        <p>点击上方“上传教学课件”，支持一键上传课件并自动构建 RAG 向量索引。</p>
+
+        <!-- 空状态 -->
+        <div v-else class="empty-resources-box">
+          <div class="empty-icon-circle">
+            <el-icon><FolderOpened /></el-icon>
+          </div>
+          <h4>暂无符合条件的课程资料</h4>
+          <p>点击上方“上传教学课件”，支持一键上传课件并自动构建 RAG 向量索引。</p>
+        </div>
+
+        <AppPagination
+          v-if="filteredTotal > 0"
+          v-model:page-num="pageNum"
+          v-model:page-size="pageSize"
+          :total="filteredTotal"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next, jumper"
+        />
       </div>
     </div>
 
@@ -197,67 +203,86 @@
         <el-upload
           drag
           action="#"
+          multiple
           :auto-upload="false"
           :show-file-list="false"
+          :file-list="uploadFileList"
           :on-change="handleFileChange"
           accept=".pdf,.ppt,.pptx,.doc,.docx,.mp4,.md,.txt"
           class="modern-dropzone"
         >
-          <div v-if="!selectedFile" class="dropzone-idle">
+          <div class="dropzone-idle">
             <div class="drop-icon-cloud">
               <el-icon><Upload /></el-icon>
             </div>
             <div class="drop-text">
-              <strong>点击选择本地课件文件，或直接拖拽至此区域</strong>
+              <strong>点击选择本地课件（可多选），或直接拖拽至此区域</strong>
               <p>支持 PDF、PPT、Word、MP4、Markdown 等格式，单文件最大支持 200MB</p>
             </div>
           </div>
-          <div v-else class="dropzone-file-ready">
-            <div class="ready-file-badge" :class="`badge--${newResourceType.toLowerCase()}`">
-              {{ newResourceType }}
-            </div>
-            <div class="ready-file-info">
-              <strong class="ready-filename">{{ selectedFile.name }}</strong>
-              <span class="ready-filesize">文件大小：{{ fileSizeDisplay || '3.5 MB' }} · 格式已自动识别适配</span>
-            </div>
-            <button type="button" class="ready-change-btn" @click.stop="selectedFile = null">重新选择</button>
-          </div>
         </el-upload>
+        <div v-if="selectedFiles.length > 0" class="pending-upload-files">
+          <div class="pending-upload-files__head">
+            <span class="pending-upload-files__count">已选择 {{ selectedFiles.length }} 个文件</span>
+            <button type="button" class="pending-upload-files__clear" @click="confirmClearSelectedFiles">
+              清空列表
+            </button>
+          </div>
+          <ul class="pending-upload-files__list">
+            <li
+              v-for="(file, index) in selectedFiles"
+              :key="`${file.name}-${file.size}-${index}`"
+              class="pending-upload-files__item"
+            >
+              <span class="pending-upload-files__file-icon" aria-hidden="true">
+                <el-icon><Document /></el-icon>
+              </span>
+              <span class="pending-upload-files__name" :title="file.name">{{ file.name }}</span>
+              <span class="pending-upload-files__size">{{ formatUploadFileSize(file.size) }}</span>
+              <button
+                type="button"
+                class="pending-upload-files__remove"
+                title="移除此文件"
+                aria-label="移除此文件"
+                @click="confirmRemoveSelectedFile(index)"
+              >
+                <el-icon :size="14"><Close /></el-icon>
+              </button>
+            </li>
+          </ul>
+        </div>
       </div>
 
       <el-form label-position="top" class="upload-detail-form">
-        <el-form-item label="课件资料显示标题" required>
+        <el-form-item v-if="selectedFiles.length <= 1" label="课件资料显示标题" required>
           <el-input
             v-model="newResourceTitle"
             placeholder="例如：数据结构第三章-树与二叉树精讲课件.pdf"
             maxlength="80"
             show-word-limit
           />
+          <p v-if="selectedFiles.length === 1" class="detected-type-hint">
+            格式已根据所选文件自动识别为
+            <span class="detected-type-hint__badge">
+              {{ resourceTypeShortLabel(inferResourceTypeFromFileName(selectedFiles[0].name)) }}
+            </span>
+            ，无需手动选择
+          </p>
         </el-form-item>
 
-        <div class="form-grid-2">
-          <el-form-item label="文件格式类型" required>
-            <el-select v-model="newResourceType" class="w-full">
-              <el-option label="PDF 文档 / 讲义" value="PDF" />
-              <el-option label="PPT / PPTX 教学幻灯" value="PPT" />
-              <el-option label="Word 实验指导书" value="WORD" />
-              <el-option label="MP4 教学视频录屏" value="VIDEO" />
-              <el-option label="其他参考拓展资料" value="DOCUMENT" />
-            </el-select>
-          </el-form-item>
+        <p v-else class="batch-upload-hint">批量上传时将按各文件名自动识别格式并分别入库，无需单独填写标题。</p>
 
-          <el-form-item label="关联大纲章节">
-            <el-select v-model="selectedChapterId" placeholder="选择关联章节（可选）" class="w-full" clearable>
-              <el-option label="全课通用 / 核心导论" :value="undefined" />
-              <el-option
-                v-for="(chap, cIdx) in chapters"
-                :key="chap.id"
-                :label="`第 ${cIdx + 1} 章：${chap.title}`"
-                :value="chap.id"
-              />
-            </el-select>
-          </el-form-item>
-        </div>
+        <el-form-item label="关联大纲章节">
+          <el-select v-model="selectedChapterId" placeholder="选择关联章节（可选）" class="w-full" clearable>
+            <el-option label="全课通用 / 核心导论" :value="undefined" />
+            <el-option
+              v-for="(chap, cIdx) in chapters"
+              :key="chap.id"
+              :label="`第 ${cIdx + 1} 章：${chap.title}`"
+              :value="chap.id"
+            />
+          </el-select>
+        </el-form-item>
 
         <div class="ai-sync-toggles-card">
           <div class="toggle-item">
@@ -291,7 +316,7 @@
           <button
             type="button"
             class="capsule-modal-btn capsule-modal-btn--primary"
-            :disabled="!newResourceTitle.trim() || uploading"
+            :disabled="!canConfirmUpload || uploading"
             @click="handleUploadSubmit"
           >
             <el-icon v-if="uploading" class="is-loading"><Loading /></el-icon>
@@ -305,56 +330,42 @@
     <el-drawer
       v-model="showPreviewDrawer"
       :title="`资料研读预览：${currentPreviewItem?.title || ''}`"
-      size="720px"
+      size="82%"
       destroy-on-close
+      class="course-resource-preview-drawer"
     >
       <div class="doc-preview-wrapper">
         <div class="doc-preview-meta">
-          <span class="preview-badge">{{ currentPreviewItem?.resourceType || 'PDF' }} 格式</span>
-          <span class="preview-badge">文档大小：{{ currentPreviewItem?.size || '4.2 MB' }}</span>
-          <span class="preview-badge is-rag">AI 知识库切片已就绪</span>
+          <span class="preview-badge">
+            {{
+              currentPreviewItem
+                ? `${resourceTypeShortLabel(itemResourceType(currentPreviewItem), currentPreviewItem.title)} 格式`
+                : '—'
+            }}
+          </span>
+          <span v-if="currentPreviewItem?.size" class="preview-badge">
+            文档大小：{{ currentPreviewItem.size }}
+          </span>
+          <span v-if="currentPreviewItem?.documentId" class="preview-badge is-rag">已关联知识库文档</span>
         </div>
 
-        <div class="doc-preview-reader">
-          <div class="reader-header">
-            <h3>{{ currentPreviewItem?.title }}</h3>
-            <p class="reader-subtitle">EduMind 智能课件解析渲染引擎 · 支持知识高亮与沉浸式阅读</p>
+        <div v-loading="previewLoading" class="doc-preview-reader">
+          <div
+            v-if="previewHtml"
+            ref="previewBodyRef"
+            class="reader-content-body markdown-body chat-md-content"
+            v-html="previewHtml"
+          />
+          <div v-else-if="previewPdfUrl" class="reader-pdf-frame">
+            <iframe :src="previewPdfUrl" title="PDF 预览" />
           </div>
-
-          <div class="reader-content-body">
-            <div class="mock-slide-page">
-              <span class="page-corner">Page 1 / 18</span>
-              <h4>第一部分：核心概念与推导</h4>
-              <p>
-                本节重点讨论该结构的时间复杂度、空间开销与内存布局特性。结合大 O 渐进分析法，在最坏情况与平均情况下均具备优良的检索性能。
-              </p>
-              <div class="mock-code-block">
-                <code>
-// 典型算法核心实现示例
-Status TraverseList(List *L) {
-    if (!L) return ERROR;
-    Node *p = L->head;
-    while(p) {
-        Visit(p->data);
-        p = p->next;
-    }
-    return OK;
-}
-                </code>
-              </div>
-            </div>
+          <div v-else class="reader-empty">
+            <el-icon class="reader-empty__icon"><Document /></el-icon>
+            <p class="reader-empty__title">暂无预览内容</p>
           </div>
         </div>
 
         <div class="preview-bottom-actions">
-          <button
-            type="button"
-            class="capsule-primary-btn"
-            @click="handleAskAiAboutDoc(currentPreviewItem)"
-          >
-            <el-icon><MagicStick /></el-icon>
-            <span>围绕此课件向 AI 助教提问</span>
-          </button>
           <button
             type="button"
             class="capsule-secondary-btn"
@@ -370,8 +381,8 @@ Status TraverseList(List *L) {
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   FolderOpened,
@@ -382,15 +393,30 @@ import {
   Download,
   View,
   Delete,
-  Clock,
-  Check,
-  MagicStick,
   CircleClose,
-  Loading
+  Check,
+  Loading,
+  Close
 } from '@element-plus/icons-vue';
+import type { UploadFile, UploadFiles } from 'element-plus';
 import type { Course } from '@/types/course/course';
+import type { CourseResourceItem } from '@/types/course/resource';
 import { useCourseMember } from '@/composables/course/useCourseMember';
 import { useCourse } from '@/composables/course/useCourse';
+import {
+  defaultResourceTitleFromFileName,
+  formatUploadFileSize,
+  inferResourceTypeFromFileName,
+  isMarkdownLikeResourceType,
+  resolveResourceType,
+  resourceTypeShortLabel
+} from '@/utils/course/infer-resource-type';
+import { formatDateTime } from '@/utils/format/date';
+import { bindMarkdownCodeCopy, renderChatMarkdown } from '@/utils/ai/chat-markdown';
+import { batchUploadMessage, emptyBatchUploadResult } from '@/utils/upload/coalesce-upload-files';
+import { downloadByApiPath, fetchStorageBlob, fetchStorageText } from '@/utils/download/blob-download';
+import AppPagination from '@/components/common/AppPagination.vue';
+import { usePagination } from '@/composables/common/usePagination';
 
 withDefaults(
   defineProps<{
@@ -401,14 +427,13 @@ withDefaults(
 );
 
 const route = useRoute();
-const router = useRouter();
 const courseId = Number(route.params.id) || 0;
 
 const {
   resources,
   resourceLoading,
   fetchResources,
-  createResource,
+  uploadResource,
   deleteResource
 } = useCourseMember(courseId);
 
@@ -416,10 +441,10 @@ const { chapters, fetchChapters } = useCourse();
 
 const searchKeyword = ref('');
 const currentTypeTab = ref('ALL');
+const { pageNum, pageSize } = usePagination(10);
 
 const showUploadDialog = ref(false);
 const newResourceTitle = ref('');
-const newResourceType = ref('PDF');
 const selectedChapterId = ref<number | undefined>(undefined);
 const autoSyncRag = ref(true);
 const autoExtractSummary = ref(true);
@@ -427,38 +452,122 @@ const uploading = ref(false);
 const uploadProgress = ref(0);
 const uploadProgressText = ref('');
 
-const selectedFile = ref<any>(null);
-const fileSizeDisplay = ref('');
+const uploadFileList = ref<UploadFile[]>([]);
+const selectedFiles = ref<File[]>([]);
 
 const showPreviewDrawer = ref(false);
-const currentPreviewItem = ref<any>(null);
+const currentPreviewItem = ref<CourseResourceItem | null>(null);
+const previewLoading = ref(false);
+const previewMarkdownText = ref('');
+const previewPdfUrl = ref('');
+const previewBodyRef = ref<HTMLElement | null>(null);
+const localPreviewByResourceId = new Map<number, string>();
+const localResourceTypeById = new Map<number, string>();
 
-function handleFileChange(file: any) {
-  if (!file?.raw) return;
-  selectedFile.value = file;
-  const raw = file.raw;
-  const name = raw.name || '';
-  newResourceTitle.value = name;
+function itemResourceType(item: CourseResourceItem): string {
+  const cachedType = localResourceTypeById.get(item.id);
+  if (cachedType) return cachedType;
+  if (localPreviewByResourceId.has(item.id)) return 'MD';
+  return resolveResourceType(item.resourceType, item.title);
+}
 
-  const lower = name.toLowerCase();
-  if (lower.endsWith('.pdf')) {
-    newResourceType.value = 'PDF';
-  } else if (lower.endsWith('.ppt') || lower.endsWith('.pptx')) {
-    newResourceType.value = 'PPT';
-  } else if (lower.endsWith('.doc') || lower.endsWith('.docx')) {
-    newResourceType.value = 'WORD';
-  } else if (lower.endsWith('.mp4') || lower.endsWith('.mov')) {
-    newResourceType.value = 'VIDEO';
-  } else {
-    newResourceType.value = 'DOCUMENT';
+const previewHtml = computed(() =>
+  previewMarkdownText.value ? renderChatMarkdown(previewMarkdownText.value) : ''
+);
+
+const canConfirmUpload = computed(() => {
+  if (selectedFiles.value.length === 0) return false;
+  if (selectedFiles.value.length === 1) {
+    return newResourceTitle.value.trim().length > 0;
   }
+  return true;
+});
 
-  const bytes = raw.size || 0;
-  if (bytes > 1024 * 1024) {
-    fileSizeDisplay.value = `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  } else {
-    fileSizeDisplay.value = `${Math.round(bytes / 1024)} KB`;
+function handleFileChange(_file: UploadFile, fileList: UploadFiles) {
+  uploadFileList.value = [...fileList];
+  syncSelectedFilesFromUploadList();
+}
+
+function filesFromUploadList(fileList: UploadFiles): File[] {
+  const files: File[] = [];
+  for (const item of fileList) {
+    if (item.raw) {
+      files.push(item.raw);
+    }
   }
+  return files;
+}
+
+function syncSelectedFilesFromUploadList() {
+  selectedFiles.value = filesFromUploadList(uploadFileList.value);
+
+  if (selectedFiles.value.length === 1) {
+    const raw = selectedFiles.value[0];
+    newResourceTitle.value = defaultResourceTitleFromFileName(raw.name) || raw.name;
+  }
+}
+
+function removeSelectedFile(index: number) {
+  uploadFileList.value = uploadFileList.value.filter((_, i) => i !== index);
+  syncSelectedFilesFromUploadList();
+  if (selectedFiles.value.length === 0) {
+    newResourceTitle.value = '';
+  }
+}
+
+function clearSelectedFiles() {
+  uploadFileList.value = [];
+  selectedFiles.value = [];
+  newResourceTitle.value = '';
+}
+
+async function confirmRemoveSelectedFile(index: number) {
+  const file = selectedFiles.value[index];
+  if (!file) return;
+  try {
+    await ElMessageBox.confirm(
+      `确定从待上传列表中移除「${file.name}」吗？移除后需重新选择文件。`,
+      '移除确认',
+      {
+        type: 'warning',
+        confirmButtonText: '确认移除',
+        cancelButtonText: '取消',
+        confirmButtonClass: 'el-button--danger',
+        lockScroll: false
+      }
+    );
+    removeSelectedFile(index);
+  } catch {
+    // 用户取消
+  }
+}
+
+async function confirmClearSelectedFiles() {
+  const count = selectedFiles.value.length;
+  if (count === 0) return;
+  try {
+    await ElMessageBox.confirm(
+      `确定清空已选择的 ${count} 个文件吗？清空后需重新选择或拖拽上传。`,
+      '清空确认',
+      {
+        type: 'warning',
+        confirmButtonText: '确认清空',
+        cancelButtonText: '取消',
+        confirmButtonClass: 'el-button--danger',
+        lockScroll: false
+      }
+    );
+    clearSelectedFiles();
+  } catch {
+    // 用户取消
+  }
+}
+
+function formatResourceListedTime(value?: string): string {
+  if (!value) return '上传时间未知';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '上传时间未知';
+  return formatDateTime(d);
 }
 
 const pdfCount = computed(() => resources.value.filter(r => (r.resourceType || '').toUpperCase() === 'PDF').length);
@@ -485,21 +594,106 @@ const filteredResources = computed(() => {
   });
 });
 
-function handlePreview(item: any) {
+const filteredTotal = computed(() => filteredResources.value.length);
+
+const pagedResources = computed(() => {
+  const start = (pageNum.value - 1) * pageSize.value;
+  return filteredResources.value.slice(start, start + pageSize.value);
+});
+
+watch([currentTypeTab, searchKeyword], () => {
+  pageNum.value = 1;
+});
+
+watch(filteredTotal, (count) => {
+  const maxPage = Math.max(1, Math.ceil(count / pageSize.value) || 1);
+  if (pageNum.value > maxPage) {
+    pageNum.value = maxPage;
+  }
+});
+
+function handlePreview(item: CourseResourceItem) {
   currentPreviewItem.value = item;
   showPreviewDrawer.value = true;
 }
 
-function handleDownload(item: any) {
-  ElMessage.success(`正在准备下载：${item?.title || '课件'}`);
+const previewPdfObjectUrl = ref('');
+
+async function loadPreviewContent(item: CourseResourceItem) {
+  previewLoading.value = true;
+  previewMarkdownText.value = '';
+  if (previewPdfObjectUrl.value) {
+    URL.revokeObjectURL(previewPdfObjectUrl.value);
+    previewPdfObjectUrl.value = '';
+  }
+  previewPdfUrl.value = '';
+  try {
+    const cached = localPreviewByResourceId.get(item.id);
+    if (cached) {
+      previewMarkdownText.value = cached;
+      return;
+    }
+
+    if (!item.downloadUrl) {
+      return;
+    }
+
+    const displayType = itemResourceType(item);
+
+    if (displayType === 'PDF') {
+      const blob = await fetchStorageBlob(item.downloadUrl);
+      previewPdfObjectUrl.value = URL.createObjectURL(blob);
+      previewPdfUrl.value = previewPdfObjectUrl.value;
+      return;
+    }
+
+    if (isMarkdownLikeResourceType(displayType, item.title)) {
+      previewMarkdownText.value = await fetchStorageText(item.downloadUrl);
+      return;
+    }
+
+    if (displayType !== 'PDF') {
+      previewMarkdownText.value = await fetchStorageText(item.downloadUrl);
+    }
+  } catch {
+    ElMessage.warning('预览内容加载失败，请尝试下载后本地打开');
+  } finally {
+    previewLoading.value = false;
+  }
 }
 
-function handleAskAiAboutDoc(item: any) {
-  showPreviewDrawer.value = false;
-  router.push({
-    path: `/course/${courseId}/ai`,
-    query: { prompt: `请结合我刚刚研读的课件【${item?.title}】，帮我总结核心概念清单与期末重点。` }
-  });
+watch(showPreviewDrawer, async (open) => {
+  if (!open) {
+    previewMarkdownText.value = '';
+    previewPdfUrl.value = '';
+    if (previewPdfObjectUrl.value) {
+      URL.revokeObjectURL(previewPdfObjectUrl.value);
+      previewPdfObjectUrl.value = '';
+    }
+    return;
+  }
+  const item = currentPreviewItem.value;
+  if (!item) return;
+  await loadPreviewContent(item);
+  await nextTick();
+  if (previewBodyRef.value) {
+    bindMarkdownCodeCopy(previewBodyRef.value);
+  }
+});
+
+async function handleDownload(item: CourseResourceItem | null) {
+  if (!item) return;
+  if (!item.downloadUrl) {
+    ElMessage.info('暂无可下载的文件');
+    return;
+  }
+  try {
+    const ext = inferResourceTypeFromFileName(item.title).toLowerCase();
+    const suffix = ext === 'md' ? '.md' : ext === 'pdf' ? '.pdf' : '';
+    await downloadByApiPath(item.downloadUrl, `${item.title || 'course-resource'}${suffix}`);
+  } catch {
+    ElMessage.error('下载失败，请稍后重试');
+  }
 }
 
 async function handleDelete(resourceId: number) {
@@ -531,34 +725,67 @@ async function confirmDeleteResource(item: any) {
 }
 
 async function handleUploadSubmit() {
-  if (!newResourceTitle.value.trim()) {
+  const files = selectedFiles.value;
+  if (files.length === 0) {
+    ElMessage.warning('请选择要上传的课件文件');
+    return;
+  }
+  if (files.length === 1 && !newResourceTitle.value.trim()) {
     ElMessage.warning('请输入课件资料标题');
     return;
   }
+
   uploading.value = true;
-  uploadProgress.value = 25;
+  uploadProgress.value = 0;
   uploadProgressText.value = '正在上传课件文件至课程专属存储空间...';
 
+  const result = { ...emptyBatchUploadResult() };
+
   try {
-    await new Promise(r => setTimeout(r, 250));
-    uploadProgress.value = 65;
-    uploadProgressText.value = autoSyncRag.value ? '正在切片并构建 RAG 向量索引切片...' : '正在入库归档...';
+    for (let i = 0; i < files.length; i += 1) {
+      const file = files[i];
+      const title =
+        files.length === 1
+          ? newResourceTitle.value.trim()
+          : defaultResourceTitleFromFileName(file.name) || file.name;
+      const resourceType = inferResourceTypeFromFileName(file.name);
 
-    await createResource({
-      title: newResourceTitle.value.trim(),
-      resourceType: newResourceType.value,
-      chapterId: selectedChapterId.value
-    });
+      uploadProgress.value = Math.max(10, Math.round(((i + 0.5) / files.length) * 90));
+      uploadProgressText.value =
+        files.length === 1
+          ? autoSyncRag.value
+            ? '正在切片并构建 RAG 向量索引切片...'
+            : '正在入库归档...'
+          : `正在入库第 ${i + 1}/${files.length} 个课件：${file.name}`;
 
-    uploadProgress.value = 100;
+      await uploadResource(file, {
+        title,
+        resourceType,
+        chapterId: selectedChapterId.value
+      });
+      result.succeeded += 1;
+
+      uploadProgress.value = Math.round(((i + 1) / files.length) * 100);
+    }
+
     uploadProgressText.value = '完成！';
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 150));
 
-    ElMessage.success('课件上传成功，并已同步构建 RAG 向量切片！');
+    const { level, text } = batchUploadMessage(result, '课件');
+    if (level === 'success') {
+      ElMessage.success(
+        files.length === 1 && autoSyncRag.value ? `${text}，并已同步构建 RAG 向量切片！` : text
+      );
+    } else if (level === 'warning') {
+      ElMessage.warning(text);
+    } else {
+      ElMessage.error(text);
+    }
+
     showUploadDialog.value = false;
     newResourceTitle.value = '';
-    selectedFile.value = null;
-    fileSizeDisplay.value = '';
+    uploadFileList.value = [];
+    selectedFiles.value = [];
     uploadProgress.value = 0;
   } catch (err: any) {
     ElMessage.error(err?.message || '上传资料失败');
@@ -579,26 +806,40 @@ onMounted(() => {
   flex-direction: column;
   gap: 18px;
 
+  .resources-panel-card {
+    background: #ffffff;
+    border: 1px solid #ebf1f7;
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(30, 80, 150, 0.04);
+    overflow: hidden;
+  }
+
+  .resources-panel-divider {
+    height: 1px;
+    background: #ebf1f7;
+  }
+
   // 1. 顶部指标概览
   .resources-stat-overview {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 14px;
+    gap: 12px;
+    padding: 16px 20px 12px;
 
     .stat-capsule-card {
-      background: #FFFFFF;
-      border-radius: 16px;
-      border: 1px solid #EBF1F7;
-      padding: 16px 20px;
+      background: #f8fafc;
+      border-radius: 14px;
+      border: 1px solid #eef2f7;
+      padding: 14px 18px;
       display: flex;
       align-items: center;
       gap: 14px;
-      box-shadow: 0 4px 16px rgba(30, 80, 150, 0.04);
-      transition: all 0.2s ease;
+      transition: background 0.2s ease;
 
       &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(30, 80, 150, 0.08);
+        background: #f1f5f9;
+        transform: none;
+        box-shadow: none;
       }
 
       .stat-icon-circle {
@@ -638,11 +879,11 @@ onMounted(() => {
 
   // 2. 长圆工具栏
   .resources-toolbar-panel {
-    background: #FFFFFF;
-    border-radius: 16px;
+    background: transparent;
+    border-radius: 0;
     padding: 12px 20px;
-    border: 1px solid #EBF1F7;
-    box-shadow: 0 2px 12px rgba(30, 80, 150, 0.04);
+    border: none;
+    box-shadow: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -777,7 +1018,22 @@ onMounted(() => {
 
   // 3. 资源卡片网格
   .resources-list-container {
-    min-height: 380px;
+    min-height: 200px;
+    padding: 8px 20px 16px;
+
+    :deep(.pagination-bar) {
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #ebf1f7;
+
+      .el-pagination {
+        justify-content: flex-start;
+        width: 100%;
+      }
+    }
 
     .resources-grid {
       display: flex;
@@ -788,16 +1044,16 @@ onMounted(() => {
         background: #FFFFFF;
         border: 1px solid #EBF1F7;
         border-radius: 14px;
-        padding: 14px 20px;
+        padding: 12px 16px;
         display: flex;
+        flex-direction: row;
         align-items: center;
-        gap: 16px;
+        gap: 12px;
         transition: all 0.2s ease;
         box-shadow: 0 2px 8px rgba(30, 80, 150, 0.03);
 
         &:hover {
           border-color: #DBEAFE;
-          transform: translateY(-1px);
           box-shadow: 0 6px 20px rgba(22, 119, 255, 0.08);
         }
 
@@ -808,60 +1064,69 @@ onMounted(() => {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.02em;
           flex-shrink: 0;
+          text-align: center;
+          line-height: 1.1;
 
           &.badge-type--pdf { background: #FFF1F2; color: #E11D48; }
           &.badge-type--ppt { background: #FEF3C7; color: #D97706; }
           &.badge-type--word { background: #EFF6FF; color: #2563EB; }
           &.badge-type--video { background: #F3E8FF; color: #9333EA; }
+          &.badge-type--md { background: #ECFDF5; color: #047857; }
+          &.badge-type--txt { background: #F8FAFC; color: #475569; }
           &.badge-type--doc,
-          &.badge-type--document { background: #F1F5F9; color: #475569; }
+          &.badge-type--document { background: #EFF6FF; color: #2563EB; }
         }
 
-        .card-center-info {
-          flex: 1;
+        .resource-title {
+          margin: 0;
+          flex: 1 1 120px;
           min-width: 0;
+          font-size: 15px;
+          font-weight: 600;
+          color: #0F172A;
+          cursor: pointer;
+          transition: color 0.2s;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
 
-          .resource-title {
-            margin: 0 0 6px 0;
-            font-size: 14.5px;
-            font-weight: 600;
-            color: #0F172A;
-            cursor: pointer;
-            transition: color 0.2s;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-
-            &:hover {
-              color: #1677FF;
-            }
+          &:hover {
+            color: #1677FF;
           }
+        }
 
-          .resource-meta-row {
-            display: flex;
+        .resource-meta-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex: 0 0 auto;
+          flex-wrap: nowrap;
+          white-space: nowrap;
+
+          .pill-sub-tag {
+            display: inline-flex;
             align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
+            gap: 4px;
+            font-size: 12px;
+            color: #64748B;
+            background: #F8FAFC;
+            padding: 3px 10px;
+            border-radius: 9999px;
+            border: 1px solid #eef2f7;
 
-            .pill-sub-tag {
-              display: inline-flex;
-              align-items: center;
-              gap: 4px;
-              font-size: 11.5px;
-              color: #64748B;
-              background: #F8FAFC;
-              padding: 2px 8px;
-              border-radius: 9999px;
+            &--time {
+              color: #475569;
+            }
 
-              &--rag {
-                background: #ECFDF5;
-                color: #059669;
-                font-weight: 500;
-              }
+            &--rag {
+              background: #ECFDF5;
+              color: #059669;
+              font-weight: 500;
+              border-color: #bbf7d0;
             }
           }
         }
@@ -870,7 +1135,9 @@ onMounted(() => {
           display: flex;
           align-items: center;
           gap: 8px;
+          flex: 0 0 auto;
           flex-shrink: 0;
+          margin-left: 4px;
 
           .action-pill-btn {
             display: inline-flex;
@@ -886,10 +1153,16 @@ onMounted(() => {
             color: #475569;
             cursor: pointer;
             transition: all 0.2s ease;
+            font-family: inherit;
+            outline: none;
 
             &:hover {
               border-color: #CBD5E1;
               background: #F8FAFC;
+            }
+
+            &:focus-visible {
+              box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
             }
 
             &--preview {
@@ -899,19 +1172,23 @@ onMounted(() => {
               &:hover { background: #DBEAFE; }
             }
 
-            &--ai {
-              color: #7C3AED;
-              border-color: #DDD6FE;
-              background: #F5F3FF;
-              &:hover { background: #EDE9FE; }
+            &--download {
+              color: #0F766E;
+              border-color: #99F6E4;
+              background: #F0FDFA;
+              &:hover { background: #CCFBF1; }
             }
 
             &--del {
-              padding: 0 8px;
+              width: 30px;
+              padding: 0;
+              justify-content: center;
               color: #EF4444;
+              border-color: #FECACA;
+              background: #FFF5F5;
               &:hover {
-                background: #FEF2F2;
-                border-color: #FECACA;
+                background: #FEE2E2;
+                border-color: #FCA5A5;
               }
             }
           }
@@ -920,14 +1197,14 @@ onMounted(() => {
     }
 
     .empty-resources-box {
-      padding: 60px 0;
+      padding: 48px 0 32px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: #FFFFFF;
-      border-radius: 16px;
-      border: 1px solid #EBF1F7;
+      background: transparent;
+      border-radius: 0;
+      border: none;
 
       .empty-icon-circle {
         width: 56px;
@@ -985,140 +1262,6 @@ onMounted(() => {
       &:disabled {
         opacity: 0.5;
         cursor: not-allowed;
-      }
-    }
-  }
-
-  // 5. 在线预览抽屉
-  .doc-preview-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-
-    .doc-preview-meta {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-
-      .preview-badge {
-        padding: 3px 10px;
-        border-radius: 9999px;
-        background: #F1F5F9;
-        font-size: 12px;
-        color: #475569;
-
-        &.is-rag {
-          background: #ECFDF5;
-          color: #059669;
-          font-weight: 600;
-        }
-      }
-    }
-
-    .doc-preview-reader {
-      background: #F8FAFC;
-      border: 1px solid #E2E8F0;
-      border-radius: 14px;
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-
-      .reader-header {
-        h3 {
-          margin: 0 0 6px 0;
-          font-size: 17px;
-          color: #0F172A;
-        }
-
-        .reader-subtitle {
-          margin: 0;
-          font-size: 12px;
-          color: #64748B;
-        }
-      }
-
-      .reader-content-body {
-        .mock-slide-page {
-          background: #FFFFFF;
-          border: 1px solid #E2E8F0;
-          border-radius: 12px;
-          padding: 24px;
-          position: relative;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-
-          .page-corner {
-            position: absolute;
-            top: 14px;
-            right: 16px;
-            font-size: 11px;
-            color: #94A3B8;
-          }
-
-          h4 {
-            margin: 0 0 12px 0;
-            font-size: 15px;
-            color: #1E293B;
-          }
-
-          p {
-            font-size: 13.5px;
-            color: #475569;
-            line-height: 1.7;
-          }
-
-          .mock-code-block {
-            background: #0F172A;
-            border-radius: 8px;
-            padding: 14px;
-            margin-top: 14px;
-            color: #93C5FD;
-            font-family: monospace;
-            font-size: 12.5px;
-            overflow-x: auto;
-          }
-        }
-      }
-    }
-
-    .preview-bottom-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: 8px;
-
-      .capsule-primary-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        height: 38px;
-        padding: 0 18px;
-        border-radius: 9999px;
-        background: #1677FF;
-        color: #FFFFFF;
-        border: none;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-
-        &:hover { background: #4096FF; }
-      }
-
-      .capsule-secondary-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        height: 38px;
-        padding: 0 18px;
-        border-radius: 9999px;
-        background: #F1F5F9;
-        color: #334155;
-        border: 1px solid #E2E8F0;
-        font-size: 13px;
-        font-weight: 500;
-        cursor: pointer;
-
-        &:hover { background: #E2E8F0; }
       }
     }
   }
@@ -1256,9 +1399,176 @@ onMounted(() => {
       }
     }
   }
+
+  .pending-upload-files {
+    margin-top: 12px;
+    padding: 12px 14px 10px;
+    border-radius: 14px;
+    border: 1px solid #dbeafe;
+    background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+
+    &__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    &__count {
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    &__clear {
+      height: 28px;
+      padding: 0 12px;
+      border: none;
+      border-radius: 9999px;
+      background: transparent;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 0.2s ease, background 0.2s ease;
+      font-family: inherit;
+
+      &:hover {
+        color: #dc2626;
+        background: #fef2f2;
+      }
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.28);
+      }
+    }
+
+    &__list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 168px;
+      overflow-y: auto;
+    }
+
+    &__item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+      &:hover {
+        border-color: #bfdbfe;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.06);
+      }
+    }
+
+    &__file-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: #eff6ff;
+      color: #2563eb;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    &__name {
+      flex: 1;
+      min-width: 0;
+      font-size: 13px;
+      font-weight: 500;
+      color: #0f172a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    &__size {
+      flex-shrink: 0;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 9999px;
+      background: #f1f5f9;
+      font-size: 11px;
+      font-weight: 500;
+      color: #64748b;
+      line-height: 22px;
+    }
+
+    &__remove {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: none;
+      border-radius: 9999px;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: color 0.2s ease, background 0.2s ease;
+      font-family: inherit;
+
+      &:hover {
+        color: #dc2626;
+        background: #fef2f2;
+      }
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25);
+      }
+    }
+  }
 }
 
 .upload-detail-form {
+  .detected-type-hint {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.5;
+
+    &__badge {
+      display: inline-flex;
+      align-items: center;
+      height: 22px;
+      padding: 0 8px;
+      margin: 0 4px;
+      border-radius: 9999px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #2563eb;
+      font-size: 11px;
+      font-weight: 700;
+    }
+  }
+
+  .batch-upload-hint {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    font-size: 12px;
+    color: #1d4ed8;
+    line-height: 1.5;
+  }
+
   .form-grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1359,6 +1669,141 @@ onMounted(() => {
       &:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+      }
+    }
+  }
+}
+</style>
+
+<style lang="scss">
+/* 预览抽屉 teleport 到 body，不可放在 .course-resources-page scoped 内 */
+.course-resource-preview-drawer {
+  .el-drawer__body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 12px 20px 20px;
+  }
+
+  .doc-preview-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+
+    .doc-preview-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+
+      .preview-badge {
+        padding: 3px 10px;
+        border-radius: 9999px;
+        background: #f1f5f9;
+        font-size: 12px;
+        color: #475569;
+
+        &.is-rag {
+          background: #ecfdf5;
+          color: #059669;
+          font-weight: 600;
+        }
+      }
+    }
+
+    .doc-preview-reader {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 12px;
+      overflow: hidden;
+
+      .reader-content-body {
+        flex: 1;
+        min-height: min(72vh, 780px);
+        overflow-y: auto;
+        padding: 20px 24px;
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+      }
+
+      .reader-pdf-frame {
+        flex: 1;
+        min-height: min(72vh, 780px);
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+
+        iframe {
+          width: 100%;
+          height: 100%;
+          min-height: min(72vh, 780px);
+          border: none;
+        }
+      }
+
+      .reader-empty {
+        flex: 1;
+        min-height: min(52vh, 520px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 32px 24px;
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px dashed #cbd5e1;
+
+        .reader-empty__icon {
+          font-size: 40px;
+          color: #94a3b8;
+          margin-bottom: 12px;
+        }
+
+        .reader-empty__title {
+          margin: 0;
+          font-size: 15px;
+          font-weight: 600;
+          color: #334155;
+        }
+      }
+    }
+
+    .preview-bottom-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      flex-shrink: 0;
+
+      .capsule-secondary-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 38px;
+        padding: 0 18px;
+        border-radius: 9999px;
+        background: #f1f5f9;
+        color: #334155;
+        border: 1px solid #e2e8f0;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        font-family: inherit;
+
+        &:hover {
+          background: #e2e8f0;
+        }
       }
     }
   }

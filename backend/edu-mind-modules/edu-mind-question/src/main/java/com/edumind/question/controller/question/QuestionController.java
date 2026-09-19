@@ -12,7 +12,6 @@ import com.edumind.question.vo.question.QuestionBatchSaveVO;
 import com.edumind.question.vo.question.QuestionVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -56,8 +55,8 @@ public class QuestionController {
 
     @SaCheckPermission("question:edit")
     @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteQuestion(@PathVariable("id") Long id) {
+    public ApiResult<Void> deleteQuestion(@PathVariable("id") Long id) {
         questionService.deleteQuestion(id);
+        return ApiResult.success();
     }
 }

@@ -162,44 +162,22 @@ INSERT IGNORE INTO course_member (course_id, user_id, member_role) VALUES
 -- 5. 题库、试题与选项
 -- -----------------------------------------------------------------------------
 INSERT IGNORE INTO question_bank (id, name, course_id, description, question_count, status, deleted) VALUES
-(1, '数据结构核心真题库',   101, '涵盖全国统考408与期末高频真题，包括线性表、树与排序算法', 5, 1, 0),
-(2, 'Java面向对象精选题集', 102, 'Java基础语法、面向对象、集合框架与异常处理典型题型',     3, 1, 0),
-(3, '高等数学期末测试真题库', 103, '极限、连续、导数与微积分计算经典测试题',                 3, 1, 0);
+(1, '数据结构核心真题库',   101, '涵盖栈、队列等线性结构典型题型', 1, 1, 0),
+(2, 'Java面向对象精选题集', 102, 'Java 集合框架与面向对象典型单选题', 1, 1, 0),
+(3, '高等数学期末测试真题库', 103, '极限与等价无穷小经典单选题', 1, 1, 0);
 
 INSERT IGNORE INTO edu_question (id, bank_id, course_id, knowledge_point_id, stem, type, options, answer, analysis, difficulty, score, status, deleted) VALUES
 (1001, 3, 103, 17, '当 $x \\to 0$ 时，下列无穷小量中与 $x$ 等价的无穷小量是（ ）。', 'SINGLE_CHOICE',
  '[{"key":"A","content":"$\\\\sin 2x$"},{"key":"B","content":"$\\\\ln(1 + x)$"},{"key":"C","content":"$1 - \\\\cos x$"},{"key":"D","content":"$e^x - 1 - x$"}]',
  'B', '根据等价无穷小基本公式，当 $x \\to 0$ 时，$\\\\ln(1+x) \\sim x$；而 $\\\\sin 2x \\sim 2x$，$1-\\\\cos x \\sim \\\\frac{1}{2}x^2$。故正确答案为 B。', 3, 5, 1, 0),
 
-(1002, 3, 103, 19, '设函数 $f(x) = \\ln(1 + x^2)$，则导数 $f\'(1)$ 的值为（ ）。', 'SINGLE_CHOICE',
- '[{"key":"A","content":"$\\\\frac{1}{2}$"},{"key":"B","content":"$1$"},{"key":"C","content":"$2$"},{"key":"D","content":"$\\\\ln 2$"}]',
- 'B', '求复合函数导数：$f\'(x) = \\\\frac{1}{1 + x^2} \\\\cdot 2x = \\\\frac{2x}{1 + x^2}$，代入 $x = 1$ 得 $f\'(1) = \\\\frac{2}{2} = 1$。故选 B。', 2, 5, 1, 0),
-
 (1003, 1, 101, 10, '已知一个栈的入栈序列为 1, 2, 3, 4, 5，则不可能得到的出栈序列是（ ）。', 'SINGLE_CHOICE',
  '[{"key":"A","content":"$4, 5, 3, 2, 1$"},{"key":"B","content":"$4, 3, 5, 1, 2$"},{"key":"C","content":"$1, 5, 4, 2, 3$"},{"key":"D","content":"$3, 4, 2, 1, 5$"}]',
  'B', '选项B中，当4、3出栈后，栈内剩余1、2，后压入5出栈后，栈顶应为2，不可能先出1再出2。故出栈序列 $4, 3, 5, 1, 2$ 不合法。', 3, 5, 1, 0),
 
-(1004, 1, 101, 13, '下列关于平衡二叉树（AVL树）的叙述中，正确的有（ ）。', 'MULTIPLE_CHOICE',
- '[{"key":"A","content":"任意结点的左、右子树高度差绝对值不超过1"},{"key":"B","content":"查找操作的时间复杂度在最坏情况下为 $O(\\\\log n)$"},{"key":"C","content":"插入新结点引发失衡后，至多需要两次单旋转即可恢复平衡"},{"key":"D","content":"完全二叉树一定是AVL树"}]',
- 'AB', '选项A为AVL树定义；选项B时间复杂度为对数级，正确；完全二叉树不一定是平衡查找树。故正确答案为 AB。', 4, 6, 1, 0),
-
-(1005, 1, 101, 12, '在单链表中，增加头结点的目的是为了在首元结点之前插入新结点和删除首元结点的操作与其它结点的操作统一。', 'JUDGMENT',
- '[{"key":"T","content":"正确"},{"key":"F","content":"错误"}]',
- 'T', '头结点的引入使得对首元结点的操作与后续结点的操作相同，无需单独维护头指针变量的重定向，统一了边界处理。', 2, 3, 1, 0),
-
-(1006, 1, 101, 10, '请简要描述快速排序（QuickSort）的核心分治思想，并分析其最好、平均与最坏情况下的时间复杂度。', 'ESSAY',
- '[]',
- '分治思想：1. 选取基准元素pivot；2. 分区划分将小于等于pivot的放左侧，大于的放右侧；3. 递归排序左右两部分。时间复杂度：最好和平均均为O(nlogn)，最坏O(n^2)。',
- '考查快速排序的分治划分机制以及分区不平衡导致的退化现象。', 3, 10, 1, 0),
-
 (1007, 2, 102, 16, '在 Java 集合框架中，关于 ArrayList 与 LinkedList 的特性描述，正确的是（ ）。', 'SINGLE_CHOICE',
  '[{"key":"A","content":"ArrayList 底层是动态数组，随机访问时间复杂度为 $O(1)$"},{"key":"B","content":"LinkedList 支持基于下标的 $O(1)$ 常数时间随机访问"},{"key":"C","content":"ArrayList 插入元素永远不需要复制数组"},{"key":"D","content":"LinkedList 占用内存比 ArrayList 更少"}]',
- 'A', 'ArrayList底层是Object[]数组，支持下标随机访问；LinkedList为双向链表，查找需要遍历，且包含前后节点引用指针额外开销。故正确答案为 A。', 2, 5, 1, 0),
-
-(1008, 2, 102, 14, 'Java 语言中，所有类的最终根父类是 ______。', 'BLANK',
- '[]',
- 'java.lang.Object',
- 'Java中任何未显式指定父类的类都隐式继承自 java.lang.Object。', 1, 4, 1, 0);
+ 'A', 'ArrayList底层是Object[]数组，支持下标随机访问；LinkedList为双向链表，查找需要遍历，且包含前后节点引用指针额外开销。故正确答案为 A。', 2, 5, 1, 0);
 
 -- 试题选项明细
 INSERT IGNORE INTO question_option (id, question_id, option_key, content, is_correct) VALUES
@@ -207,20 +185,10 @@ INSERT IGNORE INTO question_option (id, question_id, option_key, content, is_cor
 (2,  1001, 'B', '$\\ln(1 + x)$', 1),
 (3,  1001, 'C', '$1 - \\cos x$', 0),
 (4,  1001, 'D', '$e^x - 1 - x$', 0),
-(5,  1002, 'A', '$\\frac{1}{2}$', 0),
-(6,  1002, 'B', '$1$', 1),
-(7,  1002, 'C', '$2$', 0),
-(8,  1002, 'D', '$\\ln 2$', 0),
 (9,  1003, 'A', '$4, 5, 3, 2, 1$', 0),
 (10, 1003, 'B', '$4, 3, 5, 1, 2$', 1),
 (11, 1003, 'C', '$1, 5, 4, 2, 3$', 0),
 (12, 1003, 'D', '$3, 4, 2, 1, 5$', 0),
-(13, 1004, 'A', '任意结点的左、右子树高度差绝对值不超过1', 1),
-(14, 1004, 'B', '查找操作的时间复杂度在最坏情况下为 $O(\\log n)$', 1),
-(15, 1004, 'C', '插入新结点引发失衡后，至多需要两次单旋转即可恢复平衡', 0),
-(16, 1004, 'D', '完全二叉树一定是AVL树', 0),
-(17, 1005, 'T', '正确', 1),
-(18, 1005, 'F', '错误', 0),
 (19, 1007, 'A', 'ArrayList 底层是动态数组，随机访问时间复杂度为 $O(1)$', 1),
 (20, 1007, 'B', 'LinkedList 支持基于下标的 $O(1)$ 常数时间随机访问', 0),
 (21, 1007, 'C', 'ArrayList 插入元素永远不需要复制数组', 0),
@@ -228,9 +196,9 @@ INSERT IGNORE INTO question_option (id, question_id, option_key, content, is_cor
 
 -- 题库与题目关联
 INSERT IGNORE INTO question_bank_item (bank_id, question_id) VALUES
-(1, 1003), (1, 1004), (1, 1005), (1, 1006),
-(2, 1007), (2, 1008),
-(3, 1001), (3, 1002);
+(1, 1003),
+(2, 1007),
+(3, 1001);
 
 -- -----------------------------------------------------------------------------
 -- 6. 试卷与试题关联
@@ -241,11 +209,7 @@ INSERT IGNORE INTO teaching_exam (id, course_id, title, total_score, pass_score,
 
 INSERT IGNORE INTO exam_question (exam_id, question_id, score, sort_order) VALUES
 (501, 1001, 10, 1),
-(501, 1002, 10, 2),
-(502, 1003, 10, 1),
-(502, 1004, 15, 2),
-(502, 1005, 10, 3),
-(502, 1006, 25, 4);
+(502, 1003, 10, 1);
 
 -- -----------------------------------------------------------------------------
 -- 7. 教学作业、提交与批改结果
@@ -259,14 +223,10 @@ INSERT IGNORE INTO assignment_submission (id, assignment_id, student_id, status,
 (302, 201, 4, 'SUBMITTED', NULL, 100, '2025-10-21 11:15:00');
 
 INSERT IGNORE INTO submission_answer (id, submission_id, question_id, answer) VALUES
-(401, 301, 1003, 'B'),
-(402, 301, 1005, 'T'),
-(403, 301, 1006, '快排基于分治思想：1. 选取基准值(pivot)；2. 将小于等于pivot的放左侧，大于的放右侧；3. 递归排序左右两部分。最好和平均时间复杂度为O(nlogn)，最坏情况当已有序时退化为O(n^2)。');
+(401, 301, 1003, 'B');
 
 INSERT IGNORE INTO grading_result (id, submission_id, question_id, score, max_score, is_correct, ai_comment, teacher_comment, status) VALUES
-(501, 301, 1003, 5,  5,  1, '作答完全正确，清晰理解了栈后进先出的约束条件。', '优秀', 'CONFIRMED'),
-(502, 301, 1005, 3,  3,  1, '回答正确，头结点统一了空表和非空表的插入删除逻辑。', '完全正确', 'CONFIRMED'),
-(503, 301, 1006, 9, 10,  2, '【AI批改分析】分治三个阶段描述准确，时间复杂度分析完备。失分点：未提及三数取中等优化避免退化的工程实践。', '思路很清晰，继续保持！', 'CONFIRMED');
+(501, 301, 1003, 5,  5,  1, '作答完全正确，清晰理解了栈后进先出的约束条件。', '优秀', 'CONFIRMED');
 
 -- -----------------------------------------------------------------------------
 -- 8. 知识库、文档与切片文本

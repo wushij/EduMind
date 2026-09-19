@@ -3,4 +3,4 @@ import type { QuestionItem } from '@/types/question/question';
 import type { GenerateQuestionRequest } from '@/types/ai/generation';
 
 export const generateQuestions = (params: GenerateQuestionRequest) =>
-  post<QuestionItem[]>('/ai/questions/generate', params);
+  post<QuestionItem[]>('/ai/questions/generate', params, { timeout: 180000 });

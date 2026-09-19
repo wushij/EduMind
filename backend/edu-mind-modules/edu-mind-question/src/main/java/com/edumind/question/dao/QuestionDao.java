@@ -80,8 +80,26 @@ public class QuestionDao {
         if (StringUtils.hasText(query.getKeyword())) {
             wrapper.like(QuestionEntity::getStem, query.getKeyword());
         }
+        applyGarbageStemExclusion(wrapper);
         wrapper.orderByDesc(QuestionEntity::getCreateTime);
         return questionMapper.selectPage(page, wrapper);
+    }
+
+    /**
+     * 与 {@code V2_5_3__purge_garbage_question_stems.sql} 规则一致，列表不展示误入库的 AI 提示词题干。
+     */
+    private void applyGarbageStemExclusion(LambdaQueryWrapper<QuestionEntity> wrapper) {
+        wrapper.not(w -> w.likeRight(QuestionEntity::getStem, "Mock 题目"));
+        wrapper.not(w -> w.like(QuestionEntity::getStem, "Mock 题目"));
+        wrapper.not(w -> w.like(QuestionEntity::getStem, "你是一位专业的教学出题助手")
+                .like(QuestionEntity::getStem, "JSON 格式")
+                .like(QuestionEntity::getStem, "questions"));
+        wrapper.not(w -> w.like(QuestionEntity::getStem, "请严格按 JSON 格式输出")
+                .like(QuestionEntity::getStem, "questions"));
+        wrapper.not(w -> w.like(QuestionEntity::getStem, "课程ID=")
+                .like(QuestionEntity::getStem, "知识点=")
+                .like(QuestionEntity::getStem, "题型=")
+                .apply("CHAR_LENGTH(stem) > 500"));
     }
 
     public int insert(QuestionEntity entity) {

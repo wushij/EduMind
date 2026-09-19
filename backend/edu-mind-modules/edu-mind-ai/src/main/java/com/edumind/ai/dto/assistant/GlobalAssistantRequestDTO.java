@@ -16,8 +16,10 @@ public class GlobalAssistantRequestDTO {
     /** 课节章节 ID（微课节） */
     private Long lessonChapterId;
 
-    /** lesson_studio / lesson_learn / course_space / global */
+    /** lesson_studio / lesson_learn / course_space / question_bank / global */
     private String contextModule;
+
+    private Long questionId;
 
     private String selectedText;
 

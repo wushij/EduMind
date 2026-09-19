@@ -49,12 +49,12 @@ export function filterBankQuestions(
 
 export function filterCandidateQuestions(
   pool: QuestionItem[],
-  bankQuestionIds: number[],
+  bankQuestionIds: (number | string)[],
   filters: CandidateFilterState
 ): QuestionItem[] {
-  const currentIds = new Set(bankQuestionIds);
+  const currentIds = new Set(bankQuestionIds.map(String));
   return pool.filter(q => {
-    if (currentIds.has(q.id)) return false;
+    if (currentIds.has(String(q.id))) return false;
     if (filters.drawerType && q.type !== filters.drawerType) return false;
     if (filters.drawerSearch.trim()) {
       const kw = filters.drawerSearch.trim().toLowerCase();
@@ -120,9 +120,45 @@ const FALLBACK_BANKS = [
   { id: 3, name: '高等数学期末测试真题库', courseId: 103, questionCount: 3, description: '微积分计算经典测试题', updateTime: '2026-09-08' }
 ];
 
-export function resolveCourseName(courses: Course[], courseId: number): string {
-  const c = courses.find((item) => item.id === courseId);
-  return c ? c.title : '专业核心课';
+export function downloadMarkdownFile(title: string, questions: QuestionItem[], courseName: string) {
+  const totalScore = calculateBankTotalScore(questions);
+  const lines: string[] = [];
+  lines.push(`# ${title}`);
+  lines.push(`> 关联课程：${courseName} | 试题题量：${questions.length} 题 | 卷面参考总分：${totalScore} 分 | 导出时间：${new Date().toLocaleString()}`);
+  lines.push('');
+
+  questions.forEach((q, idx) => {
+    lines.push(`### 第 ${idx + 1} 题【${getTypeLabel(q.type)}】(${q.score || 5} 分)`);
+    lines.push(q.stem || '');
+    lines.push('');
+    if (Array.isArray(q.options) && q.options.length > 0) {
+      q.options.forEach(opt => {
+        lines.push(`- **${opt.key}.** ${opt.content}`);
+      });
+      lines.push('');
+    }
+    lines.push(`**【参考答案】** ${(q as any).answer || q.correctAnswer || '略'}`);
+    if (q.analysis) {
+      lines.push(`**【考点解析】** ${q.analysis}`);
+    }
+    lines.push('');
+  });
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${title.replace(/\s+/g, '_')}_${Date.now()}.md`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+export function resolveCourseName(courses: Course[], courseId: number | string | undefined | null): string {
+  if (!courseId) return '专业核心课';
+  const c = courses.find((item) => String(item.id) === String(courseId));
+  return c ? (c.title || c.name || '专业核心课') : '专业核心课';
 }
 
 export function useBankList() {
@@ -135,8 +171,9 @@ export function useBankList() {
   const banks = ref<any[]>([]);
   const courses = ref<Course[]>([]);
   const selectedCourseId = ref<number | null>(null);
+  const searchKeyword = ref('');
   const pageNum = ref(1);
-  const pageSize = ref(10);
+  const pageSize = ref(12);
   const total = ref(0);
 
   const newBankForm = reactive({
@@ -150,20 +187,49 @@ export function useBankList() {
     courseId: [{ required: true, message: '请选择关联课程', trigger: 'change' }]
   };
 
+  const filteredBanks = computed(() => {
+    return banks.value.filter(b => {
+      if (selectedCourseId.value !== null && String(b.courseId) !== String(selectedCourseId.value)) {
+        return false;
+      }
+      if (searchKeyword.value.trim()) {
+        const kw = searchKeyword.value.trim().toLowerCase();
+        const inName = b.name?.toLowerCase().includes(kw);
+        const inDesc = b.description?.toLowerCase().includes(kw);
+        const cName = getCourseName(b.courseId)?.toLowerCase();
+        const inCourse = cName?.includes(kw);
+        if (!inName && !inDesc && !inCourse) return false;
+      }
+      return true;
+    });
+  });
+
+  const totalQuestionsAcrossBanks = computed(() => {
+    return banks.value.reduce((acc, b) => acc + (Number(b.questionCount) || 0), 0);
+  });
+
+  function getCourseBankCount(courseId: number | null): number {
+    if (courseId === null) return banks.value.length;
+    return banks.value.filter(b => String(b.courseId) === String(courseId)).length;
+  }
+
   function handleCourseFilter(courseId: number | null) {
     selectedCourseId.value = courseId;
     pageNum.value = 1;
     loadBanks();
   }
 
-  function getCourseName(courseId: number) {
+  function getCourseName(courseId: number | string | undefined | null) {
     return resolveCourseName(courses.value, courseId);
   }
 
   async function loadCourses() {
     try {
-      const res = await getCourseList({ page: 1, pageSize: 50 });
-      courses.value = res.data?.list || [];
+      const res = await getCourseList({ page: 1, pageSize: 100 });
+      courses.value = (res.data?.list || []).map(c => ({
+        ...c,
+        title: c.title || c.name || '未命名课程'
+      }));
     } catch (err) {
       console.error('加载课程失败', err);
     }
@@ -230,6 +296,28 @@ export function useBankList() {
     }
   }
 
+  async function exportSingleBankMarkdown(bank: any) {
+    try {
+      ElMessage.info(`正在准备导出「${bank.name}」试题集...`);
+      const res = await getQuestionBankDetail(bank.id);
+      const detail = res.data;
+      const rawQuestions = detail?.questions && Array.isArray(detail.questions) ? detail.questions : [];
+      const questions = normalizeQuestionList(rawQuestions as Record<string, unknown>[]);
+      if (questions.length === 0) {
+        ElMessage.warning(`题库「${bank.name}」内暂无收录试题`);
+        return;
+      }
+      downloadMarkdownFile(
+        bank.name || '题库精选试卷',
+        questions,
+        bank.courseName || getCourseName(bank.courseId)
+      );
+      ElMessage.success(`题库「${bank.name}」(${questions.length} 题) 已成功导出为 Markdown 试卷`);
+    } catch (err: any) {
+      ElMessage.error(err?.message || '导出题库试卷失败');
+    }
+  }
+
   onMounted(async () => {
     await Promise.all([loadCourses(), loadBanks()]);
   });
@@ -241,19 +329,24 @@ export function useBankList() {
     showCreateDialog,
     dialogFormRef,
     banks,
+    filteredBanks,
     courses,
     selectedCourseId,
+    searchKeyword,
     pageNum,
     pageSize,
     total,
+    totalQuestionsAcrossBanks,
     newBankForm,
     dialogRules,
+    getCourseBankCount,
     handleCourseFilter,
     getCourseName,
     loadCourses,
     loadBanks,
     handleCreateBank,
-    handleDeleteBank
+    handleDeleteBank,
+    exportSingleBankMarkdown
   };
 }
 
@@ -269,14 +362,14 @@ export function useBank() {
   const searchKeyword = ref('');
   const filterType = ref('');
   const filterDifficulty = ref('');
-  const selectedRowKeys = ref<number[]>([]);
-  const expandedAnalyses = ref<number[]>([]);
+  const selectedRowKeys = ref<(number | string)[]>([]);
+  const expandedAnalyses = ref<(number | string)[]>([]);
 
   const drawerVisible = ref(false);
   const drawerSearch = ref('');
   const drawerType = ref('');
   const candidatePool = ref<QuestionItem[]>([]);
-  const selectedCandidateIds = ref<number[]>([]);
+  const selectedCandidateIds = ref<(number | string)[]>([]);
   const addingLoading = ref(false);
 
   const detailModalVisible = ref(false);
@@ -332,11 +425,11 @@ export function useBank() {
     }
   }
 
-  function toggleSelectRow(id: number) {
+  function toggleSelectRow(id: number | string) {
     selectedRowKeys.value = toggleArraySelection(selectedRowKeys.value, id);
   }
 
-  function toggleExpandAnalysis(id: number) {
+  function toggleExpandAnalysis(id: number | string) {
     expandedAnalyses.value = toggleArraySelection(expandedAnalyses.value, id);
   }
 
@@ -345,11 +438,11 @@ export function useBank() {
     detailModalVisible.value = true;
   }
 
-  async function handleRemoveQuestion(id: number) {
+  async function handleRemoveQuestion(id: number | string) {
     try {
       await removeQuestionFromBank(bankId.value, id);
       await loadBankDetail();
-      selectedRowKeys.value = selectedRowKeys.value.filter(k => k !== id);
+      selectedRowKeys.value = selectedRowKeys.value.filter(k => String(k) !== String(id));
       ElMessage.success('已成功从题库中移出该试题');
     } catch (err: any) {
       ElMessage.error(err?.message || '移出试题失败');
@@ -378,7 +471,7 @@ export function useBank() {
     drawerVisible.value = true;
   }
 
-  function toggleCandidateSelect(id: number) {
+  function toggleCandidateSelect(id: number | string) {
     selectedCandidateIds.value = toggleArraySelection(selectedCandidateIds.value, id);
   }
 
@@ -426,9 +519,44 @@ export function useBank() {
     }
   }
 
+  const courses = ref<Course[]>([]);
+
+  async function loadCourses() {
+    try {
+      const res = await getCourseList({ page: 1, pageSize: 100 });
+      courses.value = (res.data?.list || []).map(c => ({
+        ...c,
+        title: c.title || c.name || '未命名课程'
+      }));
+    } catch {}
+  }
+
+  function getCourseName(courseId: number | string | undefined | null) {
+    return resolveCourseName(courses.value, courseId);
+  }
+
+  function exportBankMarkdown() {
+    if (bankQuestions.value.length === 0) {
+      ElMessage.warning('题库中暂无试题可导出');
+      return;
+    }
+    const cName = bankInfo.value?.courseName || getCourseName(bankInfo.value?.courseId);
+    downloadMarkdownFile(
+      bankInfo.value?.name || '题库精选试卷',
+      bankQuestions.value,
+      cName
+    );
+    ElMessage.success(`题库「${bankInfo.value?.name || '试题集'}」已成功导出为 Markdown 文件`);
+  }
+
+  function handleAiExpand() {
+    const cId = bankInfo.value?.courseId || '';
+    const bId = bankId.value;
+    router.push(`/ai/question/generate?courseId=${cId}&targetBankId=${bId}`);
+  }
+
   onMounted(async () => {
-    await loadBankDetail();
-    await loadCandidatePool();
+    await Promise.all([loadBankDetail(), loadCandidatePool(), loadCourses()]);
   });
 
   return {
@@ -436,6 +564,7 @@ export function useBank() {
     bankId,
     loading,
     bankInfo,
+    courses,
     bankQuestions,
     searchKeyword,
     filterType,
@@ -453,6 +582,7 @@ export function useBank() {
     totalScore,
     filteredQuestions,
     candidateQuestions,
+    getCourseName,
     loadBankDetail,
     loadCandidatePool,
     toggleSelectRow,
@@ -465,6 +595,8 @@ export function useBank() {
     confirmAddQuestions,
     handleFastComposeExam,
     handleDeleteBank,
+    exportBankMarkdown,
+    handleAiExpand,
     getTypeLabel,
     getTypeTagType,
     getDifficultyLabel,

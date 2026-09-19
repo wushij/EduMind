@@ -210,16 +210,48 @@ public class MockLlmClient implements LlmClient {
     @Override
     public String generateQuestions(String prompt, Map<String, Object> params) {
         int count = params.get("count") instanceof Number n ? n.intValue() : 3;
+        int score = params.get("scorePerQuestion") instanceof Number s ? s.intValue() : 5;
         List<Map<String, Object>> questions = new ArrayList<>();
+        boolean isAi = prompt != null && (prompt.contains("AI") || prompt.contains("大模型") || prompt.contains("机器学习"));
+        boolean isOs = prompt != null && (prompt.contains("操作系统") || prompt.contains("Linux") || prompt.contains("进程"));
+        boolean isMath = prompt != null && (prompt.contains("数学") || prompt.contains("微积分") || prompt.contains("极限"));
+
         for (int i = 1; i <= count; i++) {
             Map<String, Object> question = new HashMap<>();
             question.put("type", "SINGLE_CHOICE");
             question.put("difficulty", 3);
-            question.put("score", params.getOrDefault("scorePerQuestion", 5));
-            question.put("stem", "Mock 题目 " + i + "：" + prompt);
-            question.put("options", "[{\"key\":\"A\",\"content\":\"选项A\",\"isCorrect\":true},{\"key\":\"B\",\"content\":\"选项B\",\"isCorrect\":false}]");
-            question.put("answer", "A");
-            question.put("analysis", "Mock 解析");
+            question.put("score", score);
+            question.put("cognitiveLevel", "APPLY");
+
+            if (isAi) {
+                question.put("knowledgePointName", "大模型注意力与微调机制");
+                question.put("stem", "在大语言模型推理与长文本外推中，关于 RoPE（旋转位置编码）的数学性质，下列描述正确的是：");
+                question.put("options", "[{\"key\":\"A\",\"content\":\"RoPE 通过绝对位置向量直接相加注入位置信息\",\"isCorrect\":false},{\"key\":\"B\",\"content\":\"RoPE 利用复数旋转性质将相对位置关系转化为内积中的角度旋转\",\"isCorrect\":true},{\"key\":\"C\",\"content\":\"RoPE 完全破坏了注意力矩阵的对称性与可并行性\",\"isCorrect\":false},{\"key\":\"D\",\"content\":\"RoPE 只能应用于固定 512 长度文本，无法进行线性插值扩展\",\"isCorrect\":false}]");
+                question.put("answer", "B");
+                question.put("analysis", "【权威解析】RoPE 巧妙利用旋转矩阵的正交性，通过对二维子空间施加旋转角变换，使两向量内积结果直接蕴含相对位置差值 $m-n$，兼具绝对位置编码的实现简易性与相对位置编码的泛化外推能力。");
+                question.put("distractorAnalysis", "选项 A 为传统绝对位置编码做法（如原始 Transformer 的正弦余弦相加）；选项 D 忽视了 RoPE 的 NTK 插值与线性外推扩展能力。");
+            } else if (isOs) {
+                question.put("knowledgePointName", "进程同步与死锁预防");
+                question.put("stem", "在多线程高并发系统中，某临界资源仅允许互斥访问，关于哲学家就餐问题中死锁现象的防范，下列方案不可行的是：");
+                question.put("options", "[{\"key\":\"A\",\"content\":\"对所有筷子进行全局编号，要求哲学家只能先申请小编号筷子再申请大编号筷子\",\"isCorrect\":false},{\"key\":\"B\",\"content\":\"至多允许 4 位哲学家同时尝试拿起左手边的筷子\",\"isCorrect\":false},{\"key\":\"C\",\"content\":\"要求哲学家必须同时拿起左右两只筷子，否则一只都不拿\",\"isCorrect\":false},{\"key\":\"D\",\"content\":\"无限增大线程数量与每位哲学家就餐思考的休眠时间\",\"isCorrect\":true}]");
+                question.put("answer", "D");
+                question.put("analysis", "【权威解析】选项 A 破坏了死锁的循环等待条件；选项 B 破坏了占有且等待并防止全员死锁；选项 C 采用原子化资源申请破坏了保持且等待条件。选项 D 无法消除死锁四个必要条件，反而加剧资源竞争概率。");
+                question.put("distractorAnalysis", "选项 D 属于典型的掩耳盗铃式参数调优，并发线程数增加反而更容易导致并发冲突。");
+            } else if (isMath) {
+                question.put("knowledgePointName", "泰勒展开与极限定理");
+                question.put("stem", "计算极限：$\\lim_{x \\to 0} \\frac{\\tan x - \\sin x}{x^3}$ 的值为：");
+                question.put("options", "[{\"key\":\"A\",\"content\":\"$1/2$\",\"isCorrect\":true},{\"key\":\"B\",\"content\":\"$1$\",\"isCorrect\":false},{\"key\":\"C\",\"content\":\"$0$\",\"isCorrect\":false},{\"key\":\"D\",\"content\":\"$2$\",\"isCorrect\":false}]");
+                question.put("answer", "A");
+                question.put("analysis", "【权威解析】$\\tan x - \\sin x = \\tan x (1 - \\cos x)$。当 $x \\to 0$ 时，$\\tan x \\sim x$，$1 - \\cos x \\sim \\frac{1}{2}x^2$，故分子等价于 $x \\cdot \\frac{1}{2}x^2 = \\frac{1}{2}x^3$。代入原式求得极限为 $1/2$。");
+                question.put("distractorAnalysis", "若粗心忽略 $1-\\cos x$ 前面的系数 $\\frac{1}{2}$ 则极易误选 B。");
+            } else {
+                question.put("knowledgePointName", "散列表冲突与探测算法");
+                question.put("stem", "已知散列表长度为 11，采用除留余数法散列函数 $H(key) = key \\bmod 11$，若用二次探测法（平方法）处理冲突，增量序列为 $1^2, -1^2, 2^2, -2^2, \\dots$，关于其特性描述正确的是：");
+                question.put("options", "[{\"key\":\"A\",\"content\":\"二次探测法能够彻底避免二次聚集（Secondary Clustering）\",\"isCorrect\":false},{\"key\":\"B\",\"content\":\"二次探测法有效缓解了线性探测法容易出现的堆积（一次聚集）现象\",\"isCorrect\":true},{\"key\":\"C\",\"content\":\"二次探测法只要表中有空位就一定能保证探测到所有表元\",\"isCorrect\":false},{\"key\":\"D\",\"content\":\"二次探测法每次探测步长固定为常数 1\",\"isCorrect\":false}]");
+                question.put("answer", "B");
+                question.put("analysis", "【权威解析】线性探测法由于步长固定为 1，容易形成相邻块连片聚簇（一次聚集）。二次探测法通过非线性递增序列分散了冲突地址，有效解决了连续堆积问题。");
+                question.put("distractorAnalysis", "选项 C 错误，二次探测法只能探测到表中的一部分位置，不能遍历全部表项；选项 A 错误，双重散列才能更好抑制二次聚集。");
+            }
             questions.add(question);
         }
         Map<String, Object> result = new HashMap<>();

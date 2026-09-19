@@ -16,7 +16,7 @@ ai:
     api-key: ${AI_API_KEY:${DEEPSEEK_API_KEY:}}
     base-url: https://api.deepseek.com
     model: deepseek-chat
-    timeout-ms: 60000
+    timeout-ms: 180000
     mock-enabled: false   # 与 prod 一致：真 API；Key 走环境变量或后台「模型配置」
     stream-enabled: true
 

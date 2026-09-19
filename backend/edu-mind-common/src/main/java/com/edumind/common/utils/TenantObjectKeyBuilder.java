@@ -51,6 +51,25 @@ public final class TenantObjectKeyBuilder {
     }
 
     /**
+     * 课程教学资料路径：tenants/{tenantId}/course/{courseId}/resources/{uuid}/{filename}
+     */
+    public static String courseTeachingResource(Long tenantId, Long courseId, String uuid, String filename) {
+        return build(tenantId, "course/" + courseId + "/resources/" + uuid + "/" + sanitizeFilename(filename));
+    }
+
+    /**
+     * 构建可通过 StorageFileController 访问的相对 URL
+     */
+    public static String storageFileUrl(String bucketName, String objectKey) {
+        String bucket = bucketName != null && !bucketName.isBlank() ? bucketName : "edumind";
+        String key = objectKey != null ? objectKey.trim() : "";
+        while (key.startsWith("/")) {
+            key = key.substring(1);
+        }
+        return "/api/storage/files/" + bucket + "/" + key;
+    }
+
+    /**
      * 校验当前租户是否拥有指定 objectKey 的读写权限
      * 1. 若为旧版历史文件（不含 tenants/ 前缀），允许兼容访问
      * 2. 若当前为平台旁路 (currentTenantId == null 或 isIgnoreTenant)，允许全局访问

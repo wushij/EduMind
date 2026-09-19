@@ -231,6 +231,21 @@ const LESSON_LEARN_PRESET_CHIPS = [
   }
 ];
 
+const QUESTION_BANK_PRESET_CHIPS = [
+  {
+    label: '讲解思路',
+    prompt: '请结合当前锚定的完整题目，分步骤讲解解题思路，先不要直接给出最终选项字母。'
+  },
+  {
+    label: '选项辨析',
+    prompt: '请逐项说明当前题目各选项为什么对或错，并指出常见误区。'
+  },
+  {
+    label: '考点归纳',
+    prompt: '请说明这道题考查的核心知识点，并给出 1–2 道同类变式题的出题方向。'
+  }
+];
+
 function buildCourseSpacePresetChips() {
   return [
     {
@@ -381,7 +396,10 @@ export function useGlobalAssistant() {
     const ctx = teachingCopilotStore.activeContext;
     if (
       ctx?.courseId &&
-      (ctx.contextModule === 'lesson_studio' || ctx.contextModule === 'lesson_learn')
+      (ctx.contextModule === 'lesson_studio' ||
+        ctx.contextModule === 'lesson_learn' ||
+        ctx.contextModule === 'course_space' ||
+        ctx.contextModule === 'question_bank')
     ) {
       return ctx.courseId;
     }
@@ -411,6 +429,12 @@ export function useGlobalAssistant() {
       teachingCopilotStore.activeContext?.contextModule === 'lesson_learn'
   );
 
+  const isQuestionBankContext = computed(
+    () =>
+      !manualGlobalScope.value &&
+      teachingCopilotStore.activeContext?.contextModule === 'question_bank'
+  );
+
   const activeCourseLabel = computed(() => {
     if (manualGlobalScope.value) {
       return '全域研读模式 · 通用教学空间';
@@ -422,6 +446,9 @@ export function useGlobalAssistant() {
     }
     if (ctx?.contextModule === 'lesson_learn') {
       return `课节学习 · ${ctx.title || '未命名课节'}`;
+    }
+    if (ctx?.contextModule === 'question_bank') {
+      return ctx.title || '题库题目辅导';
     }
     if (activeCourseId.value) {
       return `课程空间: #${activeCourseId.value} 教学研读中枢`;
@@ -447,6 +474,7 @@ export function useGlobalAssistant() {
     const ctx = teachingCopilotStore.activeContext;
     if (isLessonStudioContext.value) return LESSON_STUDIO_PRESET_CHIPS;
     if (isLessonLearnContext.value) return LESSON_LEARN_PRESET_CHIPS;
+    if (isQuestionBankContext.value) return QUESTION_BANK_PRESET_CHIPS;
     if (!manualGlobalScope.value && activeCourseId.value) {
       return buildCourseSpacePresetChips();
     }

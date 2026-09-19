@@ -12,4 +12,4 @@ export interface LessonContentGenerateResult {
 }
 
 export const generateLessonContent = (data: LessonContentGenerateRequest) =>
-  post<LessonContentGenerateResult>('/ai/lesson-content/generate', data);
+  post<LessonContentGenerateResult>('/ai/lesson-content/generate', data, { timeout: 180000 });

@@ -9,8 +9,8 @@ export interface QuestionOption {
 }
 
 export interface Question {
-  id: number;
-  courseId: number;
+  id: number | string;
+  courseId: number | string;
   courseName?: string;
   chapterId?: number;
   chapterName?: string;
@@ -24,6 +24,9 @@ export interface Question {
   correctAnswer?: string;
   analysis: string;
   knowledgePointNames: string[];
+  knowledgePointId?: number;
+  cognitiveLevel?: string;
+  distractorAnalysis?: string;
   createdAt?: string;
 }
 

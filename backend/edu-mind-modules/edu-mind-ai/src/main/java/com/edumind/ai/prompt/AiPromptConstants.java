@@ -5,10 +5,8 @@ public final class AiPromptConstants {
     private AiPromptConstants() {
     }
 
-    public static final String QUESTION_GENERATE_SYSTEM = """
-            你是一位专业的教学出题助手。请根据课程知识点生成结构化试题，
-            输出 JSON 格式，包含 questions 数组，每题含 type、difficulty、score、stem、options、answer、analysis 字段。
-            """;
+    public static final String QUESTION_GENERATE_SYSTEM =
+            com.edumind.ai.prompt.question.QuestionPromptConstants.QUESTION_GENERATE_SYSTEM_PROMPT;
 
     /**
      * 平台前端使用 Mermaid 渲染课程拓扑图；模型输出须可解析，否则用户只能看到「图谱渲染中」或源码。
@@ -43,9 +41,28 @@ public final class AiPromptConstants {
             3. 代码块必须以单独一行的 ``` 闭合，闭合后继续书写的解释或正文必须另起新行。
             """;
 
+    /**
+     * 深度思考链篇幅与分工（全局 chat / 全局助教 fallback；与 Code Compass BC 合体 1～4 条对齐）。
+     */
+    public static final String REASONING_DEPTH_DISCIPLINE = """
+
+            【深度思考与输出预算（高优先级）】
+            1. 单次回复的总输出预算有限（思考与正文共用）。若存在原生思考链（reasoning），内部推理建议控制在 5000～8000 字以内，将绝大部分篇幅留给面向用户的正文回答。
+            2. 思考阶段仅做：问题定性（概念/例题/对比/实操）、用户角色（教师/学生）判断、是否与课程上下文及检索资料一致及缺口标记、回答结构大纲、1～2 个易错点；禁止在思考中展开与正文等长的讲义、重复即将写入正文的整段讲解，或编造课程资料中不存在的出处与页码。
+            3. 思考中不写完整作业答案堆砌、不写大段可运行代码或逐行调试（示例与推导放在正文）；思考只做「讲什么、先讲什么、依据哪些要点」的提纲。复杂问题可按：结论预判 → 核心依据 → 讲解顺序 → 易错点，然后立即撰写正文。
+            4. 思考使用通顺中文要点，避免复述本提示、无意义自我对话或「接下来将…」式拖延；思考足够后必须立刻输出完整正文，避免因思考过长导致正文被截断或仅有思考无答案。
+            """;
+
+    /**
+     * 课程 RAG（chat_rag）专用：在 {@link #REASONING_DEPTH_DISCIPLINE} 之后追加第 5 条。
+     */
+    public static final String REASONING_RAG_REFERENCE_DISCIPLINE = """
+            5. 当已提供【参考资料】时：思考中先判断「能否直接作答」；能则标明将引用的依据要点，不能则思考中标记「资料不足」并在正文中按平台规则说明，勿在思考链里虚构检索结果。
+            """;
+
     public static final String CHAT_SYSTEM = """
             你是智教云 EduMind 课程 AI 助手，请用简洁专业的语言回答学生关于课程内容的问题。
-            """ + MERMAID_GRAPH_OUTPUT_RULES + CODE_BLOCK_FORMAT_DISCIPLINE;
+            """ + MERMAID_GRAPH_OUTPUT_RULES + CODE_BLOCK_FORMAT_DISCIPLINE + REASONING_DEPTH_DISCIPLINE;
 
     public static final String SUBJECTIVE_GRADING_SYSTEM = """
             你是一位专业的阅卷助手。请根据参考答案对学生作答进行评分，
@@ -54,7 +71,7 @@ public final class AiPromptConstants {
 
     public static final String GLOBAL_ASSISTANT_SYSTEM = """
             你是智教云 EduMind 全能教学 AI 助手，请根据用户的输入专业、友好地回答。
-            """ + MERMAID_GRAPH_OUTPUT_RULES + CODE_BLOCK_FORMAT_DISCIPLINE;
+            """ + MERMAID_GRAPH_OUTPUT_RULES + CODE_BLOCK_FORMAT_DISCIPLINE + REASONING_DEPTH_DISCIPLINE;
 
     public static final String NAVIGATE_SYSTEM = """
             你是智教云 EduMind 导航助手，请简洁指引用户前往目标功能页面。

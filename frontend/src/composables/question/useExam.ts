@@ -360,7 +360,7 @@ export function useExamCreate() {
   const activeSection = ref<ExamSection | null>(null);
   const pickerKeyword = ref('');
   const pickerDifficulty = ref('');
-  const selectedPickerIds = ref<number[]>([]);
+  const selectedPickerIds = ref<(number | string)[]>([]);
   const poolQuestions = ref<QuestionItem[]>([]);
 
   const currentTotalScore = computed(() => calculateSectionsTotalScore(sections.value));
@@ -447,8 +447,8 @@ export function useExamCreate() {
     pickerVisible.value = true;
   }
 
-  function togglePickerItem(id: number) {
-    const idx = selectedPickerIds.value.indexOf(id);
+  function togglePickerItem(id: number | string) {
+    const idx = selectedPickerIds.value.findIndex(item => String(item) === String(id));
     if (idx > -1) {
       selectedPickerIds.value.splice(idx, 1);
     } else {
@@ -458,7 +458,9 @@ export function useExamCreate() {
 
   function confirmAddPickedQuestions() {
     if (!activeSection.value) return;
-    const pickedList = poolQuestions.value.filter(q => selectedPickerIds.value.includes(q.id));
+    const pickedList = poolQuestions.value.filter(q =>
+      selectedPickerIds.value.some(id => String(id) === String(q.id))
+    );
     const newQuestions = pickedList.map(q => ({
       ...q,
       score: activeSection.value?.defaultScore || q.score || 5

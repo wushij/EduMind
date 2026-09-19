@@ -50,6 +50,7 @@ export interface GlobalAssistantChatRequest {
   draftTitle?: string;
   draftDescription?: string;
   objectiveExcerpt?: string;
+  questionId?: number;
 }
 
 export interface GlobalAssistantAskResponse {

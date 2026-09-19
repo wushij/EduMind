@@ -185,6 +185,7 @@ public class CourseConverter {
                 .description(entity.getDescription())
                 .cognitiveDimension(entity.getCognitiveDimension())
                 .importance(entity.getImportance())
+                .examFocus(entity.getExamFocus())
                 .sort(entity.getSortOrder())
                 .build();
     }

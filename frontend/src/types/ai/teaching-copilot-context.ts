@@ -4,6 +4,7 @@ export type TeachingCopilotContextModule =
   | 'lesson_studio'
   | 'lesson_learn'
   | 'course_space'
+  | 'question_bank'
   | 'global';
 
 export interface TeachingCopilotContext {
@@ -12,7 +13,11 @@ export interface TeachingCopilotContext {
   lessonInsertIntent?: LessonInsertIntent;
   courseId?: number;
   lessonChapterId?: number;
+  /** 题库题目辅导锚定 */
+  questionId?: number;
   title?: string;
+  /** 题干摘要等，用于 RAG 检索 query */
+  draftTitle?: string;
   description?: string;
   lessonType?: string;
   wordCount?: number;
@@ -29,9 +34,10 @@ export function buildTeachingContextRequestPayload(
   return {
     contextModule: ctx.contextModule,
     lessonChapterId: ctx.lessonChapterId,
+    questionId: ctx.questionId,
     selectedText: ctx.selectedText,
     draftExcerpt: ctx.draftExcerpt,
-    draftTitle: ctx.title,
+    draftTitle: ctx.draftTitle || ctx.title,
     draftDescription: ctx.description,
     objectiveExcerpt: ctx.objectiveExcerpt
   };

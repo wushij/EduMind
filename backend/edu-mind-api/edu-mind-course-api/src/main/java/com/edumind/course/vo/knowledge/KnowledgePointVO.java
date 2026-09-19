@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.util.List;
 
 @Data
 @Builder
@@ -21,5 +22,8 @@ public class KnowledgePointVO implements Serializable {
     private String description;
     private String cognitiveDimension;
     private Integer importance;
+    private String examFocus;
     private Integer sort;
+    private List<Long> prerequisiteIds;
+    private List<KnowledgePointBriefVO> prerequisites;
 }

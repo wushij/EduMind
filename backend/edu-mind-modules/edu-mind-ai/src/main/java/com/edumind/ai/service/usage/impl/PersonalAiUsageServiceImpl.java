@@ -57,6 +57,7 @@ public class PersonalAiUsageServiceImpl implements PersonalAiUsageService {
             Map.entry("TEACHING_ADVICE", "AI 学情诊断与教学建议"),
             Map.entry("COURSE_OBJECTIVE", "课程教学目标 AI 推荐"),
             Map.entry("COURSE_DESCRIPTION", "课程简介 AI 生成"),
+            Map.entry("COURSE_KNOWLEDGE_POINT", "课程知识点 AI 推荐"),
             Map.entry("RAG", "RAG 知识检索问答"),
             Map.entry("AGENT", "AI Agent 任务规划"),
             Map.entry("GRAPH_SUGGEST", "知识图谱关系推荐"),

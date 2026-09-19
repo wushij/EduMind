@@ -124,10 +124,14 @@ axiosInstance.interceptors.response.use(
     const status = error.response?.status;
     const apiBody = error.response?.data;
     const silent = (error.config as HttpRequestConfig | undefined)?.silent;
-    const apiMessage =
+    let apiMessage =
       (typeof apiBody === 'object' && apiBody !== null && 'message' in apiBody
         ? String((apiBody as { message?: string }).message || '')
         : '') || error.message || '网络通信异常';
+
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      apiMessage = '请求响应超时（大模型深度推演耗时较长），请稍后重试或适当减少一次生成的题量';
+    }
 
     if (!silent) {
       logAppError('HTTP', error, {

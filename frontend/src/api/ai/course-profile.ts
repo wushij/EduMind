@@ -1,4 +1,5 @@
 import { post } from '@/core/http/request';
+import type { HttpRequestConfig } from '@/core/http/types';
 
 export interface CourseDescriptionSuggestResult {
   text: string;
@@ -6,5 +7,5 @@ export interface CourseDescriptionSuggestResult {
   sourceLabel?: string;
 }
 
-export const suggestCourseDescription = (courseId: number) =>
-  post<CourseDescriptionSuggestResult>('/ai/course-profile/suggest-description', { courseId });
+export const suggestCourseDescription = (courseId: number, config?: HttpRequestConfig) =>
+  post<CourseDescriptionSuggestResult>('/ai/course-profile/suggest-description', { courseId }, config);

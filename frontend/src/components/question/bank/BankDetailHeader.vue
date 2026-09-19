@@ -47,12 +47,22 @@
           <el-button type="primary" class="capsule-btn-main" @click="onOpenAddDrawer">
             <el-icon class="mr-1"><Plus /></el-icon> 挑选题目入库
           </el-button>
-          <el-button class="capsule-btn-sub" @click="onFastComposeExam">
-            <el-icon class="mr-1"><DocumentCopy /></el-icon> 基于此题库组卷
-          </el-button>
-          <button type="button" class="table-action-pill table-action-pill--danger" @click="onDeleteBank">
-            删除题库
-          </button>
+          <div class="action-buttons-row">
+            <el-button class="capsule-btn-sub" @click="onExportMarkdown">
+              <el-icon class="mr-1"><Download /></el-icon> 导出试题集
+            </el-button>
+            <el-button class="capsule-btn-ai" @click="onAiExpand">
+              <el-icon class="mr-1"><MagicStick /></el-icon> AI 智能扩题
+            </el-button>
+          </div>
+          <div class="action-buttons-row">
+            <el-button class="capsule-btn-sub" @click="onFastComposeExam">
+              <el-icon class="mr-1"><DocumentCopy /></el-icon> 基于此题库组卷
+            </el-button>
+            <button type="button" class="table-action-pill table-action-pill--danger" @click="onDeleteBank">
+              删除题库
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -60,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowLeft, Plus, DocumentCopy, FolderOpened } from '@element-plus/icons-vue';
+import { ArrowLeft, Plus, DocumentCopy, FolderOpened, Download, MagicStick } from '@element-plus/icons-vue';
 import type { Router } from 'vue-router';
 
 defineProps<{
@@ -71,6 +81,8 @@ defineProps<{
   totalScore: number;
   onOpenAddDrawer: () => void;
   onFastComposeExam: () => void;
+  onExportMarkdown: () => void;
+  onAiExpand: () => void;
   onDeleteBank: () => void;
 }>();
 </script>
@@ -194,18 +206,56 @@ defineProps<{
       flex-direction: column;
       gap: 8px;
 
+      .action-buttons-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
       .capsule-btn-main {
         background: #2563eb;
         border-color: #2563eb;
         border-radius: 8px;
         font-weight: 500;
         padding: 8px 18px;
+        width: 100%;
       }
 
       .capsule-btn-sub {
         border-radius: 8px;
         font-weight: 500;
-        padding: 8px 18px;
+        padding: 8px 14px;
+        flex: 1;
+      }
+
+      .capsule-btn-ai {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        border: none;
+        color: #ffffff;
+        border-radius: 8px;
+        font-weight: 500;
+        padding: 8px 14px;
+        flex: 1;
+
+        &:hover {
+          opacity: 0.9;
+          color: #ffffff;
+        }
+      }
+
+      .table-action-pill--danger {
+        padding: 7px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        background: #fef2f2;
+        color: #ef4444;
+        border: 1px solid #fecaca;
+        cursor: pointer;
+        transition: all 0.15s;
+
+        &:hover {
+          background: #fee2e2;
+        }
       }
     }
   }

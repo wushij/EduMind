@@ -1,7 +1,10 @@
 import { get, post, del } from '@/core/http/request';
-import type { CourseMemberItem } from '@/types/course/member';
+import type { CourseMemberCandidate, CourseMemberItem } from '@/types/course/member';
 
 export const getCourseMembers = (courseId: number) => get<CourseMemberItem[]>(`/courses/${courseId}/members`);
+
+export const searchCourseMemberCandidates = (courseId: number, keyword: string) =>
+  get<CourseMemberCandidate[]>(`/courses/${courseId}/members/candidates`, { keyword });
 
 export const addCourseMember = (courseId: number, userId: number, role: string) =>
   post<number>(`/courses/${courseId}/members`, { userId, role });

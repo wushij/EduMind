@@ -33,6 +33,7 @@
       v-model:visible="showAddDialog"
       v-model:new-user-id="newUserId"
       v-model:new-member-role="newMemberRole"
+      :course-id="courseId"
       :adding="adding"
       @submit="handleAddSubmit"
     />

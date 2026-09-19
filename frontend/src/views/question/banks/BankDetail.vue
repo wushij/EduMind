@@ -8,6 +8,8 @@
       :total-score="totalScore"
       :on-open-add-drawer="openAddDrawer"
       :on-fast-compose-exam="handleFastComposeExam"
+      :on-export-markdown="exportBankMarkdown"
+      :on-ai-expand="handleAiExpand"
       :on-delete-bank="handleDeleteBank"
     />
 
@@ -84,6 +86,8 @@ const {
   confirmAddQuestions,
   handleFastComposeExam,
   handleDeleteBank,
+  exportBankMarkdown,
+  handleAiExpand,
   getTypeLabel,
   getTypeTagType,
   getDifficultyLabel,

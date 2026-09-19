@@ -1,4 +1,4 @@
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { generateLessonPlan } from '@/api/ai/lesson';
@@ -21,7 +21,7 @@ export function useLessonPlan() {
     objectives: ''
   });
 
-  onMounted(async () => {
+  async function applyRouteContext() {
     const qCourseId = route.query.courseId;
     const qTopic = route.query.topic;
     let courseId: number | null = null;
@@ -35,20 +35,26 @@ export function useLessonPlan() {
     if (qTopic != null && String(qTopic).trim()) {
       form.value.topic = String(qTopic);
     }
-    if (courseId && !form.value.objectives.trim()) {
+    if (courseId) {
       try {
         const res = await getCourseObjectives(courseId);
         const lines = (res?.data ?? [])
           .map(o => (o.description ? `${o.title}：${o.description}` : o.title))
           .filter(Boolean);
-        if (lines.length) {
-          form.value.objectives = lines.join('\n');
-        }
+        form.value.objectives = lines.length ? lines.join('\n') : '';
       } catch {
         // optional prefetch
       }
     }
-  });
+  }
+
+  watch(
+    () => [route.query.courseId, route.query.topic] as const,
+    () => {
+      void applyRouteContext();
+    },
+    { immediate: true }
+  );
   const loading = ref(false);
   const result = ref('');
 

@@ -9,6 +9,18 @@ export interface QuestionGenerateFormState {
   difficulty: Difficulty;
   count: number;
   scorePerQuestion: number;
+  promptDirective: string;
+  questionScene: string;
+  customInstruction: string;
+}
+
+export interface KnowledgePointItem {
+  id: number;
+  title: string;
+  chapterId?: number;
+  cognitiveDimension?: string;
+  importance?: number;
+  examFocus?: string;
 }
 
 export interface QuestionTypeOption {
@@ -16,11 +28,13 @@ export interface QuestionTypeOption {
   label: string;
   icon: any;
   color: string;
+  desc?: string;
 }
 
 export interface DifficultyOption {
   val: Difficulty;
   label: string;
   desc: string;
+  cognitiveGoal?: string;
   colorClass: string;
 }

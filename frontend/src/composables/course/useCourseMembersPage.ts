@@ -128,7 +128,7 @@ export function useCourseMembersPage(courseId: number) {
 
   async function handleAddSubmit() {
     if (!newUserId.value) {
-      ElMessage.warning('请输入用户 ID');
+      ElMessage.warning('请搜索并选择要录入的用户');
       return;
     }
     adding.value = true;

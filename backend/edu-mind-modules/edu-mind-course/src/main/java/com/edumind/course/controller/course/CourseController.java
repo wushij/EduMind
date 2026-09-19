@@ -131,11 +131,26 @@ public class CourseController {
         return ApiResult.success(courseService.listKnowledgePoints(id, chapterId));
     }
 
+    @SaCheckPermission("course:view")
+    @GetMapping("/{id}/knowledge-points/{kpId}")
+    public ApiResult<KnowledgePointVO> getKnowledgePoint(@PathVariable("id") Long id,
+                                                         @PathVariable("kpId") Long kpId) {
+        return ApiResult.success(courseService.getKnowledgePoint(id, kpId));
+    }
+
     @SaCheckPermission("course:edit")
     @PostMapping("/{id}/knowledge-points")
     public ApiResult<KnowledgePointVO> createKnowledgePoint(@PathVariable("id") Long id,
                                                             @Valid @RequestBody com.edumind.course.dto.knowledge.KnowledgePointCreateDTO dto) {
         return ApiResult.success(courseService.createKnowledgePoint(id, dto));
+    }
+
+    @SaCheckPermission("course:edit")
+    @PutMapping("/{id}/knowledge-points/{kpId}")
+    public ApiResult<KnowledgePointVO> updateKnowledgePoint(@PathVariable("id") Long id,
+                                                             @PathVariable("kpId") Long kpId,
+                                                             @Valid @RequestBody com.edumind.course.dto.knowledge.KnowledgePointUpdateDTO dto) {
+        return ApiResult.success(courseService.updateKnowledgePoint(id, kpId, dto));
     }
 
     @SaCheckPermission("course:edit")

@@ -15,6 +15,7 @@ import com.edumind.question.entity.QuestionEntity;
 import com.edumind.question.service.question.QuestionService;
 import com.edumind.question.vo.question.QuestionBatchSaveVO;
 import com.edumind.question.vo.question.QuestionVO;
+import com.edumind.question.support.QuestionStemGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     public Long createQuestion(QuestionCreateDTO dto) {
+        QuestionStemGuard.assertValidStem(dto.getStem());
         QuestionEntity entity = questionConverter.toEntity(dto);
         if (entity.getTenantId() == null) {
             entity.setTenantId(TenantContext.requireTenantId());
@@ -50,6 +52,7 @@ public class QuestionServiceImpl implements QuestionService {
             if (item.getCourseId() == null && dto.getCourseId() != null) {
                 item.setCourseId(dto.getCourseId());
             }
+            QuestionStemGuard.assertValidStem(item.getStem());
             QuestionEntity entity = questionConverter.toEntity(item);
             if (entity.getTenantId() == null) {
                 entity.setTenantId(currentTenantId);
@@ -87,6 +90,9 @@ public class QuestionServiceImpl implements QuestionService {
         QuestionEntity entity = questionDao.getById(id);
         if (entity == null) {
             throw new BusinessException("题目不存在");
+        }
+        if (dto.getStem() != null) {
+            QuestionStemGuard.assertValidStem(dto.getStem());
         }
         questionConverter.applyUpdate(entity, dto);
         questionDao.updateById(entity);
