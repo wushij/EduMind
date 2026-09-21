@@ -151,21 +151,33 @@
         <div class="ai-card-header">
           <div class="ai-title">
             <el-icon class="ai-sparkle-icon"><MagicStick /></el-icon>
-            <h4>EduMind AI 教学导学建议</h4>
+            <h4>基于掌握度的学情导学建议</h4>
           </div>
-          <span class="ai-model-tag">DeepSeek-R1 赋能</span>
+          <!-- 该文案由掌握度分档规则生成，并非大模型输出，因此不再标注模型名 -->
+          <span class="ai-model-tag">规则引擎生成</span>
         </div>
         <p class="ai-card-content">
           {{ aiDiagnosisAdvice }}
         </p>
         <div class="ai-card-actions">
-          <el-button type="primary" class="gradient-pill-btn" size="small" @click="handleDispatchPractice">
+          <el-button
+            v-if="canDispatchIntervention"
+            type="primary"
+            class="gradient-pill-btn"
+            size="small"
+            @click="goInterventionCenter"
+          >
             <el-icon><Promotion /></el-icon>
-            <span>一键下发薄弱项靶向微练</span>
+            <span>前往教学干预下发</span>
           </el-button>
-          <el-button class="plain-pill-btn" size="small" @click="handleSendNotice">
+          <el-button
+            v-if="canSendBroadcast"
+            class="plain-pill-btn"
+            size="small"
+            @click="goBroadcastCenter"
+          >
             <el-icon><ChatDotRound /></el-icon>
-            <span>发送学情鼓励通知</span>
+            <span>前往消息广播</span>
           </el-button>
         </div>
       </div>
@@ -175,7 +187,7 @@
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
-import { ElMessage } from 'element-plus';
+import { useRouter } from 'vue-router';
 import {
   CreditCard,
   School,
@@ -188,6 +200,7 @@ import {
   MagicStick
 } from '@element-plus/icons-vue';
 import { getStudentCognitiveProfile } from '@/composables/system/useOrganization';
+import { canAccessRoute } from '@/utils/router/route-access';
 import type { OrganizationMemberVO, StudentCognitiveProfileVO } from '@/types/system/tenant';
 
 const props = defineProps<{
@@ -268,12 +281,29 @@ const formatDateTime = (val?: string) => {
   return val.replace('T', ' ').substring(0, 16);
 };
 
-const handleDispatchPractice = () => {
-  ElMessage.success(`已为【${props.student?.name || '该学员'}】自适应生成薄弱考点变式练习任务！`);
+const router = useRouter();
+const INTERVENTION_PATH = '/analytics/interventions';
+const BROADCAST_PATH = '/system/notification-broadcast';
+
+/** 仅当当前账号确实有权访问对应模块时才展示入口，避免点了被守卫拦截 */
+const canDispatchIntervention = computed(() => canAccessRoute(router, INTERVENTION_PATH));
+const canSendBroadcast = computed(() => canAccessRoute(router, BROADCAST_PATH));
+
+/**
+ * 原实现直接弹「已生成薄弱考点变式练习任务」的成功提示，但没有任何后端调用，属于虚假反馈。
+ * 真正的干预编排与下发在「教学干预决策」模块完成，这里只负责跳转到真实入口。
+ */
+const goInterventionCenter = () => {
+  const studentId = props.student?.userId;
+  router.push({
+    path: INTERVENTION_PATH,
+    query: studentId ? { studentId: String(studentId) } : undefined
+  });
 };
 
-const handleSendNotice = () => {
-  ElMessage.success(`已向【${props.student?.name || '该学员'}】发送个性化学习激励提醒！`);
+/** 消息广播是真实模块（按角色/全员广播），同样只做跳转，不再伪造“已发送”提示 */
+const goBroadcastCenter = () => {
+  router.push(BROADCAST_PATH);
 };
 </script>
 

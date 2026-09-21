@@ -28,8 +28,10 @@ public class GlobalAssistantRequestDTO {
     private String draftTitle;
 
     private String draftDescription;
-
     private String objectiveExcerpt;
+
+    /** 前端选择的模型配置键（config_name / model_key）；为空时走平台场景策略与默认模型 */
+    private String modelKey;
 
     /**
      * 兼容前端历史传参 input 别名

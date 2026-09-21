@@ -206,28 +206,36 @@
         <table v-if="portrait?.wrongQuestions?.length" class="wrong-table">
           <thead>
             <tr>
-              <th style="width: 38%;">题目题干摘要</th>
-              <th>关联考点</th>
-              <th>归因类型</th>
-              <th>AI 错因诊断</th>
-              <th>重做频次</th>
+              <th class="col-stem">题目题干摘要</th>
+              <th class="col-kp">关联考点</th>
+              <th class="col-type">归因类型</th>
+              <th class="col-diag">AI 错因诊断</th>
+              <th class="col-count">重做频次</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="w in portrait.wrongQuestions" :key="w.recordId">
-              <td>
+              <td class="col-stem">
                 <div class="stem-text">{{ w.questionStem || `题目 #${w.questionId}` }}</div>
               </td>
-              <td>
-                <span class="kp-pill">{{ w.knowledgePointTitle }}</span>
+              <td class="col-kp">
+                <span class="kp-pill" :title="w.knowledgePointTitle">{{ w.knowledgePointTitle }}</span>
               </td>
-              <td>
-                <span class="error-type-tag">{{ formatErrorTypes(w.errorTypes) }}</span>
+              <td class="col-type">
+                <div class="error-tags-wrap">
+                  <span
+                    v-for="(t, idx) in splitErrorTypes(w.errorTypes)"
+                    :key="idx"
+                    class="error-type-tag"
+                  >
+                    {{ t }}
+                  </span>
+                </div>
               </td>
-              <td>
+              <td class="col-diag">
                 <p class="diagnosis-text">{{ w.diagnosis || '概念细节理解存在轻微偏差' }}</p>
               </td>
-              <td>
+              <td class="col-count">
                 <span class="wrong-count-tag">{{ w.wrongCount }} 次</span>
               </td>
             </tr>
@@ -286,17 +294,31 @@
         </div>
 
         <div class="ai-header-actions">
+          <!--
+            秒级推演计时胶囊：与「AI 智能评阅」弹窗的计时样式保持一致，
+            推演进行中显示实时耗时，完成后保留本次总耗时，便于教师判断模型响应速度。
+          -->
+          <div
+            v-if="adviceLoading || elapsedTenths > 0"
+            class="advice-timer-capsule"
+            :class="{ 'is-running': adviceLoading }"
+          >
+            <span v-if="adviceLoading" class="timer-dot"></span>
+            <span class="timer-label">{{ adviceLoading ? '推演已耗时：' : '本次推演耗时：' }}</span>
+            <span class="timer-digits">{{ formattedAdviceSeconds }}s</span>
+          </div>
+
           <button
             v-if="adviceLoading"
             type="button"
             class="ai-action-capsule-btn ai-action-capsule-btn--warning"
-            title="停止本次 AI 推演"
+            title="中止本次 AI 推演"
             @click.stop="emit('stop-advice')"
           >
             <svg viewBox="0 0 24 24" class="btn-svg is-spin" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="6" y="6" width="12" height="12" rx="2"></rect>
             </svg>
-            <span>停止推演</span>
+            <span>中止推演</span>
           </button>
 
           <template v-else>
@@ -340,7 +362,7 @@
       <div
         class="ai-feedback-content"
         v-loading="adviceLoading"
-        element-loading-text="AI 深度学情诊断推演中..."
+        :element-loading-text="`AI 深度学情诊断推演中… 已耗时 ${formattedAdviceSeconds}s`"
       >
         <p>{{ portrait?.aiDiagnosis || '暂无该学员的 AI 诊断建议，点击上方「生成精准诊断建议」获取基于 DeepSeek 大模型的深度推演分析。' }}</p>
       </div>
@@ -349,7 +371,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import { ElMessageBox } from 'element-plus';
 import KnowledgeRadar from '@/components/analytics/KnowledgeRadar.vue';
 import LearningChart from '@/components/analytics/LearningChart.vue';
@@ -388,12 +410,45 @@ const emit = defineEmits<{
   (e: 'go-wrong-book'): void;
 }>();
 
+/* ── AI 推演计时（精确到 0.1s，与「AI 智能评阅」弹窗的秒级计时胶囊口径一致） ── */
+const elapsedTenths = ref(0);
+let adviceTimer: ReturnType<typeof setInterval> | null = null;
+
+const formattedAdviceSeconds = computed(() => (elapsedTenths.value / 10).toFixed(1));
+
+function stopAdviceTimer() {
+  if (adviceTimer) {
+    clearInterval(adviceTimer);
+    adviceTimer = null;
+  }
+}
+
+// 开始推演即从头计时；中止或完成则停表并保留本次耗时，便于教师判断模型响应速度
+watch(
+  () => props.adviceLoading,
+  (loading) => {
+    stopAdviceTimer();
+    if (loading) {
+      elapsedTenths.value = 0;
+      adviceTimer = setInterval(() => {
+        elapsedTenths.value++;
+      }, 100);
+    }
+  },
+  { immediate: true }
+);
+
+onUnmounted(stopAdviceTimer);
+
 function handleClearAdvice() {
   ElMessageBox.confirm('确定清空该学员当前生成的 AI 诊断建议吗？', '清空建议确认', {
     confirmButtonText: '确定清空',
     cancelButtonText: '取消',
     type: 'warning'
   }).then(() => {
+    // 建议已清空，计时胶囊一并归零，避免残留上一次推演的耗时
+    stopAdviceTimer();
+    elapsedTenths.value = 0;
     emit('clear-advice');
   }).catch(() => {});
 }
@@ -435,6 +490,15 @@ function formatErrorTypes(types?: string) {
               .replace(/LOGIC/g, '逻辑推理')
               .replace(/CALCULATION/g, '计算失误')
               .replace(/,/g, ' / ');
+}
+
+function splitErrorTypes(types?: string): string[] {
+  if (!types) return ['概念混淆'];
+  const formatted = types
+    .replace(/CONCEPT/g, '概念混淆')
+    .replace(/LOGIC/g, '逻辑推理')
+    .replace(/CALCULATION/g, '计算失误');
+  return formatted.split(/[,/，、]+/).map((s) => s.trim()).filter(Boolean);
 }
 </script>
 
@@ -836,59 +900,103 @@ function formatErrorTypes(types?: string) {
       text-align: left;
 
       th {
-        padding: 12px 22px;
+        padding: 12px 20px;
         font-size: 12px;
         font-weight: 600;
         color: #64748B;
         background: #F8FAFC;
         border-bottom: 1px solid #E2E8F0;
+        white-space: nowrap;
       }
 
       td {
-        padding: 14px 22px;
+        padding: 14px 20px;
         border-bottom: 1px solid #F1F5F9;
         vertical-align: middle;
         font-size: 13px;
         color: #334155;
       }
 
+      .col-stem {
+        width: 30%;
+        min-width: 240px;
+      }
+
+      .col-kp {
+        width: 20%;
+        min-width: 170px;
+      }
+
+      .col-type {
+        width: 15%;
+        min-width: 120px;
+      }
+
+      .col-diag {
+        min-width: 260px;
+      }
+
+      .col-count {
+        width: 80px;
+        min-width: 80px;
+        text-align: center;
+      }
+
       .stem-text {
         font-weight: 600;
         color: #0F172A;
-        line-height: 1.4;
+        line-height: 1.5;
+        font-size: 13px;
       }
 
       .kp-pill {
         display: inline-block;
-        padding: 3px 10px;
-        border-radius: 9999px;
+        padding: 4px 12px;
+        border-radius: 9999px; // 长圆考点胶囊
         background: #EFF6FF;
-        color: #1E40AF;
+        color: #1D4ED8;
         font-size: 12px;
         font-weight: 600;
+        line-height: 1.4;
+        white-space: nowrap; // 防内部折断
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        vertical-align: middle;
+      }
+
+      .error-tags-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
       }
 
       .error-type-tag {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 9999px;
+        display: inline-flex;
+        align-items: center;
+        padding: 3px 10px;
+        border-radius: 9999px; // 长圆归因类型胶囊
         background: #FEF2F2;
         color: #DC2626;
         font-size: 11px;
         font-weight: 700;
+        line-height: 1.3;
+        white-space: nowrap; // 单个类型不拆断
       }
 
       .diagnosis-text {
         margin: 0;
-        font-size: 12px;
-        color: #64748B;
-        line-height: 1.4;
+        font-size: 13px;
+        color: #475569;
+        line-height: 1.6;
       }
 
       .wrong-count-tag {
-        font-size: 12px;
+        display: inline-block;
+        font-size: 13px;
         font-weight: 700;
         color: #DC2626;
+        text-align: center;
       }
     }
 
@@ -1020,6 +1128,43 @@ function formatErrorTypes(types?: string) {
       display: flex;
       align-items: center;
       gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* 秒级推演计时胶囊（与「AI 智能评阅」弹窗同款视觉） */
+    .advice-timer-capsule {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 14px;
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 9999px;
+      font-size: 12px;
+      color: #334155;
+
+      .timer-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #10B981;
+        animation: pulse-dot 1s infinite alternate;
+      }
+
+      .timer-label {
+        color: #64748B;
+      }
+
+      .timer-digits {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-weight: 700;
+        font-size: 13px;
+        color: #2563EB;
+      }
+
+      &.is-running {
+        border-color: #BFDBFE;
+      }
     }
 
     .ai-action-capsule-btn {
@@ -1157,5 +1302,11 @@ function formatErrorTypes(types?: string) {
   .adaptive-panel .adaptive-weeks-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* 推演计时呼吸点（与 AI 智能评阅弹窗一致） */
+@keyframes pulse-dot {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
 }
 </style>

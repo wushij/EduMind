@@ -275,12 +275,13 @@ async function executeRealAiProcess() {
     }
 
     const applyOptionsPatch = (patch: Partial<Question>) => {
-      if (!hasFilledQuestionOptions(generated.options)) {
+      const opts = generated.options;
+      if (!opts || !hasFilledQuestionOptions(opts)) {
         return false;
       }
-      patch.options = generated.options.map((o) => ({ ...o }));
+      patch.options = opts.map((o) => ({ ...o }));
       patch.correctAnswer =
-        generated.correctAnswer || generated.options.find((o) => o.isCorrect)?.key || 'A';
+        generated.correctAnswer || opts.find((o) => o.isCorrect)?.key || 'A';
       return true;
     };
 

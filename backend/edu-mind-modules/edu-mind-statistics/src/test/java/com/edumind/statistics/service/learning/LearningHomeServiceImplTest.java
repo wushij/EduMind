@@ -31,8 +31,6 @@ class LearningHomeServiceImplTest {
     private LearningRecordDao learningRecordDao;
     @Mock
     private StudentAssignmentQueryApi studentAssignmentQueryApi;
-    @Mock
-    private AdaptivePathService adaptivePathService;
 
     @InjectMocks
     private LearningHomeServiceImpl learningHomeService;
@@ -62,8 +60,7 @@ class LearningHomeServiceImplTest {
                         .build());
         when(knowledgeMasteryService.getMastery(101L, 2L))
                 .thenReturn(new com.edumind.statistics.vo.analytics.KnowledgeMasteryVO());
-        when(adaptivePathService.buildAdaptivePath(101L, 2L))
-                .thenReturn(new com.edumind.statistics.vo.learning.LearningPathVO());
+        // 今日任务改为复用薄弱考点构造，不再构建整条学习路径（原先这里需要 stub buildAdaptivePath）
 
         LearningHomeOverviewVO overview = learningHomeService.getOverview(2L, null);
 

@@ -31,7 +31,7 @@ vi.mock('@/api/system/oper-log', () => ({
 describe('useAudit shared helpers', () => {
   it('maps role and scene labels', () => {
     expect(getRoleLabel('ADMIN')).toBe('管理员');
-    expect(getSceneLabel('CHAT')).toContain('CHAT');
+    expect(getSceneLabel('CHAT')).toBe('智能对话');
     expect(getSceneStyleClass('GRADING')).toBe('badge-grading');
     expect(getLatencyClass(200)).toBe('lat-fast');
     expect(getLatencyClass(5000)).toBe('lat-danger');

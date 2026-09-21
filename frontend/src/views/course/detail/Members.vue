@@ -25,6 +25,8 @@
       :get-role-class="getRoleClass"
       :get-avatar-class="getAvatarClass"
       :manageable="courseEditable"
+      :viewer-is-staff="viewerIsStaff"
+      :viewer-user-id="viewerUserId"
       @view-portrait="handleViewPortrait"
       @remove="handleRemove"
     />
@@ -41,6 +43,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import type { Course } from '@/types/course/course';
 import MembersStatOverview from '@/components/course/MembersStatOverview.vue';
@@ -49,6 +52,8 @@ import MembersTable from '@/components/course/MembersTable.vue';
 import MembersAddDialog from '@/components/course/MembersAddDialog.vue';
 import { useCourseMembersPage } from '@/composables/course/useCourseMembersPage';
 import { useCourseEditable } from '@/composables/course/useCourseEditable';
+import { useAuthStore } from '@/stores/auth/auth';
+import { RoleEnum } from '@/constants/auth';
 
 const props = defineProps<{
   course?: Course | null;
@@ -57,6 +62,11 @@ const props = defineProps<{
 const route = useRoute();
 const courseId = Number(route.params.id) || props.course?.id || 0;
 const courseEditable = useCourseEditable(() => props.course);
+
+const authStore = useAuthStore();
+/** 学生视角下成员列表只保留本人画像入口，不再暴露班级整体学情 */
+const viewerIsStaff = computed(() => authStore.hasAnyRole([RoleEnum.ADMIN, RoleEnum.TEACHER]));
+const viewerUserId = computed(() => authStore.currentUser?.id ?? null);
 
 const {
   members,

@@ -70,9 +70,14 @@ import LessonLearnToc from '@/components/course/lesson/LessonLearnToc.vue';
 import type { LessonTocItem } from '@/utils/course/lesson-toc';
 import { buildLessonToc } from '@/utils/course/lesson-toc';
 import { buildLessonLearnAiExcerpt } from '@/utils/course/lesson-learn-ai-context';
+import { useAuthStore } from '@/stores/auth/auth';
 
 const route = useRoute();
 const router = useRouter();
+const authStore = useAuthStore();
+
+/** 教师侧才有 AI 出题权限；学生点击随堂测/生成练习应走学生侧的 AI 练习 */
+const isTeacherSide = computed(() => authStore.hasAnyRole(['ADMIN', 'TEACHER']));
 
 const courseId = computed(() => Number(route.params.id));
 const lessonId = computed(() => Number(route.params.lessonId));
@@ -147,7 +152,15 @@ function goCourseAiWithContext() {
 }
 
 function goQuiz() {
-  router.push(`/ai/question/generate?courseId=${courseId.value}`);
+  // AI 出题为教师模块（meta.roles = ADMIN/TEACHER）；学生侧等价能力是「AI 练习」，直接进入并自动开练
+  if (isTeacherSide.value) {
+    router.push(`/ai/question/generate?courseId=${courseId.value}`);
+    return;
+  }
+  router.push({
+    path: '/learning/practice',
+    query: { courseId: String(courseId.value), autoStart: '1' }
+  });
 }
 
 function goEditLesson() {

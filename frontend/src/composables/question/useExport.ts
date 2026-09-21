@@ -269,7 +269,7 @@ export function applyPresetConfig(
   keys.forEach((key) => {
     const val = preset.config[key];
     if (val !== undefined) {
-      (configForm as Record<string, unknown>)[key] = val;
+      (configForm as unknown as Record<string, unknown>)[key] = val;
     }
   });
 }
@@ -346,7 +346,7 @@ export function useExport() {
     previewError.value = '';
     try {
       const res = await getExamDetail(examId);
-      examPaper.value = normalizeExamPaper((res.data || {}) as Record<string, unknown>);
+      examPaper.value = normalizeExamPaper((res.data || {}) as unknown as Record<string, unknown>);
       if (examPaper.value) {
         const fromList = examOptions.value.find((e) => e.id === examId);
         if (fromList?.courseName && examPaper.value.courseName?.startsWith('课程 #')) {

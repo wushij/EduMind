@@ -170,11 +170,14 @@ export function useWrongQuestions(initialCourseId = 102) {
     const map: Record<string, string> = {
       SINGLE_CHOICE: '单选题',
       MULTIPLE_CHOICE: '多选题',
+      FILL_BLANK: '填空题',
+      SHORT_ANSWER: '简答题',
       CALCULATION: '计算题',
       ESSAY: '解答题',
-      TRUE_FALSE: '判断题'
+      TRUE_FALSE: '判断题',
+      JUDGEMENT: '判断题'
     };
-    return type ? map[type] || '综合题' : '综合题';
+    return type ? (map[type.toUpperCase()] || type) : '综合题';
   }
 
   function getDifficultyType(diff?: string) {

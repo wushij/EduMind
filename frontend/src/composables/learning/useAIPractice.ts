@@ -5,12 +5,13 @@ import {
   gradeAiPracticeAnswer,
   submitAiPractice
 } from '@/api/learning/ai-practice';
-import { getKnowledgePoints } from '@/api/course/knowledge-point';
+import { getKnowledgePoints, getKnowledgePoint } from '@/api/course/knowledge-point';
 import { getStudentPortrait } from '@/api/analytics/learning';
 import { getWrongBook } from '@/api/learning/wrong-book';
 import { resolveApiErrorMessage } from '@/core/http/api-error-message';
 import { parseQuestionOptionsAsVal } from '@/utils/format/question-options';
 import { isObjectiveQuestionType } from '@/utils/format/question-answer';
+import { normalizeDifficulty } from '@/utils/learning/map-recommendation';
 import type { PracticeQuestionVO } from '@/types/learning/ai-practice';
 import type { AiPracticeSubmitVO, AiPracticeQuestionResult } from '@/types/learning/ai-practice';
 import { usePracticeTimer } from '@/composables/learning/usePracticeTimer';
@@ -29,10 +30,15 @@ export interface PracticeQuestion {
   knowledgePointId?: number;
 }
 
-const DIFFICULTY_LABEL: Record<number, string> = {
-  1: 'EASY',
-  2: 'MEDIUM',
-  3: 'HARD'
+/**
+ * 难度展示标签。
+ * 分级口径与后端一致（1~2 简单 / 3 中等 / 4~5 困难），统一复用公共 normalizeDifficulty，
+ * 此前这里自带一份映射把 3 当成 HARD，导致"难度中等却显示 HARD"。
+ */
+const DIFFICULTY_LABELS: Record<string, string> = {
+  EASY: '简单',
+  MEDIUM: '中等',
+  HARD: '困难'
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -47,8 +53,9 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 function mapQuestionVo(q: PracticeQuestionVO): PracticeQuestion {
-  const diffNum = Number(q.difficulty ?? 2);
-  const diffLabel = DIFFICULTY_LABEL[diffNum] || 'MEDIUM';
+  const rawNum = typeof q.difficulty === 'number' ? q.difficulty : Number(q.difficulty);
+  const diffNum = Number.isFinite(rawNum) && rawNum > 0 ? rawNum : 3;
+  const diffLabel = DIFFICULTY_LABELS[normalizeDifficulty(q.difficulty)] || '中等';
   const options = parseQuestionOptionsAsVal(q.options);
   return {
     id: q.id,
@@ -119,7 +126,7 @@ export function useAIPractice(initialCourseId = 102) {
         stem: '',
         type: 'SINGLE_CHOICE',
         typeText: '单选题',
-        difficulty: 'MEDIUM',
+        difficulty: '中等',
         options: [],
         answer: '',
         analysis: '',
@@ -152,9 +159,10 @@ export function useAIPractice(initialCourseId = 102) {
     practiceMode.value = mode;
   }
 
+  /** 入参是展示用的中文难度标签（简单/中等/困难） */
   function getDifficultyTag(diff: string) {
-    if (diff === 'EASY') return 'success';
-    if (diff === 'HARD') return 'danger';
+    if (diff === DIFFICULTY_LABELS.EASY) return 'success';
+    if (diff === DIFFICULTY_LABELS.HARD) return 'danger';
     return 'warning';
   }
 
@@ -189,6 +197,11 @@ export function useAIPractice(initialCourseId = 102) {
     if (seedQuestionIds.value.length > 0) {
       questionCount.value = seedQuestionIds.value.length;
     }
+    // 定向考点入口（学习首页「立即强化」）：锁定考点，mode=KNOWLEDGE_TIER 时会按该考点选题
+    const kpId = query.knowledgePointId;
+    if (typeof kpId === 'string' && /^\d+$/.test(kpId.trim()) && kpId.trim().length <= 15) {
+      selectedKpId.value = Number(kpId.trim());
+    }
     const cid = query.courseId;
     if (cid != null && cid !== '') {
       courseId.value = Number(cid);
@@ -200,17 +213,36 @@ export function useAIPractice(initialCourseId = 102) {
     try {
       const [kpRes, portraitRes, wrongRes] = await Promise.all([
         getKnowledgePoints(courseId.value),
-        getStudentPortrait({ courseId: courseId.value }).catch(() => null),
-        getWrongBook({ courseId: courseId.value, page: 1, pageSize: 1 }).catch(() => null)
+        getStudentPortrait({ courseId: courseId.value }, { silent: true }).catch(() => null),
+        getWrongBook({ courseId: courseId.value, page: 1, pageSize: 1 }, { silent: true }).catch(() => null)
       ]);
       const list = kpRes.data ?? [];
+      const formattedList = list.map((kp) => ({
+        id: Number(kp.id),
+        name: kp.title || kp.name || `考点 #${kp.id}`,
+        mastery: kp.masteryRate
+      }));
+
+      // 如果路由传了指定考点 ID 且不在列表中，尝试补齐该考点名称，避免回显显示生硬的纯数字
+      if (selectedKpId.value > 0 && !formattedList.some((k) => k.id === selectedKpId.value)) {
+        try {
+          const singleKpRes = await getKnowledgePoint(courseId.value, selectedKpId.value);
+          if (singleKpRes?.data) {
+            const singleKp = singleKpRes.data;
+            formattedList.unshift({
+              id: Number(singleKp.id),
+              name: singleKp.title || singleKp.name || `考点 #${singleKp.id}`,
+              mastery: singleKp.masteryRate
+            });
+          }
+        } catch {
+          // 忽略单查失败
+        }
+      }
+
       kpOptions.value = [
         { id: 0, name: '全课程薄弱考点自适应聚合 (AI 推荐)' },
-        ...list.map((kp) => ({
-          id: kp.id,
-          name: kp.title || kp.name || `考点 #${kp.id}`,
-          mastery: kp.masteryRate
-        }))
+        ...formattedList
       ];
       sessionMeta.value.pendingWrongQuestionCount = wrongRes?.data?.total ?? 0;
       const weakFromKp = list.filter((kp) => (kp.masteryRate ?? 100) < 70).length;
@@ -362,7 +394,8 @@ export function useAIPractice(initialCourseId = 102) {
       isFinished.value = true;
       ElMessage.success('自适应练习已完成，报告已生成');
     } catch (err: unknown) {
-      ElMessage.error(err instanceof Error ? err.message : '提交练习失败');
+      // 直接取 err.message 会显示 axios 的「Request failed with status code 400」，对用户没有任何信息量
+      ElMessage.error(resolveApiErrorMessage(err, '提交练习失败'));
     } finally {
       submitting.value = false;
     }

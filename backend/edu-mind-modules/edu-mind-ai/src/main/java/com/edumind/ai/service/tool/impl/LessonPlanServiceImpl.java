@@ -1,8 +1,13 @@
 package com.edumind.ai.service.tool.impl;
 
 import com.edumind.ai.dto.tool.LessonPlanDTO;
+import com.edumind.ai.gateway.AiGatewayFacade;
+import com.edumind.ai.integration.llm.LlmChatMessage;
 import com.edumind.ai.integration.llm.LlmClient;
+import com.edumind.ai.service.audit.AiCallAuditContext;
 import com.edumind.ai.service.tool.LessonPlanService;
+import com.edumind.common.context.TenantContext;
+import com.edumind.common.model.UserContext;
 import com.edumind.course.api.CourseQueryApi;
 import com.edumind.course.vo.chapter.ChapterTreeVO;
 import com.edumind.course.vo.course.CourseDetailVO;
@@ -22,13 +27,16 @@ import java.util.concurrent.Executors;
 @RequiredArgsConstructor
 public class LessonPlanServiceImpl implements LessonPlanService {
 
-    private final LlmClient llmClient;
+    /** 场景键：走网关以便统一参与场景路由、熔断降级与调用审计（此前直连 LlmClient 会绕过这些能力） */
+    private static final String SCENE = "lesson_plan";
+
+    private final AiGatewayFacade aiGatewayFacade;
     private final CourseQueryApi courseQueryApi;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     @Override
     public String generate(LessonPlanDTO dto) {
-        return llmClient.chat(systemPrompt(), buildUserPrompt(dto));
+        return aiGatewayFacade.chat(SCENE, null, systemPrompt(), buildUserPrompt(dto), auditContext(dto));
     }
 
     @Override
@@ -36,7 +44,10 @@ public class LessonPlanServiceImpl implements LessonPlanService {
         SseEmitter emitter = new SseEmitter(120_000L);
         executor.execute(() -> {
             try {
-                llmClient.streamChat(systemPrompt(), buildUserPrompt(dto), new LlmClient.StreamCallback() {
+                aiGatewayFacade.streamChat(SCENE, null, systemPrompt(),
+                        List.of(LlmChatMessage.user(buildUserPrompt(dto))), auditContext(dto),
+                        () -> false,
+                        new LlmClient.StreamCallback() {
                     @Override
                     public void onChunk(String content) {
                         try {
@@ -70,6 +81,14 @@ public class LessonPlanServiceImpl implements LessonPlanService {
 
     private String systemPrompt() {
         return "你是资深高校教学设计师，请输出结构清晰、可直接用于课堂的 Markdown 教案。";
+    }
+
+    private AiCallAuditContext auditContext(LessonPlanDTO dto) {
+        return AiCallAuditContext.builder()
+                .userId(UserContext.getUserId())
+                .tenantId(TenantContext.getTenantId())
+                .courseId(dto != null ? dto.getCourseId() : null)
+                .build();
     }
 
     private String buildUserPrompt(LessonPlanDTO dto) {

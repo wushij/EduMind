@@ -3,6 +3,7 @@ package com.edumind.ai.service.assistant.impl;
 import com.alibaba.fastjson2.JSON;
 import com.edumind.ai.dto.assistant.GlobalAssistantRequestDTO;
 import com.edumind.ai.gateway.AiGatewayFacade;
+import com.edumind.ai.gateway.AiUserModelPolicy;
 import com.edumind.ai.integration.llm.LlmChatMessage;
 import com.edumind.ai.integration.llm.LlmClient;
 import com.edumind.ai.integration.llm.LlmStreamRelay;
@@ -50,6 +51,7 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
     private final LessonContentIndexApi lessonContentIndexApi;
     private final LessonCopilotEnricher lessonCopilotEnricher;
     private final ChatStreamRegistry chatStreamRegistry;
+    private final AiUserModelPolicy aiUserModelPolicy;
     private final java.util.concurrent.ExecutorService assistantExecutor = java.util.concurrent.Executors.newCachedThreadPool();
 
     @Override
@@ -112,7 +114,8 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                         reasoningBuilder);
                 aiGatewayFacade.streamChat(
                         "global_assistant",
-                        null,
+                        // 与课程问答保持一致：接收并校验前端选择的模型，未通过治理校验时回落场景策略
+                        aiUserModelPolicy.validateUserSelection(dto.getModelKey()),
                         plan.getSystemPrompt(),
                         List.of(LlmChatMessage.user(plan.getUserPrompt())),
                         auditContext,
@@ -195,7 +198,9 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                 .courseId(dto.getCourseId())
                 .conversationId(convId)
                 .build();
-        String answer = aiGatewayFacade.chat("global_assistant", null, plan.getSystemPrompt(), plan.getUserPrompt(), auditContext);
+        String answer = aiGatewayFacade.chat("global_assistant",
+                aiUserModelPolicy.validateUserSelection(dto.getModelKey()),
+                plan.getSystemPrompt(), plan.getUserPrompt(), auditContext);
 
         String targetCode = resolveTargetCode(intent, plan);
 

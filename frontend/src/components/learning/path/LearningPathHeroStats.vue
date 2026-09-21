@@ -1,18 +1,18 @@
 <template>
   <div class="hero-stats-row">
-    <div class="hero-stat-card">
+    <div class="hero-stat-card" title="已完成任务数 / 本路径全部任务数">
       <span class="stat-num text-primary">{{ overallProgressPercent }}%</span>
       <span class="stat-label">路径完成率</span>
     </div>
-    <div class="hero-stat-card">
+    <div class="hero-stat-card" title="掌握度低于 70% 的考点数量（来自作业与测评批改的真实数据）">
       <span class="stat-num text-danger">{{ weakPointCount }}</span>
       <span class="stat-label">薄弱考点</span>
     </div>
-    <div class="hero-stat-card">
+    <div class="hero-stat-card" title="本路径中掌握度仍未达标的节点数量（含无数据时的入门计划节点）">
       <span class="stat-num text-warning">{{ graphGapCount }}</span>
       <span class="stat-label">图谱待补缺口</span>
     </div>
-    <div class="hero-stat-card">
+    <div class="hero-stat-card" title="完成本路径全部任务的预计耗时（分钟）">
       <span class="stat-num text-success">{{ estimatedTotalMinutes }}</span>
       <span class="stat-label">预计学时(分钟)</span>
     </div>

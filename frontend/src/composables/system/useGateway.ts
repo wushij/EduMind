@@ -17,6 +17,8 @@ export const GATEWAY_RANGE_OPTIONS = [
 export interface ModelOption {
   label: string;
   value: string;
+  /** 是否为平台默认模型（is_default），路由页据此提示"当前实际生效"的兜底模型 */
+  isDefault?: boolean;
 }
 
 export function formatTokens(value?: number) {
@@ -34,10 +36,16 @@ export function computePromptRatio(prompt?: number, completion?: number) {
   return Math.round((p / total) * 100);
 }
 
-export function filterProviders<T extends { provider: string }>(list: T[], searchKey: string): T[] {
+export function filterProviders<T extends { provider: string; modelKey?: string | null }>(
+  list: T[],
+  searchKey: string
+): T[] {
   if (!searchKey.trim()) return list;
   const key = searchKey.toLowerCase().trim();
-  return list.filter((p) => p.provider.toLowerCase().includes(key));
+  // 配置键与上游型号都可作为搜索词（多条配置可能共用同一上游型号）
+  return list.filter(
+    (p) => p.provider.toLowerCase().includes(key) || (p.modelKey ?? '').toLowerCase().includes(key)
+  );
 }
 
 export function getCallsPercentage(calls: number, totalRequests?: number) {
@@ -83,12 +91,40 @@ export function translateSceneName(scene: string) {
   switch (scene.toLowerCase()) {
     case 'chat':
       return '智能助教答疑';
+    case 'learning':
+      return '自适应学习辅导';
+    case 'memory_extract':
+      return '学情记忆沉淀';
+    case 'question':
     case 'question_generate':
       return 'AI 出题与变式';
     case 'grading':
-      return '作业批改';
+    case 'subjective_grading':
+      return '作业智能批改';
+    case 'prep':
+    case 'lesson_plan':
+      return '智能备课教案';
+    case 'exam':
+    case 'paper_compose':
+      return '智能组卷分析';
     case 'agent':
       return 'Agent 任务规划';
+    case 'global_assistant':
+      return '全局 AI 助手';
+    case 'rag':
+    case 'chat_rag':
+    case 'kb_retrieval':
+      return '知识库检索增强';
+    case 'evaluation':
+      return '学情诊断评估';
+    case 'stream':
+      return '流式对话';
+    case 'ocr':
+      return '智能 OCR 识别';
+    case 'embedding':
+      return '向量嵌入';
+    case 'rerank':
+      return '重排优化';
     default:
       return scene;
   }
@@ -99,20 +135,40 @@ export function getSceneName(scene: string) {
   switch (scene.toLowerCase()) {
     case 'chat':
       return '课程智能助教答疑';
+    case 'learning':
+      return 'AI 自适应学习辅导';
+    case 'memory_extract':
+      return '学情长期记忆沉淀';
     case 'rag':
     case 'chat_rag':
+    case 'kb_retrieval':
       return '课程知识库问答';
     case 'question':
     case 'question_generate':
       return 'AI 题库出题与变式';
     case 'grading':
+    case 'subjective_grading':
       return '作业/主观题智能批改';
+    case 'prep':
+    case 'lesson_plan':
+      return 'AI 智能备课教案';
+    case 'exam':
+    case 'paper_compose':
+      return '智能组卷与试题分析';
+    case 'global_assistant':
+      return '全局 AI 教学助手';
+    case 'evaluation':
+      return '学情综合诊断评估';
     case 'agent':
       return 'Agent 多步任务规划';
     case 'embedding':
       return '向量知识库切片嵌入';
+    case 'rerank':
+      return '语义相关性重排';
     case 'stream':
       return '流式长文本启发对话';
+    case 'ocr':
+      return '智能 OCR 文本识别';
     default:
       return scene;
   }
@@ -122,13 +178,15 @@ export function buildModelOption(model: {
   name?: string;
   modelKey?: string;
   modelName?: string;
+  isDefault?: boolean;
 }): ModelOption {
   const configName = model.name || model.modelKey || model.modelName || '未命名模型';
   const modelName = model.modelName || configName;
   const label = modelName !== configName ? `${configName} · ${modelName}` : configName;
   return {
     label,
-    value: model.modelKey || model.name || modelName
+    value: model.modelKey || model.name || modelName,
+    isDefault: !!model.isDefault
   };
 }
 

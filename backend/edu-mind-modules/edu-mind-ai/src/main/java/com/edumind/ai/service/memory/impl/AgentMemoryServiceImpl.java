@@ -69,6 +69,16 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
     @Autowired(required = false)
     private CourseQueryApi courseQueryApi;
 
+    /** courseId 为空（全局空间）时归一化为占位 ID，避免并发插入多条全局命名空间 */
+    private static Long globalCourseId(Long courseId) {
+        return courseId != null ? courseId : AiMemoryNamespaceEntity.GLOBAL_COURSE_ID;
+    }
+
+    /** 占位 ID 还原为 null，保证对外语义仍是"无课程（全局空间）" */
+    private static Long normalizeCourseId(Long courseId) {
+        return courseId == null || courseId == AiMemoryNamespaceEntity.GLOBAL_COURSE_ID ? null : courseId;
+    }
+
     @Override
     public MemoryNamespaceVO getNamespace(Long courseId) {
         Long tenantId = TenantContext.requireTenantId();
@@ -79,7 +89,9 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
             entity = new AiMemoryNamespaceEntity();
             entity.setTenantId(tenantId);
             entity.setUserId(userId);
-            entity.setCourseId(courseId);
+            // 唯一索引 (tenant_id,user_id,course_id) 中 NULL 不参与去重，
+            // 个人全局空间统一用 course_id = 0 承载，避免并发首访插入多条全局空间
+            entity.setCourseId(globalCourseId(courseId));
             entity.setScope(courseId != null ? "COURSE" : "GLOBAL");
             // 隐私合规首选：默认未授权 (0: PENDING/NOT_AUTHORIZED)，需用户显式知情同意
             entity.setConsentStatus(0);
@@ -100,11 +112,11 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
 
         AiMemoryNamespaceEntity entity = aiMemoryDao.findNamespace(tenantId, userId, dto.getCourseId());
         if (entity == null) {
-            // 若命名空间未初始化，先创建对应命名空间
+            // 若命名空间未初始化，先创建对应命名空间（全局空间统一落到 course_id = 0，配合唯一索引防并发重复）
             entity = new AiMemoryNamespaceEntity();
             entity.setTenantId(tenantId);
             entity.setUserId(userId);
-            entity.setCourseId(dto.getCourseId());
+            entity.setCourseId(globalCourseId(dto.getCourseId()));
             entity.setScope(dto.getCourseId() != null ? "COURSE" : "GLOBAL");
             entity.setStatus(1);
             entity.setRetentionDays(dto.getRetentionDays() != null ? dto.getRetentionDays() : 180);
@@ -283,17 +295,20 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
 
         List<AiMemoryNamespaceEntity> namespaces = new ArrayList<>(aiMemoryDao.listNamespacesByUser(tenantId, userId));
 
-        // 保证全局空间一定在列表首位
-        boolean hasGlobal = namespaces.stream().anyMatch(n -> n.getCourseId() == null);
+        // 保证全局空间一定在列表首位（courseId 为 null；并发首访可能同时插入，故插入前再查一次）
+        boolean hasGlobal = namespaces.stream().anyMatch(n -> normalizeCourseId(n.getCourseId()) == null);
         if (!hasGlobal) {
-            AiMemoryNamespaceEntity globalNs = new AiMemoryNamespaceEntity();
-            globalNs.setTenantId(tenantId);
-            globalNs.setUserId(userId);
-            globalNs.setScope("GLOBAL");
-            globalNs.setConsentStatus(0);
-            globalNs.setRetentionDays(180);
-            globalNs.setStatus(1);
-            aiMemoryDao.insertNamespace(globalNs);
+            AiMemoryNamespaceEntity globalNs = aiMemoryDao.findNamespace(tenantId, userId, null);
+            if (globalNs == null) {
+                globalNs = new AiMemoryNamespaceEntity();
+                globalNs.setTenantId(tenantId);
+                globalNs.setUserId(userId);
+                globalNs.setScope("GLOBAL");
+                globalNs.setConsentStatus(0);
+                globalNs.setRetentionDays(180);
+                globalNs.setStatus(1);
+                aiMemoryDao.insertNamespace(globalNs);
+            }
             namespaces.add(0, globalNs);
         }
 
@@ -308,7 +323,7 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
                             AiMemoryNamespaceEntity cNs = new AiMemoryNamespaceEntity();
                             cNs.setTenantId(tenantId);
                             cNs.setUserId(userId);
-                            cNs.setCourseId(cId);
+                            cNs.setCourseId(globalCourseId(cId));
                             cNs.setScope("COURSE");
                             cNs.setConsentStatus(0);
                             cNs.setRetentionDays(180);
@@ -352,14 +367,15 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
 
             MemorySpaceItemVO spaceVO = new MemorySpaceItemVO();
             spaceVO.setNamespaceId(ns.getId());
-            spaceVO.setCourseId(ns.getCourseId());
+            // 对外输出时把"个人全局空间"的占位课程 ID(0) 还原为 null，前端据此判定全局空间
+            spaceVO.setCourseId(normalizeCourseId(ns.getCourseId()));
             spaceVO.setScope(ns.getScope());
             boolean granted = ns.getConsentStatus() != null && ns.getConsentStatus() == 1;
             spaceVO.setConsentGranted(granted);
             spaceVO.setRetentionDays(ns.getRetentionDays() != null ? ns.getRetentionDays() : 180);
             spaceVO.setItemCount(count);
 
-            if (ns.getCourseId() == null) {
+            if (normalizeCourseId(ns.getCourseId()) == null) {
                 spaceVO.setCourseTitle("全局认知底座与跨学科偏好");
                 globalConsent = granted;
             } else {
@@ -436,7 +452,7 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
             namespace = new AiMemoryNamespaceEntity();
             namespace.setTenantId(tenantId);
             namespace.setUserId(userId);
-            namespace.setCourseId(courseId);
+            namespace.setCourseId(globalCourseId(courseId));
             namespace.setScope(courseId != null ? "COURSE" : "GLOBAL");
             namespace.setConsentStatus(1);
             namespace.setRetentionDays(180);

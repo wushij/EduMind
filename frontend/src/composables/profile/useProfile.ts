@@ -8,6 +8,7 @@ import { usePreferenceStore } from '@/stores/user/preference';
 import { usePreferences } from '@/composables/profile/usePreferences';
 import type { UserInfo } from '@/types/auth/auth';
 import { USE_MOCK } from '@/config/mock';
+import { resolveApiErrorMessage } from '@/core/http/api-error-message';
 import { DEFAULT_AVATAR } from '@/constants/auth';
 import type { UploadRequestOptions } from 'element-plus';
 import { storeToRefs } from 'pinia';
@@ -157,8 +158,8 @@ export function useProfile() {
         authStore.setUser(res.data);
         ElMessage.success('头像已更新');
       }
-    } catch (err: any) {
-      ElMessage.error(err?.message || '头像上传失败');
+    } catch (err: unknown) {
+      ElMessage.error(resolveApiErrorMessage(err, '头像上传失败'));
     } finally {
       avatarUploading.value = false;
     }

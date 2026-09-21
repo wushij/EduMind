@@ -60,8 +60,10 @@ export function useWrongQuestionsPage(defaultCourseId = 102) {
       const res = await getCourseList({ page: 1, pageSize: 50 });
       const courses = (res.data?.list ?? []) as Course[];
       if (courses.length > 0) {
+        // ⚠️ 后端 Long 以字符串返回（c.id 运行时是 "103"），必须转数字后再与数字型 courseId 比较，
+        // 否则 some() 恒为 false，会把路由指定的课程悄悄换成列表第一门课（曾导致"错题归到 java 课程"）
         courseOptions.value = courses.map((c) => ({
-          id: c.id,
+          id: Number(c.id),
           name: courseLabel(c)
         }));
         hasEnrolledCourses.value = true;

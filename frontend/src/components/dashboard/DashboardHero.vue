@@ -31,26 +31,28 @@
         aria-label="课程 AI 助手"
         @click="router.push('/course/ai')"
       />
-      <!-- AI 出题 / 组卷：x:559~796 -->
+      <!-- AI 出题 / 组卷：x:559~796（教师模块，学生点击走 AI 练习，避免被路由守卫拦下报"权限不足"） -->
       <button
         type="button"
         class="dashboard-hero__hitbox dashboard-hero__hitbox--card-3"
         aria-label="AI 出题与组卷"
-        @click="router.push('/ai/question/generate')"
+        @click="goQuestionModule"
       />
       <!-- AI 批改：x:796~1020 -->
       <button
         type="button"
         class="dashboard-hero__hitbox dashboard-hero__hitbox--card-4"
         aria-label="AI 批改"
-        @click="router.push('/ai/grading')"
+        @click="goGradingModule"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth/auth';
 import dashboardBannerImg from '@/assets/images/产品首页主视觉背景banner.png';
 
 const emit = defineEmits<{
@@ -59,6 +61,18 @@ const emit = defineEmits<{
 }>();
 
 const router = useRouter();
+const authStore = useAuthStore();
+
+/** AI 出题/组卷、AI 批改 都是教师模块（meta.roles = ADMIN/TEACHER），学生需导航到学生侧等价页面 */
+const isTeacherSide = computed(() => authStore.hasAnyRole(['ADMIN', 'TEACHER']));
+
+function goQuestionModule() {
+  router.push(isTeacherSide.value ? '/ai/question/generate' : '/learning/practice');
+}
+
+function goGradingModule() {
+  router.push(isTeacherSide.value ? '/ai/grading' : '/learning/report');
+}
 </script>
 
 <style scoped lang="scss">

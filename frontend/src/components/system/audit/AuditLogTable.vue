@@ -94,7 +94,7 @@
         <template #default="{ row }">
           <span class="status-pill" :class="row.status.toLowerCase()">
             <span class="status-dot"></span>
-            {{ row.status }}
+            {{ getStatusLabel(row.status) }}
           </span>
         </template>
       </el-table-column>
@@ -144,7 +144,7 @@
           </div>
           <span class="status-pill" :class="selectedLog.status.toLowerCase()">
             <span class="status-dot"></span>
-            {{ selectedLog.status }}
+            {{ getStatusLabel(selectedLog.status) }}
           </span>
         </div>
         <div class="hero-grid">
@@ -304,6 +304,7 @@ import type { AIAuditLog } from '@/types/system/audit';
 import {
   getRoleLabel,
   getSceneLabel,
+  getStatusLabel,
   getSceneStyleClass,
   getLatencyClass,
   getUserAvatarUrl
@@ -417,17 +418,26 @@ defineEmits<{
 
   .scene-tag-wrap {
     .scene-badge {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      white-space: nowrap;
       font-size: 11.5px;
       font-weight: 600;
       padding: 3px 10px;
       border-radius: 9999px;
+      line-height: 1.35;
+      background: #F8FAFC;
+      color: #475569;
+      border: 1px solid #E2E8F0;
 
       &.badge-chat { background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }
       &.badge-prep { background: #FAF5FF; color: #9333EA; border: 1px solid #E9D5FF; }
       &.badge-rag { background: #F0FDFA; color: #0D9488; border: 1px solid #99F6E4; }
       &.badge-grading { background: #EEF2FF; color: #4F46E5; border: 1px solid #C7D2FE; }
       &.badge-agent { background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A; }
+      &.badge-question { background: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }
+      &.badge-memory { background: #F5F3FF; color: #7C3AED; border: 1px solid #DDD6FE; }
+      &.badge-advice { background: #ECFEFF; color: #0891B2; border: 1px solid #A5F3FC; }
       &.badge-default { background: #F8FAFC; color: #475569; border: 1px solid #E2E8F0; }
     }
   }
@@ -607,17 +617,26 @@ defineEmits<{
   }
 
   .scene-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
     font-size: 11.5px;
     font-weight: 600;
     padding: 3px 10px;
     border-radius: 9999px;
+    line-height: 1.35;
+    background: #F8FAFC;
+    color: #475569;
+    border: 1px solid #E2E8F0;
 
     &.badge-chat { background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }
     &.badge-prep { background: #FAF5FF; color: #9333EA; border: 1px solid #E9D5FF; }
     &.badge-rag { background: #F0FDFA; color: #0D9488; border: 1px solid #99F6E4; }
     &.badge-grading { background: #EEF2FF; color: #4F46E5; border: 1px solid #C7D2FE; }
     &.badge-agent { background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A; }
+    &.badge-question { background: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }
+    &.badge-memory { background: #F5F3FF; color: #7C3AED; border: 1px solid #DDD6FE; }
+    &.badge-advice { background: #ECFEFF; color: #0891B2; border: 1px solid #A5F3FC; }
     &.badge-default { background: #F8FAFC; color: #475569; border: 1px solid #E2E8F0; }
   }
 

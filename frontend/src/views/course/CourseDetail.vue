@@ -236,9 +236,10 @@ async function refreshKnowledgeMountSummary() {
     return;
   }
   try {
-    const kb = await getKnowledgeBaseDetail(kbId);
-    kbMountDocCount.value = kb.documentCount ?? 0;
-    kbMountChunkCount.value = kb.chunkCount ?? 0;
+    const res = await getKnowledgeBaseDetail(kbId);
+    const kb = res.data;
+    kbMountDocCount.value = kb?.documentCount ?? 0;
+    kbMountChunkCount.value = kb?.chunkCount ?? 0;
   } catch {
     kbMountDocCount.value = 0;
     kbMountChunkCount.value = 0;

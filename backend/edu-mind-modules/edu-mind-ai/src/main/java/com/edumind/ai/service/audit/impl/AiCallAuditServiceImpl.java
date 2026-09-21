@@ -49,7 +49,10 @@ public class AiCallAuditServiceImpl implements AiCallAuditService {
                 entity.setKnowledgeBaseId(context.getKnowledgeBaseId());
                 entity.setRetrievalHitCount(context.getRetrievalHitCount());
             }
+            // model 记上游型号（展示用），modelKey 额外记命中的配置键：
+            // 多条配置可能指向同一上游型号，只记型号会让调用明细无法区分实际用了哪条配置
             entity.setModel(resolveModelDisplay(modelKey));
+            entity.setModelKey(StringUtils.hasText(modelKey) ? modelKey.trim() : null);
             entity.setScene(normalizeScene(scene));
             entity.setPromptTokens(Math.max(0, promptTokens));
             entity.setCompletionTokens(Math.max(0, completionTokens));

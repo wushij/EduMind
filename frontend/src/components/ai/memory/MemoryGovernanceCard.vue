@@ -30,7 +30,6 @@
           :model-value="retentionDays"
           size="default"
           class="pill-select"
-          style="width: 120px;"
           @update:model-value="$emit('update:retentionDays', $event)"
           @change="$emit('change')"
         >
@@ -223,6 +222,28 @@ defineEmits<{
         font-size: 13px;
         color: #475569;
         font-weight: 500;
+        white-space: nowrap;
+      }
+    }
+
+    .retention-box {
+      .pill-select {
+        width: 156px;
+
+        :deep(.el-select__wrapper) {
+          border-radius: 9999px;
+          background: #FFFFFF;
+          padding: 2px 10px 2px 12px;
+          box-shadow: 0 0 0 1px #E2E8F0 inset;
+
+          &:hover {
+            box-shadow: 0 0 0 1px #1677FF inset;
+          }
+
+          &.is-focused {
+            box-shadow: 0 0 0 1px #1677FF inset;
+          }
+        }
       }
     }
 

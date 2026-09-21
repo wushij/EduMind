@@ -68,12 +68,18 @@
 
     <template v-else>
       <div class="path-main-grid">
-        <LearningPathGraphPanel :graph-slice="detail?.graphSlice" />
+        <LearningPathGraphPanel :graph-slice="detail?.graphSlice" :weeks="detail?.weeks ?? []" />
         <div class="path-plan-column">
           <div class="plan-panel">
             <div class="plan-panel-header">
-              <h4>{{ detail?.title || '自适应推荐学习路径' }}</h4>
-              <el-tag size="small" type="success">规则引擎动态生成</el-tag>
+              <div class="header-title-box">
+                <span class="title-decor-pill"></span>
+                <h4>{{ detail?.title || '自适应推荐学习路径' }}</h4>
+              </div>
+              <span class="engine-tag">
+                <el-icon class="mr-1"><Cpu /></el-icon>
+                自适应路径规划
+              </span>
             </div>
             <LearningPathWeekGrid
               :weeks="detail?.weeks ?? []"
@@ -93,7 +99,7 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import { Back, MagicStick, Refresh } from '@element-plus/icons-vue';
+import { Back, MagicStick, Refresh, Cpu } from '@element-plus/icons-vue';
 import LearningSubpageHero from '@/components/learning/LearningSubpageHero.vue';
 import LearningPathHeroStats from '@/components/learning/path/LearningPathHeroStats.vue';
 import LearningPathGraphPanel from '@/components/learning/path/LearningPathGraphPanel.vue';
@@ -143,13 +149,41 @@ const {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 14px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+    gap: 10px;
 
-    h4 {
-      margin: 0;
-      font-size: 16px;
-      font-weight: 700;
-      color: #0f172a;
+    .header-title-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+
+      .title-decor-pill {
+        width: 4px;
+        height: 16px;
+        border-radius: 9999px;
+        background: #10b981;
+      }
+
+      h4 {
+        margin: 0;
+        font-size: 16.5px;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.2px;
+      }
+    }
+
+    .engine-tag {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      background: #f0fdf4;
+      color: #16a34a;
+      border: 1px solid rgba(22, 163, 74, 0.18);
     }
   }
 }

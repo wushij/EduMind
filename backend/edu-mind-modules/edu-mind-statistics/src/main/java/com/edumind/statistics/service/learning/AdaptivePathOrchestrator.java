@@ -171,6 +171,11 @@ public class AdaptivePathOrchestrator {
         List<KnowledgeMasteryVO.WeakPointVO> weak = new ArrayList<>(mastery.getWeakPoints());
         weak.sort(Comparator.comparing(wp -> wp.getMastery() != null ? wp.getMastery() : 1.0));
 
+        // 该课程尚无任何掌握度数据（还没有作业/测评批改记录）：
+        // 此时并不是“识别到了薄弱点”，而是回退到按章节顺序生成入门计划。
+        // 文案必须如实说明，否则学生会误以为系统已经做过归因、进而怀疑数据是假的。
+        boolean noMasteryData = weak.isEmpty();
+
         List<Long> focusIds = new ArrayList<>();
         for (KnowledgeMasteryVO.WeakPointVO wp : weak) {
             if (wp.getKnowledgePointId() != null && focusIds.size() < MAX_WEEKS) {
@@ -208,14 +213,22 @@ public class AdaptivePathOrchestrator {
             }
             if (!scheduled.contains(focusId)) {
                 KnowledgePointVO kp = kpById.get(focusId);
-                String theme = kp != null ? "强化：" + kp.getTitle() : "强化薄弱考点";
                 double m = masteryByKp.getOrDefault(focusId, 0.0);
-                String reason = weak.stream()
-                        .filter(w -> Objects.equals(w.getKnowledgePointId(), focusId))
-                        .map(KnowledgeMasteryVO.WeakPointVO::getSuggestion)
-                        .filter(StringUtils::hasText)
-                        .findFirst()
-                        .orElse("根据测评与错题数据识别的薄弱项。");
+                String theme;
+                String reason;
+                if (noMasteryData) {
+                    // 无掌握度数据：如实标注为入门计划，不再冒充“薄弱点归因”结论
+                    theme = kp != null ? "起步：" + kp.getTitle() : "课程入门";
+                    reason = "该课程暂无掌握度数据，先按课程章节顺序安排入门任务；完成作业或测评后将自动改为按薄弱考点精准排期。";
+                } else {
+                    theme = kp != null ? "强化：" + kp.getTitle() : "强化薄弱考点";
+                    reason = weak.stream()
+                            .filter(w -> Objects.equals(w.getKnowledgePointId(), focusId))
+                            .map(KnowledgeMasteryVO.WeakPointVO::getSuggestion)
+                            .filter(StringUtils::hasText)
+                            .findFirst()
+                            .orElse("根据测评与错题数据识别的薄弱项。");
+                }
                 plans.add(new FocusWeekPlan(focusId, theme, m * 100, reason));
                 scheduled.add(focusId);
             }

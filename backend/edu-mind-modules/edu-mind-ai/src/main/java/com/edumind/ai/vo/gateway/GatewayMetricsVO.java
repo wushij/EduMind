@@ -29,6 +29,8 @@ public class GatewayMetricsVO {
     @Data
     public static class ProviderMetricVO {
         private String provider;
+        /** 命中的模型配置路由键（为空表示历史日志未记录，前端回退展示 provider） */
+        private String modelKey;
         private Long calls;
         private Long tokens;
         private Long promptTokens;

@@ -50,14 +50,19 @@
         </div>
 
         <div class="member-actions-col">
+          <!--
+            入口按角色收敛：教师/管理员可查看任意成员；
+            学生仅能在自己那一行进入本人画像，避免从成员列表跳到班级整体学情分析。
+          -->
           <button
+            v-if="canViewPortrait(m)"
             type="button"
             class="action-pill-btn action-pill-btn--portrait"
-            :title="m.memberRole === 'TEACHER' ? '查看课程整体学情分析' : '查看该学生学情诊断画像'"
+            :title="portraitTitle(m)"
             @click="emit('view-portrait', m)"
           >
             <el-icon><TrendCharts /></el-icon>
-            <span>{{ m.memberRole === 'TEACHER' ? '课程学情' : '学情画像' }}</span>
+            <span>{{ portraitLabel(m) }}</span>
           </button>
           <button
             v-if="manageable && m.memberRole !== 'TEACHER'"
@@ -86,7 +91,7 @@
 import { User, TrendCharts, Delete } from '@element-plus/icons-vue';
 import type { CourseMemberItem } from '@/types/course/member';
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     members: CourseMemberItem[];
     loading: boolean;
@@ -97,14 +102,40 @@ withDefaults(
     getRoleClass: (role: string) => string;
     getAvatarClass: (role: string) => string;
     manageable?: boolean;
+    /** 当前查看者是否为教师/管理员 */
+    viewerIsStaff?: boolean;
+    /** 当前查看者用户 ID（学生视角用于限定只能看自己） */
+    viewerUserId?: number | null;
   }>(),
-  { manageable: false }
+  { manageable: false, viewerIsStaff: false, viewerUserId: null }
 );
 
 const emit = defineEmits<{
   'view-portrait': [member: CourseMemberItem];
   remove: [userId: number];
 }>();
+
+/** 教师/管理员可查看任意成员；学生只允许在自己那一行进入本人画像 */
+function canViewPortrait(member: CourseMemberItem): boolean {
+  if (props.viewerIsStaff) {
+    return true;
+  }
+  return props.viewerUserId != null && member.userId === props.viewerUserId;
+}
+
+function portraitLabel(member: CourseMemberItem): string {
+  if (props.viewerIsStaff) {
+    return member.memberRole === 'TEACHER' ? '课程学情' : '学情画像';
+  }
+  return '我的学情画像';
+}
+
+function portraitTitle(member: CourseMemberItem): string {
+  if (props.viewerIsStaff) {
+    return member.memberRole === 'TEACHER' ? '查看课程整体学情分析' : '查看该学生学情诊断画像';
+  }
+  return '查看本人学情诊断画像';
+}
 </script>
 
 <style scoped lang="scss">

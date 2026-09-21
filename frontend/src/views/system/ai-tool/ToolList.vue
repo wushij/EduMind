@@ -4,58 +4,102 @@
       <div class="hero-bg-glow hero-bg-glow--blue" />
       <div class="hero-bg-glow hero-bg-glow--purple" />
 
+      <!-- 1. 顶部主栏：左侧精致徽标与标题描述，右侧操作坞 -->
       <div class="hero-header-row">
-        <div class="hero-title-area">
-          <div class="hero-eyebrow">
-            <span class="eyebrow-chip">EduMind AI Compute</span>
-            <span class="eyebrow-divider">/</span>
-            <span class="eyebrow-sub">教学工具资产中枢</span>
+        <div class="hero-left-section">
+          <div class="hero-icon-box">
+            <el-icon><Tools /></el-icon>
           </div>
-          <h1 class="hero-title">教学工具配置</h1>
-          <p class="hero-desc">
-            统一纳管 AI 工具广场的展示元数据、路由跳转、推荐标记与上下架状态。配置变更将实时同步至用户端工具广场。
-          </p>
+          <div class="hero-text-wrap">
+            <div class="hero-title-line">
+              <h1 class="hero-title">教学工具配置</h1>
+              <span class="status-pill">
+                <span class="status-dot" />
+                <span>{{ stats?.online ?? onlineCount }} 项在线</span>
+              </span>
+            </div>
+            <p class="hero-desc">
+              统一纳管 AI 工具广场的展示元数据、模型路由、场景分类与上下架状态，变更实时同步至用户端。
+            </p>
+          </div>
         </div>
-        <div class="hero-action-area">
-          <el-button type="primary" round class="add-btn" :icon="Plus" @click="goCreate">
-            新建工具
-          </el-button>
-          <el-button round class="btn-refresh" :icon="Refresh" :loading="loading" @click="handleManualRefresh">
-            刷新
-          </el-button>
-          <el-button round class="preview-btn" :icon="Shop" @click="router.push('/ai/marketplace')">
-            前往广场预览
-          </el-button>
+
+        <div class="hero-action-dock">
+          <button
+            type="button"
+            class="action-btn action-btn--ghost"
+            @click="router.push('/ai/marketplace')"
+          >
+            <el-icon><Shop /></el-icon>
+            <span>前往广场预览</span>
+          </button>
+          <button
+            type="button"
+            class="action-btn action-btn--secondary"
+            :disabled="loading"
+            @click="handleManualRefresh"
+          >
+            <el-icon :class="{ 'is-loading': loading }"><Refresh /></el-icon>
+            <span>刷新</span>
+          </button>
+          <button type="button" class="action-btn action-btn--primary" @click="goCreate">
+            <el-icon><Plus /></el-icon>
+            <span>新建工具</span>
+          </button>
         </div>
       </div>
 
+      <!-- 2. 精致指标概览网格 -->
       <div class="metrics-grid" v-loading="loading">
-        <div class="metric-card">
-          <div class="metric-icon-box blue"><el-icon><Operation /></el-icon></div>
-          <div class="metric-content">
-            <div class="metric-label">纳管工具总数</div>
-            <div class="metric-value">{{ stats?.total ?? toolList.length }} <span class="unit">个</span></div>
+        <div class="metric-card metric-card--total">
+          <div class="metric-icon-box blue">
+            <el-icon><Operation /></el-icon>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">纳管工具总数</span>
+            <div class="metric-num-row">
+              <span class="metric-value">{{ stats?.total ?? toolList.length }}</span>
+              <span class="metric-unit">个</span>
+            </div>
           </div>
         </div>
-        <div class="metric-card">
-          <div class="metric-icon-box green"><el-icon><CircleCheck /></el-icon></div>
-          <div class="metric-content">
-            <div class="metric-label">在线运行</div>
-            <div class="metric-value text-green">{{ stats?.online ?? onlineCount }} <span class="unit">项</span></div>
+
+        <div class="metric-card metric-card--online">
+          <div class="metric-icon-box green">
+            <el-icon><CircleCheck /></el-icon>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">在线运行状态</span>
+            <div class="metric-num-row">
+              <span class="metric-value text-green">{{ stats?.online ?? onlineCount }}</span>
+              <span class="metric-unit">项</span>
+            </div>
           </div>
         </div>
-        <div class="metric-card">
-          <div class="metric-icon-box cyan"><el-icon><User /></el-icon></div>
-          <div class="metric-content">
-            <div class="metric-label">教师工具</div>
-            <div class="metric-value text-cyan">{{ stats?.teacherCount ?? teacherCount }} <span class="unit">个</span></div>
+
+        <div class="metric-card metric-card--teacher">
+          <div class="metric-icon-box cyan">
+            <el-icon><User /></el-icon>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">教师专属工具</span>
+            <div class="metric-num-row">
+              <span class="metric-value text-cyan">{{ stats?.teacherCount ?? teacherCount }}</span>
+              <span class="metric-unit">个</span>
+            </div>
           </div>
         </div>
-        <div class="metric-card">
-          <div class="metric-icon-box purple"><el-icon><DataAnalysis /></el-icon></div>
-          <div class="metric-content">
-            <div class="metric-label">累计调用</div>
-            <div class="metric-value text-purple">{{ formatCount(stats?.totalUseCount ?? totalUseCount) }} <span class="unit">次</span></div>
+
+        <div class="metric-card metric-card--usage">
+          <div class="metric-icon-box purple">
+            <el-icon><DataAnalysis /></el-icon>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">全平台累计调用</span>
+            <div class="metric-num-row">
+              <span class="metric-value text-purple">{{ formatCount(stats?.totalUseCount ?? totalUseCount) }}</span>
+              <span class="metric-unit">次</span>
+            </div>
           </div>
         </div>
       </div>
@@ -121,7 +165,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import {
-  Plus, Refresh, Search, Operation, CircleCheck, User, DataAnalysis, Shop
+  Plus, Refresh, Search, Operation, CircleCheck, User, DataAnalysis, Shop, Tools
 } from '@element-plus/icons-vue';
 import ToolAdminCard from '@/components/system/ai-tool/ToolAdminCard.vue';
 import { useAIToolManage } from '@/composables/system/useAIToolManage';
@@ -281,10 +325,11 @@ onMounted(reload);
 .tool-hero-card {
   position: relative;
   overflow: hidden;
-  border-radius: 20px;
+  border-radius: 18px;
   background: linear-gradient(135deg, #f8fbff 0%, #ffffff 55%, #f5f3ff 100%);
   border: 1px solid #e8edf5;
-  padding: 28px 28px 20px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03), 0 6px 16px rgba(15, 23, 42, 0.02);
+  padding: 22px 24px 20px;
   margin-bottom: 16px;
 }
 
@@ -315,100 +360,142 @@ onMounted(reload);
   position: relative;
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 20px;
   flex-wrap: wrap;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
-.hero-eyebrow {
+.hero-left-section {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: #64748b;
-  margin-bottom: 8px;
+  gap: 16px;
+  max-width: 720px;
+
+  .hero-icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    color: #2563eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    flex-shrink: 0;
+    border: 1px solid rgba(37, 99, 235, 0.15);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+  }
+
+  .hero-text-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    .hero-title-line {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+
+      .hero-title {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: -0.02em;
+        line-height: 1.25;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 10px;
+        border-radius: 9999px;
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        color: #065f46;
+        font-size: 12px;
+        font-weight: 600;
+
+        .status-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #10b981;
+          box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+        }
+      }
+    }
+
+    .hero-desc {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #64748b;
+    }
+  }
 }
 
-.eyebrow-chip {
-  background: #1677ff14;
-  color: #1677ff;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-weight: 600;
-}
-
-.hero-title {
-  margin: 0 0 8px;
-  font-size: 28px;
-  font-weight: 700;
-  color: #1f2937;
-}
-
-.hero-desc {
-  margin: 0;
-  max-width: 640px;
-  font-size: 14px;
-  line-height: 1.7;
-  color: #6b7280;
-}
-
-.hero-action-area {
+.hero-action-dock {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
   flex-wrap: wrap;
 
-  .add-btn {
-    border-radius: 9999px !important;
+  .action-btn {
+    height: 36px;
+    padding: 0 16px;
+    border-radius: 10px;
+    font-size: 13px;
     font-weight: 600;
-    font-size: 13px;
-    height: 34px !important;
-    padding: 0 18px !important;
-    background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%) !important;
-    box-shadow: 0 4px 14px rgba(22, 119, 255, 0.3) !important;
-    border: none !important;
-    color: #ffffff !important;
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 18px rgba(22, 119, 255, 0.4) !important;
-    }
-  }
-
-  .preview-btn {
-    border-radius: 9999px !important;
-    font-weight: 500;
-    font-size: 13px;
-    height: 34px !important;
-    padding: 0 16px !important;
-    background: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
-    color: #475569 !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    cursor: pointer;
     transition: all 0.2s ease;
+    border: 1px solid transparent;
 
-    &:hover {
-      color: #1677ff !important;
-      border-color: #93c5fd !important;
-      background: #eff6ff !important;
-      transform: translateY(-1px);
-      box-shadow: 0 3px 8px rgba(37, 99, 235, 0.1) !important;
+    &--primary {
+      background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(22, 119, 255, 0.22);
+
+      &:hover {
+        background: linear-gradient(135deg, #0958d9 0%, #003eb3 100%);
+        box-shadow: 0 6px 16px rgba(22, 119, 255, 0.32);
+      }
     }
-  }
 
-  // 统一 1:1 对齐菜单管理高定胶囊刷新按钮
-  :deep(.btn-refresh) {
-    height: 34px !important;
-    padding: 0 16px !important;
-    border-radius: 9999px !important;
-    font-size: 13px !important;
+    &--secondary {
+      background: #ffffff;
+      border-color: #e2e8f0;
+      color: #475569;
+
+      &:hover:not(:disabled) {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+        color: #1e293b;
+      }
+
+      &:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+      }
+    }
+
+    &--ghost {
+      background: #eff6ff;
+      border-color: #dbeafe;
+      color: #1d4ed8;
+
+      &:hover {
+        background: #dbeafe;
+        border-color: #bfdbfe;
+        color: #1e40af;
+      }
+    }
   }
 }
 
@@ -416,36 +503,44 @@ onMounted(reload);
   position: relative;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: 14px;
+
+  @media (max-width: 960px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 540px) {
+    grid-template-columns: 1fr;
+  }
 }
 
 .metric-card {
   display: flex;
   align-items: center;
-  gap: 14px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(226, 232, 240, 0.85);
-  border-radius: 16px;
-  padding: 16px 18px;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.02);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(22, 119, 255, 0.08);
-    border-color: rgba(147, 197, 253, 0.7);
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
   }
 }
 
 .metric-icon-box {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 21px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+  font-size: 20px;
+  flex-shrink: 0;
 
   &.blue { background: #eff6ff; color: #2563eb; }
   &.green { background: #ecfdf5; color: #059669; }
@@ -453,23 +548,42 @@ onMounted(reload);
   &.purple { background: #f5f3ff; color: #7c3aed; }
 }
 
+.metric-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .metric-label {
   font-size: 12px;
   color: #64748b;
   font-weight: 500;
-  margin-bottom: 2px;
+  white-space: nowrap;
 }
 
-.metric-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: #0f172a;
-  letter-spacing: -0.02em;
+.metric-num-row {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
 
-  .unit { font-size: 13px; font-weight: 500; color: #94a3b8; margin-left: 2px; }
-  &.text-green { color: #059669; }
-  &.text-cyan { color: #0891b2; }
-  &.text-purple { color: #7c3aed; }
+  .metric-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+
+    &.text-green { color: #059669; }
+    &.text-cyan { color: #0891b2; }
+    &.text-purple { color: #7c3aed; }
+  }
+
+  .metric-unit {
+    font-size: 12px;
+    font-weight: 500;
+    color: #94a3b8;
+  }
 }
 
 .filter-bar-card {

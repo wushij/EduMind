@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted, nextTick, shallowRef, type Component } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, shallowRef, type Component } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   EditPen,
@@ -16,6 +16,7 @@ import { DashboardStatistics } from '@/types/analytics/statistics';
 import type { IconTheme } from '@/types/common/icon';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_DASHBOARD_DATA } from '@/mock/dashboard';
+import { canAccessRoute } from '@/utils/router/route-access';
 
 export interface CommonFunctionItem {
   title: string;
@@ -201,7 +202,14 @@ export function useDashboard(options?: { enableCharts?: boolean }) {
   const loading = ref(false);
   const usedMockFallback = ref(false);
 
-  const commonFunctions = COMMON_FUNCTIONS;
+  /**
+   * 常用功能按目标路由的真实权限过滤：
+   * 学生不会看到「AI 出题 / 作业批改 / AI 备课」等教师模块入口，
+   * 从根上避免点了之后被路由守卫弹「权限不足」再踢回工作台。
+   */
+  const commonFunctions = computed(() =>
+    COMMON_FUNCTIONS.filter((fn) => canAccessRoute(router, fn.route))
+  );
   const todoItems = DEFAULT_TODO_ITEMS;
   const selectedDataPeriod = ref('WEEK');
   const abilityLegend = ABILITY_LEGEND;

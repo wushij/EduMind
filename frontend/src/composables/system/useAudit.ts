@@ -34,31 +34,68 @@ export function getRoleLabel(role?: string) {
 }
 
 export function getSceneLabel(scene?: string) {
-  if (!scene) return '通用对话';
+  if (!scene) return '智能对话';
   const s = scene.toUpperCase();
   const map: Record<string, string> = {
-    CHAT: '智能对话 (CHAT)',
-    CHAT_RAG: '知识增强对话 (CHAT_RAG)',
-    PREP: '备课助手 (PREP)',
-    RAG: '知识问答 (RAG)',
-    GRADING: '作业批改 (GRADING)',
-    AGENT: '智能体协作 (AGENT)',
-    GLOBAL_ASSISTANT: '全局助手 (ASSISTANT)',
-    QUESTION_GENERATE: '智能出题 (QUESTION)',
-    COURSE_OBJECTIVE: '课程教学目标 AI 推荐',
-    COURSE_DESCRIPTION: '课程简介 AI 生成',
-    COURSE_KNOWLEDGE_POINT: '课程知识点 AI 推荐'
+    CHAT: '智能对话',
+    CHAT_RAG: '知识对话',
+    PREP: '智能备课',
+    LEARNING: '自适应学习辅导',
+    MEMORY: '学情记忆沉淀',
+    MEMORY_EXTRACT: '学情记忆沉淀',
+    RAG: '知识问答',
+    KB_RETRIEVAL: '知识库检索',
+    GRADING: '作业批改',
+    SUBJECTIVE_GRADING: '主观题评阅',
+    AGENT: '智能体协作',
+    GLOBAL_ASSISTANT: '全局助手',
+    QUESTION: '智能出题',
+    QUESTION_GENERATE: '智能出题',
+    EXAM: '智能组卷',
+    EVALUATION: '学情诊断评估',
+    TEACHING_ADVICE: '学情教学建议',
+    ADVICE: '学情教学建议',
+    COURSE_OBJECTIVE: '教学目标生成',
+    COURSE_DESCRIPTION: '课程简介生成',
+    COURSE_KNOWLEDGE_POINT: '知识点推荐',
+    STREAM: '流式对话',
+    OCR: 'OCR 识别',
+    EMBEDDING: '向量嵌入',
+    RERANK: '语义重排'
   };
-  return map[s] || scene;
+  const raw = map[s] || scene;
+  return raw.replace(/\s*\([A-Za-z0-9_-]+\)\s*$/, '').trim();
+}
+
+export function getStatusLabel(status?: string) {
+  if (!status) return '未知状态';
+  const s = status.toUpperCase();
+  const map: Record<string, string> = {
+    SUCCESS: '调用成功',
+    OK: '调用成功',
+    200: '调用成功',
+    ERROR: '调用异常',
+    FAIL: '调用失败',
+    FAILED: '调用失败',
+    500: '服务异常',
+    CIRCUIT_BREAK: '熔断保护',
+    BLOCKED: '限流拦截',
+    RATE_LIMIT: '限流拦截',
+    TIMEOUT: '响应超时'
+  };
+  return map[s] || status;
 }
 
 export function getSceneStyleClass(scene?: string) {
   const s = (scene || '').toUpperCase();
-  if (s === 'CHAT' || s === 'CHAT_RAG') return 'badge-chat';
+  if (s === 'CHAT' || s === 'CHAT_RAG' || s === 'LEARNING' || s === 'STREAM') return 'badge-chat';
   if (s === 'PREP') return 'badge-prep';
-  if (s === 'RAG') return 'badge-rag';
-  if (s === 'GRADING') return 'badge-grading';
+  if (s === 'RAG' || s === 'KB_RETRIEVAL') return 'badge-rag';
+  if (s === 'GRADING' || s === 'SUBJECTIVE_GRADING') return 'badge-grading';
+  if (s === 'QUESTION' || s === 'QUESTION_GENERATE' || s === 'EXAM') return 'badge-question';
   if (s === 'AGENT') return 'badge-agent';
+  if (s === 'MEMORY' || s === 'MEMORY_EXTRACT') return 'badge-memory';
+  if (s === 'TEACHING_ADVICE' || s === 'ADVICE' || s === 'EVALUATION') return 'badge-advice';
   return 'badge-default';
 }
 
@@ -560,6 +597,7 @@ export function useAudit() {
     copyText,
     getRoleLabel,
     getSceneLabel,
+    getStatusLabel,
     getSceneStyleClass,
     getLatencyClass,
     getUserAvatarUrl

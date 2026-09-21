@@ -18,6 +18,8 @@ public class AiCallLogEntity implements Serializable {
     private Long courseId;
     private String conversationId;
     private String model;
+    /** 命中的模型配置路由键：同一上游型号可能被多条配置复用，用于区分实际走了哪条配置 */
+    private String modelKey;
     private Integer promptTokens;
     private Integer completionTokens;
     private Integer latencyMs;

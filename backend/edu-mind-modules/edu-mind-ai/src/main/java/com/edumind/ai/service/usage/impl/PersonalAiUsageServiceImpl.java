@@ -37,7 +37,9 @@ public class PersonalAiUsageServiceImpl implements PersonalAiUsageService {
     private static final Set<String> QA_AND_GENERATE_SCENES = Set.of(
             "chat", "chat_stream", "CHAT", "CHAT_RAG",
             "global_assistant", "GLOBAL_ASSISTANT",
-            "question_generate", "subjective_grading"
+            "learning", "LEARNING",
+            "question", "QUESTION", "question_generate", "QUESTION_GENERATE",
+            "subjective_grading", "SUBJECTIVE_GRADING", "grading", "GRADING"
     );
 
     private static final Map<String, String> SCENE_LABELS = Map.ofEntries(
@@ -46,23 +48,57 @@ public class PersonalAiUsageServiceImpl implements PersonalAiUsageService {
             Map.entry("CHAT", "课程 AI 智能对话"),
             Map.entry("CHAT_RAG", "课程 AI 智能助教 (RAG 问答)"),
             Map.entry("CHAT_TITLE", "会话标题生成"),
+            Map.entry("chat_title", "会话标题生成"),
             Map.entry("global_assistant", "全局 AI 教学助手"),
             Map.entry("GLOBAL_ASSISTANT", "全局 AI 教学助手"),
+            Map.entry("learning", "AI 自适应学习辅导"),
+            Map.entry("LEARNING", "AI 自适应学习辅导"),
+            Map.entry("memory_extract", "学情长期记忆沉淀"),
+            Map.entry("MEMORY_EXTRACT", "学情长期记忆沉淀"),
+            Map.entry("kb_retrieval", "知识库检索增强"),
+            Map.entry("KB_RETRIEVAL", "知识库检索增强"),
+            Map.entry("evaluation", "学情综合诊断评估"),
+            Map.entry("EVALUATION", "学情综合诊断评估"),
+            Map.entry("question", "AI 自适应试题生成"),
+            Map.entry("QUESTION", "AI 自适应试题生成"),
             Map.entry("question_generate", "AI 自适应练习生成"),
-            Map.entry("subjective_grading", "主观题智能批改与纠错"),
+            Map.entry("QUESTION_GENERATE", "AI 自适应练习生成"),
+            Map.entry("subjective_grading", "主观题智能评阅与批改"),
+            Map.entry("SUBJECTIVE_GRADING", "主观题智能评阅与批改"),
+            Map.entry("grading", "主观题智能评阅与批改"),
+            Map.entry("GRADING", "主观题智能评阅与批改"),
             Map.entry("summary", "章节摘要提炼"),
+            Map.entry("SUMMARY", "章节摘要提炼"),
             Map.entry("lesson_plan", "智能教案生成"),
-            Map.entry("paper_compose", "智能组卷"),
-            Map.entry("GRADING", "主观题智能批改与纠错"),
+            Map.entry("LESSON_PLAN", "智能教案生成"),
+            Map.entry("prep", "智能备课教案"),
+            Map.entry("PREP", "智能备课教案"),
+            Map.entry("paper_compose", "智能组卷与试题分析"),
+            Map.entry("PAPER_COMPOSE", "智能组卷与试题分析"),
+            Map.entry("exam", "智能组卷与试题分析"),
+            Map.entry("EXAM", "智能组卷与试题分析"),
+            Map.entry("teaching_advice", "AI 学情诊断与教学建议"),
             Map.entry("TEACHING_ADVICE", "AI 学情诊断与教学建议"),
+            Map.entry("course_objective", "课程教学目标 AI 推荐"),
             Map.entry("COURSE_OBJECTIVE", "课程教学目标 AI 推荐"),
+            Map.entry("course_description", "课程简介 AI 生成"),
             Map.entry("COURSE_DESCRIPTION", "课程简介 AI 生成"),
+            Map.entry("course_knowledge_point", "课程知识点 AI 推荐"),
             Map.entry("COURSE_KNOWLEDGE_POINT", "课程知识点 AI 推荐"),
+            Map.entry("rag", "RAG 知识检索问答"),
             Map.entry("RAG", "RAG 知识检索问答"),
+            Map.entry("agent", "AI Agent 任务规划"),
             Map.entry("AGENT", "AI Agent 任务规划"),
+            Map.entry("graph_suggest", "知识图谱关系推荐"),
             Map.entry("GRAPH_SUGGEST", "知识图谱关系推荐"),
             Map.entry("stream", "流式 AI 对话"),
-            Map.entry("exam", "智能组卷与试题分析")
+            Map.entry("STREAM", "流式 AI 对话"),
+            Map.entry("ocr", "智能 OCR 文本识别"),
+            Map.entry("OCR", "智能 OCR 文本识别"),
+            Map.entry("embedding", "知识向量化嵌入"),
+            Map.entry("EMBEDDING", "知识向量化嵌入"),
+            Map.entry("rerank", "语义重排检索优化"),
+            Map.entry("RERANK", "语义重排检索优化")
     );
 
     private final AiCallLogDao aiCallLogDao;
@@ -321,7 +357,7 @@ public class PersonalAiUsageServiceImpl implements PersonalAiUsageService {
 
     private String resolveSceneLabel(String scene) {
         if (!StringUtils.hasText(scene)) {
-            return "AI 功能调用";
+            return "AI 综合功能";
         }
         String label = SCENE_LABELS.get(scene);
         if (label != null) {
@@ -337,10 +373,11 @@ public class PersonalAiUsageServiceImpl implements PersonalAiUsageService {
 
     /** 兼容历史记录中的「配置名 · 模型名」格式，仅展示模型名 */
     private String normalizeModelDisplay(String model) {
-        if (!StringUtils.hasText(model)) {
-            return "unknown";
+        if (!StringUtils.hasText(model) || "unknown".equalsIgnoreCase(model.trim())) {
+            return "系统默认模型";
         }
         int separator = model.indexOf(" · ");
-        return separator >= 0 ? model.substring(separator + 3).trim() : model;
+        String name = separator >= 0 ? model.substring(separator + 3).trim() : model.trim();
+        return "unknown".equalsIgnoreCase(name) ? "系统默认模型" : name;
     }
 }

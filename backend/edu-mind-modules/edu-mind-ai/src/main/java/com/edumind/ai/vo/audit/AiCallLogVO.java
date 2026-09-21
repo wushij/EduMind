@@ -16,6 +16,8 @@ public class AiCallLogVO {
     private Long courseId;
     private String conversationId;
     private String model;
+    /** 命中的模型配置路由键（与上游型号区分：同型号可对应多条配置） */
+    private String modelKey;
     private Integer promptTokens;
     private Integer completionTokens;
     private Integer totalTokens;

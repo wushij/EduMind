@@ -1,24 +1,24 @@
 <template>
-  <div>
+  <div class="model-header-wrap">
     <el-card shadow="never" class="header-card">
       <div class="header-row">
-        <div class="header-info">
-          <div class="header-tag-row">
-            <span class="module-badge">
-              <el-icon><Cpu /></el-icon> EduMind AI · 模型配置
-            </span>
-            <span class="env-badge">Zero-Restart 热重载</span>
+        <div class="header-main">
+          <div class="header-icon-box">
+            <el-icon :size="24"><Cpu /></el-icon>
           </div>
-          <h2 class="header-title">LLM 与 Embedding 模型管理</h2>
-          <p class="header-subtitle">
-            统一维护全平台对话推理与向量计算模型接入，支持行内一键连通性测试与默认调度策略
-          </p>
+          <div class="header-info">
+            <h2 class="header-title">LLM 与 Embedding 模型管理</h2>
+            <p class="header-subtitle">
+              统一维护全平台对话推理与向量计算模型接入，支持行内一键连通性测试与默认调度策略
+            </p>
+          </div>
         </div>
+
         <div class="header-actions">
-          <el-button type="primary" class="add-btn" @click="onOpenCreate">
+          <el-button type="primary" class="btn-create" @click="onOpenCreate">
             <el-icon><Plus /></el-icon> 新增模型
           </el-button>
-          <el-button round :icon="Refresh" class="btn-refresh" :loading="refreshing" @click="onRefresh">
+          <el-button :icon="Refresh" class="btn-refresh" :loading="refreshing" @click="onRefresh">
             刷新
           </el-button>
         </div>
@@ -68,18 +68,51 @@ defineProps<{
 </script>
 
 <style scoped lang="scss">
+.model-header-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .header-card {
-  border-radius: 14px;
-  border: 1px solid #f1f5f9;
-  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e8edf3;
+  background: linear-gradient(135deg, #ffffff 0%, #f8faff 100%);
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
+  transition: box-shadow 0.25s ease;
+
+  :deep(.el-card__body) {
+    padding: 22px 28px;
+  }
 }
 
 .header-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
   flex-wrap: wrap;
+}
+
+.header-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.header-icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #e0edff 0%, #dbeafe 100%);
+  border: 1px solid #bfdbfe;
+  color: #1677ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(22, 119, 255, 0.12);
 }
 
 .header-info {
@@ -88,57 +121,60 @@ defineProps<{
   gap: 4px;
 }
 
-.header-tag-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.module-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: #eaf3ff;
-  color: #1677ff;
-  border: 1px solid #bae0ff;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.env-badge {
-  display: inline-flex;
-  align-items: center;
-  background: #f1f5f9;
-  color: #64748b;
-  border: 1px solid #e2e8f0;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-}
-
 .header-title {
-  margin: 4px 0 2px;
+  margin: 0;
   font-size: 20px;
   font-weight: 700;
   color: #0f172a;
+  letter-spacing: -0.01em;
 }
 
 .header-subtitle {
   color: #64748b;
   font-size: 13px;
+  line-height: 1.5;
   margin: 0;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex-shrink: 0;
 
-  .add-btn {
-    min-width: 112px;
+  .btn-create {
+    height: 36px;
+    padding: 0 20px;
+    border-radius: 9999px !important;
+    font-weight: 600;
+    font-size: 13px;
+    background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+    border: none;
+    box-shadow: 0 4px 14px rgba(22, 119, 255, 0.28);
+    transition: all 0.2s ease;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(22, 119, 255, 0.38);
+    }
+  }
+
+  .btn-refresh {
+    height: 36px;
+    padding: 0 18px;
+    border-radius: 9999px !important;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+    font-weight: 500;
+    font-size: 13px;
+    background: #ffffff;
+    transition: all 0.2s ease;
+
+    &:hover {
+      border-color: #cbd5e1;
+      background: #f8fafc;
+      color: #0f172a;
+    }
   }
 }
 
@@ -151,8 +187,8 @@ defineProps<{
   display: inline-flex;
   align-items: center;
   background: #f1f5f9;
-  padding: 3px;
-  border-radius: 999px;
+  padding: 4px;
+  border-radius: 9999px; // 纯正长圆药丸外框
   gap: 4px;
   border: 1px solid #e2e8f0;
 }
@@ -160,15 +196,15 @@ defineProps<{
 .segment-btn {
   border: none;
   background: transparent;
-  padding: 6px 16px;
-  border-radius: 999px;
+  padding: 7px 20px;
+  border-radius: 9999px; // 纯正长圆药丸内部项
   font-size: 13px;
   font-weight: 600;
   color: #64748b;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
 
@@ -180,23 +216,25 @@ defineProps<{
     background: #ffffff;
     color: #1677ff;
     font-weight: 600;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
   }
 }
 
 .count-pill {
-  background: #f1f5f9;
-  color: #64748b;
-  padding: 1px 7px;
-  border-radius: 10px;
+  background: #e2e8f0;
+  color: #475569;
+  padding: 1px 8px;
+  border-radius: 9999px; // 纯正长圆计数胶囊
   font-size: 11px;
+  font-weight: 700;
   min-width: 22px;
   text-align: center;
   box-sizing: border-box;
+  transition: all 0.2s ease;
 }
 
 .segment-btn.active .count-pill {
-  background: #eaf3ff;
+  background: #e0edff;
   color: #1677ff;
 }
 </style>

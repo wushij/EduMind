@@ -64,7 +64,8 @@
         </div>
       </div>
 
-      <div class="toolbar-right-actions">
+      <!-- AI 学情诊断建议属于教师的教学干预动作，学生视角不展示 -->
+      <div v-if="showOverall" class="toolbar-right-actions">
         <button
           type="button"
           class="capsule-btn capsule-btn--primary ai-btn"
@@ -89,7 +90,7 @@
           <span v-if="courseCode" class="course-code-badge">{{ courseCode }}</span>
           <span class="status-pill-badge status--active">
             <span class="pulse-dot"></span>
-            <span>教学诊断运行中</span>
+            <span>{{ showOverall ? '教学诊断运行中' : '个人学情画像' }}</span>
           </span>
         </div>
 
@@ -114,7 +115,7 @@
             <strong class="meta-value">{{ semester || '2026年秋季学期' }}</strong>
           </div>
 
-          <div class="meta-badge-item">
+          <div v-if="showOverall" class="meta-badge-item">
             <svg viewBox="0 0 24 24" class="meta-svg" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
               <circle cx="9" cy="7" r="4"></circle>
@@ -128,8 +129,8 @@
       </div>
     </div>
 
-    <!-- 底部统计卡片行（继承课程中心高雅长圆设计） -->
-    <div class="hero-stats-row">
+    <!-- 底部统计卡片行（继承课程中心高雅长圆设计）：均为班级维度指标，学生视角不展示 -->
+    <div v-if="showOverall" class="hero-stats-row">
       <div class="hero-stat-card">
         <span class="stat-num text-primary">{{ studentCount ?? 0 }} 人</span>
         <span class="stat-label">班级在读学生</span>
@@ -152,6 +153,7 @@
     <div class="hero-nav-pill-bar">
       <div class="pill-nav-tabs">
         <button
+          v-if="showOverall"
           type="button"
           class="pill-nav-item"
           :class="{ active: activeTab === 'overall' }"
@@ -204,6 +206,8 @@ const props = defineProps<{
   aiUsageCount?: number;
   activeTab: 'overall' | 'personal';
   personalTabEnabled?: boolean;
+  /** 是否允许查看班级整体学情：学生视角为 false，隐藏班级维度入口与统计 */
+  canViewOverall?: boolean;
   selectedStudentName?: string;
   range: string;
   adviceLoading?: boolean;
@@ -219,6 +223,9 @@ const emit = defineEmits<{
 const router = useRouter();
 const currentCourseId = ref(props.courseId);
 const currentRange = ref(props.range);
+
+/** 未显式传入时默认允许查看班级维度，保持教师/管理员原有行为 */
+const showOverall = computed(() => props.canViewOverall !== false);
 
 watch(() => props.courseId, (val) => {
   currentCourseId.value = val;

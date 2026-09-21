@@ -7,11 +7,6 @@
           返回工具中枢
         </el-button>
         <div class="header-titles">
-          <div class="eyebrow-row">
-            <span class="eyebrow-tag">EduMind AI Compute</span>
-            <span class="eyebrow-slash">/</span>
-            <span class="eyebrow-text">{{ isEdit ? '编辑教学工具' : '新建教学工具' }}</span>
-          </div>
           <h1 class="page-title">{{ isEdit ? `编辑：${form.name || '教学工具'}` : '新建 AI 教学工具' }}</h1>
           <p class="page-subtitle">配置工具的基础信息、适用分类、大模型及跳转路由，右侧可实时同步预览卡片效果</p>
         </div>

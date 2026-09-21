@@ -71,8 +71,9 @@ export function useLearningHome() {
     try {
       const res = await getCourseList({ page: 1, pageSize: 50 });
       const list = (res.data?.list ?? []) as Course[];
+      // 后端 Long 以字符串返回，统一转数字，避免与数字型 courseId 比较/传参时类型不一致
       courseOptions.value = list.map((c) => ({
-        id: c.id,
+        id: Number(c.id),
         name: getCourseDisplayName(c)
       }));
     } catch {
@@ -87,14 +88,9 @@ export function useLearningHome() {
         primaryCourseId != null ? { primaryCourseId } : undefined
       );
       overview.value = res.data ?? null;
-      if (overview.value?.courses && overview.value.courses.length > 0) {
-        courseOptions.value = overview.value.courses.map((c) => ({
-          id: c.courseId,
-          name: c.courseName || `课程 #${c.courseId}`
-        }));
-      }
+      applyOverviewCourseOptions();
       if (overview.value?.primaryCourseId != null) {
-        selectedCourseId.value = overview.value.primaryCourseId;
+        selectedCourseId.value = Number(overview.value.primaryCourseId);
       }
     } catch (err: unknown) {
       overview.value = null;
@@ -104,9 +100,24 @@ export function useLearningHome() {
     }
   }
 
+  /** 总览返回的课程列表作为最终展示来源（含课程显示名），保证结果确定 */
+  function applyOverviewCourseOptions() {
+    const courses = overview.value?.courses;
+    if (courses && courses.length > 0) {
+      courseOptions.value = courses.map((c) => ({
+        id: Number(c.courseId),
+        name: c.courseName || `课程 #${c.courseId}`
+      }));
+    }
+  }
+
   async function refresh(primaryCourseId?: number) {
-    await loadCourseOptions();
-    await loadOverview(primaryCourseId ?? selectedCourseId.value ?? undefined);
+    // 课程列表与总览互不依赖（总览自身会返回 primaryCourseId），原先串行 await 白白多等一次往返
+    await Promise.all([
+      loadCourseOptions(),
+      loadOverview(primaryCourseId ?? selectedCourseId.value ?? undefined)
+    ]);
+    applyOverviewCourseOptions();
   }
 
   async function changePrimaryCourse(courseId: number) {

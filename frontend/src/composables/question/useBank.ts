@@ -15,6 +15,7 @@ import { getQuestions } from '@/api/question/question';
 import type { QuestionItem, QuestionType, Difficulty } from '@/types/question/question';
 import type { Course } from '@/types/course/course';
 import { normalizeQuestionList } from '@/utils/question/normalize-question';
+import { canAccessRoute } from '@/utils/router/route-access';
 
 export interface BankFilterState {
   searchKeyword: string;
@@ -413,6 +414,11 @@ export function useBankList() {
   }
 
   function handleAiExpand(bank: any) {
+    // AI 智能出题为教师模块，前置拦截避免被路由守卫弹「权限不足」并踢回工作台
+    if (!canAccessRoute(router, '/ai/question/generate')) {
+      ElMessage.warning('AI 智能扩题为教师专属功能');
+      return;
+    }
     router.push({
       path: '/ai/question/generate',
       query: {
@@ -689,6 +695,11 @@ export function useBank() {
   }
 
   function handleAiExpand() {
+    // 同上：AI 出题属教师模块，学生点击前先给出明确说明
+    if (!canAccessRoute(router, '/ai/question/generate')) {
+      ElMessage.warning('AI 智能扩题为教师专属功能');
+      return;
+    }
     const cId = bankInfo.value?.courseId || '';
     const bId = bankId.value;
     router.push(`/ai/question/generate?courseId=${cId}&targetBankId=${bId}`);

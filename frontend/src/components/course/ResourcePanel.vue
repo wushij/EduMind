@@ -415,6 +415,7 @@ import { formatDateTime } from '@/utils/format/date';
 import { bindMarkdownCodeCopy, renderChatMarkdown } from '@/utils/ai/chat-markdown';
 import { batchUploadMessage, emptyBatchUploadResult } from '@/utils/upload/coalesce-upload-files';
 import { downloadByApiPath, fetchStorageBlob, fetchStorageText } from '@/utils/download/blob-download';
+import { resolveApiErrorMessage } from '@/core/http/api-error-message';
 import AppPagination from '@/components/common/AppPagination.vue';
 import { usePagination } from '@/composables/common/usePagination';
 
@@ -707,8 +708,8 @@ async function handleDelete(resourceId: number) {
   try {
     await deleteResource(resourceId);
     ElMessage.success('课件资料已成功删除');
-  } catch (err: any) {
-    ElMessage.error(err?.message || '删除资料失败');
+  } catch (err: unknown) {
+    ElMessage.error(resolveApiErrorMessage(err, '删除资料失败'));
   }
 }
 
@@ -795,8 +796,9 @@ async function handleUploadSubmit() {
     uploadFileList.value = [];
     selectedFiles.value = [];
     uploadProgress.value = 0;
-  } catch (err: any) {
-    ElMessage.error(err?.message || '上传资料失败');
+  } catch (err: unknown) {
+    // 用统一解析：直接读 err.message 会暴露 axios 的「Request failed with status code 400」这类无意义文案
+    ElMessage.error(resolveApiErrorMessage(err, '上传资料失败'));
   } finally {
     uploading.value = false;
   }

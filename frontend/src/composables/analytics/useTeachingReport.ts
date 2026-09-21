@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus';
 import { useLearningAnalytics } from '@/composables/analytics/useLearningAnalytics';
 import type { TeachingReportVO } from '@/types/analytics/report';
 import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
+import { canAccessRoute } from '@/utils/router/route-access';
 
 export interface KnowledgeMasteryItem {
   id: number;
@@ -106,6 +107,11 @@ export function useTeachingReport(defaultCourseId = 102) {
   }
 
   function handleQuickQuiz(kp: KnowledgeMasteryItem) {
+    // 快速组卷复用 AI 出题工作台（教师模块），非教师角色前置拦截并说明原因
+    if (!canAccessRoute(router, '/ai/question/generate')) {
+      ElMessage.warning('快速组卷为教师专属功能');
+      return;
+    }
     router.push({
       path: '/ai/question/generate',
       query: {

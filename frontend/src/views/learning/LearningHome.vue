@@ -85,31 +85,34 @@ function onCourseChange(courseId: number) {
   void changePrimaryCourse(courseId);
 }
 
+/**
+ * 学生端「立即强化 / 一键生成巩固练习」统一入口：
+ * 进入 AI 练习并锁定该薄弱考点（mode=KNOWLEDGE_TIER + knowledgePointId），到页面自动开练。
+ * 注意：/ai/question/generate 是教师模块（meta.roles = ADMIN/TEACHER），学生点会被路由守卫拦下报「权限不足」。
+ */
+function goPracticeForWeakPoint(point: LearningHomeWeakPointUI) {
+  router.push({
+    path: '/learning/practice',
+    query: {
+      courseId: String(point.courseId),
+      knowledgePointId: String(point.knowledgePointId),
+      mode: 'KNOWLEDGE_TIER',
+      autoStart: '1'
+    }
+  });
+}
+
 function handleGenerateWeakQuestions() {
   const point = weakPoints.value[0];
   if (!point) {
     router.push('/learning/practice');
     return;
   }
-  router.push({
-    path: '/ai/question/generate',
-    query: {
-      courseId: String(point.courseId),
-      subject: point.course,
-      knowledgePoint: point.name
-    }
-  });
+  goPracticeForWeakPoint(point);
 }
 
 function handleStudyPoint(point: LearningHomeWeakPointUI) {
-  router.push({
-    path: '/ai/question/generate',
-    query: {
-      courseId: String(point.courseId),
-      subject: point.course,
-      knowledgePoint: point.name
-    }
-  });
+  goPracticeForWeakPoint(point);
 }
 
 function handleExecuteTask(task: LearningHomeTaskUI) {

@@ -81,9 +81,16 @@ public class GatewayManageServiceImpl implements GatewayManageService {
                 latencies.add(logItem.getLatencyMs());
             }
 
-            // 供应商 / 模型分组
-            String provider = StringUtils.hasText(logItem.getModel()) ? logItem.getModel() : "unknown";
-            ProviderAgg pAgg = providerMap.computeIfAbsent(provider, k -> new ProviderAgg());
+            // 供应商 / 模型分组：优先按「命中的配置键」分组。
+            // 多条配置可能指向同一上游型号（如 v4.1flash 与 Flash 都是 deepseek-v4-flash），
+            // 只按型号分组会把不同配置合并成一行，无法判断实际走了哪条配置。
+            String upstreamModel = StringUtils.hasText(logItem.getModel()) ? logItem.getModel() : "unknown";
+            String groupKey = StringUtils.hasText(logItem.getModelKey()) ? logItem.getModelKey() : upstreamModel;
+            ProviderAgg pAgg = providerMap.computeIfAbsent(groupKey, k -> new ProviderAgg());
+            if (pAgg.modelKey == null) {
+                pAgg.modelKey = StringUtils.hasText(logItem.getModelKey()) ? logItem.getModelKey() : null;
+                pAgg.modelName = upstreamModel;
+            }
             pAgg.calls++;
             pAgg.promptTokens += pTokens;
             pAgg.completionTokens += cTokens;
@@ -148,7 +155,9 @@ public class GatewayManageServiceImpl implements GatewayManageService {
         for (Map.Entry<String, ProviderAgg> entry : providerMap.entrySet()) {
             ProviderAgg agg = entry.getValue();
             GatewayMetricsVO.ProviderMetricVO pVO = new GatewayMetricsVO.ProviderMetricVO();
-            pVO.setProvider(entry.getKey());
+            // provider 保持"上游型号"语义（前端据此显示服务商品牌），modelKey 用于区分具体配置
+            pVO.setProvider(agg.modelName != null ? agg.modelName : entry.getKey());
+            pVO.setModelKey(agg.modelKey);
             pVO.setCalls(agg.calls);
             pVO.setTokens(agg.tokens);
             pVO.setPromptTokens(agg.promptTokens);
@@ -407,17 +416,32 @@ public class GatewayManageServiceImpl implements GatewayManageService {
         return switch (scene.toLowerCase()) {
             case "chat" -> "课程智能助教答疑";
             case "global_assistant" -> "全局教学助手";
-            case "chat_rag", "rag", "knowledge" -> "RAG 知识检索增强";
-            case "question_generate" -> "AI 题库出题与变式";
-            case "grading" -> "作业/主观题智能批改";
+            case "learning" -> "AI 自适应学习辅导";
+            case "memory_extract" -> "学情长期记忆沉淀";
+            case "chat_rag", "rag", "knowledge", "kb_retrieval" -> "RAG 知识检索增强";
+            case "question", "question_generate" -> "AI 题库出题与变式";
+            case "grading", "subjective_grading" -> "作业/主观题智能批改";
+            case "prep", "lesson_plan" -> "AI 智能备课教案";
+            case "exam", "paper_compose" -> "智能组卷与试题分析";
+            case "evaluation" -> "学情综合诊断评估";
+            case "teaching_advice" -> "AI 学情诊断与教学建议";
+            case "course_objective" -> "课程教学目标 AI 推荐";
+            case "course_description" -> "课程简介 AI 生成";
+            case "course_knowledge_point" -> "课程知识点 AI 推荐";
             case "agent" -> "Agent 多步任务规划";
             case "stream" -> "流式启发式对话";
-            case "exam" -> "智能组卷与试题分析";
+            case "ocr" -> "智能 OCR 文本识别";
+            case "embedding" -> "知识向量化嵌入";
+            case "rerank" -> "语义重排检索优化";
             default -> scene;
         };
     }
 
     private static class ProviderAgg {
+        /** 命中的配置键；历史日志为空时回退为上游型号 */
+        String modelKey;
+        /** 上游型号（展示用） */
+        String modelName;
         long calls;
         long tokens;
         long promptTokens;

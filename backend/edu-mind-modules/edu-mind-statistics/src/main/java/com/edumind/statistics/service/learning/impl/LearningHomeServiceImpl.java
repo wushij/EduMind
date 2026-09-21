@@ -7,16 +7,13 @@ import com.edumind.course.vo.course.CourseVO;
 import com.edumind.course.vo.lesson.CourseLessonProgressSummaryVO;
 import com.edumind.statistics.dao.LearningRecordDao;
 import com.edumind.statistics.service.analytics.KnowledgeMasteryService;
-import com.edumind.statistics.service.learning.AdaptivePathService;
 import com.edumind.statistics.service.learning.LearningHomeService;
 import com.edumind.statistics.vo.analytics.KnowledgeMasteryVO;
 import com.edumind.statistics.vo.learning.LearningHomeOverviewVO;
-import com.edumind.statistics.vo.learning.LearningPathVO;
 import com.edumind.teaching.api.StudentAssignmentQueryApi;
 import com.edumind.teaching.vo.assignment.StudentAssignmentVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -40,7 +37,6 @@ public class LearningHomeServiceImpl implements LearningHomeService {
     private final KnowledgeMasteryService knowledgeMasteryService;
     private final LearningRecordDao learningRecordDao;
     private final StudentAssignmentQueryApi studentAssignmentQueryApi;
-    private final AdaptivePathService adaptivePathService;
 
     @Override
     public LearningHomeOverviewVO getOverview(Long studentId, Long primaryCourseId) {
@@ -66,6 +62,8 @@ public class LearningHomeServiceImpl implements LearningHomeService {
         double masterySum = 0;
 
         List<StudentAssignmentVO> allAssignments = studentAssignmentQueryApi.listMine(null);
+        // 学习时长一次批量聚合，避免逐课程查询明细再内存求和
+        Map<Long, Integer> studyMinutesByCourse = learningRecordDao.sumDurationByCourses(studentId, courseIds);
 
         for (Long courseId : courseIds) {
             LearningHomeOverviewVO.CourseItemVO item = new LearningHomeOverviewVO.CourseItemVO();
@@ -96,7 +94,7 @@ public class LearningHomeServiceImpl implements LearningHomeService {
             item.setPendingAssignmentCount(pending);
 
             courseItems.add(item);
-            totalStudyMinutes += learningRecordDao.getTotalDuration(courseId, studentId);
+            totalStudyMinutes += studyMinutesByCourse == null ? 0 : studyMinutesByCourse.getOrDefault(courseId, 0);
 
             for (KnowledgeMasteryVO.WeakPointVO wp : mastery.getWeakPoints()) {
                 LearningHomeOverviewVO.WeakPointItemVO weak = new LearningHomeOverviewVO.WeakPointItemVO();
@@ -116,7 +114,8 @@ public class LearningHomeServiceImpl implements LearningHomeService {
         allWeak.sort(Comparator.comparing(LearningHomeOverviewVO.WeakPointItemVO::getMastery));
         overview.setWeakPoints(allWeak.stream().limit(MAX_WEAK_POINTS).collect(Collectors.toList()));
 
-        List<LearningHomeOverviewVO.TodayTaskVO> tasks = buildTodayTasks(allAssignments, resolvedPrimary, studentId, courseNames);
+        List<LearningHomeOverviewVO.TodayTaskVO> tasks =
+                buildTodayTasks(allAssignments, resolvedPrimary, studentId, courseNames, allWeak);
         overview.setTodayTasks(tasks.stream().limit(MAX_TODAY_TASKS).collect(Collectors.toList()));
 
         LearningHomeOverviewVO.SummaryVO summary = overview.getSummary();
@@ -188,7 +187,8 @@ public class LearningHomeServiceImpl implements LearningHomeService {
             List<StudentAssignmentVO> assignments,
             Long primaryCourseId,
             Long studentId,
-            Map<Long, String> courseNames) {
+            Map<Long, String> courseNames,
+            List<LearningHomeOverviewVO.WeakPointItemVO> weakPoints) {
         List<LearningHomeOverviewVO.TodayTaskVO> tasks = new ArrayList<>();
         LocalDateTime weekLater = LocalDateTime.now().plusDays(7);
 
@@ -216,33 +216,28 @@ public class LearningHomeServiceImpl implements LearningHomeService {
             tasks.add(task);
         }
 
-        if (primaryCourseId != null) {
-            LearningPathVO path = adaptivePathService.buildAdaptivePath(primaryCourseId, studentId);
-            if (path.getWeeks() != null && !path.getWeeks().isEmpty()) {
-                LearningPathVO.LearningPathWeekVO firstWeek = path.getWeeks().get(0);
-                String courseName = courseNames.getOrDefault(primaryCourseId, "当前课程");
-                int idx = 0;
-                for (LearningPathVO.LearningPathTaskVO pt : firstWeek.getTasks()) {
-                    if (!"PENDING".equalsIgnoreCase(pt.getStatus())
-                            && !"IN_PROGRESS".equalsIgnoreCase(pt.getStatus())) {
-                        continue;
-                    }
-                    LearningHomeOverviewVO.TodayTaskVO task = new LearningHomeOverviewVO.TodayTaskVO();
-                    task.setId("path-" + primaryCourseId + "-" + idx++);
-                    task.setTitle(pt.getTitle());
-                    task.setCourseId(primaryCourseId);
-                    task.setCourseName(courseName);
-                    task.setType(pt.getType() != null ? pt.getType() : "PRACTICE");
-                    task.setEstimatedMinutes(pt.getEstimatedMinutes() != null ? pt.getEstimatedMinutes() : 15);
-                    task.setStatus("PENDING");
-                    String url = pt.getTargetUrl();
-                    task.setTargetUrl(StringUtils.hasText(url)
-                            ? url
-                            : "/learning/practice?courseId=" + primaryCourseId);
-                    tasks.add(task);
-                    break;
-                }
-            }
+        // 今日自适应任务：直接复用上面已算出的最弱考点构造。
+        // 原实现为此调用 buildAdaptivePath 构建整条学习路径（实测该项占本接口耗时一半以上：总 265ms 中 130~200ms），
+        // 而这里只需要一条"待完成"的任务，用已算出的薄弱考点拼装等价且更聚焦。
+        if (primaryCourseId != null && tasks.size() < MAX_TODAY_TASKS) {
+            Long focusCourseId = primaryCourseId;
+            weakPoints.stream()
+                    .filter(w -> Objects.equals(w.getCourseId(), focusCourseId))
+                    .findFirst()
+                    .ifPresent(weak -> {
+                        LearningHomeOverviewVO.TodayTaskVO task = new LearningHomeOverviewVO.TodayTaskVO();
+                        task.setId("path-" + focusCourseId + "-" + weak.getKnowledgePointId());
+                        task.setTitle("巩固练习：" + weak.getTitle());
+                        task.setCourseId(focusCourseId);
+                        task.setCourseName(courseNames.getOrDefault(focusCourseId, "当前课程"));
+                        task.setType("PRACTICE");
+                        task.setEstimatedMinutes(15);
+                        task.setStatus("PENDING");
+                        task.setTargetUrl("/learning/practice?courseId=" + focusCourseId
+                                + "&knowledgePointId=" + weak.getKnowledgePointId()
+                                + "&mode=KNOWLEDGE_TIER&autoStart=1");
+                        tasks.add(task);
+                    });
         }
         return tasks;
     }

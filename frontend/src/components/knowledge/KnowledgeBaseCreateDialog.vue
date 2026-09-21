@@ -134,7 +134,7 @@ withDefaults(
     createForm: CreateForm;
     createRules: Record<string, unknown>;
     categoryOptions: CategoryTab[];
-    courses?: Array<{ id: number; title: string }>;
+    courses?: Array<{ id: number; title?: string; name?: string }>;
   }>(),
   {
     isEdit: false,

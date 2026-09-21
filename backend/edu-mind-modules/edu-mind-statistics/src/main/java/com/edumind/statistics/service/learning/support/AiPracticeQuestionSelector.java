@@ -100,6 +100,10 @@ public class AiPracticeQuestionSelector {
         if (picked.size() < count) {
             List<QuestionVO> rest = pool.stream()
                     .filter(q -> !pickedIds.contains(q.getId()))
+                    // 明确指定了考点（考点认知进阶 / 立即强化）时，不得用其它考点的题凑数，
+                    // 否则会出现"点洛必达法则，练到 Java"这种内容对不上的情况；宁少不给错题
+                    .filter(q -> dto.getKnowledgePointId() == null || dto.getKnowledgePointId() <= 0
+                            || dto.getKnowledgePointId().equals(q.getKnowledgePointId()))
                     .collect(Collectors.toCollection(ArrayList::new));
             Collections.shuffle(rest);
             for (QuestionVO q : rest) {

@@ -50,9 +50,15 @@
       @abort="emit('abort-grading')"
     />
 
+    <!--
+      反馈面板：这里必须用普通 v-if。
+      v-else-if 写在 <transition> 的子组件上时，与上方 <AiCognitiveThinkingPanel v-if> 之间隔了 transition 一层，
+      Vue 编译器无法把两者连成条件链，会直接报 “v-else/v-else-if has no adjacent v-if or v-else-if” 导致页面白屏。
+      因此改为独立 v-if，并显式排除批改中（!grading），保持与推演面板互斥的原有语义。
+    -->
     <transition name="el-zoom-in-top">
       <AIPracticeFeedbackPanel
-        v-else-if="submittedCurrent && showFeedback"
+        v-if="!grading && submittedCurrent && showFeedback"
         :correct="answersState[currentIndex] === 'CORRECT'"
         :kp-title="currentQuestion.kpTitle"
         :reference-answer="displayReferenceAnswer(currentIndex)"

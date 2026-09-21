@@ -1,5 +1,7 @@
 export interface GatewayProviderMetricVO {
   provider: string;
+  /** 命中的模型配置键；为空表示历史日志未记录该字段 */
+  modelKey?: string | null;
   calls: number;
   tokens: number;
   promptTokens?: number;

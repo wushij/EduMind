@@ -84,26 +84,39 @@ export function getSceneLabel(scene?: string) {
   const map: Record<string, string> = {
     CHAT: '智能对话',
     CHAT_RAG: '知识增强对话',
+    LEARNING: 'AI 自适应学习辅导',
+    MEMORY_EXTRACT: '学情长期记忆沉淀',
     PREP: '智能备课',
     RAG: '知识问答',
+    KB_RETRIEVAL: '知识库检索增强',
     GRADING: '作业智能批改',
+    SUBJECTIVE_GRADING: '主观题智能评阅',
+    QUESTION: 'AI 试题生成',
     QUESTION_GENERATE: 'AI 试卷/题库生成',
+    EXAM: '智能组卷分析',
+    EVALUATION: '学情综合诊断评估',
+    TEACHING_ADVICE: '学情教学建议',
     AGENT: '智能体多步执行',
     GLOBAL_ASSISTANT: '全局智能助手',
     COURSE_OBJECTIVE: '课程教学目标 AI 推荐',
     COURSE_DESCRIPTION: '课程简介 AI 生成',
-    COURSE_KNOWLEDGE_POINT: '课程知识点 AI 推荐'
+    COURSE_KNOWLEDGE_POINT: '课程知识点 AI 推荐',
+    STREAM: '流式对话',
+    OCR: '智能 OCR 识别',
+    EMBEDDING: '向量知识嵌入',
+    RERANK: '语义重排优化'
   };
-  return map[s] || scene;
+  const raw = map[s] || scene;
+  return raw.replace(/\s*\([A-Za-z0-9_-]+\)\s*$/, '').trim();
 }
 
 export function getSceneStyleClass(scene?: string) {
   const s = (scene || '').toUpperCase();
-  if (s === 'CHAT' || s === 'CHAT_RAG') return 'badge-chat';
+  if (s === 'CHAT' || s === 'CHAT_RAG' || s === 'LEARNING' || s === 'STREAM') return 'badge-chat';
   if (s === 'PREP') return 'badge-prep';
-  if (s === 'RAG') return 'badge-rag';
-  if (s === 'GRADING') return 'badge-grading';
-  if (s === 'QUESTION_GENERATE') return 'badge-question';
+  if (s === 'RAG' || s === 'KB_RETRIEVAL') return 'badge-rag';
+  if (s === 'GRADING' || s === 'SUBJECTIVE_GRADING') return 'badge-grading';
+  if (s === 'QUESTION' || s === 'QUESTION_GENERATE' || s === 'EXAM') return 'badge-question';
   if (s === 'AGENT') return 'badge-agent';
   return 'badge-default';
 }

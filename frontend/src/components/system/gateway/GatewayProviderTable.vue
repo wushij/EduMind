@@ -21,8 +21,11 @@
       <el-table-column prop="provider" label="模型规格 / 供应商" min-width="180">
         <template #default="{ row }">
           <div class="model-name-cell">
-            <span class="model-tag font-mono">{{ row.provider }}</span>
-            <span class="model-type-hint">{{ getModelProviderBrand(row.provider) }}</span>
+            <!-- 优先展示命中的配置键：多条配置可能指向同一上游型号，只看型号无法区分实际用了哪条配置 -->
+            <span class="model-tag font-mono">{{ row.modelKey || row.provider }}</span>
+            <span class="model-type-hint">
+              {{ row.modelKey ? `${row.provider} · ${getModelProviderBrand(row.provider)}` : getModelProviderBrand(row.provider) }}
+            </span>
           </div>
         </template>
       </el-table-column>

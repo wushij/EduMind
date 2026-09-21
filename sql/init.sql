@@ -752,7 +752,8 @@ CREATE TABLE IF NOT EXISTS ai_call_log (
     user_id             BIGINT      DEFAULT NULL COMMENT '调用用户ID',
     course_id           BIGINT      DEFAULT NULL COMMENT '关联课程ID (NULL表示全局/无课程上下文)',
     conversation_id     VARCHAR(64) DEFAULT NULL COMMENT '关联会话ID（可选，无外键；删除会话不影响审计）',
-    model               VARCHAR(64) DEFAULT NULL COMMENT '调用的LLM模型名',
+    model               VARCHAR(64) DEFAULT NULL COMMENT '调用的LLM模型名（上游型号）',
+    model_key           VARCHAR(64) DEFAULT NULL COMMENT '命中的模型配置路由键（同一上游型号可能被多条配置复用，用于区分实际走了哪条配置）',
     prompt_tokens       INT         DEFAULT 0 COMMENT 'Prompt Token数',
     completion_tokens   INT         DEFAULT 0 COMMENT 'Completion Token数',
     latency_ms          INT         DEFAULT 0 COMMENT '响应耗时（毫秒）',
@@ -1151,13 +1152,16 @@ CREATE TABLE IF NOT EXISTS ai_memory_namespace (
     id             BIGINT      NOT NULL AUTO_INCREMENT COMMENT '命名空间ID',
     tenant_id      BIGINT      NOT NULL COMMENT '租户ID',
     user_id        BIGINT      NOT NULL COMMENT '用户ID',
-    course_id      BIGINT      DEFAULT NULL COMMENT '关联课程ID(NULL代表个人全局)',
+    course_id      BIGINT      NOT NULL DEFAULT 0 COMMENT '关联课程ID(0代表个人全局空间)',
     scope          VARCHAR(32) NOT NULL DEFAULT 'COURSE' COMMENT '作用域(GLOBAL/COURSE)',
     consent_status TINYINT     NOT NULL DEFAULT 0 COMMENT '用户授权状态(1:同意, 0:未授权/已撤回)',
     retention_days INT         NOT NULL DEFAULT 180 COMMENT '记忆留存周期(天)',
     status         TINYINT     NOT NULL DEFAULT 1 COMMENT '状态',
     create_time    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (id),
+    -- 全局空间用占位 0 而非 NULL：MySQL 唯一索引中 NULL 不参与去重，
+    -- 否则并发首访会插入多条全局命名空间，查询抛 TooManyResultsException（记忆页 500）
+    UNIQUE KEY uk_tenant_user_course (tenant_id, user_id, course_id),
     KEY idx_tenant_user_course (tenant_id, user_id, course_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI长期记忆命名空间表';
 

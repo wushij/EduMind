@@ -5,11 +5,6 @@
 
     <div class="hero-header-row">
       <div class="hero-title-area">
-        <div class="hero-eyebrow">
-          <span class="eyebrow-chip">EduMind AI Engineering</span>
-          <span class="eyebrow-divider">/</span>
-          <span class="eyebrow-sub">提示词工程资产中枢</span>
-        </div>
         <h1 class="hero-title">Prompt 提示词模板中心</h1>
         <p class="hero-desc">
           统一纳管课程 RAG 问答、试题生成向导、主客观智能批阅及教学备课的高质量提示词资产，构建具备上下文注入、多轮会话、引用溯源与防注入屏障的生产级教学中枢。
@@ -143,33 +138,6 @@ defineEmits<{
 
     .hero-title-area {
       max-width: 820px;
-
-      .hero-eyebrow {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: #1677FF;
-        background: rgba(22, 119, 255, 0.08);
-        border: 1px solid rgba(22, 119, 255, 0.15);
-        padding: 3px 12px;
-        border-radius: 9999px;
-        margin-bottom: 8px;
-
-        .eyebrow-chip {
-          color: #1677FF;
-          font-weight: 700;
-        }
-        .eyebrow-divider {
-          color: #93C5FD;
-        }
-        .eyebrow-sub {
-          color: #2563EB;
-        }
-      }
 
       .hero-title {
         margin: 0 0 6px 0;

@@ -182,7 +182,9 @@ onMounted(() => {
   }
 });
 
-defineExpose({ refresh: fetchList });
+// 页面把「全部已读 / 清空通知」放到顶部 hero 时，需要复用同一份状态与操作，
+// 避免再起一份 useNotificationList 造成重复请求与计数不一致。
+defineExpose({ refresh: fetchList, unreadCount, total, notifications, handleReadAll, handleClearAll });
 </script>
 
 <style scoped lang="scss">

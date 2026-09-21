@@ -4,9 +4,12 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { useCourseMember } from '@/composables/course/useCourseMember';
 import type { CourseMemberItem } from '@/types/course/member';
 import { normalizeAvatarUrl } from '@/utils/format/file';
+import { useAuthStore } from '@/stores/auth/auth';
+import { RoleEnum } from '@/constants/auth';
 
 export function useCourseMembersPage(courseId: number) {
   const router = useRouter();
+  const authStore = useAuthStore();
 
   const {
     members,
@@ -87,17 +90,31 @@ export function useCourseMembersPage(courseId: number) {
   }
 
   function handleViewPortrait(member: CourseMemberItem) {
+    const isStaff = authStore.hasAnyRole([RoleEnum.ADMIN, RoleEnum.TEACHER]);
+    const selfId = authStore.currentUser?.id ?? null;
+
     if (member.memberRole === 'TEACHER') {
+      // 班级整体学情分析仅教师/管理员可进入，学生点击教师行的入口必须拦截
+      if (!isStaff) {
+        ElMessage.warning('学生账号仅可查看本人学情画像');
+        return;
+      }
       router.push({
         path: '/analytics/learning',
         query: { courseId, tab: 'overall' }
       });
-    } else {
-      router.push({
-        path: '/analytics/learning',
-        query: { studentId: member.userId, courseId, tab: 'personal' }
-      });
+      return;
     }
+
+    // 学生只能查看自己的画像，不能通过他人行进入同学画像
+    if (!isStaff && member.userId !== selfId) {
+      ElMessage.warning('学生账号仅可查看本人学情画像');
+      return;
+    }
+    router.push({
+      path: '/analytics/learning',
+      query: { studentId: member.userId, courseId, tab: 'personal' }
+    });
   }
 
   async function handleRemove(userId: number) {

@@ -7,6 +7,7 @@ import com.edumind.ai.dto.gateway.AiModelSaveDTO;
 import com.edumind.ai.dto.gateway.AiModelTestDTO;
 import com.edumind.ai.entity.AiGatewayRouteEntity;
 import com.edumind.ai.entity.AiModelConfigEntity;
+import com.edumind.ai.gateway.AiUserModelPolicy;
 import com.edumind.ai.integration.crypto.AiApiKeyCipherService;
 import com.edumind.ai.integration.llm.AiModelConnectivityTester;
 import com.edumind.ai.integration.embedding.EmbeddingClientRegistry;
@@ -39,6 +40,7 @@ public class AiModelManageServiceImpl implements AiModelManageService {
     private final AiProviderPresetCatalog aiProviderPresetCatalog;
     private final LlmClientRegistry llmClientRegistry;
     private final EmbeddingClientRegistry embeddingClientRegistry;
+    private final AiUserModelPolicy aiUserModelPolicy;
 
     @Override
     public AiProviderPresetsResponseVO getProviderPresets() {
@@ -187,6 +189,8 @@ public class AiModelManageServiceImpl implements AiModelManageService {
     public List<AiModelConfigVO> listEnabledChatModels() {
         return aiModelConfigDao.listByFilter("chat", "enabled").stream()
                 .filter(config -> !isMockConfig(config))
+                // 只暴露平台允许用户自选的模型（开关 + 白名单），避免用户在下拉里选到平台未开放的模型
+                .filter(config -> aiUserModelPolicy.isSelectable(config.getConfigName()))
                 .map(aiModelConfigConverter::toVo)
                 .collect(Collectors.toList());
     }

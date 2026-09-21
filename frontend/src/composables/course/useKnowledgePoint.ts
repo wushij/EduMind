@@ -10,6 +10,8 @@ import {
 import { suggestCourseKnowledgePoints } from '@/api/ai/course-knowledge-points';
 import { getChapters } from '@/api/course/chapter';
 import { useTeachingCopilotStore } from '@/stores/ai/teaching-copilot-context';
+import { useAuthStore } from '@/stores/auth/auth';
+import { RoleEnum } from '@/constants/auth';
 import type { Course } from '@/types/course/course';
 import type { CourseKnowledgePointSuggestItem, KnowledgePoint } from '@/types/course/knowledge-point';
 import { mapSuggestItemToSave, resolvePrerequisiteIds } from '@/services/course/knowledge-point-import';
@@ -19,6 +21,7 @@ export function useKnowledgePoint(courseRef?: Ref<Course | null | undefined>) {
   const route = useRoute();
   const router = useRouter();
   const teachingCopilotStore = useTeachingCopilotStore();
+  const authStore = useAuthStore();
   const courseId = computed(() => Number(route.params.id) || courseRef?.value?.id || 101);
 
   const loading = ref(false);
@@ -339,8 +342,26 @@ export function useKnowledgePoint(courseRef?: Ref<Course | null | undefined>) {
     );
   }
 
+  /**
+   * 针对考点出题练习。
+   * AI 智能出题（/ai/question/generate）是教师模块（meta.roles = ADMIN/TEACHER），
+   * 学生点击会直接被路由守卫拦截并弹出「权限不足」提示。
+   * 学生侧的等价能力是「AI 练习」，因此按角色分流；教师仍走原出题工作台。
+   */
   function handleGenerateQuizForKp(kp: KnowledgePoint) {
-    router.push(`/ai/question/generate?courseId=${courseId.value}&kp=${encodeURIComponent(kp.title || kp.name || '')}`);
+    const title = encodeURIComponent(kp.title || kp.name || '');
+    if (authStore.hasAnyRole([RoleEnum.ADMIN, RoleEnum.TEACHER])) {
+      router.push(`/ai/question/generate?courseId=${courseId.value}&kp=${title}`);
+      return;
+    }
+    router.push({
+      path: '/learning/practice',
+      query: {
+        courseId: String(courseId.value),
+        knowledgePointId: String(kp.id),
+        autoStart: '1'
+      }
+    });
   }
 
   async function handleDeleteKp(kp: KnowledgePoint) {

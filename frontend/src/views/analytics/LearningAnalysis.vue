@@ -14,6 +14,7 @@
       :ai-usage-count="learningData?.aiUsageCount"
       :active-tab="activeTab"
       :personal-tab-enabled="personalTabEnabled"
+      :can-view-overall="!isStudentViewer"
       :selected-student-name="portraitData?.studentInfo.realName"
       :range="range"
       :advice-loading="adviceLoading"
@@ -63,14 +64,15 @@
         v-else
         :key="`portrait-${selectedStudentId || 'default'}`"
         :portrait="portraitData"
-        :student-options="enrolledStudents"
+        :student-options="portraitStudentOptions"
+        :variant="isStudentViewer ? 'student' : 'teacher'"
         :advice-loading="adviceLoading"
         @switch-student="handleSwitchStudent"
         @back-overall="handleBackOverall"
         @generate-advice="handleGenerateAdvice"
         @clear-advice="handleClearPersonalAdvice"
         @stop-advice="handleStopAdvice"
-        @open-diagnosis-drawer="aiDrawerVisible = true"
+        @open-diagnosis-drawer="handleOpenDiagnosisDrawer"
       />
     </transition>
 
@@ -98,9 +100,20 @@ import AiDiagnosisDrawer from '@/components/analytics/AiDiagnosisDrawer.vue';
 import { useLearningAnalytics } from '@/composables/analytics/useLearningAnalytics';
 import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
 import { getCourseDetail } from '@/api/course/course';
+import { useAuthStore } from '@/stores/auth/auth';
+import { RoleEnum } from '@/constants/auth';
 
 const route = useRoute();
 const router = useRouter();
+const authStore = useAuthStore();
+
+/**
+ * 学生视角判定：仅具备学生角色（无教师/管理员）时，
+ * 页面必须锁定为「本人学情画像」，不得展示班级整体学情分析。
+ * 后端对班级接口同样做了角色拦截，这里是前端的第一道防线。
+ */
+const isStudentViewer = computed(() => !authStore.hasAnyRole([RoleEnum.ADMIN, RoleEnum.TEACHER]));
+const viewerId = computed(() => authStore.currentUser?.id ?? null);
 
 // 优先从路由 query 提取 courseId，未提供时默认课程 102
 const initialCourseId = Number(route.query.courseId) || 102;
@@ -150,7 +163,13 @@ const currentSemester = computed(() => {
 
 const enrolledStudents = computed(() => learningData.value?.students ?? []);
 
-const personalTabEnabled = computed(() => enrolledStudents.value.length > 0);
+// 学生视角下不依赖班级名册：只要登录用户存在即可查看本人画像
+const personalTabEnabled = computed(() =>
+  isStudentViewer.value ? viewerId.value != null : enrolledStudents.value.length > 0
+);
+
+/** 个体画像的可切换学员列表：学生视角不暴露班级名册，仅保留本人上下文 */
+const portraitStudentOptions = computed(() => (isStudentViewer.value ? [] : enrolledStudents.value));
 
 function resolvePortraitStudentId(): number | null {
   const fromQuery = Number(route.query.studentId);
@@ -177,6 +196,16 @@ async function loadCourseMeta(cid: number) {
 
 // 刷新全量数据
 async function reload() {
+  // 学生视角：不请求班级整体数据（后端同样会拒绝），只加载本人画像
+  if (isStudentViewer.value) {
+    activeTab.value = 'personal';
+    await loadCourseMeta(courseId.value);
+    if (viewerId.value != null) {
+      await fetchStudentPortrait(courseId.value, viewerId.value, range.value);
+    }
+    return;
+  }
+
   await Promise.all([
     loadCourseMeta(courseId.value),
     fetchLearning(courseId.value, range.value)
@@ -231,6 +260,11 @@ function handleRangeChange(newRange: string) {
 }
 
 function handleTabChange(tab: 'overall' | 'personal') {
+  // 学生账号不得进入班级整体分析
+  if (tab === 'overall' && isStudentViewer.value) {
+    ElMessage.warning('学生账号仅可查看本人学情画像');
+    return;
+  }
   if (tab === 'personal' && !personalTabEnabled.value) {
     ElMessage.warning('当前课程暂无选课学员，无法查看个体学情画像');
     return;
@@ -272,6 +306,11 @@ const activeWeakPoints = computed(() => {
 });
 
 async function handleGenerateAdvice() {
+  // AI 学情诊断建议属于教师的教学干预动作，学生端仅提供只读画像
+  if (isStudentViewer.value) {
+    ElMessage.warning('AI 学情诊断建议由教师生成，学生端仅可查看本人画像');
+    return;
+  }
   const isPersonal = activeTab.value === 'personal';
   const targetStudentId = isPersonal
     ? (selectedStudentId.value || portraitData.value?.studentInfo?.studentId)
@@ -331,15 +370,47 @@ function handleClearCurrentAdvice() {
   }
 }
 
+/**
+ * 打开 AI 诊断抽屉。
+ * 没有真实诊断数据时不打开空抽屉，避免出现「看起来有结论、其实没有」的观感。
+ */
+function handleOpenDiagnosisDrawer() {
+  if (isStudentViewer.value) {
+    ElMessage.warning('AI 学情诊断由教师生成，学生端仅可查看本人画像数据');
+    return;
+  }
+  if (!teachingAdvice.value) {
+    ElMessage.info('请先点击右上角「生成个人学情诊断」，生成后再查看诊断处方');
+    return;
+  }
+  aiDrawerVisible.value = true;
+}
+
 function handleDispatchPractice() {
-  ElMessage.success(`已为「${portraitData.value?.studentInfo?.realName || '学员'}」定向下发 5 道考点自适应强化题！`);
+  // 真正的干预编排与下发在「教学干预决策」模块完成。
+  // 原先这里只弹「已下发 5 道强化题」的成功提示却没有任何后端调用，属于虚假反馈，现改为跳转真实入口。
   aiDrawerVisible.value = false;
+  const query: Record<string, string> = { courseId: String(courseId.value) };
+  const targetStudentId = portraitData.value?.studentInfo?.studentId;
+  if (activeTab.value === 'personal' && targetStudentId) {
+    query.studentId = String(targetStudentId);
+  }
+  router.push({ path: '/analytics/interventions', query });
 }
 
 // 监听路由参数变动（支持从外部选课成员列表点击跳转）
 watch(
   () => route.query,
   (query) => {
+    // 学生视角：无论 URL 传入什么 tab，一律锁定为本人画像
+    if (isStudentViewer.value) {
+      activeTab.value = 'personal';
+      if (query.courseId && Number(query.courseId) !== courseId.value) {
+        courseId.value = Number(query.courseId);
+        reload();
+      }
+      return;
+    }
     let shouldReload = false;
     if (query.courseId && Number(query.courseId) !== courseId.value) {
       courseId.value = Number(query.courseId);
@@ -363,7 +434,9 @@ watch(
 );
 
 onMounted(() => {
-  if (route.query.tab === 'personal' || route.query.studentId) {
+  if (isStudentViewer.value) {
+    activeTab.value = 'personal';
+  } else if (route.query.tab === 'personal' || route.query.studentId) {
     activeTab.value = 'personal';
   }
   reload();

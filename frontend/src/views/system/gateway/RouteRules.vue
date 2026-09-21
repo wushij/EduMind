@@ -42,6 +42,18 @@
         <span>建议：主模型选择能力强、推理质量高的大模型（如 deepseek-v4-flash），降级模型选择本地备用或高吞吐低延迟模型（如 mock 或轻量模型）。</span>
       </div>
 
+      <!-- 明确解析顺序，避免"配了却不生效"的误判 -->
+      <div class="table-tip-row tip-row--hierarchy">
+        <el-icon><InfoFilled /></el-icon>
+        <span>
+          模型解析顺序：<strong>① 会话内用户选择</strong>（受平台白名单约束）
+          → <strong>② 本页场景策略</strong>
+          → <strong>③ 平台默认模型</strong>
+          <template v-if="defaultModelLabel">（当前：{{ defaultModelLabel }}，仅在本场景未配置或目标不可用时兜底）</template>
+          。批改、评测、出题等教学任务不接受用户选择，保证评测口径一致。
+        </span>
+      </div>
+
       <el-table :data="routes" stripe style="width: 100%;">
         <el-table-column label="教学业务场景" width="240">
           <template #default="{ row }">
@@ -105,6 +117,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { ArrowLeft, Refresh, Check, InfoFilled } from '@element-plus/icons-vue';
 import { useGatewayRoutes } from '@/composables/system/useGateway';
 
@@ -119,6 +132,11 @@ const {
   loadData,
   saveRoutes
 } = useGatewayRoutes();
+
+/** 平台默认模型（is_default）：场景未配置时的兜底，展示出来避免"哪个准"的困惑 */
+const defaultModelLabel = computed(
+  () => modelOptions.value.find((option) => option.isDefault)?.label ?? ''
+);
 </script>
 
 <style scoped lang="scss">
@@ -226,6 +244,20 @@ const {
       .el-icon {
         color: #2563EB;
         font-size: 16px;
+      }
+
+      /* 解析顺序说明：与"建议"区分开，突出这是生效规则 */
+      &.tip-row--hierarchy {
+        background: #EFF6FF;
+        border-color: #BFDBFE;
+        color: #1D4ED8;
+        align-items: flex-start;
+        line-height: 1.7;
+
+        strong {
+          color: #1E40AF;
+          font-weight: 700;
+        }
       }
     }
 

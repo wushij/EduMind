@@ -15,8 +15,8 @@ export function getWrongBook(params: {
   errorType?: string;
   knowledgePointId?: number;
   status?: number;
-}) {
-  return get<WrongBookListVO>('/learning/wrong-book', params);
+}, config?: HttpRequestConfig) {
+  return get<WrongBookListVO>('/learning/wrong-book', params, config);
 }
 
 export function getWrongBookOverview(courseId: number) {

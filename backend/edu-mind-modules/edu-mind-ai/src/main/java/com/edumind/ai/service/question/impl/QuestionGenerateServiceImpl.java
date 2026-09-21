@@ -35,6 +35,17 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
 
     private static final long GENERATING_TTL_SECONDS = 120L;
 
+    /** 单次出题最多调用大模型次数（首次 + 解析失败重试一次） */
+    private static final int MAX_GENERATE_ATTEMPTS = 2;
+
+    /** 重试时追加的强化指令：针对上一次输出题干被截断的问题 */
+    private static final String RETRY_REINFORCE_INSTRUCTION = """
+
+            【重要提醒】上一次输出存在题干被截断或 JSON 无法解析的问题。
+            请重新完整输出：每题题干必须完整成句（不要以逗号、顿号或左括号结尾），
+            所有括号与引号必须闭合，并输出完整合法的 JSON 对象。
+            """;
+
     private final AiGatewayFacade aiGatewayFacade;
     private final PromptService promptService;
     private final AiSessionCacheService aiSessionCacheService;
@@ -64,31 +75,41 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
                     .courseId(dto.getCourseId())
                     .build();
 
-            try {
-                String json = aiGatewayFacade.generateQuestions(
-                        "question_generate",
-                        null,
-                        systemPrompt + "\n\n" + userPrompt,
-                        params,
-                        auditContext
-                );
-                List<QuestionVO> parsed = parseQuestions(json, dto);
-                if (!parsed.isEmpty()) {
-                    return parsed;
+            // 解析结果为空（模型输出被截断、JSON 不完整等）时自动重试一次，再走兜底模板；
+            // 只重试一次，避免异常场景下无上限地消耗 Token 与等待时间
+            boolean manualAssist = dto.getPromptDirective() != null && !dto.getPromptDirective().isBlank();
+            List<QuestionVO> parsed = List.of();
+            for (int attempt = 1; attempt <= MAX_GENERATE_ATTEMPTS && parsed.isEmpty(); attempt++) {
+                try {
+                    String attemptPrompt = systemPrompt + "\n\n" + userPrompt
+                            + (attempt > 1 ? RETRY_REINFORCE_INSTRUCTION : "");
+                    String json = aiGatewayFacade.generateQuestions(
+                            "question_generate",
+                            null,
+                            attemptPrompt,
+                            params,
+                            auditContext
+                    );
+                    parsed = parseQuestions(json, dto);
+                    if (parsed.isEmpty()) {
+                        log.warn("AI 出题解析结果为空（第 {} 次尝试），raw 前 800 字：{}",
+                                attempt, json != null && json.length() > 800 ? json.substring(0, 800) + "…" : json);
+                    }
+                } catch (BusinessException ex) {
+                    throw ex;
+                } catch (Exception ex) {
+                    log.warn("大模型生成题目调用或解析异常（第 {} 次尝试）", attempt, ex);
+                    if (manualAssist && attempt >= MAX_GENERATE_ATTEMPTS) {
+                        String detail = ex.getMessage() != null ? ex.getMessage() : "未知错误";
+                        throw aiAssistFailed("AI 命题调用失败：" + detail);
+                    }
                 }
-                log.warn("AI 出题 JSON 解析结果为空，raw 前 800 字：{}",
-                        json != null && json.length() > 800 ? json.substring(0, 800) + "…" : json);
-                if (dto.getPromptDirective() != null && !dto.getPromptDirective().isBlank()) {
-                    throw aiAssistFailed("AI 返回内容无法解析为试题 JSON，请稍后重试或简化题干后重试");
-                }
-            } catch (BusinessException ex) {
-                throw ex;
-            } catch (Exception ex) {
-                log.warn("大模型生成题目调用或解析异常", ex);
-                if (dto.getPromptDirective() != null && !dto.getPromptDirective().isBlank()) {
-                    String detail = ex.getMessage() != null ? ex.getMessage() : "未知错误";
-                    throw aiAssistFailed("AI 命题调用失败：" + detail);
-                }
+            }
+            if (!parsed.isEmpty()) {
+                return parsed;
+            }
+            if (manualAssist) {
+                throw aiAssistFailed("AI 返回内容无法解析为试题 JSON，请稍后重试或简化题干后重试");
             }
 
             // 批量出题场景：大模型不可用时使用教学模板兜底（录题页带 promptDirective 时已在上文直接报错）
@@ -277,6 +298,11 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
             if (QuestionStemValidator.isGarbageStem(vo.getStem())) {
                 continue;
             }
+            // 题干被 max_tokens 截断（以逗号/左括号结尾、括号未闭合）时直接丢弃，避免入库半截题
+            if (QuestionStemValidator.isTruncatedStem(vo.getStem())) {
+                log.warn("跳过题干疑似截断的生成结果：{}", vo.getStem());
+                continue;
+            }
 
             Object optsObj = item.get("options");
             if (optsObj == null) {
@@ -286,13 +312,13 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
                 optsObj = item.get("choices");
             }
             if (optsObj instanceof String s) {
-                vo.setOptions(s);
+                vo.setOptions(normalizeOptionsJson(s));
             } else if (optsObj instanceof JSONArray arr) {
-                vo.setOptions(JSON.toJSONString(arr));
+                vo.setOptions(normalizeOptionsJson(JSON.toJSONString(arr)));
             } else if (optsObj instanceof JSONObject jo) {
                 vo.setOptions(JSON.toJSONString(convertOptionObjectToArray(jo)));
             } else if (optsObj != null) {
-                vo.setOptions(JSON.toJSONString(optsObj));
+                vo.setOptions(normalizeOptionsJson(JSON.toJSONString(optsObj)));
             } else {
                 vo.setOptions("[]");
             }
@@ -392,6 +418,70 @@ public class QuestionGenerateServiceImpl implements QuestionGenerateService {
             arr.add(opt);
         }
         return arr;
+    }
+
+    /**
+     * 选项文本字段白名单（按优先级）。
+     * 大模型实际会输出 content / text / val 等多种字段名，此前只有前端做容错，
+     * 导致库里同一张表出现三种选项格式（实测 146 道单选里 60 道选项含 text 字段）。
+     * 这里在入库前统一归一为 {key, content, isCorrect}，保证"写进去"与"读出来"一致。
+     */
+    private static final List<String> OPTION_TEXT_FIELDS =
+            List.of("content", "val", "text", "optionContent", "option", "label", "title");
+
+    /** 把模型输出的选项 JSON 归一化为标准 {key, content, isCorrect} 数组字符串 */
+    private String normalizeOptionsJson(String rawOptions) {
+        if (rawOptions == null || rawOptions.isBlank()) {
+            return "[]";
+        }
+        Object parsed;
+        try {
+            parsed = JSON.parse(rawOptions);
+        } catch (Exception ex) {
+            // 模型偶尔把选项写成 "A.xxx, B.yyy" 这类非 JSON 文本，无法可靠解析，保留原文由前端兜底
+            return rawOptions;
+        }
+        if (!(parsed instanceof JSONArray arr)) {
+            if (parsed instanceof JSONObject jo) {
+                return JSON.toJSONString(convertOptionObjectToArray(jo));
+            }
+            return rawOptions;
+        }
+        JSONArray normalized = new JSONArray();
+        for (int i = 0; i < arr.size(); i++) {
+            Object element = arr.get(i);
+            if (element instanceof JSONObject opt) {
+                String content = firstNonBlankTextField(opt);
+                if (content == null) {
+                    continue;
+                }
+                JSONObject target = new JSONObject();
+                String key = opt.getString("key");
+                target.put("key", key != null && !key.isBlank() ? key.trim() : String.valueOf((char) ('A' + i)));
+                target.put("content", content);
+                Object isCorrect = opt.get("isCorrect") != null ? opt.get("isCorrect") : opt.get("correct");
+                if (isCorrect instanceof Boolean flag) {
+                    target.put("isCorrect", flag);
+                }
+                normalized.add(target);
+            } else if (element != null) {
+                JSONObject target = new JSONObject();
+                target.put("key", String.valueOf((char) ('A' + i)));
+                target.put("content", String.valueOf(element));
+                normalized.add(target);
+            }
+        }
+        return normalized.isEmpty() ? "[]" : JSON.toJSONString(normalized);
+    }
+
+    private String firstNonBlankTextField(JSONObject option) {
+        for (String field : OPTION_TEXT_FIELDS) {
+            String value = option.getString(field);
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private String firstNonBlank(String... values) {

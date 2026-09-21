@@ -7,6 +7,7 @@ import com.edumind.ai.dto.ChatStreamDTO;
 import com.edumind.ai.entity.ConversationEntity;
 import com.edumind.ai.entity.MessageEntity;
 import com.edumind.ai.gateway.AiGatewayFacade;
+import com.edumind.ai.gateway.AiUserModelPolicy;
 import com.edumind.ai.integration.llm.LlmChatMessage;
 import com.edumind.ai.integration.llm.LlmClient;
 import com.edumind.ai.integration.llm.LlmProperties;
@@ -66,6 +67,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatHistoryBuilder chatHistoryBuilder;
     private final LessonContentIndexApi lessonContentIndexApi;
     private final LessonCopilotEnricher lessonCopilotEnricher;
+    private final AiUserModelPolicy aiUserModelPolicy;
 
     @Override
     public SseEmitter streamChat(ChatStreamDTO dto) {
@@ -249,7 +251,9 @@ public class ChatServiceImpl implements ChatService {
                     .retrievalHitCount(citationsForSave != null && !citationsForSave.isEmpty()
                             ? citationsForSave.size() : null)
                     .build();
-            aiGatewayFacade.streamChat(auditScene, dto.getModelKey(), systemPrompt, chatHistory, auditContext,
+            // 会话内用户选择的模型需通过平台治理校验（开关 + 白名单），未通过则回落场景策略
+            String userSelectedModelKey = aiUserModelPolicy.validateUserSelection(dto.getModelKey());
+            aiGatewayFacade.streamChat(auditScene, userSelectedModelKey, systemPrompt, chatHistory, auditContext,
                     () -> chatStreamRegistry.isCancelled(streamId),
                     new LlmClient.StreamCallback() {
                 @Override

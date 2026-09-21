@@ -27,6 +27,7 @@ export const learningRoutes: RouteRecordRaw[] = [
   },
   {
     path: '/learning/practice',
+    alias: ['/learning/ai-practice'],
     name: 'LearningPractice',
     component: () => import('@/views/learning/AIPractice.vue'),
     meta: { title: 'AI 自适应练习', requiresAuth: true }

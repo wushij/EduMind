@@ -17,16 +17,21 @@ public class ModelRouterImpl implements ModelRouter {
     private final AiModelConfigDao aiModelConfigDao;
     private final LlmProperties llmProperties;
 
+    /**
+     * 模型解析顺序（与「网关路由」页说明保持一致）：
+     * <ol>
+     *   <li>显式指定的模型键（会话内用户选择、提示词模板/Agent 绑定）——但用户侧选择需先经
+     *       {@link AiUserModelPolicy} 白名单校验，未通过时调用方传 null 进来；</li>
+     *   <li>场景策略：管理员在「网关路由与模型调度规则」按业务场景配置的首选模型；</li>
+     *   <li>平台默认模型（「模型管理」页 is_default）——场景未配置或路由目标不可用时兜底；</li>
+     *   <li>任一可用配置，最后才允许 mock。</li>
+     * </ol>
+     * 注意：场景策略必须排在平台默认之前，否则管理员配置的场景路由永远不会生效。
+     */
     @Override
     public String resolveModelKey(String scene, String explicitModelKey) {
         if (StringUtils.hasText(explicitModelKey)) {
             return normalizeModelKey(explicitModelKey);
-        }
-
-        // 优先使用后台「模型配置」中的默认模型，避免 application-*.yml 的 provider=mock 覆盖已接入的真实模型
-        AiModelConfigEntity defaultChat = aiModelConfigDao.findDefaultByType("chat");
-        if (defaultChat != null && isInvokable(defaultChat)) {
-            return configLookupKey(defaultChat);
         }
 
         if (StringUtils.hasText(scene)) {
@@ -37,6 +42,12 @@ public class ModelRouterImpl implements ModelRouter {
                     return configLookupKey(routed);
                 }
             }
+        }
+
+        // 平台默认模型兜底（避免 application-*.yml 的 provider=mock 覆盖已接入的真实模型）
+        AiModelConfigEntity defaultChat = aiModelConfigDao.findDefaultByType("chat");
+        if (defaultChat != null && isInvokable(defaultChat)) {
+            return configLookupKey(defaultChat);
         }
 
         return aiModelConfigDao.listEnabled().stream()

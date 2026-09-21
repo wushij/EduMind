@@ -25,9 +25,10 @@
                 <span v-if="isPersonal && targetStudentName" class="student-target-tag">
                   诊断对象：{{ targetStudentName }}
                 </span>
+                <!-- 不写死具体模型名：实际由后端按场景路由到配置的模型，写死会误导 -->
                 <span class="engine-badge">
                   <span class="pulse-dot"></span>
-                  <span>DeepSeek-R1 认知推演</span>
+                  <span>AI 大模型认知推演</span>
                 </span>
               </div>
             </div>
@@ -35,39 +36,60 @@
         </div>
       </div>
 
-      <!-- AI 诊断核心结论卡片 -->
-      <div class="diagnosis-card summary-card">
-        <div class="card-header-bar">
-          <span class="pill-decor"></span>
-          <h4>AI 诊断核心结论</h4>
-          <span class="source-tag">高阶语义归因</span>
+      <!--
+        无诊断数据时不展示任何“结论”。
+        此前这里会在 advice 为空时渲染写死的占位文案（“该学员各考点掌握稳固……”）并伪装成 AI 推演结果，
+        极易被误认为真实归因，因此改为明确的空状态引导。
+      -->
+      <div v-if="!hasAdvice" class="diagnosis-card empty-card">
+        <div class="empty-icon-circle">
+          <svg viewBox="0 0 24 24" class="empty-icon-svg" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
         </div>
-        <div class="summary-text-box">
-          <p>{{ advice?.summary || defaultSummary }}</p>
-        </div>
+        <h4>尚未生成 AI 学情诊断</h4>
+        <p>
+          点击右上角「生成个人学情诊断」，AI 会基于该学员的真实掌握度、薄弱考点与班级对比数据生成诊断结论与干预建议。
+        </p>
       </div>
 
-      <!-- 重点推荐行动清单 -->
-      <div class="diagnosis-card actions-card">
-        <div class="card-header-bar">
-          <span class="pill-decor pill-decor--green"></span>
-          <h4>推荐靶向干预行动项</h4>
-          <span class="action-count-badge">{{ actionList.length }} 项建议</span>
+      <template v-else>
+        <!-- AI 诊断核心结论卡片 -->
+        <div class="diagnosis-card summary-card">
+          <div class="card-header-bar">
+            <span class="pill-decor"></span>
+            <h4>AI 诊断核心结论</h4>
+            <span class="source-tag">高阶语义归因</span>
+          </div>
+          <div class="summary-text-box">
+            <p>{{ advice?.summary }}</p>
+          </div>
         </div>
 
-        <div class="action-items-list">
-          <div
-            v-for="(act, idx) in actionList"
-            :key="idx"
-            class="action-item-capsule"
-          >
-            <div class="action-num-circle">{{ idx + 1 }}</div>
-            <div class="action-text-content">
-              <span>{{ act }}</span>
+        <!-- 重点推荐行动清单 -->
+        <div v-if="actionList.length" class="diagnosis-card actions-card">
+          <div class="card-header-bar">
+            <span class="pill-decor pill-decor--green"></span>
+            <h4>推荐靶向干预行动项</h4>
+            <span class="action-count-badge">{{ actionList.length }} 项建议</span>
+          </div>
+
+          <div class="action-items-list">
+            <div
+              v-for="(act, idx) in actionList"
+              :key="idx"
+              class="action-item-capsule"
+            >
+              <div class="action-num-circle">{{ idx + 1 }}</div>
+              <div class="action-text-content">
+                <span>{{ act }}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </template>
 
       <!-- 薄弱考点强化推荐（如有） -->
       <div v-if="weakPointList.length" class="diagnosis-card weak-card">
@@ -89,49 +111,48 @@
 
     <template #footer>
       <div class="drawer-footer-actions">
-        <button
-          type="button"
-          class="capsule-btn capsule-btn--danger"
-          @click="handleClearAdvice"
-        >
-          <span>删除建议</span>
-        </button>
+        <template v-if="hasAdvice">
+          <button
+            type="button"
+            class="capsule-btn capsule-btn--danger"
+            @click="handleClearAdvice"
+          >
+            <span>删除建议</span>
+          </button>
 
-        <button
-          type="button"
-          class="capsule-btn capsule-btn--default"
-          @click="handleCopyAdvice"
-        >
-          <svg viewBox="0 0 24 24" class="btn-svg" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-          </svg>
-          <span>复制建议</span>
-        </button>
+          <button
+            type="button"
+            class="capsule-btn capsule-btn--default"
+            @click="handleCopyAdvice"
+          >
+            <svg viewBox="0 0 24 24" class="btn-svg" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>复制建议</span>
+          </button>
 
-        <button
-          v-if="isPersonal"
-          type="button"
-          class="capsule-btn capsule-btn--primary"
-          @click="handleDispatchPractice"
-        >
-          <svg viewBox="0 0 24 24" class="btn-svg" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
-          <span>一键下发靶向微练</span>
-        </button>
+          <!-- 不在此处伪造“已下发”结果，统一跳转到真正具备下发能力的教学干预决策 -->
+          <button
+            type="button"
+            class="capsule-btn capsule-btn--primary"
+            @click="handleGoIntervention"
+          >
+            <svg viewBox="0 0 24 24" class="btn-svg" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+            <span>前往教学干预下发</span>
+          </button>
+        </template>
 
         <button
           v-else
           type="button"
-          class="capsule-btn capsule-btn--primary"
-          @click="handleApplyStrategy"
+          class="capsule-btn capsule-btn--default"
+          @click="visible = false"
         >
-          <svg viewBox="0 0 24 24" class="btn-svg" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
-          <span>同步至教学日历</span>
+          <span>关闭</span>
         </button>
       </div>
     </template>
@@ -179,29 +200,13 @@ const drawerTitle = computed(() => {
   return isPersonal.value ? '学生精准学情诊断建议' : '全班教学诊断策略决策报告';
 });
 
-const defaultSummary = computed(() => {
-  if (isPersonal.value) {
-    return '该学员各考点掌握稳固，综合表现优良。建议适度增加压轴综合题或算法优化拓展练习，向卓越层次进阶。';
-  }
-  return '班级整体掌握情况良好，各章节推进扎实，可适度增加综合应用题或跨模块综合训练。';
-});
+/** 诊断行动项：只取后端真实返回，无数据时不再编造占位建议 */
+const actionList = computed(() => props.advice?.actions ?? []);
 
-const actionList = computed(() => {
-  if (props.advice?.actions?.length) {
-    return props.advice.actions;
-  }
-  if (isPersonal.value) {
-    return [
-      '保持当前微课打卡与在线学习节奏',
-      '进入自适应巩固题库进行 5 题靶向微测',
-      '重温薄弱考点精讲并参与课堂研讨'
-    ];
-  }
-  return [
-    '组织阶段性拔高综合测验以检验长效留存',
-    '推送学科前沿拓展研读与典型案例分析资源',
-    '建立班级互助学习协作小组'
-  ];
+/** 是否存在真实诊断数据（结论或行动项至少有一项），决定是否展示“结论”区域 */
+const hasAdvice = computed(() => {
+  const summary = props.advice?.summary?.trim();
+  return Boolean(summary) || actionList.value.length > 0;
 });
 
 const weakPointList = computed(() => {
@@ -211,7 +216,7 @@ const weakPointList = computed(() => {
 function handleCopyAdvice() {
   const content = [
     `【${drawerTitle.value}】`,
-    `诊断结论：${props.advice?.summary || defaultSummary.value}`,
+    `诊断结论：${props.advice?.summary ?? ''}`,
     '干预建议：',
     ...actionList.value.map((a, i) => `${i + 1}. ${a}`)
   ].join('\n');
@@ -227,14 +232,14 @@ function handleCopyAdvice() {
   }
 }
 
-function handleDispatchPractice() {
+/**
+ * 跳转到真实的干预下发入口。
+ * 原先这里直接弹「已下发 5 道强化题」/「已同步至教学大纲」的成功提示，
+ * 但没有任何后端调用，属于虚假反馈；真正的干预编排与下发在「教学干预决策」模块完成，
+ * 因此这里只负责把用户带到真实入口，由页面决定跳转目标。
+ */
+function handleGoIntervention() {
   emit('dispatch-practice');
-  ElMessage.success(`已向学员【${props.targetStudentName || '当前学生'}】下发个性化靶向提升微练作业！`);
-  visible.value = false;
-}
-
-function handleApplyStrategy() {
-  ElMessage.success('教学策略干预项已成功同步至教学大纲与作业编排中心！');
   visible.value = false;
 }
 </script>
@@ -438,6 +443,44 @@ function handleApplyStrategy() {
       line-height: 1.65;
       color: #1E293B;
     }
+  }
+}
+
+// 无诊断数据时的空状态
+.empty-card {
+  align-items: center;
+  text-align: center;
+  padding: 32px 24px;
+  gap: 10px;
+
+  .empty-icon-circle {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #EFF6FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    .empty-icon-svg {
+      width: 26px;
+      height: 26px;
+      color: #1677FF;
+    }
+  }
+
+  h4 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: #0F172A;
+  }
+
+  p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #64748B;
   }
 }
 

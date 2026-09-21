@@ -7,12 +7,21 @@ import { buildRequestSecurityHeaders } from './request-signature';
 import { storage } from '../storage/local';
 import { logAppError } from './error-handler';
 
+/**
+ * 注意：这里刻意不设置全局 Content-Type。
+ *
+ * 原因：axios 1.x 的 default transformRequest 中，如果「当前请求头已经是 JSON 类型」
+ * （contentType 含 application/json）而 body 又是 FormData/Blob，
+ * 它会静默把 FormData 序列化成 JSON 字符串并按 JSON 发出（axios 默认头 + 未覆写时命中）。
+ * 结果就是 multipart 接口必然 415：
+ * 「不支持的 Content-Type: application/json;charset=courses/{id}/resources/upload 等上传接口」。
+ *
+ * 交给 axios 按 body 自行推断才是正确的：
+ * 普通对象 → application/json；FormData → multipart/form-data(含 boundary，由浏览器补全)。
+ */
 export const axiosInstance: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: API_TIMEOUT,
-  headers: {
-    'Content-Type': 'application/json;charset=utf-8'
-  }
+  timeout: API_TIMEOUT
 });
 
 // 请求拦截器
