@@ -1,5 +1,6 @@
 package com.edumind.question.service.question.impl;
 
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.edumind.common.api.PageResult;
 import com.edumind.common.context.TenantContext;
@@ -48,6 +49,7 @@ public class QuestionServiceImpl implements QuestionService {
     public QuestionBatchSaveVO batchSave(QuestionBatchCreateDTO dto) {
         List<Long> questionIds = new ArrayList<>();
         Long currentTenantId = TenantContext.requireTenantId();
+        List<QuestionEntity> entities = new ArrayList<>();
         for (QuestionCreateDTO item : dto.getQuestions()) {
             if (item.getCourseId() == null && dto.getCourseId() != null) {
                 item.setCourseId(dto.getCourseId());
@@ -57,7 +59,14 @@ public class QuestionServiceImpl implements QuestionService {
             if (entity.getTenantId() == null) {
                 entity.setTenantId(currentTenantId);
             }
-            questionDao.insert(entity);
+            // edu_question.id 为雪花 ID（非自增列），批量插入不经过 MP 单条 insert，需在此显式生成
+            if (entity.getId() == null) {
+                entity.setId(IdWorker.getId());
+            }
+            entities.add(entity);
+        }
+        questionDao.insertBatch(entities);
+        for (QuestionEntity entity : entities) {
             questionIds.add(entity.getId());
         }
         return QuestionBatchSaveVO.builder()

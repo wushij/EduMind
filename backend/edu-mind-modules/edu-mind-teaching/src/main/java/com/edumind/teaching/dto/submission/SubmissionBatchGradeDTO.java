@@ -9,4 +9,5 @@ public class SubmissionBatchGradeDTO {
     private Long courseId;
     private Long assignmentId;
     private List<Long> submissionIds;
+    private Boolean forceRegrade;
 }

@@ -1,6 +1,8 @@
 import { ref, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { getLearningHomeOverview } from '@/api/learning/home';
+import { getCourseList } from '@/api/course/course';
+import { courseLabel } from '@/utils/learning/course-label';
+import type { Course } from '@/types/course/course';
 import { getWrongBookDetail } from '@/api/learning/wrong-book';
 import { useWrongQuestions } from '@/composables/learning/useWrongQuestions';
 import type { WrongBookDetailVO, WrongQuestionRecordItem } from '@/types/learning/wrong-question';
@@ -41,25 +43,21 @@ export function useWrongQuestionsPage(defaultCourseId = 102) {
   async function loadCourseOptions() {
     coursesLoading.value = true;
     try {
-      const res = await getLearningHomeOverview();
-      const courses = res.data?.courses ?? [];
+      const res = await getCourseList({ page: 1, pageSize: 50 });
+      const courses = (res.data?.list ?? []) as Course[];
       if (courses.length > 0) {
         courseOptions.value = courses.map((c) => ({
-          id: c.courseId,
-          name: c.courseName || `课程 #${c.courseId}`
+          id: c.id,
+          name: courseLabel(c)
         }));
         hasEnrolledCourses.value = true;
         const queryCid = route.query.courseId ? Number(route.query.courseId) : null;
-        const kpQuery = route.query.knowledgePointId ? Number(route.query.knowledgePointId) : null;
         if (queryCid && courseOptions.value.some((c) => c.id === queryCid)) {
           teacherCourseId.value = queryCid;
         } else if (!courseOptions.value.some((c) => c.id === teacherCourseId.value)) {
           teacherCourseId.value = courseOptions.value[0].id;
         }
         courseId.value = teacherCourseId.value;
-        if (kpQuery) {
-          // knowledgePointId filter reserved for future API param wiring
-        }
       } else {
         hasEnrolledCourses.value = false;
         courseOptions.value = [];

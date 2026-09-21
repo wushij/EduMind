@@ -17,6 +17,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,7 +39,7 @@ class LearningHomeServiceImplTest {
 
     @Test
     void getOverview_returnsEmptyWhenNoCourses() {
-        when(courseQueryApi.listRecentCourses(20)).thenReturn(Collections.emptyList());
+        when(courseQueryApi.listRecentCourses(anyInt())).thenReturn(Collections.emptyList());
         when(courseQueryApi.listCourseIdsByUserId(1L)).thenReturn(Collections.emptyList());
 
         LearningHomeOverviewVO overview = learningHomeService.getOverview(1L, null);
@@ -50,7 +51,7 @@ class LearningHomeServiceImplTest {
 
     @Test
     void getOverview_resolvesPrimaryCourseFromMembershipList() {
-        when(courseQueryApi.listRecentCourses(20)).thenReturn(Collections.emptyList());
+        when(courseQueryApi.listRecentCourses(anyInt())).thenReturn(Collections.emptyList());
         when(courseQueryApi.listCourseIdsByUserId(2L)).thenReturn(List.of(101L));
         when(courseQueryApi.listCoursesByIds(List.of(101L))).thenReturn(Collections.emptyList());
         when(studentAssignmentQueryApi.listMine(null)).thenReturn(Collections.emptyList());

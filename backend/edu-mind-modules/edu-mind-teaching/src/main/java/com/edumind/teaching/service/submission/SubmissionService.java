@@ -12,4 +12,6 @@ public interface SubmissionService {
     SubmissionVO getById(Long id);
 
     List<SubmissionVO> listByAssignmentId(Long assignmentId);
+
+    void delete(Long id);
 }

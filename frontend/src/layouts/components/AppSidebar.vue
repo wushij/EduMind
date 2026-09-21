@@ -50,6 +50,7 @@
               :key="child.path"
               :index="child.path"
               :class="'menu-item'"
+              @click="handleChildItemClick(child, mod)"
             >
               <el-icon v-if="child.icon">
                 <component :is="child.icon" />
@@ -137,9 +138,10 @@ import {
 } from '@element-plus/icons-vue';
 import { useAuthStore } from '@/stores/auth/auth';
 import { useAppStore } from '@/stores/app/app';
+import { ElMessage } from 'element-plus';
 import {
   getStoredKnowledgeBaseId,
-  LAST_KNOWLEDGE_ID_KEY,
+  setStoredKnowledgeBaseId,
   parseKnowledgeBaseIdFromPath
 } from '@/composables/knowledge/useKnowledgeRoute';
 
@@ -165,6 +167,7 @@ interface SubMenuItem {
   roles?: string[];
   permissions?: string[];
   badge?: string;
+  requireKb?: boolean;
 }
 
 interface NavModule {
@@ -177,25 +180,54 @@ interface NavModule {
   children?: SubMenuItem[];
 }
 
-/** 解析当前上下文知识库 ID，避免侧边栏硬编码 /knowledge/1/... */
-function getKnowledgeBaseId(): string {
+/** 响应式追踪当前选中的知识库 ID */
+const currentKnowledgeBaseId = ref<number | undefined>(getStoredKnowledgeBaseId());
+
+function syncKnowledgeBaseId() {
   const routeId = parseKnowledgeBaseIdFromPath(route.path);
   if (routeId) {
-    return String(routeId);
+    currentKnowledgeBaseId.value = routeId;
+    return;
   }
-  return String(getStoredKnowledgeBaseId());
+  currentKnowledgeBaseId.value = getStoredKnowledgeBaseId();
 }
 
+function onKnowledgeBaseChanged(event: Event) {
+  const customEvent = event as CustomEvent<number | undefined>;
+  currentKnowledgeBaseId.value = customEvent.detail ?? getStoredKnowledgeBaseId();
+}
+
+watch(() => route.path, syncKnowledgeBaseId, { immediate: true });
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('edumind:kb-changed', onKnowledgeBaseChanged);
+    window.addEventListener('storage', syncKnowledgeBaseId);
+  }
+});
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('edumind:kb-changed', onKnowledgeBaseChanged);
+    window.removeEventListener('storage', syncKnowledgeBaseId);
+  }
+});
+
 function knowledgePath(suffix: string): string {
-  return `/knowledge/${getKnowledgeBaseId()}/${suffix}`;
+  const id = currentKnowledgeBaseId.value;
+  return id ? `/knowledge/${id}/${suffix}` : '/knowledge';
+}
+
+function handleChildItemClick(child: SubMenuItem, mod: NavModule) {
+  if (mod.key === 'knowledge' && child.requireKb && !currentKnowledgeBaseId.value) {
+    ElMessage.info('请先在知识库列表中选择或创建一个知识库');
+  }
 }
 
 /**
  * 导航模块定义 (对齐 PRD §4 信息架构 + 原型图左侧导航)
  */
 function buildModuleDefinitions(): NavModule[] {
-  const kbId = getKnowledgeBaseId();
-
   return [
     // AI 广场
     {
@@ -252,13 +284,13 @@ function buildModuleDefinitions(): NavModule[] {
         { path: '/knowledge', name: '知识库', icon: Folder, permissions: ['knowledge:view'] },
         { path: '/knowledge/create', name: '创建知识库', icon: FolderAdd },
         { path: '/knowledge/ocr', name: 'OCR 试卷识别', icon: Search },
-        { path: `/knowledge/${kbId}/documents`, name: '文档管理', icon: Files },
-        { path: `/knowledge/${kbId}/chunks`, name: '切片管理', icon: Grid },
-        { path: `/knowledge/${kbId}/embeddings`, name: '向量状态', icon: PieChart },
-        { path: `/knowledge/${kbId}/parse`, name: '文档解析', icon: SetUp },
-        { path: `/knowledge/${kbId}/retrieval`, name: '检索测试', icon: Search },
-        { path: `/knowledge/${kbId}/rag-debug`, name: 'RAG 诊断', icon: Operation },
-        { path: `/knowledge/${kbId}/graph`, name: '知识图谱', icon: Connection }
+        { path: knowledgePath('documents'), name: '文档管理', icon: Files, requireKb: true },
+        { path: knowledgePath('chunks'), name: '切片管理', icon: Grid, requireKb: true },
+        { path: knowledgePath('embeddings'), name: '向量状态', icon: PieChart, requireKb: true },
+        { path: knowledgePath('parse'), name: '文档解析', icon: SetUp, requireKb: true },
+        { path: knowledgePath('retrieval'), name: '检索测试', icon: Search, requireKb: true },
+        { path: knowledgePath('rag-debug'), name: 'RAG 诊断', icon: Operation, requireKb: true },
+        { path: knowledgePath('graph'), name: '知识图谱', icon: Connection, requireKb: true }
       ]
     },
 
@@ -423,17 +455,14 @@ const activeMenu = computed(() => {
   if (path === '/course/ai' || path === '/course/ai-assistant' || path.match(/^\/course\/[^/]+\/ai/)) {
     return '/course/ai';
   }
-  if (path.startsWith('/knowledge/') && path.includes('/documents')) {
-    return knowledgePath('documents');
-  }
-  if (path.startsWith('/knowledge/') && path.includes('/parse')) {
-    return knowledgePath('parse');
-  }
-  if (path.startsWith('/knowledge/') && path.includes('/rag-debug')) {
-    return knowledgePath('rag-debug');
-  }
-  if (path.startsWith('/knowledge/') && path.includes('/graph')) {
-    return knowledgePath('graph');
+  if (path.startsWith('/knowledge/')) {
+    if (path.includes('/documents')) return knowledgePath('documents');
+    if (path.includes('/parse')) return knowledgePath('parse');
+    if (path.includes('/chunks')) return knowledgePath('chunks');
+    if (path.includes('/embeddings')) return knowledgePath('embeddings');
+    if (path.includes('/retrieval')) return knowledgePath('retrieval');
+    if (path.includes('/rag-debug')) return knowledgePath('rag-debug');
+    if (path.includes('/graph')) return knowledgePath('graph');
   }
   return path;
 });
@@ -489,7 +518,7 @@ watch(
   (path) => {
     const kbId = parseKnowledgeBaseIdFromPath(path);
     if (kbId) {
-      localStorage.setItem(LAST_KNOWLEDGE_ID_KEY, String(kbId));
+      setStoredKnowledgeBaseId(kbId);
     }
   },
   { immediate: true }

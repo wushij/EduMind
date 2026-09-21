@@ -1,7 +1,9 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { getLearningHomeOverview } from '@/api/learning/home';
+import { getCourseList } from '@/api/course/course';
+import { courseLabel } from '@/utils/learning/course-label';
+import type { Course } from '@/types/course/course';
 import { getLearningPathDetail, listLearningPathStudents } from '@/api/learning/learning-path';
 import { useAuthStore } from '@/stores/auth/auth';
 import { RoleEnum } from '@/constants/auth';
@@ -28,19 +30,17 @@ export function useLearningPathPage() {
 
   async function loadCourses() {
     try {
-      const res = await getLearningHomeOverview();
-      const courses = res.data?.courses ?? [];
+      const res = await getCourseList({ page: 1, pageSize: 50 });
+      const courses = (res.data?.list ?? []) as Course[];
       courseOptions.value = courses.map((c) => ({
-        id: c.courseId,
-        name: c.courseName || `课程 #${c.courseId}`
+        id: c.id,
+        name: courseLabel(c)
       }));
       hasEnrolledCourses.value = courseOptions.value.length > 0;
 
       const queryCid = route.query.courseId ? Number(route.query.courseId) : null;
       if (queryCid && courseOptions.value.some((c) => c.id === queryCid)) {
         courseId.value = queryCid;
-      } else if (res.data?.primaryCourseId) {
-        courseId.value = res.data.primaryCourseId;
       } else if (courseOptions.value.length) {
         courseId.value = courseOptions.value[0].id;
       }

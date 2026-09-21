@@ -25,6 +25,14 @@ public class SysOrganizationDao {
         return sysOrganizationMapper.selectById(id);
     }
 
+    /** 批量按 ID 查询组织（单次 IN 查询），用于替代循环内逐条查询 */
+    public List<SysOrganizationEntity> findByIds(java.util.Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return sysOrganizationMapper.selectBatchIds(ids);
+    }
+
     public SysOrganizationEntity findByIdAndTenantId(Long id, Long tenantId) {
         return sysOrganizationMapper.selectOne(new LambdaQueryWrapper<SysOrganizationEntity>()
                 .eq(SysOrganizationEntity::getId, id)

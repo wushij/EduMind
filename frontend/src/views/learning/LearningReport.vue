@@ -13,7 +13,12 @@
           style="width: 220px"
           @change="onFiltersChange"
         >
-          <el-option v-for="c in courseOptions" :key="c.id" :label="c.name" :value="c.id" />
+          <el-option
+            v-for="c in courseOptions"
+            :key="c.id"
+            :label="c.name || (c as any).title || ('课程 #' + c.id)"
+            :value="c.id"
+          />
         </el-select>
         <el-radio-group v-model="timeRange" @change="onFiltersChange">
           <el-radio-button label="7d">近 7 天</el-radio-button>
@@ -21,12 +26,23 @@
           <el-radio-button label="term">本学期</el-radio-button>
         </el-radio-group>
         <button type="button" class="capsule-btn capsule-btn--default" @click="goWrongBook">
+          <svg viewBox="0 0 24 24" class="btn-icon-svg" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
           <span>错题本</span>
         </button>
-        <button type="button" class="capsule-btn capsule-btn--default" @click="goPractice">
+        <button type="button" class="capsule-btn capsule-btn--ai" @click="goPractice">
+          <svg viewBox="0 0 24 24" class="btn-icon-svg" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
           <span>AI 练习</span>
         </button>
         <button type="button" class="capsule-btn capsule-btn--default" @click="router.push('/learning/path')">
+          <svg viewBox="0 0 24 24" class="btn-icon-svg" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+          </svg>
           <span>学习路径</span>
         </button>
       </template>
@@ -60,7 +76,7 @@
       :advice="teachingAdvice"
       mode="personal"
       :target-student-name="portrait?.studentInfo?.realName"
-      :weak-points="portrait?.weakPoints ?? []"
+      :weak-points="portrait?.weakPoints?.map(wp => wp.title) ?? []"
       @clear-advice="handleClearAdvice"
     />
   </div>

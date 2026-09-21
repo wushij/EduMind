@@ -25,7 +25,9 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -103,9 +105,7 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
     public PageResult<NotificationBroadcastVO> pageList(long page, long pageSize, String targetType) {
         PageResult<NotificationBroadcastEntity> pageResult = broadcastDao.page(page, pageSize, targetType);
         List<NotificationBroadcastVO> voList = NotificationBroadcastConverter.toVOList(pageResult.getList());
-        for (NotificationBroadcastVO vo : voList) {
-            populateSenderInfo(vo);
-        }
+        populateSenderInfoBatch(voList);
         return PageResult.<NotificationBroadcastVO>builder()
                 .total(pageResult.getTotal())
                 .pageNum(pageResult.getPageNum())
@@ -134,16 +134,47 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
             return;
         }
         try {
-            UserBriefVO u = userQueryApi.getUserById(vo.getSenderId());
-            if (u != null) {
-                if (StringUtils.hasText(u.getAvatar())) {
-                    vo.setSenderAvatar(u.getAvatar());
-                }
-                if (!StringUtils.hasText(vo.getSenderName()) && StringUtils.hasText(u.getUsername())) {
-                    vo.setSenderName(u.getUsername());
-                }
-            }
+            applySenderInfo(vo, userQueryApi.getUserById(vo.getSenderId()));
         } catch (Exception ignored) {
+        }
+    }
+
+    /** 批量补全发送人信息：单次批量查询替代逐条跨模块查询，避免列表页 N+1 */
+    private void populateSenderInfoBatch(List<NotificationBroadcastVO> voList) {
+        if (voList == null || voList.isEmpty()) {
+            return;
+        }
+        List<Long> senderIds = voList.stream()
+                .map(NotificationBroadcastVO::getSenderId)
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+        if (senderIds.isEmpty()) {
+            return;
+        }
+        Map<Long, UserBriefVO> senderMap;
+        try {
+            senderMap = userQueryApi.mapUserBriefsByIds(senderIds);
+        } catch (Exception ignored) {
+            return;
+        }
+        for (NotificationBroadcastVO vo : voList) {
+            if (vo == null || vo.getSenderId() == null) {
+                continue;
+            }
+            applySenderInfo(vo, senderMap.get(vo.getSenderId()));
+        }
+    }
+
+    private void applySenderInfo(NotificationBroadcastVO vo, UserBriefVO u) {
+        if (vo == null || u == null) {
+            return;
+        }
+        if (StringUtils.hasText(u.getAvatar())) {
+            vo.setSenderAvatar(u.getAvatar());
+        }
+        if (!StringUtils.hasText(vo.getSenderName()) && StringUtils.hasText(u.getUsername())) {
+            vo.setSenderName(u.getUsername());
         }
     }
 
@@ -183,6 +214,22 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
 
         PageResult<NotificationEntity> entityPage = notificationDao.pageByBroadcast(broadcastId, isRead, matchedUserIds, page, pageSize);
 
+        // 批量补全收件人用户与角色信息：单次批量查询替代逐条 2 次跨模块调用，消除列表 N+1
+        List<Long> recipientUserIds = entityPage.getList().stream()
+                .map(NotificationEntity::getUserId)
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+        Map<Long, UserBriefVO> recipientUserMap = Map.of();
+        Map<Long, List<String>> recipientRoleMap = Map.of();
+        if (!recipientUserIds.isEmpty()) {
+            try {
+                recipientUserMap = userQueryApi.mapUserBriefsByIds(recipientUserIds);
+                recipientRoleMap = userQueryApi.mapRoleCodesByUserIds(recipientUserIds);
+            } catch (Exception ignored) {
+            }
+        }
+
         List<com.edumind.notification.vo.broadcast.BroadcastRecipientVO> recipientVOList = new ArrayList<>();
         for (NotificationEntity entity : entityPage.getList()) {
             com.edumind.notification.vo.broadcast.BroadcastRecipientVO rvo = new com.edumind.notification.vo.broadcast.BroadcastRecipientVO();
@@ -192,31 +239,27 @@ public class NotificationBroadcastServiceImpl implements NotificationBroadcastSe
             rvo.setCreateTime(entity.getCreateTime());
 
             if (entity.getUserId() != null) {
-                try {
-                    UserBriefVO u = userQueryApi.getUserById(entity.getUserId());
-                    if (u != null) {
-                        rvo.setUsername(u.getUsername());
-                        rvo.setRealName(u.getRealName());
-                        rvo.setAvatar(u.getAvatar());
-                    }
-                } catch (Exception ignored) {}
+                UserBriefVO u = recipientUserMap.get(entity.getUserId());
+                if (u != null) {
+                    rvo.setUsername(u.getUsername());
+                    rvo.setRealName(u.getRealName());
+                    rvo.setAvatar(u.getAvatar());
+                }
 
-                try {
-                    List<String> roles = userQueryApi.getRolesByUserId(entity.getUserId());
-                    if (roles != null && !roles.isEmpty()) {
-                        String primaryRole = roles.get(0);
-                        rvo.setRoleCode(primaryRole);
-                        rvo.setRoleName(switch (primaryRole.toUpperCase()) {
-                            case "ADMIN" -> "系统管理员";
-                            case "TEACHER" -> "教师";
-                            case "STUDENT" -> "学生";
-                            default -> primaryRole;
-                        });
-                    } else {
-                        rvo.setRoleCode("USER");
-                        rvo.setRoleName("普通用户");
-                    }
-                } catch (Exception ignored) {}
+                List<String> roles = recipientRoleMap.get(entity.getUserId());
+                if (roles != null && !roles.isEmpty()) {
+                    String primaryRole = roles.get(0);
+                    rvo.setRoleCode(primaryRole);
+                    rvo.setRoleName(switch (primaryRole.toUpperCase()) {
+                        case "ADMIN" -> "系统管理员";
+                        case "TEACHER" -> "教师";
+                        case "STUDENT" -> "学生";
+                        default -> primaryRole;
+                    });
+                } else {
+                    rvo.setRoleCode("USER");
+                    rvo.setRoleName("普通用户");
+                }
             }
             if (!StringUtils.hasText(rvo.getUsername())) {
                 rvo.setUsername("用户#" + entity.getUserId());

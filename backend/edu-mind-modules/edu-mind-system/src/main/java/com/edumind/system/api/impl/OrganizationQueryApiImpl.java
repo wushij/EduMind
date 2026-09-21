@@ -7,7 +7,9 @@ import com.edumind.system.vo.tenant.OrganizationBriefVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -38,5 +40,10 @@ public class OrganizationQueryApiImpl implements OrganizationQueryApi {
     @Override
     public MemberOrgBriefVO getPrimaryClassByUserId(Long tenantId, Long userId) {
         return organizationQueryService.getPrimaryClassByUserId(tenantId, userId);
+    }
+
+    @Override
+    public Map<Long, MemberOrgBriefVO> mapPrimaryClassesByUserIds(Long tenantId, Collection<Long> userIds) {
+        return organizationQueryService.mapPrimaryClassesByUserIds(tenantId, userIds);
     }
 }

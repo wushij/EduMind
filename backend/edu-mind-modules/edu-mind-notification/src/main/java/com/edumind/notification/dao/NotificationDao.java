@@ -1,6 +1,7 @@
 package com.edumind.notification.dao;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.edumind.common.api.PageResult;
@@ -10,7 +11,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 消息通知数据访问层 DAO
@@ -18,6 +21,9 @@ import java.util.List;
 @Repository
 @RequiredArgsConstructor
 public class NotificationDao {
+
+    /** 批量插入单条 SQL 的最大行数，避免超出 MySQL max_allowed_packet */
+    private static final int INSERT_BATCH_SIZE = 500;
 
     private final NotificationMapper notificationMapper;
 
@@ -124,6 +130,44 @@ public class NotificationDao {
 
     public int insert(NotificationEntity entity) {
         return notificationMapper.insert(entity);
+    }
+
+    /** 单条 SQL 分片批量插入（参与当前事务），用于替代循环内逐条 insert */
+    public int insertBatch(List<NotificationEntity> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return 0;
+        }
+        int affected = 0;
+        for (int i = 0; i < entities.size(); i += INSERT_BATCH_SIZE) {
+            int end = Math.min(i + INSERT_BATCH_SIZE, entities.size());
+            affected += notificationMapper.insertBatch(entities.subList(i, end));
+        }
+        return affected;
+    }
+
+    /** 批量统计多个用户的未读通知数（单次 GROUP BY 查询），用于替代循环内逐用户 countUnreadByUserId */
+    public Map<Long, Long> countUnreadByUserIds(java.util.Collection<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        QueryWrapper<NotificationEntity> wrapper = new QueryWrapper<NotificationEntity>()
+                .select("user_id AS userId", "COUNT(*) AS cnt")
+                .in("user_id", userIds)
+                .eq("is_read", 0)
+                .groupBy("user_id");
+        List<Map<String, Object>> rows = notificationMapper.selectMaps(wrapper);
+        if (rows == null || rows.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        Map<Long, Long> result = new HashMap<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            Object userId = row.get("userId");
+            Object count = row.get("cnt");
+            if (userId instanceof Number idValue && count instanceof Number countValue) {
+                result.put(idValue.longValue(), countValue.longValue());
+            }
+        }
+        return result;
     }
 
     public int deleteByRefId(Long refId) {

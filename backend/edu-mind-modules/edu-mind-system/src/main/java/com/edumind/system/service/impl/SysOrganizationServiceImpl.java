@@ -149,8 +149,12 @@ public class SysOrganizationServiceImpl implements SysOrganizationService {
             }
 
             Map<Long, Double> finalMasteryMap = masteryMap;
+            // 批量补全成员用户信息，避免逐成员查询用户表造成 N+1
+            Map<Long, UserEntity> userMap = userDao.findByIds(studentUserIds).stream()
+                    .filter(user -> user.getId() != null)
+                    .collect(Collectors.toMap(UserEntity::getId, user -> user, (left, right) -> left));
             return members.stream().map(member -> {
-                UserEntity user = userDao.findById(member.getUserId());
+                UserEntity user = userMap.get(member.getUserId());
                 Double mastery = finalMasteryMap.get(member.getUserId());
                 Integer masteryRate = mastery != null ? (int) Math.round(mastery * 100) : null;
                 LocalDateTime activeTime = user != null
@@ -299,9 +303,19 @@ public class SysOrganizationServiceImpl implements SysOrganizationService {
             Map<Long, String> assignedMap = orgRelations.stream()
                     .collect(Collectors.toMap(SysMemberOrgEntity::getMemberId, SysMemberOrgEntity::getRoleType, (a, b) -> a));
 
+            // 批量补全候选成员用户信息，避免遍历全租户成员逐一查用户表
+            Map<Long, UserEntity> candidateUserMap = userDao.findByIds(allMembers.stream()
+                            .map(SysTenantMemberEntity::getUserId)
+                            .filter(Objects::nonNull)
+                            .distinct()
+                            .collect(Collectors.toList()))
+                    .stream()
+                    .filter(user -> user.getId() != null)
+                    .collect(Collectors.toMap(UserEntity::getId, user -> user, (left, right) -> left));
+
             List<SysTenantMemberCandidateVO> result = new ArrayList<>();
             for (SysTenantMemberEntity member : allMembers) {
-                UserEntity user = userDao.findById(member.getUserId());
+                UserEntity user = candidateUserMap.get(member.getUserId());
                 String realName = member.getRealName() != null ? member.getRealName() : (user != null ? user.getRealName() : "");
                 String memberNo = member.getMemberNo() != null ? member.getMemberNo() : "";
                 if (keyword != null && !keyword.isBlank()) {

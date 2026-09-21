@@ -145,9 +145,14 @@ public class SubmissionDao {
                     }
                 }
             });
-        } else if (!CollectionUtils.isEmpty(studentIds)) {
-            wrapper.in(SubmissionEntity::getStudentId, studentIds);
         }
         return wrapper;
+    }
+
+    public int deleteById(Long id) {
+        if (id == null) {
+            return 0;
+        }
+        return submissionMapper.deleteById(id);
     }
 }

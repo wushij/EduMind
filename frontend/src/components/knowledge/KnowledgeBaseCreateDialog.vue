@@ -51,7 +51,7 @@
           <el-option
             v-for="course in courses"
             :key="course.id"
-            :label="course.title"
+            :label="course.name || course.title || `课程 #${course.id}`"
             :value="course.id"
           />
         </el-select>

@@ -20,8 +20,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -124,6 +129,96 @@ public class OrganizationQueryServiceImpl implements OrganizationQueryService {
                 .memberNo(member.getMemberNo())
                 .roleType(member.getStatus() != null ? String.valueOf(member.getStatus()) : null)
                 .build();
+    }
+
+    @Override
+    public Map<Long, MemberOrgBriefVO> mapPrimaryClassesByUserIds(Long tenantId, Collection<Long> userIds) {
+        Set<Long> distinctUserIds = userIds == null
+                ? Collections.emptySet()
+                : userIds.stream().filter(Objects::nonNull).collect(Collectors.toSet());
+        if (distinctUserIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Long resolvedTenantId = null;
+        try {
+            resolvedTenantId = resolveAndVerifyTenantId(tenantId);
+        } catch (Exception e) {
+            // 与单条方法保持一致：租户上下文不可解析时退化为按用户活跃成员关系查询
+        }
+
+        // 1) 一次批量解析每个用户的成员记录（优先租户内成员，缺失再按活跃成员补齐）
+        Map<Long, SysTenantMemberEntity> memberByUserId = new HashMap<>();
+        if (resolvedTenantId != null) {
+            for (SysTenantMemberEntity member : sysTenantMemberDao.listByUserIds(distinctUserIds, resolvedTenantId)) {
+                if (member.getUserId() != null) {
+                    memberByUserId.putIfAbsent(member.getUserId(), member);
+                }
+            }
+        }
+        List<Long> missingUserIds = distinctUserIds.stream()
+                .filter(id -> !memberByUserId.containsKey(id))
+                .collect(Collectors.toList());
+        if (!missingUserIds.isEmpty()) {
+            for (SysTenantMemberEntity member : sysTenantMemberDao.listByUserIds(missingUserIds, null)) {
+                boolean active = member.getStatus() == null || member.getStatus() == 1;
+                if (active && member.getUserId() != null) {
+                    memberByUserId.putIfAbsent(member.getUserId(), member);
+                }
+            }
+        }
+        if (memberByUserId.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        // 2) 一次批量取成员的组织关系，并按成员分组
+        List<Long> memberIds = memberByUserId.values().stream()
+                .map(SysTenantMemberEntity::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        Map<Long, List<SysMemberOrgEntity>> relationsByMemberId = sysMemberOrgDao.listByMemberIds(memberIds).stream()
+                .filter(relation -> relation.getMemberId() != null)
+                .collect(Collectors.groupingBy(SysMemberOrgEntity::getMemberId));
+
+        // 3) 一次批量取组织，供班级判定使用
+        Set<Long> orgIds = relationsByMemberId.values().stream()
+                .flatMap(List::stream)
+                .map(SysMemberOrgEntity::getOrganizationId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, SysOrganizationEntity> orgById = orgIds.isEmpty()
+                ? Collections.emptyMap()
+                : sysOrganizationDao.findByIds(orgIds).stream()
+                        .filter(org -> org.getId() != null)
+                        .collect(Collectors.toMap(SysOrganizationEntity::getId, org -> org, (left, right) -> left));
+
+        // 4) 组装：CLASS 类型优先，否则取第一个可用组织，语义与 getPrimaryClassByUserId 完全一致
+        Map<Long, MemberOrgBriefVO> result = new HashMap<>();
+        for (Map.Entry<Long, SysTenantMemberEntity> entry : memberByUserId.entrySet()) {
+            SysTenantMemberEntity member = entry.getValue();
+            SysOrganizationEntity primaryOrg = null;
+            for (SysMemberOrgEntity relation : relationsByMemberId.getOrDefault(member.getId(), Collections.emptyList())) {
+                SysOrganizationEntity org = orgById.get(relation.getOrganizationId());
+                if (org == null) {
+                    continue;
+                }
+                if ("CLASS".equalsIgnoreCase(org.getOrgType())) {
+                    primaryOrg = org;
+                    break;
+                }
+                if (primaryOrg == null) {
+                    primaryOrg = org;
+                }
+            }
+            result.put(entry.getKey(), MemberOrgBriefVO.builder()
+                    .id(primaryOrg != null ? primaryOrg.getId() : null)
+                    .name(primaryOrg != null ? primaryOrg.getName() : null)
+                    .type(primaryOrg != null ? primaryOrg.getOrgType() : null)
+                    .memberNo(member.getMemberNo())
+                    .roleType(member.getStatus() != null ? String.valueOf(member.getStatus()) : null)
+                    .build());
+        }
+        return result;
     }
 
     private Long resolveAndVerifyTenantId(Long explicitTenantId) {

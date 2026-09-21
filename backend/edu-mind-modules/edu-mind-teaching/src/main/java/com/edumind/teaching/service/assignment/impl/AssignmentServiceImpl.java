@@ -12,6 +12,8 @@ import com.edumind.question.vo.question.QuestionVO;
 import com.edumind.teaching.converter.AssignmentConverter;
 import com.edumind.teaching.dao.AssignmentDao;
 import com.edumind.teaching.dao.ExamQuestionDao;
+import com.edumind.teaching.dao.GradingResultDao;
+import com.edumind.teaching.dao.SubmissionAnswerDao;
 import com.edumind.teaching.dao.SubmissionDao;
 import com.edumind.teaching.dto.assignment.AssignmentCreateDTO;
 import com.edumind.teaching.dto.exam.ExamCreateDTO;
@@ -45,6 +47,8 @@ public class AssignmentServiceImpl implements AssignmentService {
 
     private final AssignmentDao assignmentDao;
     private final SubmissionDao submissionDao;
+    private final SubmissionAnswerDao submissionAnswerDao;
+    private final GradingResultDao gradingResultDao;
     private final ExamQuestionDao examQuestionDao;
     private final AssignmentConverter assignmentConverter;
     private final ExamService examService;
@@ -154,13 +158,20 @@ public class AssignmentServiceImpl implements AssignmentService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        AssignmentEntity entity = requireAssignment(id);
-        if (!"DRAFT".equals(entity.getStatus())) {
-            throw new BusinessException("仅草稿状态的作业允许删除");
+        if (id == null) {
+            return;
         }
-        if (!submissionDao.listByAssignmentId(id).isEmpty()) {
-            throw new BusinessException("该作业已存在答卷记录，无法删除");
+        AssignmentEntity entity = requireAssignment(id);
+        // 级联清理作业名下所有答卷、答案与评分记录
+        List<SubmissionEntity> submissions = submissionDao.listByAssignmentId(id);
+        if (submissions != null && !submissions.isEmpty()) {
+            for (SubmissionEntity sub : submissions) {
+                gradingResultDao.deleteBySubmissionId(sub.getId());
+                submissionAnswerDao.deleteBySubmissionId(sub.getId());
+                submissionDao.deleteById(sub.getId());
+            }
         }
         assignmentDao.deleteById(id);
     }

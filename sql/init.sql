@@ -1782,26 +1782,8 @@ INSERT IGNORE INTO exam_question (exam_id, question_id, score, sort_order) VALUE
 (501, 1001, 10, 1),
 (502, 1003, 10, 1);
 
--- 16. 作业任务
-INSERT IGNORE INTO assignment (id, course_id, exam_id, title, description, deadline, status, total_score, pass_score, settings_json) VALUES
-(201, 101, 502, '第一单元：线性表与链表编程作业', '请完成单链表的基本操作及逆置算法设计，按要求提交核心复杂度分析。', '2026-12-25 23:59:59', 'PUBLISHED', 10, 6, '{"aiGradingEnabled":true,"allowLate":false,"instantFeedback":true}'),
-(202, 103, 501,  '高数第三周同步随堂小测',       '函数极限计算与等价无穷小代换小测验，共2道题，限时45分钟。',         '2026-12-18 23:59:59', 'PUBLISHED', 10, 6, '{"aiGradingEnabled":true,"allowLate":true,"instantFeedback":true}');
+-- 16. 作业任务（初始不预置冗余演示作业，由教师在平台按需创建）
 
--- 17. 学生作业提交
-INSERT IGNORE INTO assignment_submission (id, assignment_id, student_id, status, total_score, max_score, submit_time) VALUES
-(301, 201, 3, 'GRADED',    92, 100, '2025-10-20 16:30:00'),
-(302, 201, 4, 'SUBMITTED', NULL, 100, '2025-10-21 11:15:00'),
-(303, 202, 3, 'GRADED',    8, 10, '2025-10-17 14:20:00');
-
--- 18. 学生作答记录
-INSERT IGNORE INTO submission_answer (id, submission_id, question_id, answer) VALUES
-(401, 301, 1003, 'B'),
-(402, 302, 1003, 'A'),
-(403, 303, 1001, 'B');
-
--- 19. 批改结果
-INSERT IGNORE INTO grading_result (id, submission_id, question_id, score, max_score, is_correct, ai_comment, teacher_comment, status) VALUES
-(501, 301, 1003, 5,  5,  1, '作答完全正确，清晰理解了栈后进先出的约束条件。', '优秀', 'CONFIRMED');
 
 -- 20. 知识库
 INSERT IGNORE INTO knowledge_base (id, name, course_id, description, document_count, status) VALUES
@@ -1833,22 +1815,15 @@ INSERT IGNORE INTO course_resource (id, course_id, resource_id, document_id, tit
 (3, 101, NULL, 1, '数据结构第二章-线性表与链表深度解析.pdf', 'PDF'),
 (4, 102, 3, NULL, 'Java快速入门与JDK环境搭建指南.pptx', 'PPT');
 
--- 25. AI 工具广场（14 项）
+-- 25. AI 工具广场（核心可用工具）
 INSERT IGNORE INTO ai_tool (id, name, description, detailed_intro, category, icon, model_id, route, execution_mode, tags, is_recommended, is_hot, use_count, status) VALUES
 ('tool_question_gen', 'AI 智能出题', '根据课程、章节和知识点智能生成高质量题目', '支持按章节与知识点勾选范围，配置题型、难度与题量后批量生成结构化试题，并可一键入库。', 'TEACHER', 'EditPen', 'deepseek-chat', '/ai/question/generate', 'ROUTE', '出题,教师,热门', 1, 1, 2436, 1),
 ('tool_exam_gen', 'AI 智能组卷', '按总分、题型比例与难度规则快速生成标准化试卷', '内置总分校验与题型配比引擎，支持预览换题、调分并保存为可复用试卷。', 'TEACHER', 'Document', 'deepseek-chat', '/ai/exam/generate', 'ROUTE', '组卷,教师', 1, 1, 1820, 1),
 ('tool_grading', 'AI 智能批改', '客观题秒级判分，主观题 AI 评分与评语生成', '支持作业提交后自动批改与教师复核改分，减轻期末阅卷压力。', 'TEACHER', 'Checked', 'deepseek-chat', '/ai/grading', 'ROUTE', '批改,教师', 1, 0, 956, 1),
-('tool_lesson', 'AI 教案生成', '输入授课主题与学时，生成结构化教案与课堂设计', '覆盖教学目标、重难点、课堂互动与板书建议，辅助青年教师快速备课。', 'TEACHER', 'Notebook', 'deepseek-chat', '/ai/marketplace/v05/tool_lesson', 'V05_NOTICE', '教案,教师', 0, 0, 420, 1),
-('tool_summary', 'AI 课程总结', '按章节或知识模块提炼核心要点与易错清单', '支持长文档与课件要点结构化摘要，生成考前复习精要。', 'TEACHER', 'DataAnalysis', 'deepseek-chat', '/ai/marketplace/v05/tool_summary', 'V05_NOTICE', '总结,知识提炼', 0, 0, 310, 1),
+('tool_lesson', 'AI 教案生成', '输入授课主题与学时，生成结构化教案与课堂设计', '覆盖教学目标、重难点、课堂互动与板书建议，辅助青年教师快速备课。', 'TEACHER', 'Notebook', 'deepseek-chat', '/ai/lesson', 'ROUTE', '教案,教师', 0, 0, 420, 1),
+('tool_summary', 'AI 课程总结', '按章节或知识模块提炼核心要点与易错清单', '支持长文档与课件要点结构化摘要，生成考前复习精要。', 'TEACHER', 'DataAnalysis', 'deepseek-chat', '/ai/summary', 'ROUTE', '总结,知识提炼', 0, 0, 310, 1),
 ('tool_chat', 'AI 课程问答', '基于课程资料的上下文助教答疑（SSE 流式）', '在课程空间内多轮对话，支持 Markdown、公式与代码高亮渲染。', 'GENERAL', 'ChatDotRound', 'deepseek-chat', '/course/101/ai', 'ROUTE', '问答,助教,热门', 1, 1, 5200, 1),
-('tool_wrong_analysis', 'AI 错题分析', '针对错题给出思路引导、错误归因与变式练习', '结合学生作答记录分析错因类型，并推荐巩固练习方向。', 'STUDENT', 'Warning', 'deepseek-chat', '/ai/marketplace/v05/tool_wrong_analysis', 'V05_NOTICE', '错题,学生', 0, 0, 680, 1),
-('tool_knowledge_explain', 'AI 知识点讲解', '由浅入深讲解核心概念，支持苏格拉底式引导', '针对单个知识点提供类比、例题与追问，帮助学生建立直觉理解。', 'STUDENT', 'Reading', 'deepseek-chat', '/ai/marketplace/v05/tool_knowledge_explain', 'V05_NOTICE', '讲解,学生', 0, 0, 890, 1),
-('tool_practice', 'AI 自适应刷题', '根据薄弱知识点智能生成阶梯练习', '分析近期学习数据，推送专项巩固题包与难度递进练习。', 'STUDENT', 'Reading', 'deepseek-chat', '/learning/recommendations', 'ROUTE', '练习,学生,推荐', 1, 0, 1680, 1),
-('tool_learning_plan', 'AI 学习计划', '根据学情报告自动定制复习日程', '结合掌握度与考试节点生成周计划与每日任务清单。', 'STUDENT', 'Calendar', 'deepseek-chat', '/ai/marketplace/v05/tool_learning_plan', 'V05_NOTICE', '计划,学生', 0, 0, 540, 1),
-('tool_ppt', 'AI PPT 生成', '根据大纲快速生成课件骨架与讲稿要点', '输出章节页结构与演讲备注，辅助课件制作。', 'TEACHER', 'Monitor', 'deepseek-chat', '/ai/marketplace/v05/tool_ppt', 'V05_NOTICE', 'PPT,教师', 0, 0, 260, 1),
-('tool_polish', 'AI 教学文本润色', '优化题干表述，消除歧义与语病', '面向试题、教案与通知类文本提供学术化润色建议。', 'GENERAL', 'EditPen', 'deepseek-chat', '/ai/marketplace/v05/tool_polish', 'V05_NOTICE', '润色,通用', 0, 0, 380, 1),
-('tool_translate', 'AI 双语专业翻译', '中英计算机与专业课术语精准对照翻译', '保持术语一致性，适合双语课件与论文摘要翻译。', 'GENERAL', 'Connection', 'deepseek-chat', '/ai/marketplace/v05/tool_translate', 'V05_NOTICE', '翻译,通用', 0, 0, 450, 1),
-('tool_resource_rec', 'AI 资源推荐', '基于课程与章节推荐关联课件与视频资源', '在学习中心展示与当前课程强关联的习题与教学资源。', 'STUDENT', 'Promotion', 'deepseek-chat', '/learning/recommendations', 'ROUTE', '推荐,学生', 1, 0, 1320, 1);
+('tool_practice', 'AI 自适应刷题', '根据薄弱知识点智能生成阶梯练习', '分析近期学习数据，推送专项巩固题包与难度递进练习。', 'STUDENT', 'Reading', 'deepseek-chat', '/learning/recommendations', 'ROUTE', '练习,学生,推荐', 1, 0, 1680, 1);
 
 -- 26. AI 示例会话
 INSERT IGNORE INTO ai_conversation (id, user_id, course_id, title, message_count, total_tokens, deleted) VALUES

@@ -43,6 +43,16 @@ describe('renderMathText', () => {
     expect(html).toContain('mfrac');
     expect(html).toContain('故正确答案为 B');
   });
+
+  it('renders bare LaTeX commands without dollar signs into katex html', () => {
+    const rawAnalysis =
+      '根据等价无穷小基本公式，当 $x \\to 0$ 时，\\ln(1+x) \\sim x；而 \\sin 2x \\sim 2x，$1-\\cos x \\sim \\frac{1}{2}x^2$。故正确答案为 B。';
+    const html = renderMathText(rawAnalysis);
+    expect(html).toContain('katex');
+    expect(html).toContain('故正确答案为 B');
+    // 验证 \ln(1+x) 和 \sin 2x 也被渲染成了 katex
+    expect(html.match(/class="katex"/g)?.length).toBeGreaterThanOrEqual(4);
+  });
 });
 
 describe('normalizeMathTextNewlines', () => {

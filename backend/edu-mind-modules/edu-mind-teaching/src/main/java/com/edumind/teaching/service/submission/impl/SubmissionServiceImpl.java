@@ -11,6 +11,7 @@ import com.edumind.system.vo.tenant.MemberOrgBriefVO;
 import com.edumind.system.vo.user.UserBriefVO;
 import com.edumind.teaching.converter.AssignmentConverter;
 import com.edumind.teaching.dao.AssignmentDao;
+import com.edumind.teaching.dao.GradingResultDao;
 import com.edumind.teaching.dao.SubmissionAnswerDao;
 import com.edumind.teaching.dao.SubmissionDao;
 import com.edumind.teaching.vo.assignment.AssignmentSettingsVO;
@@ -26,9 +27,11 @@ import com.edumind.teaching.vo.submission.SubmissionVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,6 +42,7 @@ public class SubmissionServiceImpl implements SubmissionService {
     private final AssignmentDao assignmentDao;
     private final SubmissionDao submissionDao;
     private final SubmissionAnswerDao submissionAnswerDao;
+    private final GradingResultDao gradingResultDao;
     private final GradingService gradingService;
     private final DistributedLockService distributedLockService;
     private final TransactionTemplate transactionTemplate;
@@ -82,13 +86,16 @@ public class SubmissionServiceImpl implements SubmissionService {
         }
 
         submissionAnswerDao.deleteBySubmissionId(submission.getId());
+        // 单条 SQL 批量写入作答明细（替代逐题 insert）
+        List<SubmissionAnswerEntity> answerEntities = new ArrayList<>();
         for (SubmissionAnswerItemDTO item : dto.getAnswers()) {
             SubmissionAnswerEntity answer = new SubmissionAnswerEntity();
             answer.setSubmissionId(submission.getId());
             answer.setQuestionId(item.getQuestionId());
             answer.setAnswer(item.getAnswer());
-            submissionAnswerDao.insert(answer);
+            answerEntities.add(answer);
         }
+        submissionAnswerDao.insertBatch(answerEntities);
 
         submission.setStatus("SUBMITTED");
         submission.setSubmitTime(LocalDateTime.now());
@@ -150,6 +157,21 @@ public class SubmissionServiceImpl implements SubmissionService {
         return submissionDao.listByAssignmentId(assignmentId).stream()
                 .map(item -> getById(item.getId()))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long id) {
+        if (id == null) {
+            return;
+        }
+        SubmissionEntity entity = submissionDao.findById(id);
+        if (entity == null) {
+            return;
+        }
+        gradingResultDao.deleteBySubmissionId(id);
+        submissionAnswerDao.deleteBySubmissionId(id);
+        submissionDao.deleteById(id);
     }
 
     private Long requireUserId() {

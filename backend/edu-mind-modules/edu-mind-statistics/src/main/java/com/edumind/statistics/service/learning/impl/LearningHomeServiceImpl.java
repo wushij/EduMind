@@ -131,16 +131,17 @@ public class LearningHomeServiceImpl implements LearningHomeService {
     }
 
     private List<Long> resolveCourseIds(Long studentId) {
-        Set<Long> ids = new LinkedHashSet<>();
-        List<CourseBriefVO> recent = courseQueryApi.listRecentCourses(20);
-        if (recent != null) {
-            for (CourseBriefVO brief : recent) {
-                if (brief.getId() != null && courseQueryApi.isCourseMember(brief.getId(), studentId)) {
-                    ids.add(brief.getId());
+        Set<Long> ids = new LinkedHashSet<>(courseQueryApi.listCourseIdsByUserId(studentId));
+        if (ids.isEmpty()) {
+            List<CourseBriefVO> recent = courseQueryApi.listRecentCourses(20);
+            if (recent != null) {
+                for (CourseBriefVO brief : recent) {
+                    if (brief.getId() != null && courseQueryApi.isCourseMember(brief.getId(), studentId)) {
+                        ids.add(brief.getId());
+                    }
                 }
             }
         }
-        ids.addAll(courseQueryApi.listCourseIdsByUserId(studentId));
         return new ArrayList<>(ids);
     }
 

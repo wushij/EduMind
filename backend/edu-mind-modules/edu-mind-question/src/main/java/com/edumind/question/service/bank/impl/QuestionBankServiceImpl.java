@@ -21,7 +21,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -100,19 +104,39 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         if (bank == null) {
             throw new BusinessException("题库不存在");
         }
-        for (Long questionId : dto.getQuestionIds()) {
-            QuestionEntity question = questionDao.getById(questionId);
-            if (question == null) {
+        List<Long> requestedQuestionIds = dto.getQuestionIds() == null
+                ? List.of()
+                : dto.getQuestionIds().stream()
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .collect(Collectors.toList());
+        if (requestedQuestionIds.isEmpty()) {
+            refreshQuestionCount(id);
+            return;
+        }
+        // 1) 一次批量校验题目存在性（替代循环内逐个 getById）
+        Set<Long> existingQuestionIds = questionDao.listByIds(requestedQuestionIds).stream()
+                .map(QuestionEntity::getId)
+                .collect(Collectors.toSet());
+        for (Long questionId : requestedQuestionIds) {
+            if (!existingQuestionIds.contains(questionId)) {
                 throw new BusinessException("题目不存在: " + questionId);
             }
-            if (questionBankItemDao.exists(id, questionId)) {
+        }
+        // 2) 一次取出题库已有题目做内存去重（替代循环内逐个 exists 计数查询）
+        Set<Long> alreadyInBankQuestionIds = new HashSet<>(questionBankItemDao.listQuestionIdsByBankId(id));
+        List<QuestionBankItemEntity> items = new ArrayList<>();
+        for (Long questionId : requestedQuestionIds) {
+            if (alreadyInBankQuestionIds.contains(questionId)) {
                 continue;
             }
             QuestionBankItemEntity item = new QuestionBankItemEntity();
             item.setBankId(id);
             item.setQuestionId(questionId);
-            questionBankItemDao.insert(item);
+            items.add(item);
         }
+        // 3) 单条 SQL 批量入库（替代循环内逐条 insert）
+        questionBankItemDao.insertBatch(items);
         refreshQuestionCount(id);
     }
 

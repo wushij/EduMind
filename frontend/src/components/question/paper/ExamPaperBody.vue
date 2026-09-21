@@ -11,13 +11,13 @@
             <template v-if="skin === 'export'">
               {{ getChineseNumber(sIdx + 1) }}、{{ sec.title }}
               <span v-if="showSectionScore" class="sec-score-inline">
-                （共 {{ sec.questions.length }} 小题，合计 {{ sec.totalScore }} 分）
+                {{ sectionScoreText(sec) }}
               </span>
             </template>
             <template v-else>
               <span class="sec-number">{{ getChineseNumber(sIdx + 1) }}、{{ sec.title }}</span>
-              <span class="sec-score-info">
-                （共 {{ sec.questions.length }} 小题，合计 {{ sec.totalScore }} 分）
+              <span v-if="showSectionScore" class="sec-score-info">
+                {{ sectionScoreText(sec) }}
               </span>
             </template>
           </div>
@@ -38,7 +38,7 @@
               <div class="q-text">
                 <span class="q-index-inline">{{ globalIndex(sIdx, qIdx) }}.</span>
                 <MathText tag="span" class="q-stem-math" :text="stemForDisplay(q.stem)" />
-                <span v-if="isChoiceType(q.type)" class="q-blank-hint">（&nbsp;&nbsp;）</span>
+                <span v-if="shouldShowChoiceBlank(q.type, q.stem)" class="q-blank-hint">（&nbsp;&nbsp;）</span>
               </div>
               <span v-if="showPointBadge" class="point-tag">（{{ q.score || 5 }}分）</span>
             </div>
@@ -121,13 +121,24 @@ const props = withDefaults(
   }>(),
   {
     optionLayout: 'horizontal',
-    showPointBadge: true,
+    showPointBadge: false,
     showSectionScore: true,
     showAnswerArea: true,
     viewMode: 'PAPER',
     skin: 'export'
   }
 );
+
+function sectionScoreText(sec: GroupedSection): string {
+  const count = sec.questions?.length || 0;
+  if (!count) return '';
+  const firstScore = sec.questions[0]?.score;
+  const allSame = firstScore != null && sec.questions.every((q) => q.score === firstScore);
+  if (allSame && count > 1) {
+    return `（共 ${count} 小题，每小题 ${firstScore} 分，合计 ${sec.totalScore} 分）`;
+  }
+  return `（共 ${count} 小题，合计 ${sec.totalScore} 分）`;
+}
 
 function stemForDisplay(stem: string): string {
   return stripQuestionStemNumber(stem);
@@ -143,6 +154,12 @@ function globalIndex(sectionIdx: number, questionIdx: number): number {
 
 function isChoiceType(type: QuestionType | string): boolean {
   return type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE' || type === 'TRUE_FALSE';
+}
+
+function shouldShowChoiceBlank(type: QuestionType | string, stem: string): boolean {
+  if (!isChoiceType(type)) return false;
+  // 若题干中已有括号作答位，如 （ ）、()、（   ），则不重复追加末尾括号
+  return !/[（(]\s*[)）]/.test(stem || '');
 }
 
 function isSolvingType(type: QuestionType | string): boolean {
@@ -289,6 +306,13 @@ function sectionNotice(sec: GroupedSection): string {
     margin-bottom: 18px;
   }
 
+  .q-title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
   .q-index-inline {
     font-weight: 600;
     margin-right: 4px;
@@ -296,9 +320,17 @@ function sectionNotice(sec: GroupedSection): string {
 
   .q-stem-text,
   .q-text {
+    flex: 1;
     font-size: 14px;
     line-height: 1.65;
     color: #1e293b;
+  }
+
+  .point-tag {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #64748b;
+    white-space: nowrap;
   }
 
   .options-grid,

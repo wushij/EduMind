@@ -31,6 +31,8 @@ public class AiProviderPresetCatalog {
                 "https://platform.deepseek.com",
                 "openai_compatible",
                 List.of(
+                        "deepseek-v4.1-flash",
+                        "deepseek-flash",
                         "deepseek-v4-flash-vision-exp",
                         "deepseek-v4-pro",
                         "deepseek-v4-flash"

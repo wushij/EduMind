@@ -42,6 +42,15 @@ public class SysMemberOrgDao {
                 .eq(SysMemberOrgEntity::getMemberId, memberId));
     }
 
+    /** 批量按成员 ID 查询组织关系（单次 IN 查询），用于替代循环内逐成员查询 */
+    public List<SysMemberOrgEntity> listByMemberIds(java.util.Collection<Long> memberIds) {
+        if (memberIds == null || memberIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return sysMemberOrgMapper.selectList(new LambdaQueryWrapper<SysMemberOrgEntity>()
+                .in(SysMemberOrgEntity::getMemberId, memberIds));
+    }
+
     public int insert(SysMemberOrgEntity entity) {
         return sysMemberOrgMapper.insert(entity);
     }

@@ -1,17 +1,5 @@
 <template>
   <div class="assignment-detail-container question-module-page">
-    <!-- 顶部面包屑与导航条 -->
-    <div class="top-nav-bar">
-      <el-button :icon="ArrowLeft" link class="back-link" @click="handleBack">
-        返回作业列表
-      </el-button>
-      <el-breadcrumb separator="/">
-        <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
-        <el-breadcrumb-item :to="{ path: '/question/assignments' }">作业管理</el-breadcrumb-item>
-        <el-breadcrumb-item>{{ assignmentInfo?.title || '作业详情与答卷批改' }}</el-breadcrumb-item>
-      </el-breadcrumb>
-    </div>
-
     <AssignmentDetailHeader
       :loading="loading"
       :batch-a-i-loading="batchAILoading"
@@ -24,6 +12,7 @@
       @batch-ai-grade="handleBatchAIGrade"
       @remind-unsubmitted="handleRemindUnsubmitted"
       @delete="handleDeleteDraft"
+      @back="handleBack"
     />
 
     <!-- 主体双标签页：学生答卷管理 vs 作业试题清单 -->
@@ -39,6 +28,7 @@
             :get-submission-status-type="getSubmissionStatusType"
             @grade="goToGradingWorkspace"
             @ai-grade="triggerSingleAIGrade"
+            @delete-submission="handleDeleteSubmission"
           />
         </el-tab-pane>
 
@@ -47,7 +37,7 @@
           <div v-if="questionsList.length > 0" class="questions-tab-content">
             <div
               v-for="(q, idx) in questionsList"
-              :key="q.id"
+              :key="q.id || idx"
               class="question-review-card"
             >
               <div class="q-header">
@@ -55,7 +45,9 @@
                 <el-tag size="small" :type="getTypeTagType(q.type)">{{ getTypeLabel(q.type) }}</el-tag>
                 <span class="q-score">{{ q.score || 5 }} 分</span>
               </div>
-              <p class="q-stem">{{ q.stem }}</p>
+              <div class="q-stem">
+                <MathText :text="q.stem" />
+              </div>
 
               <div v-if="q.options && q.options.length" class="q-options">
                 <div
@@ -65,18 +57,24 @@
                   :class="{ correct: opt.isCorrect }"
                 >
                   <span class="opt-k">{{ opt.key }}.</span>
-                  <span>{{ opt.content }}</span>
+                  <MathText class="opt-content" :text="opt.content" />
                 </div>
               </div>
 
               <div class="q-analysis-box">
                 <div class="ans-line">
                   <strong>标准参考答案：</strong>
-                  <span class="text-emerald-600 font-bold">{{ q.correctAnswer || '无客观标准答案' }}</span>
+                  <span class="text-emerald-600 font-bold">
+                    <MathText v-if="q.correctAnswer" :text="q.correctAnswer" />
+                    <span v-else>无客观标准答案</span>
+                  </span>
                 </div>
                 <div class="ans-line">
                   <strong>解析与评分细则：</strong>
-                  <span>{{ q.analysis || '暂无解析' }}</span>
+                  <div class="analysis-detail">
+                    <MathText v-if="q.analysis" :text="q.analysis" />
+                    <span v-else>暂无解析</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -85,14 +83,22 @@
         </el-tab-pane>
       </el-tabs>
     </div>
+
+    <!-- AI 智能阅卷认知推演弹窗（雷达环脉冲、秒级实时计时、流水线推进与中止控制） -->
+    <AssignmentGradingEngineDialog
+      :visible="aiThinkingVisible"
+      :title="aiThinkingTitle"
+      @abort="handleAbortAIGrade"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ArrowLeft } from '@element-plus/icons-vue';
 import { useAssignmentDetail } from '@/composables/question/useAssignment';
+import MathText from '@/components/common/MathText.vue';
 import AssignmentDetailHeader from '@/components/question/assignment/AssignmentDetailHeader.vue';
 import AssignmentSubmissionTable from '@/components/question/assignment/AssignmentSubmissionTable.vue';
+import AssignmentGradingEngineDialog from '@/components/question/assignment/AssignmentGradingEngineDialog.vue';
 
 const {
   loading,
@@ -108,12 +114,17 @@ const {
   submissionRate,
   pendingReviewCount,
   averageScore,
+  aiThinkingVisible,
+  aiThinkingTitle,
   goToGradingWorkspace,
   triggerSingleAIGrade,
   handleBatchAIGrade,
+  handleAbortAIGrade,
   handleRemindUnsubmitted,
   handleBack,
   handleDeleteDraft,
+  handleDeleteAssignment,
+  handleDeleteSubmission,
   getSubmissionStatusLabel,
   getSubmissionStatusType,
   getTypeLabel,
@@ -125,18 +136,7 @@ const {
 @use '@/styles/question/module-page-shell.scss';
 
 .assignment-detail-container {
-  .top-nav-bar {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 20px;
-
-    .back-link {
-      font-size: 14px;
-      font-weight: 500;
-      color: #3b82f6;
-    }
-  }
+  width: 100%;
 
   .main-tabs-card {
     background: #ffffff;
@@ -212,15 +212,29 @@ const {
         .q-analysis-box {
           background: #ffffff;
           border-left: 3px solid #10b981;
-          padding: 10px 14px;
-          border-radius: 6px;
+          padding: 12px 16px;
+          border-radius: 8px;
           font-size: 13px;
           color: #334155;
 
           .ans-line {
-            margin-bottom: 4px;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 8px;
             &:last-child {
               margin-bottom: 0;
+            }
+
+            strong {
+              flex-shrink: 0;
+              color: #0f172a;
+            }
+
+            .analysis-detail {
+              flex: 1;
+              color: #475569;
+              line-height: 1.6;
             }
           }
         }

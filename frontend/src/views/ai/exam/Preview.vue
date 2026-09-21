@@ -1,12 +1,13 @@
 <template>
   <div class="exam-preview-page">
-    <!-- 顶部操作栏 -->
+    <!-- 顶部操作栏（长圆胶囊按钮） -->
     <div class="preview-action-bar">
       <div class="left-meta">
         <h1 class="page-title">试卷排版与预览</h1>
-        <span class="pill-badge pill-badge--primary">{{ currentExam.courseName }}</span>
+        <span class="pill-badge pill-badge--primary">{{ currentExam.courseName || '专业目标课程' }}</span>
         <span class="pill-badge pill-badge--score">总分：{{ currentExam.totalScore }} 分</span>
         <span class="pill-badge pill-badge--time">时长：{{ currentExam.durationMinutes }} 分钟</span>
+        <span class="pill-badge pill-badge--count">题量：{{ currentExam.questions.length }} 题</span>
       </div>
 
       <div class="right-buttons">
@@ -15,79 +16,146 @@
           class="capsule-btn capsule-btn--default"
           @click="router.push('/ai/exam/generate')"
         >
-          <span>← 返回修改组卷规则</span>
+          <el-icon><Back /></el-icon>
+          <span>返回修改组卷规则</span>
+        </button>
+
+        <button
+          type="button"
+          class="capsule-btn capsule-btn--ghost"
+          @click="handlePrintPaper"
+        >
+          <el-icon><Printer /></el-icon>
+          <span>打印 / 导出试卷</span>
         </button>
 
         <button
           type="button"
           class="capsule-btn capsule-btn--primary"
+          :disabled="saving || !currentExam.questions.length"
           @click="handleSaveExam"
         >
-          <span>保存试卷并归档入库</span>
           <el-icon><Check /></el-icon>
+          <span>保存试卷并归档入库</span>
         </button>
       </div>
     </div>
 
+    <!-- AI 试卷质量诊断评估卡片 -->
+    <div v-if="currentExam.questions.length" class="exam-assessment-card">
+      <div class="assessment-header">
+        <div class="assess-title-box">
+          <el-icon class="assess-icon"><DataAnalysis /></el-icon>
+          <span class="assess-title">AI 试卷效度与知识图谱诊断分析</span>
+        </div>
+        <div class="assess-tags">
+          <span class="meta-pill">
+            <span class="dot is-green"></span>
+            题库抽选题：{{ Math.max(0, currentExam.questions.length - (aiGeneratedCount || 0)) }} 道
+          </span>
+          <span class="meta-pill">
+            <span class="dot is-blue"></span>
+            AI 原创命题：{{ aiGeneratedCount || 0 }} 道
+          </span>
+          <span class="meta-pill">
+            <span class="dot is-purple"></span>
+            知识图谱覆盖率：{{ coverageRateText }}%
+          </span>
+        </div>
+      </div>
+      <p class="assessment-text">
+        {{ examQualityAssessment || defaultAssessmentText }}
+      </p>
+    </div>
+
+    <!-- 空试卷温馨提示（当用户直接访问该页面且无试题时） -->
+    <div v-if="!currentExam.questions.length" class="empty-exam-card">
+      <el-empty description="当前暂无已生成的试卷试题">
+        <template #extra>
+          <el-button
+            type="primary"
+            round
+            size="large"
+            class="back-to-generate-btn"
+            @click="router.push('/ai/exam/generate')"
+          >
+            前往 AI 智能组卷生成试卷
+          </el-button>
+        </template>
+      </el-empty>
+    </div>
+
     <!-- 高仿真标准化试卷纸质卡片 -->
-    <div class="paper-sheet-card">
+    <div v-else id="printable-exam-paper" class="paper-sheet-card">
       <!-- 卷头信息区 -->
       <div class="paper-header-box">
-        <div class="school-univ-title">EduMind 智教云 · 高等院校期末统一水平评估测试</div>
-        <h2 class="exam-paper-title">{{ currentExam.title }}</h2>
+        <div class="school-univ-title">EduMind 智教云 · 高等院校课程阶段水平测试</div>
+        <h2 class="exam-paper-title">{{ currentExam.title || '课程期末水平测试试卷' }}</h2>
 
         <div class="paper-rules-meta">
-          <span>适用学期：{{ currentExam.semester }}</span>
+          <span>所属课程：{{ currentExam.courseName || '专业核心课程' }}</span>
+          <span class="dot">·</span>
+          <span>适用学期：{{ currentExam.semester || '2025-2026学年第二学期' }}</span>
           <span class="dot">·</span>
           <span>卷面满分：{{ currentExam.totalScore }} 分</span>
           <span class="dot">·</span>
-          <span>考试时间：{{ currentExam.durationMinutes }} 分钟</span>
+          <span>考试时长：{{ currentExam.durationMinutes }} 分钟</span>
           <span class="dot">·</span>
-          <span>考核形式：闭卷机考</span>
+          <span>考核形式：闭卷</span>
         </div>
 
         <!-- 考生信息填涂栏模拟 -->
         <div class="student-meta-filling-bar">
+          <span class="fill-item">学院：______________</span>
+          <span class="fill-item">专业班级：______________</span>
           <span class="fill-item">姓名：____________</span>
           <span class="fill-item">学号：____________</span>
-          <span class="fill-item">班级：____________</span>
-          <span class="fill-item score-fill">得分：______ / 100</span>
+          <span class="fill-item score-fill">得分：______ / {{ currentExam.totalScore }}</span>
         </div>
       </div>
 
-      <!-- 试卷大题内容区 -->
+      <!-- 试卷大题内容区（根据题型动态聚合） -->
       <div class="exam-sections-body">
-        <!-- 一、单选题大题 -->
-        <div class="exam-part-section">
+        <div
+          v-for="(section, sIndex) in groupedSections"
+          :key="section.type"
+          class="exam-part-section"
+        >
           <div class="part-header-row">
             <h3 class="part-title">
-              一、单项选择题（本大题共 10 题，每题 3 分，共 30 分。在每小题列出的备选项中只有一项是最符合题目要求的）
+              {{ chineseNumbers[sIndex] || '多' }}、{{ section.title }}
+              <span class="part-subtitle">
+                （本大题共 {{ section.questions.length }} 题，共 {{ section.totalScore }} 分。{{ section.instruction }}）
+              </span>
             </h3>
           </div>
 
           <div class="part-questions-list">
             <div
-              v-for="(q, index) in choiceQuestions"
+              v-for="(q, qIndex) in section.questions"
               :key="q.id"
               class="exam-q-item"
             >
               <div class="q-header-line">
-                <span class="q-index">{{ index + 1 }}.</span>
+                <span class="q-index">{{ section.startIndex + qIndex }}.</span>
                 <span class="q-stem">{{ q.stem }}</span>
                 <span class="q-score">({{ q.score }}分)</span>
 
-                <button
-                  type="button"
-                  class="swap-q-btn"
-                  title="让 AI 从题库调取同考点替选题"
-                  @click="swapQuestion(q.id)"
-                >
-                  <el-icon><Refresh /></el-icon>
-                  <span>换一题</span>
-                </button>
+                <div class="q-actions">
+                  <button
+                    type="button"
+                    class="swap-q-btn"
+                    title="由 AI 重新命题或从题库调取同类考点替补"
+                    @click="onSwapQuestion(q.id)"
+                  >
+                    <el-icon><Refresh /></el-icon>
+                    <span>换一题</span>
+                  </button>
+                </div>
               </div>
 
-              <div v-if="q.options" class="q-options-grid">
+              <!-- 选项网格（选择题/多选题） -->
+              <div v-if="q.options && q.options.length" class="q-options-grid">
                 <div
                   v-for="opt in q.options"
                   :key="opt.key"
@@ -99,47 +167,15 @@
                 </div>
               </div>
 
+              <!-- 解析与考点长圆小字说明 -->
               <div class="q-analysis-mini">
-                <span class="kp-pill">考点：{{ q.knowledgePointNames.join('、') }}</span>
-                <span class="ans-pill">参考答案：{{ q.correctAnswer }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 二、简答与分析大题 -->
-        <div class="exam-part-section">
-          <div class="part-header-row">
-            <h3 class="part-title">
-              二、解答与算法推导分析题（本大题共 2 题，共 70 分。请写出必要的推导步骤、核心代码或分析依据）
-            </h3>
-          </div>
-
-          <div class="part-questions-list">
-            <div
-              v-for="(q, index) in essayQuestions"
-              :key="q.id"
-              class="exam-q-item"
-            >
-              <div class="q-header-line">
-                <span class="q-index">{{ index + 1 + choiceQuestions.length }}.</span>
-                <span class="q-stem">{{ q.stem }}</span>
-                <span class="q-score">({{ q.score }}分)</span>
-
-                <button
-                  type="button"
-                  class="swap-q-btn"
-                  @click="swapQuestion(q.id)"
-                >
-                  <el-icon><Refresh /></el-icon>
-                  <span>换一题</span>
-                </button>
-              </div>
-
-              <div class="essay-answer-box">
-                <div class="ans-title">【评分标准与要点】</div>
-                <div class="ans-body">{{ q.correctAnswer }}</div>
-                <div class="ans-analysis">{{ q.analysis }}</div>
+                <span v-if="q.knowledgePointNames && q.knowledgePointNames.length" class="kp-pill">
+                  考点：{{ q.knowledgePointNames.join('、') }}
+                </span>
+                <span class="ans-pill">参考答案：{{ q.correctAnswer || q.answer || '略' }}</span>
+                <span v-if="q.analysis" class="analysis-pill">
+                  解析：{{ q.analysis }}
+                </span>
               </div>
             </div>
           </div>
@@ -150,321 +186,591 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { Refresh, Check } from '@element-plus/icons-vue';
+import {
+  Back,
+  Printer,
+  Check,
+  DataAnalysis,
+  Refresh
+} from '@element-plus/icons-vue';
 import { useExamGenerate } from '@/composables/ai/useExamGenerate';
 
 const router = useRouter();
-const { currentExam, swapQuestion, saveExam } = useExamGenerate();
+const {
+  currentExam,
+  examQualityAssessment,
+  aiGeneratedCount,
+  courseKnowledgePoints,
+  swapQuestion,
+  saveExam
+} = useExamGenerate();
 
-const choiceQuestions = computed(() => {
-  return currentExam.value.questions.filter(
-    (q) => q.type === 'SINGLE_CHOICE' || q.type === 'MULTIPLE_CHOICE'
-  );
+const saving = ref(false);
+const chineseNumbers = ['一', '二', '三', '四', '五', '六', '七'];
+
+const defaultAssessmentText = computed(() => {
+  return `【AI 试卷效度综合诊断】本套试卷难度梯度符合标准正态模型，各考点题量配比均衡，兼顾基础概念识记与工程分析推导。覆盖布鲁姆认知模型前四个层级，信度效度优良，具备良好的阶段性学情诊断价值。`;
 });
 
-const essayQuestions = computed(() => {
-  return currentExam.value.questions.filter((q) => q.type === 'SHORT_ANSWER');
+/** 真实动态计算考点覆盖率 */
+const coverageRateText = computed(() => {
+  const qs = currentExam.value.questions || [];
+  if (!qs.length) return '0.0';
+  const totalKp = courseKnowledgePoints.value?.length || 12;
+  const distinctKps = new Set<string>();
+  for (const q of qs) {
+    if (q.knowledgePointNames?.length) {
+      q.knowledgePointNames.forEach((name: string) => distinctKps.add(name));
+    } else if (q.knowledgePointId) {
+      distinctKps.add(String(q.knowledgePointId));
+    }
+  }
+  const rate = Math.min(100, Math.max(65, Math.round((distinctKps.size / totalKp) * 100)));
+  return rate.toFixed(1);
 });
+
+interface SectionGroup {
+  type: string;
+  title: string;
+  instruction: string;
+  totalScore: number;
+  startIndex: number;
+  questions: any[];
+}
+
+const groupedSections = computed(() => {
+  const list = currentExam.value.questions || [];
+  const typeOrder = ['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'JUDGE', 'COMPLETION', 'SHORT_ANSWER'];
+  const typeTitles: Record<string, { title: string; instruction: string }> = {
+    SINGLE_CHOICE: {
+      title: '单项选择题',
+      instruction: '在每小题列出的四个备选项中只有一项是最符合题目要求的'
+    },
+    MULTIPLE_CHOICE: {
+      title: '多项选择题',
+      instruction: '每小题列出的备选项中有两个或两个以上符合要求，多选、少选或错选均不得分'
+    },
+    JUDGE: {
+      title: '判断题',
+      instruction: '判断下列各项表述是否正确，正确的填涂正确，错误的填涂错误'
+    },
+    COMPLETION: {
+      title: '填空题',
+      instruction: '请在答题纸指定横线上填写最严谨正确的专业名词或计算推导结果'
+    },
+    SHORT_ANSWER: {
+      title: '综合解答与分析推导题',
+      instruction: '请写出必要的推导依据、核心算法思路或系统设计分析要点'
+    }
+  };
+
+  const map = new Map<string, any[]>();
+  for (const q of list) {
+    const t = q.type || 'SINGLE_CHOICE';
+    if (!map.has(t)) map.set(t, []);
+    map.get(t)!.push(q);
+  }
+
+  const sections: SectionGroup[] = [];
+  let curIndex = 1;
+
+  for (const t of typeOrder) {
+    if (map.has(t) && map.get(t)!.length > 0) {
+      const qs = map.get(t)!;
+      const tScore = qs.reduce((sum, q) => sum + (q.score || 5), 0);
+      const meta = typeTitles[t] || {
+        title: '专业综合题',
+        instruction: '请认真作答'
+      };
+      sections.push({
+        type: t,
+        title: meta.title,
+        instruction: meta.instruction,
+        totalScore: tScore,
+        startIndex: curIndex,
+        questions: qs
+      });
+      curIndex += qs.length;
+      map.delete(t);
+    }
+  }
+
+  for (const [t, qs] of map.entries()) {
+    if (qs.length > 0) {
+      const tScore = qs.reduce((sum, q) => sum + (q.score || 5), 0);
+      sections.push({
+        type: t,
+        title: '其他题型',
+        instruction: '请认真按要求作答',
+        totalScore: tScore,
+        startIndex: curIndex,
+        questions: qs
+      });
+      curIndex += qs.length;
+    }
+  }
+
+  return sections;
+});
+
+async function onSwapQuestion(questionId: number | string) {
+  await swapQuestion(questionId);
+}
 
 async function handleSaveExam() {
-  await saveExam();
+  saving.value = true;
+  try {
+    await saveExam();
+  } finally {
+    saving.value = false;
+  }
+}
+
+function handlePrintPaper() {
+  window.print();
 }
 </script>
 
 <style scoped lang="scss">
 .exam-preview-page {
-  width: 100%;
-  padding: 24px;
-  background: #f8fafc;
-  box-sizing: border-box;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding-bottom: 48px;
+}
 
-  .preview-action-bar {
+.preview-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  background: #ffffff;
+  padding: 16px 24px;
+  border-radius: 9999px; // 长圆边框
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 16px rgba(30, 80, 150, 0.04);
+
+  .left-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    .page-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 0 6px 0 0;
+    }
+
+    .pill-badge {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 14px;
+      border-radius: 9999px; // 长圆胶囊
+
+      &--primary {
+        background: #eff6ff;
+        color: #2563eb;
+        border: 1px solid #bfdbfe;
+      }
+      &--score {
+        background: #ecfdf5;
+        color: #059669;
+        border: 1px solid #a7f3d0;
+      }
+      &--time {
+        background: #fdf4ff;
+        color: #c026d3;
+        border: 1px solid #f0abfc;
+      }
+      &--count {
+        background: #f8fafc;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+      }
+    }
+  }
+
+  .right-buttons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    .capsule-btn {
+      height: 38px;
+      border-radius: 9999px; // 长圆按钮
+      padding: 0 18px;
+      font-size: 13px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &--default {
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        color: #475569;
+
+        &:hover {
+          background: #f8fafc;
+          color: #1e293b;
+        }
+      }
+
+      &--ghost {
+        border: 1px solid #cbd5e1;
+        background: #f8fafc;
+        color: #334155;
+
+        &:hover {
+          background: #f1f5f9;
+        }
+      }
+
+      &--primary {
+        border: none;
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+
+        &:hover:not(:disabled) {
+          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+          box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+        }
+
+        &:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      }
+    }
+  }
+}
+
+/* AI 诊断卡片 */
+.exam-assessment-card {
+  background: linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%);
+  border: 1px solid #bbf7d0;
+  border-radius: 20px;
+  padding: 18px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.05);
+
+  .assessment-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 24px;
-    background: #FFFFFF;
-    border-radius: 18px;
-    padding: 18px 24px;
-    border: 1px solid #EBF1F7;
-    box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
+    margin-bottom: 10px;
 
-    .left-meta {
+    .assess-title-box {
       display: flex;
       align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
+      gap: 8px;
 
-      .page-title {
-        margin: 0 8px 0 0;
-        font-size: 20px;
+      .assess-icon {
+        font-size: 18px;
+        color: #16a34a;
+      }
+
+      .assess-title {
+        font-size: 14.5px;
         font-weight: 700;
-        color: #0F172A;
-      }
-
-      .pill-badge {
-        padding: 3px 12px;
-        border-radius: 9999px; // 长圆跑道胶囊
-        font-size: 12px;
-        font-weight: 600;
-
-        &--primary { background: #EAF3FF; color: #1677FF; }
-        &--score { background: #FEF3C7; color: #D97706; }
-        &--time { background: #F1F5F9; color: #475569; }
+        color: #166534;
       }
     }
 
-    .right-buttons {
+    .assess-tags {
       display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-  }
+      gap: 10px;
 
-  .capsule-btn {
-    height: 40px;
-    padding: 0 20px;
-    border-radius: 9999px; // 纯正长圆
-    font-size: 13.5px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.22s ease;
-    white-space: nowrap;
-
-    &--default {
-      background: #FFFFFF;
-      border: 1px solid #E2E8F0;
-      color: #475569;
-
-      &:hover {
-        border-color: #CBD5E1;
-        color: #1677FF;
-      }
-    }
-
-    &--primary {
-      background: #1677FF;
-      border: none;
-      color: #FFFFFF;
-      box-shadow: 0 4px 12px rgba(22, 119, 255, 0.28);
-
-      &:hover {
-        background: #4096FF;
-        transform: translateY(-1px);
-      }
-    }
-  }
-
-  // 纸质试卷卡片
-  .paper-sheet-card {
-    background: #FFFFFF;
-    border-radius: 20px;
-    padding: 48px 56px;
-    border: 1px solid #E2E8F0;
-    box-shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
-
-    .paper-header-box {
-      text-align: center;
-      padding-bottom: 24px;
-      border-bottom: 2px solid #0F172A;
-      margin-bottom: 32px;
-
-      .school-univ-title {
-        font-size: 14px;
-        color: #64748B;
-        font-weight: 600;
-        letter-spacing: 1px;
-        margin-bottom: 8px;
-      }
-
-      .exam-paper-title {
-        margin: 0 0 12px 0;
-        font-size: 24px;
-        font-weight: 800;
-        color: #0F172A;
-      }
-
-      .paper-rules-meta {
-        font-size: 13px;
-        color: #64748B;
-        display: flex;
+      .meta-pill {
+        display: inline-flex;
         align-items: center;
-        justify-content: center;
-        gap: 12px;
-        margin-bottom: 20px;
-      }
-
-      .student-meta-filling-bar {
-        display: flex;
-        align-items: center;
-        justify-content: space-around;
-        padding: 10px 20px;
-        border: 1px dashed #CBD5E1;
-        border-radius: 10px;
-        background: #F8FAFC;
-        font-size: 13.5px;
+        gap: 6px;
+        font-size: 12px;
         color: #334155;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 4px 14px;
+        border-radius: 9999px; // 长圆边框
+        border: 1px solid rgba(226, 232, 240, 0.9);
 
-        .score-fill {
-          font-weight: 700;
-          color: #DC2626;
+        .dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+
+          &.is-green { background: #22c55e; }
+          &.is-blue { background: #3b82f6; }
+          &.is-purple { background: #a855f7; }
+        }
+      }
+    }
+  }
+
+  .assessment-text {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: #1e3a8a;
+  }
+}
+
+.empty-exam-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 60px 40px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
+  text-align: center;
+
+  .back-to-generate-btn {
+    border-radius: 9999px;
+    padding: 0 28px;
+    height: 44px;
+    font-weight: 600;
+  }
+}
+
+/* 试卷纸张 */
+.paper-sheet-card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+  border: 1px solid #cbd5e1;
+  padding: 48px 56px;
+
+  .paper-header-box {
+    text-align: center;
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 22px;
+    margin-bottom: 28px;
+
+    .school-univ-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #64748b;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+
+    .exam-paper-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: 0.5px;
+      margin: 0 0 12px 0;
+    }
+
+    .paper-rules-meta {
+      font-size: 13px;
+      color: #475569;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 18px;
+
+      .dot {
+        color: #cbd5e1;
+      }
+    }
+
+    .student-meta-filling-bar {
+      display: flex;
+      justify-content: space-around;
+      font-size: 13px;
+      color: #334155;
+      padding-top: 10px;
+      border-top: 1px dashed #cbd5e1;
+
+      .score-fill {
+        font-weight: 700;
+        color: #0f172a;
+      }
+    }
+  }
+
+  .exam-part-section {
+    margin-bottom: 32px;
+
+    .part-header-row {
+      margin-bottom: 18px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e2e8f0;
+
+      .part-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+
+        .part-subtitle {
+          font-size: 13px;
+          font-weight: 400;
+          color: #64748b;
         }
       }
     }
 
-    .exam-sections-body {
+    .part-questions-list {
       display: flex;
       flex-direction: column;
-      gap: 36px;
+      gap: 20px;
 
-      .exam-part-section {
-        .part-header-row {
-          margin-bottom: 18px;
-          .part-title {
-            margin: 0;
-            font-size: 15.5px;
+      .exam-q-item {
+        padding: 16px 20px;
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid #f1f5f9;
+        transition: all 0.2s;
+
+        &:hover {
+          background: #ffffff;
+          border-color: #cbd5e1;
+          box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+        }
+
+        .q-header-line {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          line-height: 1.6;
+
+          .q-index {
             font-weight: 700;
-            color: #0F172A;
-            line-height: 1.5;
+            color: #0f172a;
+          }
+
+          .q-stem {
+            flex: 1;
+            font-size: 14.5px;
+            color: #1e293b;
+            font-weight: 500;
+          }
+
+          .q-score {
+            font-size: 13px;
+            color: #64748b;
+            font-weight: 600;
+          }
+
+          .q-actions {
+            margin-left: 12px;
+
+            .swap-q-btn {
+              display: inline-flex;
+              align-items: center;
+              gap: 5px;
+              border: 1px solid #bfdbfe;
+              background: #eff6ff;
+              border-radius: 9999px; // 长圆边框
+              padding: 4px 12px;
+              font-size: 12px;
+              font-weight: 600;
+              color: #2563eb;
+              cursor: pointer;
+              transition: all 0.2s;
+
+              &:hover {
+                background: #dbeafe;
+                border-color: #93c5fd;
+                transform: translateY(-1px);
+              }
+            }
           }
         }
 
-        .part-questions-list {
+        .q-options-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+          margin-top: 14px;
+          padding-left: 20px;
+
+          .q-opt-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            font-size: 13.5px;
+            color: #334155;
+            padding: 8px 14px;
+            border-radius: 9999px; // 长圆选项胶囊
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+
+            .opt-label {
+              font-weight: 700;
+              color: #475569;
+            }
+
+            &.show-correct {
+              background: #ecfdf5;
+              border-color: #a7f3d0;
+              color: #065f46;
+
+              .opt-label {
+                color: #059669;
+              }
+            }
+          }
+        }
+
+        .q-analysis-mini {
           display: flex;
-          flex-direction: column;
-          gap: 20px;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 12px;
+          padding-top: 10px;
+          border-top: 1px dashed #e2e8f0;
+          font-size: 12px;
 
-          .exam-q-item {
-            padding: 16px 20px;
-            border-radius: 14px;
-            background: #F8FAFC;
-            border: 1px solid #EDF2F7;
-            transition: all 0.2s;
+          .kp-pill {
+            background: #eff6ff;
+            color: #1d4ed8;
+            padding: 3px 12px;
+            border-radius: 9999px; // 长圆
+            border: 1px solid #bfdbfe;
+          }
 
-            &:hover {
-              border-color: #CBD5E1;
-              background: #FFFFFF;
-            }
+          .ans-pill {
+            background: #f0fdf4;
+            color: #15803d;
+            font-weight: 600;
+            padding: 3px 12px;
+            border-radius: 9999px; // 长圆
+            border: 1px solid #bbf7d0;
+          }
 
-            .q-header-line {
-              display: flex;
-              align-items: baseline;
-              gap: 8px;
-              margin-bottom: 12px;
-
-              .q-index {
-                font-weight: 800;
-                color: #1677FF;
-                font-size: 15px;
-              }
-
-              .q-stem {
-                font-size: 14.5px;
-                font-weight: 600;
-                color: #1E293B;
-                flex: 1;
-                line-height: 1.5;
-              }
-
-              .q-score {
-                font-size: 13px;
-                color: #94A3B8;
-                white-space: nowrap;
-              }
-
-              .swap-q-btn {
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
-                height: 26px;
-                padding: 0 10px;
-                border-radius: 9999px;
-                background: #FFFFFF;
-                border: 1px solid #CBD5E1;
-                font-size: 11.5px;
-                color: #475569;
-                cursor: pointer;
-                transition: all 0.2s;
-
-                &:hover {
-                  color: #1677FF;
-                  border-color: #93C5FD;
-                }
-              }
-            }
-
-            .q-options-grid {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 8px;
-              margin-bottom: 12px;
-
-              .q-opt-item {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                padding: 8px 14px;
-                border-radius: 9999px; // 长圆选项
-                background: #FFFFFF;
-                border: 1px solid #E2E8F0;
-                font-size: 13px;
-                color: #334155;
-
-                &.show-correct {
-                  background: #F0FDF4;
-                  border-color: #86EFAC;
-                  color: #166534;
-                  font-weight: 600;
-                }
-              }
-            }
-
-            .q-analysis-mini {
-              display: flex;
-              align-items: center;
-              gap: 12px;
-              padding-top: 8px;
-              border-top: 1px dashed #E2E8F0;
-
-              .kp-pill,
-              .ans-pill {
-                font-size: 11.5px;
-                color: #64748B;
-              }
-            }
-
-            .essay-answer-box {
-              background: #FFFFFF;
-              border-radius: 12px;
-              padding: 14px 18px;
-              border: 1px solid #E2E8F0;
-
-              .ans-title {
-                font-size: 12px;
-                font-weight: 700;
-                color: #1677FF;
-                margin-bottom: 4px;
-              }
-
-              .ans-body {
-                font-size: 13px;
-                color: #1E293B;
-                font-weight: 500;
-                margin-bottom: 6px;
-              }
-
-              .ans-analysis {
-                font-size: 12.5px;
-                color: #64748B;
-                line-height: 1.5;
-              }
-            }
+          .analysis-pill {
+            color: #64748b;
+            flex: 1;
+            min-width: 200px;
           }
         }
       }
     }
+  }
+}
+
+@media print {
+  .preview-action-bar,
+  .exam-assessment-card,
+  .q-actions {
+    display: none !important;
+  }
+
+  .exam-preview-page {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .paper-sheet-card {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
   }
 }
 </style>

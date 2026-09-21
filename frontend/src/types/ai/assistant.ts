@@ -51,6 +51,8 @@ export interface GlobalAssistantChatRequest {
   draftDescription?: string;
   objectiveExcerpt?: string;
   questionId?: number;
+  modelKey?: string;
+  promptPrefix?: string;
 }
 
 export interface GlobalAssistantAskResponse {

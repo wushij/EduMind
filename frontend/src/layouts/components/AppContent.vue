@@ -1,5 +1,5 @@
 <template>
-  <main class="app-content" :class="{ 'is-full-height': isFullHeight }">
+  <main class="app-content" :class="{ 'is-full-height': isFullHeight, 'is-no-padding': isNoPadding }">
     <div class="app-content-body">
       <router-view v-slot="{ Component, route: currentRoute }">
         <transition name="page-switch" mode="out-in" appear>
@@ -17,6 +17,9 @@ import { useRoute } from 'vue-router';
 const route = useRoute();
 const isFullHeight = computed(
   () => !!route.meta?.fullHeight || route.path.startsWith('/course/ai') || route.path.endsWith('/ai')
+);
+const isNoPadding = computed(
+  () => !!route.meta?.noPadding || route.name === 'AssignmentTake' || (route.path.includes('/assignments/') && route.path.endsWith('/take'))
 );
 </script>
 
@@ -50,6 +53,10 @@ const isFullHeight = computed(
       min-height: 0;
       height: 100%;
     }
+  }
+
+  &.is-no-padding {
+    padding: 0 !important;
   }
 
   .app-content-body {

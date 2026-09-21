@@ -11,6 +11,14 @@
           @input="emit('update:keyword', ($event.target as HTMLInputElement).value)"
           @keyup.enter="emit('search')"
         />
+        <button
+          v-if="keyword"
+          type="button"
+          class="clear-btn"
+          @click="emit('update:keyword', ''); emit('search');"
+        >
+          <el-icon><Close /></el-icon>
+        </button>
       </div>
       <el-select
         :model-value="selectedCourseId"
@@ -46,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { Search } from '@element-plus/icons-vue';
+import { Search, Close } from '@element-plus/icons-vue';
 import type { Course } from '@/types/course/course';
 
 defineProps<{
@@ -79,6 +87,61 @@ const emit = defineEmits<{
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
+}
+
+.capsule-search-box {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 220px;
+  max-width: 420px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  transition: all 0.2s;
+
+  &:focus-within {
+    border-color: #1677ff;
+    box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.14);
+  }
+
+  .search-icon {
+    font-size: 14px;
+    color: #94a3b8;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+
+  .capsule-search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 13px;
+    color: #1e293b;
+    min-width: 0;
+
+    &::placeholder {
+      color: #94a3b8;
+    }
+  }
+
+  .clear-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+
+    &:hover {
+      color: #64748b;
+    }
+  }
 }
 
 .filter-select {

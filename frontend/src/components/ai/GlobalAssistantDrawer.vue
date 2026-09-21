@@ -112,7 +112,12 @@ const {
   pauseAutoScrollFollow,
   handleViewportScroll,
   getIntentTagType,
-  formatMatchScore
+  formatMatchScore,
+  modelOptions,
+  currentModel,
+  currentModelKey,
+  handleModelSelect,
+  streamTimerText
 } = ga;
 
 watch(drawerVisible, (visible) => {
@@ -204,7 +209,12 @@ const uiContext: GlobalAssistantUiContext = {
   getIntentTagType,
   formatMatchScore,
   renderChatMarkdown,
-  resolveReasoningFolded
+  resolveReasoningFolded,
+  modelOptions,
+  currentModel,
+  currentModelKey,
+  handleModelSelect,
+  streamTimerText
 };
 
 provide(globalAssistantUiKey, uiContext);

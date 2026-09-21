@@ -135,47 +135,77 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="150" fixed="right">
+          <el-table-column label="操作" width="230" fixed="right">
             <template #default="{ row }">
-              <button
-                type="button"
-                class="table-action-link"
-                @click="router.push(`/question/submissions/${row.id}`)"
-              >
-                {{ row.status === 'REVIEWED' ? '查看详情' : '进入评阅' }}
-              </button>
+              <div class="action-btn-group">
+                <button
+                  type="button"
+                  class="table-action-link"
+                  @click="router.push(`/question/submissions/${row.id}`)"
+                >
+                  {{ row.status === 'REVIEWED' ? '详情' : '评阅' }}
+                </button>
+                <button
+                  type="button"
+                  class="table-action-link table-action-link--ai"
+                  title="重新调用 AI 阅卷推演模型重新判分与撰写评语"
+                  @click="handleSingleAIGrade(row)"
+                >
+                  <el-icon><MagicStick /></el-icon>
+                  <span>{{ row.status === 'SUBMITTED' ? 'AI批改' : 'AI复评' }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="table-action-link table-action-link--danger"
+                  title="彻底删除此份答卷与评分记录"
+                  @click="handleDeleteSubmission(row)"
+                >
+                  <el-icon><Delete /></el-icon>
+                  <span>删除</span>
+                </button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
 
-        <div class="pagination-row">
-          <el-pagination
-            v-model:current-page="pageNum"
+        <!-- 居左标准分页底栏（远离右下角悬浮球） -->
+        <div v-if="total > 0" class="pagination-footer-bar">
+          <AppPagination
+            v-model:page-num="pageNum"
             v-model:page-size="pageSize"
             :total="total"
             :page-sizes="[10, 20, 50]"
-            layout="total, sizes, prev, pager, next"
-            @current-change="reloadList"
-            @size-change="reloadList"
+            @change="reloadList"
           />
         </div>
       </div>
     </div>
+
+    <!-- AI 智能阅卷认知推演弹窗（雷达环脉冲、秒级实时计时、流水线推进与中止控制） -->
+    <AssignmentGradingEngineDialog
+      :visible="aiThinkingVisible"
+      :title="aiThinkingTitle"
+      @abort="handleAbortSubmissionGrade"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { Search, Document, MagicStick, Close } from '@element-plus/icons-vue';
+import { ElMessageBox } from 'element-plus';
+import { Search, Document, MagicStick, Close, Delete } from '@element-plus/icons-vue';
 import ModulePageHeroHeader from '@/components/question/common/ModulePageHeroHeader.vue';
 import SubmissionListStatsBar from '@/components/question/submission/SubmissionListStatsBar.vue';
+import AssignmentGradingEngineDialog from '@/components/question/assignment/AssignmentGradingEngineDialog.vue';
+import AppPagination from '@/components/common/AppPagination.vue';
 import { useSubmissionList } from '@/composables/question/useSubmission';
 import {
   SUBMISSION_STATUS,
   SUBMISSION_STATUS_LABEL,
   SUBMISSION_STATUS_TAG
 } from '@/constants/question/assignment';
+import type { SubmissionItem } from '@/types/question/submission';
 
 const router = useRouter();
 const {
@@ -185,21 +215,32 @@ const {
   allSubmissions,
   total,
   stats,
+  aiThinkingVisible,
+  aiThinkingTitle,
+  handleAbortSubmissionGrade,
   loadCourses,
   fetchAllSubmissions,
-  batchGradePending
+  batchGradePending,
+  triggerSingleRegrade,
+  removeSubmissionRecord
 } = useSubmissionList();
 
 const searchKeyword = ref('');
 const selectedCourseId = ref<number | null>(null);
 const selectedStatus = ref('');
 const pageNum = ref(1);
-const pageSize = ref(20);
+const pageSize = ref(10);
 
 onMounted(async () => {
-  await loadCourses();
-  await reloadList();
+  await Promise.all([loadCourses(), reloadList()]);
 });
+
+async function handleDeleteSubmission(row: SubmissionItem) {
+  const success = await removeSubmissionRecord(row.id, row.studentName);
+  if (success) {
+    await reloadList();
+  }
+}
 
 async function reloadList() {
   await fetchAllSubmissions({
@@ -230,8 +271,31 @@ function getStatusTagType(status: string) {
   return SUBMISSION_STATUS_TAG[status] || 'info';
 }
 
+async function handleSingleAIGrade(row: SubmissionItem) {
+  await triggerSingleRegrade(row);
+  await reloadList();
+}
+
 async function handleBatchAIGrading() {
-  await batchGradePending(selectedCourseId.value);
+  const pendingCount = stats.value?.submittedCount ?? 0;
+  if (pendingCount === 0 && total.value > 0) {
+    try {
+      await ElMessageBox.confirm(
+        '当前队列中暂无新提交的待评答卷（已有答卷均已完成初次 AI 预评）。\n\n是否对全队列已有答卷【重新执行一轮 AI 智能复评】？',
+        '全量 AI 复评确认',
+        {
+          confirmButtonText: '启动全队列复评',
+          cancelButtonText: '取消',
+          type: 'info'
+        }
+      );
+      await batchGradePending(selectedCourseId.value, true);
+    } catch {
+      return;
+    }
+  } else {
+    await batchGradePending(selectedCourseId.value, false);
+  }
   await reloadList();
 }
 </script>
@@ -259,10 +323,102 @@ async function handleBatchAIGrading() {
     border-radius: 9999px;
   }
 
-  .pagination-row {
+  .pagination-footer-bar {
     display: flex;
-    justify-content: flex-end;
-    padding: 16px 8px 8px;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 10px 14px 6px;
+    border-top: 1px solid #f1f5f9;
+
+    :deep(.pagination-bar) {
+      margin-top: 0;
+      padding: 0;
+      border-top: none;
+      justify-content: flex-start !important;
+    }
+  }
+
+  .action-btn-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+
+    :deep(.table-action-link) {
+      white-space: nowrap;
+      height: 28px;
+      line-height: 28px;
+      padding: 0 10px;
+      font-size: 12px;
+    }
+  }
+
+  .table-action-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 9999px;
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    color: #1677ff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: #dbeafe;
+      border-color: #93c5fd;
+    }
+  }
+
+  .table-action-link--ai {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 9999px;
+    border: 1px solid #ddd6fe;
+    background: #f5f3ff;
+    color: #7c3aed;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: #ede9fe;
+      border-color: #c4b5fd;
+      color: #6d28d9;
+    }
+  }
+
+  .table-action-link--danger {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 9999px;
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #ef4444;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: #fee2e2;
+      border-color: #fca5a5;
+      color: #dc2626;
+    }
   }
 
   .pill-badge {

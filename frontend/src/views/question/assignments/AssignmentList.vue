@@ -26,6 +26,13 @@
       @ai-grade="handleFastAIGrade"
       @delete="(id, title) => removeAssignment(id, title).then(() => loadAssignments())"
     />
+
+    <!-- AI 智能阅卷认知推演弹窗（雷达环脉冲、秒级实时计时、流水线推进与中止控制） -->
+    <AssignmentGradingEngineDialog
+      :visible="aiThinkingVisible"
+      :title="activeAssignmentTitle"
+      @abort="handleAbortAIGrade"
+    />
   </div>
 </template>
 
@@ -34,6 +41,7 @@ import AssignmentListHeader from '@/components/question/assignment/AssignmentLis
 import AssignmentListStatsRow from '@/components/question/assignment/AssignmentListStatsRow.vue';
 import AssignmentListFilterBar from '@/components/question/assignment/AssignmentListFilterBar.vue';
 import AssignmentListCards from '@/components/question/assignment/AssignmentListCards.vue';
+import AssignmentGradingEngineDialog from '@/components/question/assignment/AssignmentGradingEngineDialog.vue';
 import { useAssignmentListPage } from '@/composables/question/useAssignmentListPage';
 
 const {
@@ -49,12 +57,15 @@ const {
   selectedCourseId,
   selectedStatus,
   avgSubmissionRateLabel,
+  aiThinkingVisible,
+  activeAssignmentTitle,
   loadAssignments,
   handleSearch,
   getCourseName,
   progressPercent,
   progressLabel,
   handleFastAIGrade,
+  handleAbortAIGrade,
   removeAssignment
 } = useAssignmentListPage();
 </script>

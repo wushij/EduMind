@@ -1,5 +1,6 @@
 package com.edumind.teaching.dto.assignment;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -15,6 +16,7 @@ public class AssignmentCreateDTO {
     @NotBlank(message = "作业标题不能为空")
     private String title;
     private String description;
+    @JsonFormat(pattern = "yyyy-MM-dd[ 'T']HH:mm:ss")
     private LocalDateTime deadline;
     private Integer totalScore;
     private Integer passScore;

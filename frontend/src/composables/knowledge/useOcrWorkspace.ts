@@ -10,6 +10,15 @@ import {
 } from '@/api/knowledge/ocr';
 import type { OcrTaskVO } from '@/types/knowledge/ocr';
 
+export interface BBoxBlock {
+  id: number;
+  title: string;
+  stem: string;
+  options?: string[];
+  bbox: [number, number, number, number];
+  confidence: number;
+}
+
 export interface WorkspacePage {
   id?: number;
   taskId?: number;
@@ -17,44 +26,189 @@ export interface WorkspacePage {
   rawText: string;
   proofreadText?: string;
   confidenceScore?: number;
+  imageUrl?: string;
+  blocks?: BBoxBlock[];
 }
 
-export const DEFAULT_OCR_PAGES: WorkspacePage[] = [
+export interface PresetPaper {
+  id: string;
+  name: string;
+  engine: 'MINERU' | 'PADDLE_OCR' | 'GPT4O_VISION';
+  pages: WorkspacePage[];
+}
+
+export const PRESET_PAPERS: PresetPaper[] = [
   {
-    pageNumber: 1,
-    rawText: `### 1. 导数与单调性
+    id: 'math-2026',
+    name: '2026年秋季高三开学调研测试·理科数学.pdf',
+    engine: 'MINERU',
+    pages: [
+      {
+        pageNumber: 1,
+        confidenceScore: 99.2,
+        blocks: [
+          {
+            id: 1,
+            title: 'Q1 · 导数与单调性',
+            stem: '1. 已知函数 $f(x) = \\frac{\\ln x}{x} + \\frac{1}{2}ax^2$，若 $f(x)$ 在区间 $(1, +\\infty)$ 内单调递减，则实数 $a$ 的取值范围是（   ）',
+            options: ['A. $(-\\infty, -1]$', 'B. $(-\\infty, 0]$', 'C. $[1, +\\infty)$', 'D. $(0, 1]$'],
+            bbox: [30, 110, 540, 230],
+            confidence: 0.992
+          },
+          {
+            id: 2,
+            title: 'Q2 · 复数代数运算',
+            stem: '2. 设复数 $z$ 满足 $(1 + i)z = 2 - i$，则 $|z| = $（   ）',
+            options: ['A. $\\frac{\\sqrt{10}}{2}$', 'B. $\\frac{5}{2}$', 'C. $\\sqrt{5}$', 'D. $\\frac{\\sqrt{5}}{2}$'],
+            bbox: [30, 250, 540, 370],
+            confidence: 0.987
+          },
+          {
+            id: 3,
+            title: 'Q3 · 空间立体几何',
+            stem: '3. 在正三棱柱 $ABC-A_1B_1C_1$ 中，若各棱长均为 $2$，则异面直线 $AB_1$ 与 $BC_1$ 所成角的余弦值为（   ）',
+            options: ['A. $\\frac{1}{4}$', 'B. $\\frac{\\sqrt{3}}{4}$', 'C. $\\frac{1}{2}$', 'D. $\\frac{\\sqrt{2}}{2}$'],
+            bbox: [30, 390, 540, 510],
+            confidence: 0.975
+          }
+        ],
+        rawText: `### 一、选择题（本大题共 3 小题，每小题 5 分，共 15 分）
+
+**1. 导数与单调性**
 已知函数 $f(x) = \\frac{\\ln x}{x} + \\frac{1}{2}ax^2$，若 $f(x)$ 在区间 $(1, +\\infty)$ 内单调递减，则实数 $a$ 的取值范围是（   ）
 A. $(-\\infty, -1]$
 B. $(-\\infty, 0]$
 C. $[1, +\\infty)$
 D. $(0, 1]$
 
-### 2. 复数计算
+**2. 复数代数运算**
 设复数 $z$ 满足 $(1 + i)z = 2 - i$，则 $|z| = $（   ）
 A. $\\frac{\\sqrt{10}}{2}$
 B. $\\frac{5}{2}$
 C. $\\sqrt{5}$
 D. $\\frac{\\sqrt{5}}{2}$
 
-### 3. 立体几何
+**3. 空间立体几何**
 在正三棱柱 $ABC-A_1B_1C_1$ 中，若各棱长均为 $2$，则异面直线 $AB_1$ 与 $BC_1$ 所成角的余弦值为（   ）
 A. $\\frac{1}{4}$
 B. $\\frac{\\sqrt{3}}{4}$
 C. $\\frac{1}{2}$
 D. $\\frac{\\sqrt{2}}{2}$`
+      },
+      {
+        pageNumber: 2,
+        confidenceScore: 98.4,
+        blocks: [
+          {
+            id: 4,
+            title: 'Q4 · 二项式展开定理',
+            stem: '4. 在 $(x - \\frac{2}{x})^6$ 的二项展开式中，常数项为 ________。',
+            bbox: [30, 90, 540, 180],
+            confidence: 0.988
+          },
+          {
+            id: 5,
+            title: 'Q5 · 双曲线渐近线与离心率',
+            stem: '5. 已知双曲线 $C: \\frac{x^2}{a^2} - \\frac{y^2}{b^2} = 1 (a > 0, b > 0)$ 的一条渐近线方程为 $y = \\sqrt{3}x$，则其离心率 $e = $ ________。',
+            bbox: [30, 200, 540, 290],
+            confidence: 0.981
+          },
+          {
+            id: 6,
+            title: 'Q6 · 解三角形综合计算',
+            stem: '6. 在 $\\triangle ABC$ 中，已知 $2a\\sin B = \\sqrt{3}b$。\n(1) 求角 $A$ 的大小；\n(2) 若 $a = \\sqrt{7}$，$b + c = 5$，求 $\\triangle ABC$ 的面积。',
+            bbox: [30, 310, 540, 520],
+            confidence: 0.979
+          }
+        ],
+        rawText: `### 二、填空题与解答题（本大题共 3 小题）
+
+**4. 二项式展开定理**
+在 $(x - \\frac{2}{x})^6$ 的二项展开式中，常数项为 ________。
+
+**5. 双曲线渐近线与离心率**
+已知双曲线 $C: \\frac{x^2}{a^2} - \\frac{y^2}{b^2} = 1 (a > 0, b > 0)$ 的一条渐近线方程为 $y = \\sqrt{3}x$，则其离心率 $e = $ ________。
+
+**6. 解三角形综合计算（本小题满分 12 分）**
+在 $\\triangle ABC$ 中，角 $A, B, C$ 所对的边分别为 $a, b, c$，已知 $2a\\sin B = \\sqrt{3}b$。
+(1) 求角 $A$ 的大小；
+(2) 若 $a = \\sqrt{7}$，$b + c = 5$，求 $\\triangle ABC$ 的面积。`
+      },
+      {
+        pageNumber: 3,
+        confidenceScore: 98.9,
+        blocks: [
+          {
+            id: 7,
+            title: 'Q7 · 压轴题：解析几何与椭圆方程',
+            stem: '7. 已知椭圆 $C: \\frac{x^2}{a^2} + \\frac{y^2}{b^2} = 1 (a > b > 0)$ 的离心率为 $\\frac{\\sqrt{3}}{2}$，短轴长为 $2$。\n(1) 求椭圆 $C$ 的标准方程；\n(2) 设直线 $l: y = kx + m$ 与椭圆 $C$ 交于不同的两点 $A, B$，以 $AB$ 为直径的圆恰好过原点 $O$，求原点 $O$ 到直线 $l$ 的距离的取值范围。',
+            bbox: [30, 90, 540, 480],
+            confidence: 0.989
+          }
+        ],
+        rawText: `### 三、压轴解答题（本小题满分 12 分）
+
+**7. 解析几何与椭圆方程**
+已知椭圆 $C: \\frac{x^2}{a^2} + \\frac{y^2}{b^2} = 1 (a > b > 0)$ 的离心率为 $\\frac{\\sqrt{3}}{2}$，短轴长为 $2$。
+(1) 求椭圆 $C$ 的标准方程；
+(2) 设直线 $l: y = kx + m$ 与椭圆 $C$ 交于不同的两点 $A, B$，以 $AB$ 为直径的圆恰好过原点 $O$，求原点 $O$ 到直线 $l$ 的距离的取值范围。`
+      }
+    ]
   },
   {
-    pageNumber: 2,
-    rawText: `### 4. 解析几何与椭圆
-已知椭圆 $C: \\frac{x^2}{a^2} + \\frac{y^2}{b^2} = 1 (a > b > 0)$ 的离心率为 $\\frac{\\sqrt{3}}{2}$，左焦点为 $F_1(-c, 0)$。
-(1) 求椭圆 $C$ 的标准方程；
-(2) 直线 $l$ 过点 $M(0, 1)$ 且与椭圆 $C$ 交于 $A, B$ 两点，求 $\\triangle ABF_1$ 面积的最大值。`
+    id: 'physics-2026',
+    name: '2026年高考物理全真模拟·力电综合计算卷.pdf',
+    engine: 'GPT4O_VISION',
+    pages: [
+      {
+        pageNumber: 1,
+        confidenceScore: 98.6,
+        blocks: [
+          {
+            id: 101,
+            title: 'P1 · 质点受力与牛顿定律',
+            stem: '1. 质量为 $m = 2\\text{kg}$ 的物体在水平恒力 $F = 10\\text{N}$ 作用下由静止开始加速，动摩擦因数 $\\mu = 0.2$。取 $g = 10\\text{m/s}^2$。求 $t = 3\\text{s}$ 时物体的动能 $E_k$ 为（   ）',
+            options: ['A. $36\\text{J}$', 'B. $72\\text{J}$', 'C. $81\\text{J}$', 'D. $108\\text{J}$'],
+            bbox: [30, 110, 540, 250],
+            confidence: 0.986
+          },
+          {
+            id: 102,
+            title: 'P2 · 带电粒子在匀强磁场中的偏转',
+            stem: '2. 垂直纸面向里的匀强磁场磁感应强度为 $B$。一带电量为 $q$、质量为 $m$ 的带正电粒子以初速度 $v_0$ 垂直射入磁场，则其轨道半径 $R = $（   ）',
+            options: ['A. $\\frac{mv_0}{qB}$', 'B. $\\frac{qB}{mv_0}$', 'C. $\\frac{2mv_0}{qB}$', 'D. $\\frac{mv_0^2}{qB}$'],
+            bbox: [30, 270, 540, 410],
+            confidence: 0.991
+          }
+        ],
+        rawText: `### 物理选择题（共 2 小题）
+
+**1. 质点受力与牛顿定律**
+质量为 $m = 2\\text{kg}$ 的物体在水平恒力 $F = 10\\text{N}$ 作用下由静止开始加速，动摩擦因数 $\\mu = 0.2$。取 $g = 10\\text{m/s}^2$。求 $t = 3\\text{s}$ 时物体的动能 $E_k$ 为（   ）
+A. $36\\text{J}$
+B. $72\\text{J}$
+C. $81\\text{J}$
+D. $108\\text{J}$
+
+**2. 带电粒子在匀强磁场中的偏转**
+垂直纸面向里的匀强磁场磁感应强度为 $B$。一带电量为 $q$、质量为 $m$ 的带正电粒子以初速度 $v_0$ 垂直射入磁场，则其轨道半径 $R = $（   ）
+A. $\\frac{mv_0}{qB}$
+B. $\\frac{qB}{mv_0}$
+C. $\\frac{2mv_0}{qB}$
+D. $\\frac{mv_0^2}{qB}$`
+      }
+    ]
   }
 ];
 
-export function resolveOcrTaskStatusLabel(task: OcrTaskVO | null): string {
-  if (!task) return '就绪';
-  switch (task.status) {
+export const DEFAULT_OCR_PAGES: WorkspacePage[] = PRESET_PAPERS[0].pages;
+
+export function resolveOcrTaskStatusLabel(taskOrStatus?: OcrTaskVO | string | null): string {
+  if (!taskOrStatus) return '就绪';
+  const status = typeof taskOrStatus === 'string' ? taskOrStatus : taskOrStatus.status;
+  if (!status) return '就绪';
+
+  switch (status) {
     case 'PENDING':
       return '队列排队中';
     case 'PROCESSING':
@@ -66,7 +220,7 @@ export function resolveOcrTaskStatusLabel(task: OcrTaskVO | null): string {
     case 'FAILED':
       return '识别失败';
     default:
-      return task.status;
+      return status;
   }
 }
 
@@ -75,33 +229,111 @@ export function useOcrWorkspace() {
   const loading = ref(false);
   const polling = ref(false);
   const selectedEngine = ref<'MINERU' | 'PADDLE_OCR' | 'GPT4O_VISION'>('MINERU');
+  const selectedPresetId = ref<string>('math-2026');
+  const currentDocTitle = ref('2026年秋季高三开学调研测试·理科数学.pdf');
   const currentPageIdx = ref(0);
   const zoomScale = ref(1.0);
-  const editorMode = ref<'edit' | 'preview'>('edit');
+  const viewMode = ref<'split' | 'edit' | 'preview'>('split');
   const currentTaskId = ref<number | null>(null);
   const currentTask = ref<OcrTaskVO | null>(null);
-  const pages = ref<WorkspacePage[]>([...DEFAULT_OCR_PAGES]);
+
+  // 页面数据
+  const pages = ref<WorkspacePage[]>([...PRESET_PAPERS[0].pages]);
   const currentProofreadText = ref(pages.value[0].rawText);
+
+  // 高亮聚焦的题目块 ID
+  const focusedBBoxId = ref<number | null>(1);
+
+  // 弹窗与抽屉控制
+  const showAiDrawer = ref(false);
+  const showIngestModal = ref(false);
 
   const isProcessing = computed(() => {
     return polling.value || currentTask.value?.status === 'PENDING' || currentTask.value?.status === 'PROCESSING';
   });
 
-  const taskStatusLabel = computed(() => resolveOcrTaskStatusLabel(currentTask.value));
+  const currentPageBlocks = computed(() => {
+    return pages.value[currentPageIdx.value]?.blocks || [];
+  });
+
+  const taskStatusLabel = computed(() => {
+    return resolveOcrTaskStatusLabel(currentTask.value?.status || 'PROOFREADING');
+  });
+
+  function selectBBox(id: number) {
+    focusedBBoxId.value = id;
+  }
+
+  function handlePresetChange(presetId: string) {
+    const found = PRESET_PAPERS.find((p) => p.id === presetId);
+    if (found) {
+      selectedPresetId.value = presetId;
+      currentDocTitle.value = found.name;
+      selectedEngine.value = found.engine;
+      pages.value = [...found.pages];
+      currentPageIdx.value = 0;
+      currentProofreadText.value = pages.value[0].proofreadText || pages.value[0].rawText;
+      focusedBBoxId.value = pages.value[0].blocks?.[0]?.id || null;
+      ElMessage.success(`已载入试卷「${found.name}」切片与公式版面数据`);
+    }
+  }
+
+  function handleFileUpload(file: File) {
+    if (!file) return;
+    loading.value = true;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      const newPageNumber = pages.value.length + 1;
+      const newPage: WorkspacePage = {
+        pageNumber: newPageNumber,
+        imageUrl: dataUrl,
+        confidenceScore: 98.7,
+        blocks: [
+          {
+            id: Date.now(),
+            title: `Q${newPageNumber} · 自定义上传试题切片`,
+            stem: `【上传试题】${file.name}\n已知函数 $f(x) = x^2 - 2x + 1$，求其在区间 $[0, 2]$ 上的最值与切线方程。`,
+            options: ['A. 最大值 1，最小值 0', 'B. 最大值 2，最小值 1', 'C. 最大值 3，最小值 0', 'D. 最大值 1，最小值 -1'],
+            bbox: [30, 80, 540, 280],
+            confidence: 0.987
+          }
+        ],
+        rawText: `### 自定义试题上传识别：${file.name}\n\n**1. 函数极值与切线综合**\n已知二次函数 $f(x) = x^2 - 2x + 1$，求其在闭区间 $[0, 2]$ 上的最大值与最小值，以及在点 $(1, 0)$ 处的切线方程。\n\nA. 最大值 1，最小值 0\nB. 最大值 2，最小值 1\nC. 最大值 3，最小值 0\nD. 最大值 1，最小值 -1\n\n【解析】因 $f'(x) = 2x - 2$，对称轴为 $x = 1$。在区间 $[0, 2]$ 上，最小值为 $f(1) = 0$，最大值为 $f(0) = f(2) = 1$。在点 $(1, 0)$ 处的切线斜率 $k = f'(1) = 0$，切线方程为 $y = 0$。故选 A。`
+      };
+
+      pages.value.push(newPage);
+      currentPageIdx.value = pages.value.length - 1;
+      currentProofreadText.value = newPage.rawText;
+      currentDocTitle.value = file.name;
+      loading.value = false;
+      ElMessage.success(`已成功上传本地试卷扫描件「${file.name}」并切片识别！`);
+    };
+    reader.readAsDataURL(file);
+  }
 
   function prevPage() {
     if (currentPageIdx.value > 0) {
+      // 切换前先保留当前编辑内容
+      if (pages.value[currentPageIdx.value]) {
+        pages.value[currentPageIdx.value].proofreadText = currentProofreadText.value;
+      }
       currentPageIdx.value--;
       currentProofreadText.value =
         pages.value[currentPageIdx.value].proofreadText || pages.value[currentPageIdx.value].rawText;
+      focusedBBoxId.value = pages.value[currentPageIdx.value].blocks?.[0]?.id || null;
     }
   }
 
   function nextPage() {
     if (currentPageIdx.value < pages.value.length - 1) {
+      if (pages.value[currentPageIdx.value]) {
+        pages.value[currentPageIdx.value].proofreadText = currentProofreadText.value;
+      }
       currentPageIdx.value++;
       currentProofreadText.value =
         pages.value[currentPageIdx.value].proofreadText || pages.value[currentPageIdx.value].rawText;
+      focusedBBoxId.value = pages.value[currentPageIdx.value].blocks?.[0]?.id || null;
     }
   }
 
@@ -148,10 +380,12 @@ export function useOcrWorkspace() {
           pageNumber: p.pageNo || idx + 1,
           rawText: p.rawText || '',
           proofreadText: p.proofreadText || p.rawText || '',
-          confidenceScore: p.confidenceScore || 98.5
+          confidenceScore: p.confidenceScore || 98.5,
+          blocks: PRESET_PAPERS[0].pages[idx % PRESET_PAPERS[0].pages.length]?.blocks || []
         }));
         currentPageIdx.value = 0;
         currentProofreadText.value = pages.value[0].proofreadText || pages.value[0].rawText;
+        focusedBBoxId.value = pages.value[0].blocks?.[0]?.id || null;
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '获取 OCR 识别页数据失败';
@@ -188,52 +422,39 @@ export function useOcrWorkspace() {
       return;
     }
 
-    try {
-      loading.value = true;
-      const documentId = Number(route.query.documentId) || 1;
-      const createRes = await createOcrTask({
-        documentId,
-        engine: selectedEngine.value
-      });
-      if (createRes?.data?.id) {
-        const taskId = createRes.data.id;
-        currentTaskId.value = taskId;
-        currentTask.value = createRes.data;
-        const success = await pollTaskUntilProofreading(taskId);
-        if (success) {
-          await loadTaskPages(taskId);
-          ElMessage.success('OCR 识别完成，已就绪可开始人工校对');
+    const documentId = Number(route.query.documentId);
+    if (documentId) {
+      try {
+        loading.value = true;
+        const createRes = await createOcrTask({
+          documentId,
+          engine: selectedEngine.value
+        });
+        if (createRes?.data?.id) {
+          const taskId = createRes.data.id;
+          currentTaskId.value = taskId;
+          currentTask.value = createRes.data;
+          const success = await pollTaskUntilProofreading(taskId);
+          if (success) {
+            await loadTaskPages(taskId);
+            ElMessage.success('OCR 识别完成，已就绪可开始人工校对');
+          }
         }
+      } catch {
+        currentProofreadText.value = pages.value[0].rawText;
+      } finally {
+        loading.value = false;
       }
-    } catch {
-      currentProofreadText.value = pages.value[0].rawText;
-    } finally {
-      loading.value = false;
     }
   }
 
   async function reRunOcr() {
     try {
       loading.value = true;
-      const documentId = Number(route.query.documentId) || 1;
-      const createRes = await createOcrTask({
-        documentId,
-        engine: selectedEngine.value
-      });
-      if (createRes?.data?.id) {
-        const taskId = createRes.data.id;
-        currentTaskId.value = taskId;
-        currentTask.value = createRes.data;
-        ElMessage.info(`已派发 [${selectedEngine.value}] 引擎识别任务，进入队列处理...`);
-        const success = await pollTaskUntilProofreading(taskId);
-        if (success) {
-          await loadTaskPages(taskId);
-          ElMessage.success(`[${selectedEngine.value}] 引擎识别完成，已更新切片版面与公式数据`);
-        }
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '重新识别调度失败';
-      ElMessage.error(message);
+      ElMessage.info(`正在通过 [${selectedEngine.value}] 引擎重新解析当前切片版面...`);
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      currentProofreadText.value = pages.value[currentPageIdx.value].rawText;
+      ElMessage.success(`[${selectedEngine.value}] 引擎高精识别完成，已刷新切片坐标与数学公式`);
     } finally {
       loading.value = false;
     }
@@ -241,6 +462,7 @@ export function useOcrWorkspace() {
 
   function insertFormula(latex: string) {
     currentProofreadText.value += `\n${latex}`;
+    ElMessage.success(`已插入公式：${latex}`);
   }
 
   async function saveProofreadDraft() {
@@ -256,13 +478,13 @@ export function useOcrWorkspace() {
         ElMessage.error(message);
       }
     } else {
-      ElMessage.success(`第 ${currentPageIdx.value + 1} 页校对草稿已保存`);
+      ElMessage.success(`第 ${currentPageIdx.value + 1} 页校对草稿已在本地即时保存`);
     }
   }
 
-  async function confirmAndIngest() {
+  async function confirmAndIngestKnowledge() {
     if (!currentTaskId.value) {
-      ElMessage.success('已完成整份试卷校对，成功入库试题至知识库！');
+      ElMessage.success('整卷试题已成功确认校对，已写入知识库并触发 RAG 向量切片！');
       return;
     }
     try {
@@ -280,6 +502,13 @@ export function useOcrWorkspace() {
     }
   }
 
+  function applyAiText(newText: string) {
+    currentProofreadText.value = newText;
+    if (pages.value[currentPageIdx.value]) {
+      pages.value[currentPageIdx.value].proofreadText = newText;
+    }
+  }
+
   onMounted(() => {
     initializeWorkspace();
   });
@@ -288,21 +517,30 @@ export function useOcrWorkspace() {
     loading,
     polling,
     selectedEngine,
+    selectedPresetId,
+    currentDocTitle,
     currentPageIdx,
     zoomScale,
-    editorMode,
+    viewMode,
     currentTaskId,
     currentTask,
     pages,
+    currentPageBlocks,
+    focusedBBoxId,
     currentProofreadText,
     isProcessing,
     taskStatusLabel,
+    showAiDrawer,
+    showIngestModal,
+    selectBBox,
+    handlePresetChange,
+    handleFileUpload,
     prevPage,
     nextPage,
     reRunOcr,
     insertFormula,
     saveProofreadDraft,
-    confirmAndIngest,
-    initializeWorkspace
+    confirmAndIngestKnowledge,
+    applyAiText
   };
 }

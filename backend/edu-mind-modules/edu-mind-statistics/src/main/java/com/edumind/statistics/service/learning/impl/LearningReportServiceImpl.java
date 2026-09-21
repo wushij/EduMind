@@ -7,10 +7,8 @@ import com.edumind.course.vo.course.CourseVO;
 import com.edumind.statistics.dao.LearningRecordDao;
 import com.edumind.statistics.entity.LearningRecordEntity;
 import com.edumind.statistics.service.analytics.LearningAnalyticsService;
-import com.edumind.statistics.service.learning.LearningHomeService;
 import com.edumind.statistics.service.learning.LearningReportService;
 import com.edumind.statistics.vo.analytics.StudentPortraitVO;
-import com.edumind.statistics.vo.learning.LearningHomeOverviewVO;
 import com.edumind.statistics.vo.learning.LearningReportVO;
 import com.edumind.teaching.api.SubmissionQueryApi;
 import com.edumind.teaching.vo.submission.SubmissionStatsVO;
@@ -34,7 +32,6 @@ public class LearningReportServiceImpl implements LearningReportService {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ISO_LOCAL_DATE;
 
     private final LearningAnalyticsService learningAnalyticsService;
-    private final LearningHomeService learningHomeService;
     private final CourseQueryApi courseQueryApi;
     private final LearningRecordDao learningRecordDao;
     private final SubmissionQueryApi submissionQueryApi;
@@ -52,7 +49,7 @@ public class LearningReportServiceImpl implements LearningReportService {
             return empty;
         }
 
-        Long resolvedCourseId = resolveCourseId(enrolledIds, courseId, studentId);
+        Long resolvedCourseId = resolveCourseId(enrolledIds, courseId);
         if (!courseQueryApi.isCourseMember(resolvedCourseId, studentId)) {
             throw new BusinessException("您尚未加入该课程，无法查看学情报告");
         }
@@ -69,26 +66,23 @@ public class LearningReportServiceImpl implements LearningReportService {
     }
 
     private List<Long> resolveEnrolledCourseIds(Long studentId) {
-        Set<Long> ids = new LinkedHashSet<>();
-        List<CourseBriefVO> recent = courseQueryApi.listRecentCourses(20);
-        if (recent != null) {
-            for (CourseBriefVO brief : recent) {
-                if (brief.getId() != null && courseQueryApi.isCourseMember(brief.getId(), studentId)) {
-                    ids.add(brief.getId());
+        Set<Long> ids = new LinkedHashSet<>(courseQueryApi.listCourseIdsByUserId(studentId));
+        if (ids.isEmpty()) {
+            List<CourseBriefVO> recent = courseQueryApi.listRecentCourses(10);
+            if (recent != null) {
+                for (CourseBriefVO brief : recent) {
+                    if (brief.getId() != null && courseQueryApi.isCourseMember(brief.getId(), studentId)) {
+                        ids.add(brief.getId());
+                    }
                 }
             }
         }
-        ids.addAll(courseQueryApi.listCourseIdsByUserId(studentId));
         return new ArrayList<>(ids);
     }
 
-    private Long resolveCourseId(List<Long> enrolledIds, Long requested, Long studentId) {
+    private Long resolveCourseId(List<Long> enrolledIds, Long requested) {
         if (requested != null && enrolledIds.contains(requested)) {
             return requested;
-        }
-        LearningHomeOverviewVO overview = learningHomeService.getOverview(studentId, requested);
-        if (overview.getPrimaryCourseId() != null && enrolledIds.contains(overview.getPrimaryCourseId())) {
-            return overview.getPrimaryCourseId();
         }
         return enrolledIds.get(0);
     }

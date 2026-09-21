@@ -35,6 +35,14 @@ public class UserDao {
         return userMapper.selectById(id);
     }
 
+    /** 批量按 ID 查询用户（单次 IN 查询，用于替代循环内逐条 findById） */
+    public java.util.List<UserEntity> findByIds(java.util.Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return userMapper.selectBatchIds(ids);
+    }
+
     public int insert(UserEntity entity) {
         return userMapper.insert(entity);
     }

@@ -15,10 +15,16 @@
       :calculated-total-score="calculatedTotalScore"
       :is-score-matched="isScoreMatched"
       :generating="generating"
+      :bank-type-stats="bankTypeStats"
       @back="router.push('/ai/marketplace')"
       @quick-compose="handleQuickCompose"
       @proceed-preview="handleProceedToPreview"
       @generate="handleGenerateExam"
+      @abort="abortGeneration"
+      @course-change="onCourseChange"
+      @auto-balance="autoBalanceRules"
+      @add-rule="(t, l) => addRule(t, l)"
+      @remove-rule="(t) => removeRule(t)"
     />
   </div>
 </template>
@@ -36,6 +42,7 @@ const {
   generating,
   composing,
   displayCourses,
+  bankTypeStats,
   calculatedTotalScore,
   isScoreMatched,
   composeMode,
@@ -47,9 +54,14 @@ const {
   cognitiveLevels,
   cognitiveLevelTotal,
   loadCourseOptions,
+  onCourseChange,
+  autoBalanceRules,
+  addRule,
+  removeRule,
   handleGenerateExam,
   handleQuickCompose,
-  handleProceedToPreview
+  handleProceedToPreview,
+  abortGeneration
 } = useExamGenerate();
 
 onMounted(() => {

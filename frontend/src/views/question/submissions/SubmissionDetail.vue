@@ -31,7 +31,9 @@
             </button>
           </div>
 
-          <div class="q-stem-body">{{ item.stem }}</div>
+          <div class="q-stem-body">
+            <MathText :text="item.stem" />
+          </div>
 
           <div class="answer-block answer-block--student">
             <div class="block-title">
@@ -47,7 +49,9 @@
                 {{ item.isCorrect ? '客观比对正确' : '客观比对错误' }}
               </span>
             </div>
-            <div class="block-body">{{ item.studentAnswer || '（考生未作答）' }}</div>
+            <div class="block-body">
+              <MathText :text="item.studentAnswer || '（考生未作答）'" />
+            </div>
           </div>
 
           <div class="answer-block answer-block--standard">
@@ -58,9 +62,13 @@
               </span>
             </div>
             <div class="block-body">
-              <div><strong class="text-emerald-700">参考答案：</strong>{{ item.standardAnswer }}</div>
+              <div>
+                <strong class="text-emerald-700">参考答案：</strong>
+                <MathText :text="item.standardAnswer" />
+              </div>
               <div v-if="item.analysis" class="mt-2 text-slate-600">
-                <strong>解析：</strong>{{ item.analysis }}
+                <strong>解析：</strong>
+                <MathText :text="item.analysis" />
               </div>
             </div>
           </div>
@@ -72,7 +80,9 @@
                 <span>AI 评阅说明</span>
               </span>
             </div>
-            <div class="block-body">{{ item.aiComment }}</div>
+            <div class="block-body">
+              <MathText :text="item.aiComment" />
+            </div>
           </div>
 
           <div class="teacher-grading-dock">
@@ -145,12 +155,21 @@
         </div>
       </footer>
     </div>
+
+    <!-- AI 智能阅卷认知推演弹窗（雷达环脉冲、秒级实时计时、流水线推进与中止控制） -->
+    <AssignmentGradingEngineDialog
+      :visible="aiThinkingVisible"
+      :title="aiThinkingTitle"
+      @abort="handleAbortSubmissionGrade"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { User, Reading, MagicStick, Select, Finished } from '@element-plus/icons-vue';
+import MathText from '@/components/common/MathText.vue';
 import SubmissionDetailHeroSection from '@/components/question/submission/SubmissionDetailHeroSection.vue';
+import AssignmentGradingEngineDialog from '@/components/question/assignment/AssignmentGradingEngineDialog.vue';
 import { useSubmission } from '@/composables/question/useSubmission';
 
 const {
@@ -161,7 +180,10 @@ const {
   submissionData,
   gradingItems,
   calculatedTotalScore,
+  aiThinkingVisible,
+  aiThinkingTitle,
   handleTriggerGradeNow,
+  handleAbortSubmissionGrade,
   adoptSingleAIScore,
   adoptAllAIScores,
   handleSaveGrading,

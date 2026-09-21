@@ -1,6 +1,7 @@
 package com.edumind.notification.dao;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.edumind.common.api.PageResult;
 import com.edumind.notification.entity.NotificationBroadcastEntity;
@@ -46,6 +47,16 @@ public class NotificationBroadcastDao {
         }
         entity.setReadCount((entity.getReadCount() == null ? 0 : entity.getReadCount()) + 1);
         return broadcastMapper.updateById(entity);
+    }
+
+    /** 批量递增广播已读数（单条 UPDATE ... WHERE id IN (...)，替代循环内逐条递增） */
+    public int incrementReadCountBatch(java.util.Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        return broadcastMapper.update(null, new LambdaUpdateWrapper<NotificationBroadcastEntity>()
+                .in(NotificationBroadcastEntity::getId, ids)
+                .setSql("read_count = read_count + 1"));
     }
 
     public PageResult<NotificationBroadcastEntity> page(long pageNum, long pageSize, String targetType) {

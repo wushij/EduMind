@@ -17,7 +17,7 @@ export const learningRoutes: RouteRecordRaw[] = [
     path: '/learning/assignments/:id/take',
     name: 'AssignmentTake',
     component: () => import('@/views/learning/AssignmentTake.vue'),
-    meta: { title: '作业作答', requiresAuth: true }
+    meta: { title: '作业作答', requiresAuth: true, noPadding: true }
   },
   {
     path: '/learning/assignments/:id/result',

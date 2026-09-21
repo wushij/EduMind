@@ -58,6 +58,11 @@ export type GlobalAssistantUiContext = {
   formatMatchScore: (score?: number, peerScores?: number[]) => string;
   renderChatMarkdown: (content: string) => string;
   resolveReasoningFolded: (folded?: boolean) => boolean;
+  modelOptions: Ref<Array<{ name: string; key: string; desc: string }>>;
+  currentModel: Ref<string>;
+  currentModelKey: Ref<string | undefined>;
+  handleModelSelect: (key: string) => void;
+  streamTimerText: Ref<string>;
 };
 
 export const globalAssistantUiKey: InjectionKey<GlobalAssistantUiContext> =

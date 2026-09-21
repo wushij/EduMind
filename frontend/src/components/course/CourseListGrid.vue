@@ -1,12 +1,8 @@
 <template>
-  <!-- 课程卡片网格列表 (加载中 / 内容 / 空状态) -->
+  <!-- 课程卡片网格列表 (真实数据 / 骨架屏 / 空状态) -->
   <div class="course-grid-container">
-    <div
-      v-loading="loading"
-      class="course-grid-loading-host"
-      :class="{ 'is-empty-loading': loading && courses.length === 0 }"
-    >
-    <div v-if="courses.length > 0" class="course-grid">
+    <!-- 1. 真实课程卡片列表 (数据就绪) -->
+    <div v-if="courses.length > 0" class="course-grid" :class="{ 'is-refreshing': loading }">
       <CourseCard
         v-for="course in courses"
         :key="course.id"
@@ -14,7 +10,23 @@
       />
     </div>
 
-    <!-- 优雅空状态 -->
+    <!-- 2. 骨架屏占位 (首次加载中，布局与卡片 1:1 保持一致，彻底杜绝高度坍塌与闪烁) -->
+    <div v-else-if="loading" class="course-grid course-grid--skeleton">
+      <div v-for="i in 6" :key="i" class="skeleton-card">
+        <div class="skeleton-cover"></div>
+        <div class="skeleton-body">
+          <div class="skeleton-title"></div>
+          <div class="skeleton-desc"></div>
+          <div class="skeleton-desc skeleton-desc--short"></div>
+          <div class="skeleton-footer">
+            <div class="skeleton-avatar"></div>
+            <div class="skeleton-name"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 优雅空状态 (仅在加载完毕且无数据时展示) -->
     <div v-else class="empty-state-wrapper">
       <div class="empty-icon-box">
         <svg viewBox="0 0 24 24" class="empty-svg" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -29,7 +41,6 @@
       <button type="button" class="capsule-btn capsule-btn--default" @click="emit('reset-filters')">
         重置全部筛选
       </button>
-    </div>
     </div>
   </div>
 </template>
@@ -53,11 +64,95 @@ const emit = defineEmits<{
 .course-grid-container {
   min-height: 0;
 
-  .course-grid-loading-host {
-    min-height: 0;
+  .course-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 22px;
+    transition: opacity 0.2s ease;
 
-    &.is-empty-loading {
-      min-height: 240px;
+    &.is-refreshing {
+      opacity: 0.85;
+    }
+  }
+
+  .skeleton-card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
+    display: flex;
+    flex-direction: column;
+
+    .skeleton-cover {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+      background-size: 200% 100%;
+      animation: skeleton-shimmer 1.5s infinite;
+    }
+
+    .skeleton-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+
+      .skeleton-title {
+        height: 20px;
+        width: 70%;
+        border-radius: 6px;
+        background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+        background-size: 200% 100%;
+        animation: skeleton-shimmer 1.5s infinite;
+      }
+
+      .skeleton-desc {
+        height: 14px;
+        width: 95%;
+        border-radius: 4px;
+        background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+        background-size: 200% 100%;
+        animation: skeleton-shimmer 1.5s infinite;
+
+        &--short {
+          width: 60%;
+        }
+      }
+
+      .skeleton-footer {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+
+        .skeleton-avatar {
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+          background-size: 200% 100%;
+          animation: skeleton-shimmer 1.5s infinite;
+        }
+
+        .skeleton-name {
+          height: 14px;
+          width: 80px;
+          border-radius: 4px;
+          background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+          background-size: 200% 100%;
+          animation: skeleton-shimmer 1.5s infinite;
+        }
+      }
+    }
+  }
+
+  @keyframes skeleton-shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
     }
   }
 

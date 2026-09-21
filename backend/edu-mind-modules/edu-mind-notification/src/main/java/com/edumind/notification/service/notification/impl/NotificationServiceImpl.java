@@ -84,9 +84,8 @@ public class NotificationServiceImpl implements NotificationService {
         List<Long> unreadBroadcastRefIds = notificationDao.findUnreadBroadcastRefIdsByUserId(userId);
         notificationDao.markAllAsReadByUserId(userId);
         if (unreadBroadcastRefIds != null && !unreadBroadcastRefIds.isEmpty()) {
-            for (Long refId : unreadBroadcastRefIds) {
-                broadcastDao.incrementReadCount(refId);
-            }
+            // 单条批量 UPDATE 替代循环内逐条递增
+            broadcastDao.incrementReadCountBatch(unreadBroadcastRefIds);
         }
     }
 

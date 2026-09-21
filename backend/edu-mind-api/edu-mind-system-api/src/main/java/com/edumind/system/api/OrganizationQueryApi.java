@@ -3,7 +3,9 @@ package com.edumind.system.api;
 import com.edumind.system.vo.tenant.MemberOrgBriefVO;
 import com.edumind.system.vo.tenant.OrganizationBriefVO;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 组织架构领域跨模块只读查询公开 API
@@ -34,4 +36,10 @@ public interface OrganizationQueryApi {
      * 根据系统用户ID获取该用户所属的主要行政班级与学号信息
      */
     MemberOrgBriefVO getPrimaryClassByUserId(Long tenantId, Long userId);
+
+    /**
+     * 批量获取多个用户的主要行政班级与学号信息（固定次数批量查询）。
+     * 列表/统计场景请优先使用本方法，替代循环内逐个调用 {@link #getPrimaryClassByUserId(Long, Long)}，避免 N+1。
+     */
+    Map<Long, MemberOrgBriefVO> mapPrimaryClassesByUserIds(Long tenantId, Collection<Long> userIds);
 }

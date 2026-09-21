@@ -18,7 +18,12 @@
           style="width: 220px"
           @change="onCourseChange"
         >
-          <el-option v-for="c in courseOptions" :key="c.id" :label="c.name" :value="c.id" />
+          <el-option
+            v-for="c in courseOptions"
+            :key="c.id"
+            :label="c.name || (c as any).title || ('课程 #' + c.id)"
+            :value="c.id"
+          />
         </el-select>
         <el-select
           v-if="canPickStudent && studentOptions.length"

@@ -112,6 +112,21 @@ export function parseQuestionOptions(raw: unknown, correctAnswer?: string): Ques
         }
       }
     } catch {
+      try {
+        const sanitized = raw.replace(/\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})/g, '\\\\');
+        const parsed = JSON.parse(sanitized);
+        if (Array.isArray(parsed)) {
+          return normalizeOptionArray(parsed, correctAnswer);
+        }
+        if (parsed && typeof parsed === 'object') {
+          const fromObj = optionsFromKeyValueObject(parsed as Record<string, unknown>, correctAnswer);
+          if (fromObj.length >= 2) {
+            return fromObj;
+          }
+        }
+      } catch {
+        return [];
+      }
       return [];
     }
   }

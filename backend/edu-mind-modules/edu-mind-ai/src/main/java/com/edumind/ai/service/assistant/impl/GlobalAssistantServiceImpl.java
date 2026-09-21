@@ -59,8 +59,9 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
 
         String userQuestion = dto.getMessage() != null ? dto.getMessage() : "";
         String dispatchMessage = buildDispatchMessage(dto);
+        boolean routeByDirectQuestion = isLessonLearnWithIndex(dto) || isQuestionBankContext(dto.getContextModule());
         IntentRouter.IntentResult intent = intentDispatchService.route(
-                isLessonLearnWithIndex(dto) ? userQuestion : dispatchMessage, dto.getCourseId());
+                routeByDirectQuestion ? userQuestion : dispatchMessage, dto.getCourseId());
         IntentDispatchPlan plan = intentDispatchService.prepare(buildDispatchRequest(dto, dispatchMessage, intent));
 
         final Long userId = LoginUserResolver.requireUserId();
@@ -183,8 +184,9 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
         String convId = dto.getConversationId() != null ? dto.getConversationId() : "conv-" + UUID.randomUUID().toString().substring(0, 8);
         String userQuestion = dto.getMessage() != null ? dto.getMessage() : "";
         String dispatchMessage = buildDispatchMessage(dto);
+        boolean routeByDirectQuestion = isLessonLearnWithIndex(dto) || isQuestionBankContext(dto.getContextModule());
         IntentRouter.IntentResult intent = intentDispatchService.route(
-                isLessonLearnWithIndex(dto) ? userQuestion : dispatchMessage, dto.getCourseId());
+                routeByDirectQuestion ? userQuestion : dispatchMessage, dto.getCourseId());
         IntentDispatchPlan plan = intentDispatchService.prepare(buildDispatchRequest(dto, dispatchMessage, intent));
 
         AiCallAuditContext auditContext = AiCallAuditContext.builder()
@@ -246,10 +248,34 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
 
     private String buildIntentDesc(IntentDispatchPlan plan) {
         return switch (plan.getRoute()) {
-            case "agent" -> "识别意图：Agent 任务编排（" + plan.getAgentCode() + "）";
+            case "agent" -> {
+                String code = plan.getAgentCode() != null ? plan.getAgentCode().toLowerCase() : "";
+                if ("exam".equals(code) || "question".equals(code)) {
+                    yield "识别意图：AI 智能组卷与出题";
+                }
+                if ("tutor".equals(code) || "question_tutor".equals(code)) {
+                    yield "识别意图：题目答疑辅导";
+                }
+                if ("teaching".equals(code)) {
+                    yield "识别意图：备课教学建议";
+                }
+                if ("grading".equals(code)) {
+                    yield "识别意图：作业智能批改";
+                }
+                if ("learning".equals(code)) {
+                    yield "识别意图：学情诊断分析";
+                }
+                yield "识别意图：AI 智能助教协同";
+            }
             case "rag" -> "识别意图：知识库考点检索";
             case "navigate" -> "识别意图：页面功能直达";
-            default -> "识别意图：课程助教答疑";
+            default -> {
+                String code = plan.getAgentCode() != null ? plan.getAgentCode().toLowerCase() : "";
+                if ("tutor".equals(code) || "question_tutor".equals(code)) {
+                    yield "识别意图：题目答疑辅导";
+                }
+                yield "识别意图：课程助教答疑";
+            }
         };
     }
 

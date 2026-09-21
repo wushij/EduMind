@@ -146,13 +146,12 @@ public class SysOperLogServiceImpl implements SysOperLogService {
                 .filter(id -> id != null && id > 0)
                 .collect(Collectors.toSet());
 
-        Map<Long, UserEntity> userMap = new HashMap<>();
-        for (Long uid : userIds) {
-            UserEntity u = userDao.findById(uid);
-            if (u != null) {
-                userMap.put(uid, u);
-            }
-        }
+        // 单次批量查询操作人信息，替代逐条 findById
+        Map<Long, UserEntity> userMap = userIds.isEmpty()
+                ? new HashMap<>()
+                : userDao.findByIds(userIds).stream()
+                        .filter(user -> user.getId() != null)
+                        .collect(Collectors.toMap(UserEntity::getId, user -> user, (left, right) -> left));
 
         for (SysOperLogVO vo : list) {
             if (vo.getOperUserId() != null && userMap.containsKey(vo.getOperUserId())) {

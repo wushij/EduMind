@@ -2,11 +2,25 @@ package com.edumind.system.service.query;
 
 import com.edumind.system.vo.user.UserBriefVO;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 public interface UserQueryService {
 
     UserBriefVO getUserById(Long userId);
+
+    /**
+     * 批量查询用户简要信息（单次 IN 查询，不含角色与权限）。
+     * 用于替代循环内逐个调用 {@link #getUserById(Long)}，消除 N+1。
+     */
+    Map<Long, UserBriefVO> mapUserBriefsByIds(Collection<Long> userIds);
+
+    /**
+     * 批量查询用户角色编码（单次 IN 查询）。
+     * 用于替代循环内逐个调用 {@link #getRolesByUserId(Long)}，消除 N+1。
+     */
+    Map<Long, List<String>> mapRoleCodesByUserIds(Collection<Long> userIds);
 
     List<String> getRolesByUserId(Long userId);
 

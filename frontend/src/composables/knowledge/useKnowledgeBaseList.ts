@@ -12,6 +12,11 @@ import { useKnowledgeBase } from '@/composables/knowledge/useKnowledgeBase';
 import { getCourseList } from '@/api/course/course';
 import { triggerReindex } from '@/api/knowledge/embedding';
 import { getKnowledgeRagDashboardStats } from '@/api/knowledge/rag-dashboard';
+import {
+  getStoredKnowledgeBaseId,
+  setStoredKnowledgeBaseId,
+  clearStoredKnowledgeBaseId
+} from '@/composables/knowledge/useKnowledgeRoute';
 import type { KnowledgeBase } from '@/types/knowledge/knowledge-base';
 import type { Course } from '@/types/course/course';
 import type { KnowledgeRagDashboardVO } from '@/types/knowledge/rag-dashboard';
@@ -147,6 +152,18 @@ export function useKnowledgeBaseList() {
       await Promise.all([fetchKnowledgeBases(), fetchRagDashboardStats()]);
       const now = new Date();
       lastUpdatedText.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
+      // 校验当前存储的 knowledgeBaseId 是否仍有效，若失效则智能纠偏到第 1 个可用知识库
+      const currentStoredId = getStoredKnowledgeBaseId();
+      if (knowledgeBases.value.length > 0) {
+        const stillExists = currentStoredId && knowledgeBases.value.some((k) => k.id === currentStoredId);
+        if (!stillExists) {
+          setStoredKnowledgeBaseId(knowledgeBases.value[0].id);
+        }
+      } else {
+        clearStoredKnowledgeBaseId();
+      }
+
       if (notify) {
         ElMessage.success('知识库与向量索引数据已同步更新');
       }
@@ -278,6 +295,18 @@ export function useKnowledgeBaseList() {
       );
 
       await remove(item.id);
+
+      // 同步校准全局选中的知识库 ID
+      const currentStoredId = getStoredKnowledgeBaseId();
+      if (currentStoredId === item.id) {
+        const remaining = knowledgeBases.value.filter((k) => k.id !== item.id);
+        if (remaining.length > 0) {
+          setStoredKnowledgeBaseId(remaining[0].id);
+        } else {
+          clearStoredKnowledgeBaseId();
+        }
+      }
+
       ElMessage.success(`知识库《${item.name}》已成功移除`);
     } catch (e) {
       if (e !== 'cancel') {

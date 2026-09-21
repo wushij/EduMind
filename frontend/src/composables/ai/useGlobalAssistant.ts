@@ -6,7 +6,6 @@ import { streamGlobalAssistantChat } from '@/services/ai/copilot-sse-stream';
 import { useAIStreamScrollFollow } from '@/composables/ai/useAIStreamScrollFollow';
 import { askGlobalAssistant } from '@/api/ai/assistant';
 import { cancelChatStream } from '@/api/ai/chat';
-import { cancelChatStream } from '@/api/ai/chat';
 import {
   getMessages,
   deleteConversation,
@@ -36,6 +35,8 @@ import type {
 import { useTeachingCopilotStore, OPEN_GLOBAL_ASSISTANT_EVENT } from '@/stores/ai/teaching-copilot-context';
 import { buildTeachingContextRequestPayload } from '@/types/ai/teaching-copilot-context';
 import { useAuthStore } from '@/stores/auth/auth';
+import { resolveChatModels } from '@/services/ai/chat-service';
+import { usePreferenceStore } from '@/stores/user/preference';
 import {
   getDefaultReasoningFolded,
   isThinkingPanelHidden
@@ -59,7 +60,12 @@ function resolveTargetPath(intent?: string, agentCode?: string): string | undefi
 }
 
 function resolveIntentDesc(intent?: string, agentCode?: string): string {
-  if (intent === 'agent' && agentCode === 'exam') return '识别意图：AI 智能组卷与出题';
+  const code = (agentCode || '').toLowerCase();
+  if (code === 'exam' || code === 'question' || intent === 'EXAM_COMPOSE') return '识别意图：AI 智能组卷与出题';
+  if (code === 'tutor' || code === 'question_tutor') return '识别意图：题目答疑辅导';
+  if (code === 'teaching') return '识别意图：备课教学建议';
+  if (code === 'grading') return '识别意图：作业智能批改';
+  if (code === 'learning') return '识别意图：学情诊断分析';
   if (intent === 'rag') return '识别意图：知识库考点检索';
   if (intent === 'navigate') return '识别意图：页面功能直达';
   if (intent && INTENT_DESC_MAP[intent]) return `识别意图：${INTENT_DESC_MAP[intent]}`;
@@ -495,6 +501,68 @@ export function useGlobalAssistant() {
     return DEFAULT_PRESET_CHIPS;
   });
 
+  // 大模型选择与引擎配置 (对标课程中心同款规范，接入真实后端模型)
+  const modelOptions = ref<Array<{ name: string; key: string; desc: string }>>([]);
+  const currentModel = ref('默认推理模型');
+  const currentModelKey = ref<string | undefined>(undefined);
+
+  async function loadModels() {
+    try {
+      const chatModels = await resolveChatModels();
+      modelOptions.value = chatModels
+        .filter((m) => m.modelKey !== 'mock' && (m.provider || '').toLowerCase() !== 'mock')
+        .map((m) => ({
+          name: m.name,
+          key: m.modelKey,
+          desc: m.provider || 'LLM'
+        }));
+      const prefStore = usePreferenceStore();
+      const userPreferredKey = prefStore.preferences.defaultModel;
+      const preferredModel = userPreferredKey
+        ? chatModels.find((m) => m.modelKey === userPreferredKey)
+        : undefined;
+      const defaultModel = preferredModel || chatModels.find((m) => m.isDefault) || chatModels[0];
+      if (defaultModel) {
+        currentModel.value = defaultModel.name;
+        currentModelKey.value = defaultModel.modelKey;
+      }
+    } catch {
+      modelOptions.value = [];
+    }
+  }
+
+  function handleModelSelect(modelKey: string) {
+    const found = modelOptions.value.find((m) => m.key === modelKey);
+    if (found) {
+      currentModel.value = found.name;
+      currentModelKey.value = found.key;
+      ElMessage.success(`已切换推理引擎为：${found.name}`);
+    }
+  }
+
+  // 侧边栏 AI 无需秒表计时器展示，保持轻量高效
+  const streamTimerText = ref('');
+  function startStreamTimer() {}
+  function stopStreamTimer() {}
+
+  function buildDynamicPromptPrefix(): string {
+    const parts: string[] = [];
+    if (route.path.includes('/question') || route.path.includes('/submission')) {
+      parts.push(
+        '【智教云试题命题与学情批改助教】你正在辅助教师进行作业评阅、答卷诊断与试题考点剖析。请严格遵守学术严谨性，对数学与理工科问题务必使用规范 LaTeX 语法输出公式（行内 $...$，独立块 $$...$$），给出精准的分步推演、解题思路与评分标准。'
+      );
+    } else if (route.path.includes('/learning') || route.path.includes('/analytics')) {
+      parts.push(
+        '【智教云学情分析与个性化导学专家】请结合知识图谱掌握度，为学生提供有针对性的薄弱点突破建议与清晰步骤解答，数学公式采用规范 LaTeX 语法渲染。'
+      );
+    } else {
+      parts.push(
+        '【智教云 AI 教学副驾驶】你是由知识图谱与教学大模型驱动的专业智能助教。请准确解答教学、备课与学科问题，涉及公式及推导时规范使用 LaTeX 格式输出。'
+      );
+    }
+    return parts.join('\n');
+  }
+
   function buildAssistantRequestBase(): Omit<GlobalAssistantChatRequest, 'message'> {
     const ctxPayload = manualGlobalScope.value
       ? {}
@@ -502,6 +570,8 @@ export function useGlobalAssistant() {
     return {
       courseId: activeCourseId.value,
       conversationId: conversationId.value,
+      modelKey: currentModelKey.value,
+      promptPrefix: buildDynamicPromptPrefix(),
       ...ctxPayload
     };
   }
@@ -759,6 +829,7 @@ export function useGlobalAssistant() {
 
   function stopStreaming() {
     if (!isStreaming.value) return;
+    stopStreamTimer();
     userStoppedGeneration.value = true;
     void notifyBackendStreamCancel();
     sseClient.stop();
@@ -780,7 +851,7 @@ export function useGlobalAssistant() {
 
     resetStreamingState();
     saveCurrentSessionToHistory();
-    ElMessage.info('已停止生成（后续 Token 将尽快停止计费）');
+    ElMessage.info('已停止生成（已中断流式推理）');
     nextTick(() => bindMarkdownCodeCopy(messagesScrollRef.value));
   }
 
@@ -797,6 +868,7 @@ export function useGlobalAssistant() {
   }
 
   function finalizeAssistantMessage() {
+    stopStreamTimer();
     finishStreamingMarkdown();
     const finalReasoning = cleanReasoningText(
       streamingReasoning.value || streamingThinkingBody.value
@@ -924,6 +996,7 @@ export function useGlobalAssistant() {
     followUpPrompts.value = [];
     resetStreamingState();
     isStreaming.value = true;
+    startStreamTimer();
     scrollToBottomInstant();
 
     try {
@@ -965,6 +1038,7 @@ export function useGlobalAssistant() {
         }
       }
     } finally {
+      stopStreamTimer();
       userStoppedGeneration.value = false;
       isStreaming.value = false;
       scrollToBottomInstant();
@@ -1111,10 +1185,12 @@ export function useGlobalAssistant() {
   }
 
   onMounted(() => {
+    void loadModels();
     window.addEventListener(OPEN_GLOBAL_ASSISTANT_EVENT, handleOpenAssistantEvent);
   });
 
   onUnmounted(() => {
+    stopStreamTimer();
     window.removeEventListener(OPEN_GLOBAL_ASSISTANT_EVENT, handleOpenAssistantEvent);
   });
 
@@ -1135,6 +1211,12 @@ export function useGlobalAssistant() {
     isLessonStudioContext,
     followUpPrompts,
     showThinkingPanel: computed(() => !isThinkingPanelHidden()),
+    // 大模型选择与秒表计时状态 (对标课程中心高保真设计)
+    modelOptions,
+    currentModel,
+    currentModelKey,
+    handleModelSelect,
+    streamTimerText,
     // 历史会话管理 (对标 Code Compass 原型)
     isHistoryPanelOpen,
     isSessionLoading,

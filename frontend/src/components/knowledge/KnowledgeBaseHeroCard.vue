@@ -7,7 +7,6 @@
     <div class="hero-content">
       <!-- 左侧：标题与定位说明 -->
       <div class="hero-left">
-        <span class="hero-eyebrow">RAG 语义检索 & 知识资产中枢</span>
         <div class="hero-title-container">
           <div class="hero-icon-box">
             <el-icon :size="22"><Collection /></el-icon>
@@ -28,7 +27,7 @@
             @click="emit('create')"
           >
             <el-icon><Plus /></el-icon>
-            <span>新建知识库</span>
+            <span>创建知识库</span>
           </button>
 
           <button
@@ -237,19 +236,6 @@ const chunkIndexPercent = computed(() => {
 
   .hero-left {
     min-width: 0;
-
-    .hero-eyebrow {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      color: #1677ff;
-      background: rgba(22, 119, 255, 0.08);
-      border: 1px solid rgba(22, 119, 255, 0.15);
-      padding: 4px 14px;
-      border-radius: 9999px;
-      margin-bottom: 10px;
-    }
 
     .hero-title-container {
       display: flex;

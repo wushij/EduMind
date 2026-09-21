@@ -57,11 +57,15 @@ public class AdaptivePathOrchestrator {
     private final KnowledgeMasteryQueryApi knowledgeMasteryQueryApi;
 
     public LearningPathVO buildAdaptivePath(Long courseId, Long studentId) {
-        LearningPathDetailVO detail = buildDetail(courseId, studentId);
+        LearningPathDetailVO detail = buildDetail(courseId, studentId, false);
         return toSummaryPath(detail);
     }
 
     public LearningPathDetailVO buildDetail(Long courseId, Long studentId) {
+        return buildDetail(courseId, studentId, true);
+    }
+
+    public LearningPathDetailVO buildDetail(Long courseId, Long studentId, boolean includeGraphSlice) {
         if (courseId == null || studentId == null) {
             throw new BusinessException("课程或学员参数无效");
         }
@@ -94,6 +98,7 @@ public class AdaptivePathOrchestrator {
         int completedTasks = 0;
         int estimatedMinutes = 0;
         Set<Long> highlightKpIds = new LinkedHashSet<>();
+        Map<Long, RecommendedQuestionVO> questionCache = new HashMap<>();
 
         for (FocusWeekPlan plan : weekPlans) {
             if (weekNo > MAX_WEEKS) {
@@ -108,7 +113,7 @@ public class AdaptivePathOrchestrator {
             highlightKpIds.add(plan.knowledgePointId);
 
             List<LearningPathVO.LearningPathTaskVO> tasks = buildTasksForWeek(
-                    courseId, studentId, plan, masteryByKp, kpById);
+                    courseId, studentId, plan, masteryByKp, kpById, questionCache);
             week.setTasks(tasks);
             detail.getWeeks().add(week);
 
@@ -128,7 +133,11 @@ public class AdaptivePathOrchestrator {
                 : (int) Math.round(completedTasks * 100.0 / totalTasks));
 
         detail.setWeakPointsBrief(buildWeakBriefs(mastery));
-        detail.setGraphSlice(buildGraphSlice(courseId, highlightKpIds, masteryByKp, kpById));
+        if (includeGraphSlice && !highlightKpIds.isEmpty()) {
+            detail.setGraphSlice(buildGraphSlice(courseId, highlightKpIds, masteryByKp, kpById));
+        } else {
+            detail.setGraphSlice(new LearningPathDetailVO.GraphSliceVO());
+        }
         detail.setInterpretHint("路径基于薄弱考点、先修关系与推荐练习自动生成，完成任务将同步更新掌握度。");
         return detail;
     }
@@ -141,11 +150,13 @@ public class AdaptivePathOrchestrator {
         if (ids == null || ids.isEmpty()) {
             return List.of();
         }
+        // 批量补全学生用户信息，避免逐学生跨模块查询（每人 3 次 DB）造成 N+1
+        Map<Long, UserBriefVO> userMap = userQueryApi.mapUserBriefsByIds(ids);
         List<LearningPathStudentItemVO> list = new ArrayList<>();
         for (Long sid : ids) {
             LearningPathStudentItemVO item = new LearningPathStudentItemVO();
             item.setStudentId(sid);
-            UserBriefVO user = userQueryApi.getUserById(sid);
+            UserBriefVO user = userMap.get(sid);
             if (user != null) {
                 item.setUsername(user.getUsername());
                 item.setRealName(user.getRealName());
@@ -243,7 +254,7 @@ public class AdaptivePathOrchestrator {
 
     private List<LearningPathVO.LearningPathTaskVO> buildTasksForWeek(
             Long courseId, Long studentId, FocusWeekPlan plan, Map<Long, Double> masteryByKp,
-            Map<Long, KnowledgePointVO> kpById) {
+            Map<Long, KnowledgePointVO> kpById, Map<Long, RecommendedQuestionVO> questionCache) {
         List<LearningPathVO.LearningPathTaskVO> tasks = new ArrayList<>();
         Long kpId = plan.knowledgePointId;
         KnowledgePointVO kp = kpId != null ? kpById.get(kpId) : null;
@@ -264,7 +275,7 @@ public class AdaptivePathOrchestrator {
         read.setStatus(mastered ? "COMPLETED" : "PENDING");
         tasks.add(read);
 
-        RecommendedQuestionVO question = pickQuestion(courseId, studentId, kp);
+        RecommendedQuestionVO question = pickQuestion(courseId, studentId, kp, questionCache);
         if (question != null) {
             LearningPathVO.LearningPathTaskVO practice = new LearningPathVO.LearningPathTaskVO();
             practice.setId(taskId(kpId, "practice"));
@@ -317,21 +328,30 @@ public class AdaptivePathOrchestrator {
         return tasks;
     }
 
-    private RecommendedQuestionVO pickQuestion(Long courseId, Long studentId, KnowledgePointVO kp) {
+    private RecommendedQuestionVO pickQuestion(Long courseId, Long studentId, KnowledgePointVO kp,
+                                               Map<Long, RecommendedQuestionVO> questionCache) {
+        Long cacheKey = kp != null && kp.getId() != null ? kp.getId() : -1L;
+        if (questionCache.containsKey(cacheKey)) {
+            return questionCache.get(cacheKey);
+        }
         Long chapterId = kp != null ? kp.getChapterId() : null;
         List<RecommendedQuestionVO> list = recommendationService.recommendQuestionsForStudent(
                 courseId, chapterId, 3, studentId);
         if (list == null || list.isEmpty()) {
+            questionCache.put(cacheKey, null);
             return null;
         }
+        RecommendedQuestionVO matched = list.get(0);
         if (kp != null && kp.getId() != null) {
             for (RecommendedQuestionVO q : list) {
                 if (Objects.equals(q.getKnowledgePointId(), kp.getId())) {
-                    return q;
+                    matched = q;
+                    break;
                 }
             }
         }
-        return list.get(0);
+        questionCache.put(cacheKey, matched);
+        return matched;
     }
 
     private LearningPathDetailVO.GraphSliceVO buildGraphSlice(

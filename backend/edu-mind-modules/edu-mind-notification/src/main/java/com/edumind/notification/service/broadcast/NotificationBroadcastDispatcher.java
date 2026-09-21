@@ -12,7 +12,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -25,33 +30,55 @@ public class NotificationBroadcastDispatcher {
 
     @Async
     public void dispatch(Long tenantId, Long broadcastId, List<Long> userIds, String title, String content, int priority) {
+        if (userIds == null || userIds.isEmpty()) {
+            return;
+        }
         if (tenantId != null) {
             TenantContext.setTenantId(tenantId);
         }
         try {
-            final int batchSize = 200;
-            for (int i = 0; i < userIds.size(); i += batchSize) {
-                int end = Math.min(i + batchSize, userIds.size());
-                List<Long> chunk = userIds.subList(i, end);
-                for (Long userId : chunk) {
-                    if (!userPreferenceQueryApi.isNotificationEnabled(userId)) {
-                        continue;
-                    }
-                    NotificationEntity entity = new NotificationEntity();
-                    entity.setTenantId(tenantId);
-                    entity.setUserId(userId);
-                    entity.setTitle(title);
-                    entity.setContent(content);
-                    entity.setType("BROADCAST");
-                    entity.setRefId(broadcastId);
-                    entity.setPriority(priority);
-                    entity.setIsRead(0);
-                    notificationDao.insert(entity);
-                    NotificationVO vo = NotificationConverter.toVO(entity);
-                    notificationPushService.pushToUser(userId, vo);
-                }
+            List<Long> distinctUserIds = userIds.stream()
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+            if (distinctUserIds.isEmpty()) {
+                return;
             }
-            log.info("Broadcast dispatched: tenantId={}, broadcastId={}, recipients={}", tenantId, broadcastId, userIds.size());
+
+            // 1) 单次批量过滤关闭通知的用户（替代逐用户偏好查询）
+            Set<Long> enabledUserIds = userPreferenceQueryApi.filterNotificationEnabled(distinctUserIds);
+            if (enabledUserIds.isEmpty()) {
+                log.info("Broadcast skipped (all recipients disabled): tenantId={}, broadcastId={}", tenantId, broadcastId);
+                return;
+            }
+            List<Long> recipients = distinctUserIds.stream()
+                    .filter(enabledUserIds::contains)
+                    .collect(Collectors.toList());
+
+            // 2) 单条 SQL 批量入库（替代 N 次 insert）
+            List<NotificationEntity> entities = new ArrayList<>(recipients.size());
+            for (Long userId : recipients) {
+                NotificationEntity entity = new NotificationEntity();
+                entity.setTenantId(tenantId);
+                entity.setUserId(userId);
+                entity.setTitle(title);
+                entity.setContent(content);
+                entity.setType("BROADCAST");
+                entity.setRefId(broadcastId);
+                entity.setPriority(priority);
+                entity.setIsRead(0);
+                entities.add(entity);
+            }
+            notificationDao.insertBatch(entities);
+
+            // 3) 单次 GROUP BY 统计未读数并推送（替代逐用户 count 查询；WebSocket 推送本身仍按用户连接下发）
+            Map<Long, Long> unreadCountMap = notificationDao.countUnreadByUserIds(recipients);
+            for (NotificationEntity entity : entities) {
+                NotificationVO vo = NotificationConverter.toVO(entity);
+                notificationPushService.pushToUser(
+                        entity.getUserId(), vo, unreadCountMap.getOrDefault(entity.getUserId(), 0L));
+            }
+            log.info("Broadcast dispatched: tenantId={}, broadcastId={}, recipients={}", tenantId, broadcastId, entities.size());
         } finally {
             if (tenantId != null) {
                 TenantContext.clear();

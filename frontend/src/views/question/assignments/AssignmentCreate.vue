@@ -1,17 +1,5 @@
 <template>
   <div class="assignment-create-container question-module-page">
-    <!-- 顶部返回与标题 -->
-    <div class="top-nav-bar">
-      <el-button :icon="ArrowLeft" link class="back-link" @click="handleCancel">
-        返回作业列表
-      </el-button>
-      <el-breadcrumb separator="/">
-        <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
-        <el-breadcrumb-item :to="{ path: '/question/assignments' }">作业管理</el-breadcrumb-item>
-        <el-breadcrumb-item>发布新作业</el-breadcrumb-item>
-      </el-breadcrumb>
-    </div>
-
     <AssignmentCreateForm
       :set-form-ref="setFormRef"
       :form-data="formData"
@@ -34,7 +22,6 @@
 
 <script setup lang="ts">
 import type { FormInstance } from 'element-plus';
-import { ArrowLeft } from '@element-plus/icons-vue';
 import { useAssignmentCreate } from '@/composables/question/useAssignment';
 import AssignmentCreateForm from '@/components/question/assignment/AssignmentCreateForm.vue';
 
@@ -65,17 +52,6 @@ function setFormRef(el: FormInstance | undefined) {
 @use '@/styles/question/module-page-shell.scss';
 
 .assignment-create-container {
-  .top-nav-bar {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 20px;
-
-    .back-link {
-      font-size: 14px;
-      font-weight: 500;
-      color: #3b82f6;
-    }
-  }
+  width: 100%;
 }
 </style>

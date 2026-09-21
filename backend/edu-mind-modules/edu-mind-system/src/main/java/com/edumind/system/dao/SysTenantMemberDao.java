@@ -27,6 +27,22 @@ public class SysTenantMemberDao {
                 .eq(SysTenantMemberEntity::getStatus, 1));
     }
 
+    /**
+     * 批量按用户 ID 查询成员记录（单次 IN 查询）。
+     * tenantId 为 null 时不过滤租户，语义等价于逐个调用 {@link #listByUserId(Long)}。
+     */
+    public List<SysTenantMemberEntity> listByUserIds(java.util.Collection<Long> userIds, Long tenantId) {
+        if (userIds == null || userIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        LambdaQueryWrapper<SysTenantMemberEntity> wrapper = new LambdaQueryWrapper<SysTenantMemberEntity>()
+                .in(SysTenantMemberEntity::getUserId, userIds);
+        if (tenantId != null) {
+            wrapper.eq(SysTenantMemberEntity::getTenantId, tenantId);
+        }
+        return sysTenantMemberMapper.selectList(wrapper);
+    }
+
     public SysTenantMemberEntity findByTenantAndUser(Long tenantId, Long userId) {
         return sysTenantMemberMapper.selectOne(new LambdaQueryWrapper<SysTenantMemberEntity>()
                 .eq(SysTenantMemberEntity::getTenantId, tenantId)

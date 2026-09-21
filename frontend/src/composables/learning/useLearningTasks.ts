@@ -15,15 +15,20 @@ export interface LearningTaskItem {
   courseName: string;
   courseId: number;
   dueDate: string;
+  rawDeadline?: string;
+  totalScore?: number;
+  passScore?: number;
   estimatedMinutes: number;
   status: 'PENDING' | 'COMPLETED';
+  mySubmissionStatus?: string;
   assignmentId: number;
 }
 
 function mapAssignmentToTask(a: StudentAssignment): LearningTaskItem {
   const done =
     a.mySubmissionStatus === SUBMISSION_STATUS.GRADED ||
-    a.mySubmissionStatus === SUBMISSION_STATUS.REVIEWED;
+    a.mySubmissionStatus === SUBMISSION_STATUS.REVIEWED ||
+    a.mySubmissionStatus === SUBMISSION_STATUS.SUBMITTED;
   return {
     id: a.id,
     assignmentId: a.id,
@@ -32,8 +37,12 @@ function mapAssignmentToTask(a: StudentAssignment): LearningTaskItem {
     courseName: a.courseName || '—',
     courseId: a.courseId,
     dueDate: a.deadline ? String(a.deadline).replace('T', ' ').slice(0, 16) : '—',
-    estimatedMinutes: Math.max(15, Math.min(60, a.totalScore ?? 30)),
-    status: done ? 'COMPLETED' : 'PENDING'
+    rawDeadline: a.deadline,
+    totalScore: a.totalScore ?? 100,
+    passScore: a.passScore ?? 60,
+    estimatedMinutes: Math.max(20, Math.min(90, a.totalScore ? Math.round(a.totalScore * 0.6) : 45)),
+    status: done ? 'COMPLETED' : 'PENDING',
+    mySubmissionStatus: a.mySubmissionStatus
   };
 }
 

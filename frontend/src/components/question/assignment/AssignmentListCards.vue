@@ -34,21 +34,21 @@
           <el-progress :percentage="progressPercent(a)" :color="progressColor(a)" />
         </div>
         <div class="row-right-actions">
-          <button
-            v-if="a.status === 'DRAFT'"
-            v-permission="'assignment:delete'"
-            type="button"
-            class="table-action-pill table-action-pill--danger"
-            @click.stop="emit('delete', a.id, a.title)"
-          >
-            删除
-          </button>
           <el-button type="primary" size="small" @click="router.push(`/question/assignments/${a.id}`)">
             批改与答卷管理
           </el-button>
           <el-button type="success" plain size="small" :icon="Cpu" @click="emit('ai-grade', a.id)">
             一键 AI 批改
           </el-button>
+          <button
+            v-permission="'assignment:delete'"
+            type="button"
+            class="table-action-pill table-action-pill--danger"
+            @click.stop="emit('delete', a.id, a.title)"
+          >
+            <el-icon><Delete /></el-icon>
+            <span>删除</span>
+          </button>
         </div>
       </div>
     </div>
@@ -60,19 +60,24 @@
         立即发布新作业
       </el-button>
     </div>
-    <AppPagination
-      v-model:page-num="pageNumProxy"
-      v-model:page-size="pageSizeProxy"
-      :total="total"
-      @change="emit('page-change')"
-    />
+
+    <!-- 居左标准底栏分页卡片（每页10条，远离右下角悬浮球） -->
+    <div v-if="total > 0" class="assignment-pagination-card">
+      <AppPagination
+        v-model:page-num="pageNumProxy"
+        v-model:page-size="pageSizeProxy"
+        :total="total"
+        :page-sizes="[10, 20, 50]"
+        @change="emit('page-change')"
+      />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { Reading, Clock, User, Cpu, FolderOpened } from '@element-plus/icons-vue';
+import { Reading, Clock, User, Cpu, FolderOpened, Delete } from '@element-plus/icons-vue';
 import AppPagination from '@/components/common/AppPagination.vue';
 import type { Assignment } from '@/types/question/assignment';
 import { ASSIGNMENT_STATUS_LABEL, ASSIGNMENT_STATUS_TAG } from '@/constants/question/assignment';
@@ -226,12 +231,43 @@ function progressColor(a: Assignment) {
 }
 
 .table-action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 1px solid #fecaca;
-  background: #fff;
+  background: #fef2f2;
   color: #dc2626;
-  border-radius: 999px;
-  padding: 5px 14px;
-  font-size: 13px;
+  border-radius: 9999px;
+  padding: 4px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #dc2626;
+    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
+  }
+}
+
+.assignment-pagination-card {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 10px 18px;
+  border: 1px solid #edf2f7;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  margin-top: 4px;
+
+  :deep(.pagination-bar) {
+    margin-top: 0;
+    padding: 2px 0;
+    border-top: none;
+    justify-content: flex-start !important;
+  }
 }
 </style>

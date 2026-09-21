@@ -2,7 +2,9 @@ package com.edumind.system.api;
 
 import com.edumind.system.vo.user.UserBriefVO;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 用户领域跨模块只读查询公开 API
@@ -10,6 +12,18 @@ import java.util.List;
 public interface UserQueryApi {
 
     UserBriefVO getUserById(Long userId);
+
+    /**
+     * 批量查询用户简要信息（单次 IN 查询，不含角色与权限）。
+     * 列表/统计场景请优先使用本方法，替代循环内逐个调用 {@link #getUserById(Long)}，避免 N+1。
+     */
+    Map<Long, UserBriefVO> mapUserBriefsByIds(Collection<Long> userIds);
+
+    /**
+     * 批量查询用户角色编码（单次 IN 查询）。
+     * 用于替代循环内逐个调用 {@link #getRolesByUserId(Long)}，避免 N+1。
+     */
+    Map<Long, List<String>> mapRoleCodesByUserIds(Collection<Long> userIds);
 
     List<String> getRolesByUserId(Long userId);
 

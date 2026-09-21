@@ -241,6 +241,12 @@
 
                   <div class="message-content-col">
                     <div class="message-bubble bubble-assistant is-streaming-bubble">
+                      <!-- 正在生成状态头 -->
+                      <div class="msg-meta-header">
+                        <span class="sender-name">EduMind 智能教学助教</span>
+                        <span class="streaming-badge-tag">正在深度研读与生成解答...</span>
+                      </div>
+
                       <!-- 意图识别胶囊 (常规问答不展示，非chat特殊功能才展示) -->
                       <div
                         v-if="streamingIntent.intent && streamingIntent.intent !== 'chat' && streamingIntent.intent !== 'CHAT'"
@@ -251,7 +257,7 @@
                         </el-tag>
                       </div>
 
-                      <!-- 思考卡片：流式生成中遵循个人偏好默认呈现策略 -->
+                      <!-- 思考卡片：流式生成中遵循个人偏好默认呈现策略，侧边栏保持极简不展示多余控制 -->
                       <AIThinking
                         v-if="showThinkingPanel && (!streamingAnswerBody || streamingThinkingDisplay)"
                         :content="streamingThinkingDisplay"
@@ -259,6 +265,7 @@
                         :active="!streamingAnswerBody && (isReasoningActive || !streamingThinkingDisplay)"
                         :has-answer-body="!!streamingAnswerBody"
                         :phase-message="streamPhaseMessage"
+                        :show-timer="false"
                         @update:folded="isReasoningFolded = $event"
                         @user-collapse="pauseAutoScrollFollow"
                       />
@@ -328,7 +335,8 @@ const {
   isReasoningActive,
   streamPhaseMessage,
   pauseAutoScrollFollow,
-  isLessonStudioContext
+  isLessonStudioContext,
+  stopStreaming
 } = inject(globalAssistantUiKey)!;
 
 /** 参考切片托盘默认折叠 */

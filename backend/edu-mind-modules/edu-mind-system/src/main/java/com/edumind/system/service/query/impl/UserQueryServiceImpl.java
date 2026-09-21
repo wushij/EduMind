@@ -8,16 +8,22 @@ import com.edumind.system.dao.UserRoleDao;
 import com.edumind.system.entity.PermissionEntity;
 import com.edumind.system.entity.RoleEntity;
 import com.edumind.system.entity.UserEntity;
+import com.edumind.system.entity.UserRoleEntity;
 import com.edumind.system.service.query.UserQueryService;
-import com.edumind.system.service.user.UserVoAssembler;
 import com.edumind.system.vo.user.UserBriefVO;
-import com.edumind.system.vo.user.UserVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -30,20 +36,79 @@ public class UserQueryServiceImpl implements UserQueryService {
     private final RoleDao roleDao;
     private final PermissionDao permissionDao;
     private final SysTenantMemberDao sysTenantMemberDao;
-    private final UserVoAssembler userVoAssembler;
 
     @Override
     public UserBriefVO getUserById(Long userId) {
-        UserEntity user = userDao.findById(userId);
-        UserVO vo = userVoAssembler.toVO(user);
-        if (vo == null) {
+        if (userId == null) {
+            return null;
+        }
+        // 简要信息仅依赖 sys_user 单表，不再为 4 个字段额外查询角色与权限（原实现为 3 次查询）
+        return toBrief(userDao.findById(userId));
+    }
+
+    @Override
+    public Map<Long, UserBriefVO> mapUserBriefsByIds(Collection<Long> userIds) {
+        Set<Long> distinctIds = distinctNonNull(userIds);
+        if (distinctIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return userDao.findByIds(distinctIds).stream()
+                .map(UserQueryServiceImpl::toBrief)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(UserBriefVO::getId, vo -> vo, (a, b) -> a));
+    }
+
+    @Override
+    public Map<Long, List<String>> mapRoleCodesByUserIds(Collection<Long> userIds) {
+        Set<Long> distinctIds = distinctNonNull(userIds);
+        if (distinctIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<UserRoleEntity> relations = userRoleDao.findByUserIds(distinctIds);
+        if (CollectionUtils.isEmpty(relations)) {
+            return Collections.emptyMap();
+        }
+        Set<Long> roleIds = relations.stream()
+                .map(UserRoleEntity::getRoleId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (roleIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<Long, String> roleCodeById = roleDao.findByIds(new ArrayList<>(roleIds)).stream()
+                .filter(role -> role.getId() != null && role.getRoleCode() != null)
+                .collect(Collectors.toMap(RoleEntity::getId, RoleEntity::getRoleCode, (a, b) -> a));
+        if (roleCodeById.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<Long, List<String>> result = new HashMap<>();
+        for (UserRoleEntity relation : relations) {
+            String roleCode = roleCodeById.get(relation.getRoleId());
+            if (relation.getUserId() == null || roleCode == null) {
+                continue;
+            }
+            result.computeIfAbsent(relation.getUserId(), key -> new ArrayList<>()).add(roleCode);
+        }
+        return result;
+    }
+
+    private static Set<Long> distinctNonNull(Collection<Long> ids) {
+        if (CollectionUtils.isEmpty(ids)) {
+            return Collections.emptySet();
+        }
+        return ids.stream().filter(Objects::nonNull).collect(Collectors.toSet());
+    }
+
+    /** 与 UserConverter#toVO 保持一致的兜底语义：realName 为空回退用户名，avatar 为空回退空串 */
+    private static UserBriefVO toBrief(UserEntity entity) {
+        if (entity == null) {
             return null;
         }
         return UserBriefVO.builder()
-                .id(vo.getId())
-                .username(vo.getUsername())
-                .realName(vo.getRealName())
-                .avatar(vo.getAvatar())
+                .id(entity.getId())
+                .username(entity.getUsername())
+                .realName(StringUtils.hasText(entity.getRealName()) ? entity.getRealName() : entity.getUsername())
+                .avatar(StringUtils.hasText(entity.getAvatar()) ? entity.getAvatar() : "")
                 .build();
     }
 

@@ -11,7 +11,12 @@ import com.edumind.system.api.UserPreferenceQueryApi;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -54,25 +59,46 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
             return;
         }
         Long finalTenantId = tenantId != null ? tenantId : TenantContext.getTenantId();
-        for (Long userId : userIds) {
-            if (userId == null) {
-                continue;
-            }
-            if (!userPreferenceQueryApi.isNotificationEnabled(userId)) {
-                continue;
-            }
+        List<Long> distinctUserIds = userIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (distinctUserIds.isEmpty()) {
+            return;
+        }
+
+        // 1) 单次批量过滤关闭通知的用户（替代逐用户偏好查询）
+        Set<Long> enabledUserIds = userPreferenceQueryApi.filterNotificationEnabled(distinctUserIds);
+        if (enabledUserIds.isEmpty()) {
+            return;
+        }
+        List<Long> recipients = distinctUserIds.stream()
+                .filter(enabledUserIds::contains)
+                .collect(Collectors.toList());
+
+        // 2) 单条 SQL 批量入库（替代 N 次 insert）
+        String effectiveType = type != null ? type : "SYSTEM";
+        List<NotificationEntity> entities = new ArrayList<>(recipients.size());
+        for (Long userId : recipients) {
             NotificationEntity entity = new NotificationEntity();
             entity.setTenantId(finalTenantId);
             entity.setUserId(userId);
             entity.setTitle(title);
             entity.setContent(content);
-            entity.setType(type != null ? type : "SYSTEM");
+            entity.setType(effectiveType);
             entity.setRefId(refId);
             entity.setIsRead(0);
-            notificationDao.insert(entity);
+            entity.setPriority(0);
+            entities.add(entity);
+        }
+        notificationDao.insertBatch(entities);
 
+        // 3) 单次 GROUP BY 统计未读数并推送（替代逐用户 count 查询；WebSocket 推送本身仍按用户连接下发）
+        Map<Long, Long> unreadCountMap = notificationDao.countUnreadByUserIds(recipients);
+        for (NotificationEntity entity : entities) {
             NotificationVO vo = NotificationConverter.toVO(entity);
-            notificationPushService.pushToUser(userId, vo);
+            notificationPushService.pushToUser(
+                    entity.getUserId(), vo, unreadCountMap.getOrDefault(entity.getUserId(), 0L));
         }
     }
 }

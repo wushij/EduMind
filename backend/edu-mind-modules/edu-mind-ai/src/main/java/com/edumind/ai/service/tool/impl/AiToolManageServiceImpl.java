@@ -27,8 +27,7 @@ public class AiToolManageServiceImpl implements AiToolManageService {
 
     private static final Set<String> SEED_TOOL_IDS = Set.of(
             "tool_question_gen", "tool_exam_gen", "tool_grading", "tool_lesson", "tool_summary",
-            "tool_chat", "tool_wrong_analysis", "tool_knowledge_explain", "tool_practice",
-            "tool_learning_plan", "tool_ppt", "tool_polish", "tool_translate", "tool_resource_rec"
+            "tool_chat", "tool_practice"
     );
 
     private static final Set<String> ALLOWED_CATEGORIES = Set.of("TEACHER", "STUDENT", "GENERAL");

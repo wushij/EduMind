@@ -38,12 +38,9 @@ public class TokenStatisticsServiceImpl implements TokenStatisticsService {
         wrapper.orderByDesc(AiCallLogEntity::getCreateTime);
         Page<AiCallLogEntity> result = aiCallLogDao.page(new Page<>(page, pageSize), wrapper);
         List<AiCallLogVO> list = result.getRecords().stream()
-                .map(entity -> {
-                    AiCallLogVO vo = aiConverter.toCallLogVO(entity);
-                    enrichUserInfo(vo);
-                    return vo;
-                })
+                .map(aiConverter::toCallLogVO)
                 .collect(Collectors.toList());
+        enrichUserInfoBatch(list);
         return PageResult.<AiCallLogVO>builder()
                 .total(result.getTotal())
                 .pageNum(page)
@@ -52,20 +49,40 @@ public class TokenStatisticsServiceImpl implements TokenStatisticsService {
                 .build();
     }
 
-    private void enrichUserInfo(AiCallLogVO vo) {
-        if (vo.getUserId() == null || userQueryApi == null) {
+    /**
+     * 批量补全调用日志的用户与角色信息。
+     * 原实现对每条日志调用 2 次跨模块 API（getUserById + getRolesByUserId），
+     * 分页 N 条即 2N 次调用；改为按去重 userId 各批量查询一次。
+     */
+    private void enrichUserInfoBatch(List<AiCallLogVO> list) {
+        if (userQueryApi == null || list == null || list.isEmpty()) {
+            return;
+        }
+        List<Long> userIds = list.stream()
+                .map(AiCallLogVO::getUserId)
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+        if (userIds.isEmpty()) {
             return;
         }
         try {
-            UserBriefVO user = userQueryApi.getUserById(vo.getUserId());
-            if (user != null) {
-                vo.setUsername(user.getUsername());
-                vo.setRealName(user.getRealName());
-                vo.setAvatar(user.getAvatar());
-            }
-            List<String> roles = userQueryApi.getRolesByUserId(vo.getUserId());
-            if (roles != null && !roles.isEmpty()) {
-                vo.setUserRole(roles.get(0));
+            Map<Long, UserBriefVO> userMap = userQueryApi.mapUserBriefsByIds(userIds);
+            Map<Long, List<String>> roleMap = userQueryApi.mapRoleCodesByUserIds(userIds);
+            for (AiCallLogVO vo : list) {
+                if (vo.getUserId() == null) {
+                    continue;
+                }
+                UserBriefVO user = userMap.get(vo.getUserId());
+                if (user != null) {
+                    vo.setUsername(user.getUsername());
+                    vo.setRealName(user.getRealName());
+                    vo.setAvatar(user.getAvatar());
+                }
+                List<String> roles = roleMap.get(vo.getUserId());
+                if (roles != null && !roles.isEmpty()) {
+                    vo.setUserRole(roles.get(0));
+                }
             }
         } catch (Exception ignored) {
         }

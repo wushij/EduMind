@@ -46,7 +46,20 @@
           />
 
           <template v-if="!selectedFile">
-            <el-icon class="upload-cloud-icon"><UploadFilled /></el-icon>
+            <div class="upload-badge-wrap">
+              <svg
+                class="dialog-upload-svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 19V5" />
+                <path d="m5 12 7-7 7 7" />
+              </svg>
+            </div>
             <p class="drop-text">
               点击或将文件拖拽至此处上传
             </p>
@@ -108,7 +121,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { UploadFilled, Document, Close, InfoFilled, Loading } from '@element-plus/icons-vue';
+import { Document, Close, InfoFilled, Loading } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { uploadDocument } from '@/api/knowledge/document';
 import type { KnowledgeBase } from '@/types/knowledge/knowledge-base';
@@ -254,10 +267,35 @@ async function handleUpload() {
       display: none;
     }
 
-    .upload-cloud-icon {
-      font-size: 40px;
-      color: #94a3b8;
-      margin-bottom: 8px;
+    .upload-badge-wrap {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 12px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+
+      .dialog-upload-svg {
+        width: 24px;
+        height: 24px;
+        display: block;
+      }
+    }
+
+    &:hover,
+    &.is-dragover {
+      border-color: #2563eb;
+      background: #eff6ff;
+
+      .upload-badge-wrap {
+        background: #dbeafe;
+        color: #1d4ed8;
+        transform: translateY(-2px);
+      }
     }
 
     .drop-text {

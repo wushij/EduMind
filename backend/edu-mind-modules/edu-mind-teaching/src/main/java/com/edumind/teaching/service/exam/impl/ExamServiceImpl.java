@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -117,17 +118,20 @@ public class ExamServiceImpl implements ExamService {
     }
 
     private void saveExamQuestions(Long examId, List<ExamQuestionItemDTO> questions) {
-        if (questions == null) {
+        if (questions == null || questions.isEmpty()) {
             return;
         }
+        // 单条 SQL 批量写入试卷题目（替代逐题 insert）
         int sort = 1;
+        List<ExamQuestionEntity> entities = new ArrayList<>(questions.size());
         for (ExamQuestionItemDTO item : questions) {
             ExamQuestionEntity entity = new ExamQuestionEntity();
             entity.setExamId(examId);
             entity.setQuestionId(item.getQuestionId());
             entity.setScore(item.getScore());
             entity.setSortOrder(item.getSortOrder() != null ? item.getSortOrder() : sort++);
-            examQuestionDao.insert(entity);
+            entities.add(entity);
         }
+        examQuestionDao.insertBatch(entities);
     }
 }

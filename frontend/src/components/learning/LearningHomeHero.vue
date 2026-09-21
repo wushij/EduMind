@@ -9,11 +9,16 @@
       <el-select
         v-if="courseOptions.length"
         :model-value="selectedCourseId ?? undefined"
-        placeholder="主修课程"
-        style="width: 200px"
+        placeholder="选择主修课程"
+        style="width: 220px"
         @change="emit('course-change', $event)"
       >
-        <el-option v-for="c in courseOptions" :key="c.id" :label="c.name" :value="c.id" />
+        <el-option
+          v-for="c in courseOptions"
+          :key="c.id"
+          :label="c.name || (c as any).title || ('课程 #' + c.id)"
+          :value="c.id"
+        />
       </el-select>
       <button type="button" class="capsule-btn capsule-btn--default" @click="router.push('/learning/tasks')">
         <el-icon class="btn-icon"><List /></el-icon>

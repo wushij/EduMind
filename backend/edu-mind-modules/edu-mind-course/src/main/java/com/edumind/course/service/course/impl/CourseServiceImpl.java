@@ -36,8 +36,10 @@ import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -109,6 +111,7 @@ public class CourseServiceImpl implements CourseService {
             }
         }
 
+        Map<Long, UserBriefVO> teacherCache = new HashMap<>();
         List<CourseVO> list = page.getRecords().stream()
                 .map(entity -> {
                     Long cid = entity.getId();
@@ -116,7 +119,9 @@ public class CourseServiceImpl implements CourseService {
                     Long chapterCount = chapterDao.countByCourseId(cid);
                     Long kpCount = knowledgePointDao.countByCourseId(cid);
                     Long resourceCount = resourceQueryApi != null ? resourceQueryApi.countResourcesByCourseId(cid) : 0L;
-                    UserBriefVO teacher = resolveTeacher(entity.getTeacherId());
+                    UserBriefVO teacher = entity.getTeacherId() != null
+                            ? teacherCache.computeIfAbsent(entity.getTeacherId(), this::resolveTeacher)
+                            : null;
                     return courseConverter.toVO(
                             entity,
                             resolveTeacherName(teacher),

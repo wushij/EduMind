@@ -1,6 +1,6 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   getSubmissionDetail,
   getSubmissionGrading,
@@ -8,7 +8,8 @@ import {
   reviewGrading,
   getSubmissionsPage,
   getSubmissionStats,
-  batchGradeSubmissions
+  batchGradeSubmissions,
+  deleteSubmission
 } from '@/api/question/submission';
 import { getCourseList } from '@/api/course/course';
 import { normalizeCourseListFromApi } from '@/utils/course/course-display';
@@ -135,17 +136,42 @@ export function useSubmission() {
     }
   }
 
+  const aiThinkingVisible = ref(false);
+  const aiThinkingTitle = ref('AI 智能阅卷推演引擎');
+  let submissionAbortController: AbortController | null = null;
+
   async function handleTriggerGradeNow() {
+    aiThinkingTitle.value = `AI 智能阅卷 · ${submissionData.value?.studentName || '单份答卷'}`;
+    submissionAbortController = new AbortController();
+    aiThinkingVisible.value = true;
     gradingInProgress.value = true;
     try {
+      if (submissionAbortController.signal.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
       await gradeSubmission(submissionId.value);
+      aiThinkingVisible.value = false;
       ElMessage.success('已成功触发该答卷的 AI 智能分析与评分！');
       await loadSubmissionData();
     } catch (err: any) {
+      aiThinkingVisible.value = false;
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        ElMessage.info('已中止本次 AI 阅卷推演');
+        return;
+      }
       ElMessage.error(err?.message || '触发 AI 评阅失败，请稍后重试');
     } finally {
+      aiThinkingVisible.value = false;
       gradingInProgress.value = false;
+      submissionAbortController = null;
     }
+  }
+
+  function handleAbortSubmissionGrade() {
+    if (submissionAbortController) {
+      submissionAbortController.abort();
+    }
+    aiThinkingVisible.value = false;
   }
 
   function adoptSingleAIScore(item: GradingItem) {
@@ -203,8 +229,11 @@ export function useSubmission() {
     submissionData,
     gradingItems,
     calculatedTotalScore,
+    aiThinkingVisible,
+    aiThinkingTitle,
     loadSubmissionData,
     handleTriggerGradeNow,
+    handleAbortSubmissionGrade,
     adoptSingleAIScore,
     adoptAllAIScores,
     handleSaveGrading,
@@ -220,6 +249,17 @@ export function useSubmissionList() {
   const allSubmissions = ref<SubmissionItem[]>([]);
   const total = ref(0);
   const stats = ref<SubmissionOverviewStats>({});
+
+  const aiThinkingVisible = ref(false);
+  const aiThinkingTitle = ref('AI 智能阅卷引擎 · 全队列批改');
+  let submissionAbortController: AbortController | null = null;
+
+  function handleAbortSubmissionGrade() {
+    if (submissionAbortController) {
+      submissionAbortController.abort();
+    }
+    aiThinkingVisible.value = false;
+  }
 
   async function loadCourses() {
     try {
@@ -247,7 +287,7 @@ export function useSubmissionList() {
           status: params.status || undefined,
           keyword: params.keyword?.trim() || undefined,
           page: params.page ?? 1,
-          pageSize: params.pageSize ?? 20
+          pageSize: params.pageSize ?? 10
         }),
         getSubmissionStats({
           courseId: params.courseId ?? undefined
@@ -259,7 +299,9 @@ export function useSubmissionList() {
         aiScore: sub.totalScore,
         finalScore: sub.status === 'REVIEWED' ? sub.totalScore : undefined
       }));
-      total.value = pageRes.data?.total ?? list.length;
+      // 后端分页 total 以字符串 Long 返回，需归一化为数字，避免分页组件判定 total 缺失
+      const apiTotal = Number(pageRes.data?.total);
+      total.value = Number.isFinite(apiTotal) && apiTotal >= 0 ? apiTotal : list.length;
       stats.value = statsRes.data || {};
       return allSubmissions.value;
     } catch (err: unknown) {
@@ -272,18 +314,90 @@ export function useSubmissionList() {
     }
   }
 
-  async function batchGradePending(courseId?: number | null) {
+  async function batchGradePending(courseId?: number | null, forceRegrade?: boolean) {
+    aiThinkingTitle.value = forceRegrade ? 'AI 智能阅卷引擎 · 全队列重新批改' : 'AI 智能阅卷引擎 · 全队列批改';
+    submissionAbortController = new AbortController();
+    aiThinkingVisible.value = true;
     batchLoading.value = true;
     try {
-      const res = await batchGradeSubmissions({ courseId: courseId ?? undefined });
+      if (submissionAbortController.signal.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      const res = await batchGradeSubmissions(
+        {
+          courseId: courseId ?? undefined,
+          forceRegrade: !!forceRegrade
+        },
+        { signal: submissionAbortController.signal }
+      );
+      aiThinkingVisible.value = false;
       const successCount = res.data?.successCount ?? 0;
-      ElMessage.success(`全队列批改完成，共成功处理 ${successCount} 份待评答卷`);
+      if (successCount > 0) {
+        ElMessage.success(`全队列批改完成，共成功处理 ${successCount} 份答卷`);
+      } else {
+        ElMessage.info('当前暂无可批改的答卷');
+      }
       return successCount;
     } catch (err: unknown) {
+      aiThinkingVisible.value = false;
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        ElMessage.info('已中止本次全队列 AI 批改推演');
+        return 0;
+      }
       ElMessage.error(err instanceof Error ? err.message : '批量批改失败');
       return 0;
     } finally {
+      aiThinkingVisible.value = false;
       batchLoading.value = false;
+      submissionAbortController = null;
+    }
+  }
+
+  async function triggerSingleRegrade(row: SubmissionItem) {
+    aiThinkingTitle.value = `AI 智能阅卷 · ${row.studentName || '学生答卷'}`;
+    submissionAbortController = new AbortController();
+    aiThinkingVisible.value = true;
+    try {
+      if (submissionAbortController.signal.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      await gradeSubmission(row.id, { signal: submissionAbortController.signal });
+      aiThinkingVisible.value = false;
+      ElMessage.success(`已为【${row.studentName || '学生'}】重新完成 AI 智能预评打分与评语生成！`);
+    } catch (err: unknown) {
+      aiThinkingVisible.value = false;
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        ElMessage.info('已中止本次 AI 阅卷推演');
+        return;
+      }
+      ElMessage.error(err instanceof Error ? err.message : 'AI 批改失败');
+    } finally {
+      aiThinkingVisible.value = false;
+      submissionAbortController = null;
+    }
+  }
+
+  async function removeSubmissionRecord(id: number, studentName?: string) {
+    try {
+      await ElMessageBox.confirm(
+        `确定要删除${studentName ? `学生「${studentName}」的` : ''}该份答卷记录吗？删除后关联的作答与评分数据将一并清理且不可恢复。`,
+        '删除答卷确认',
+        {
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      );
+      loading.value = true;
+      await deleteSubmission(id);
+      ElMessage.success('答卷记录已成功删除');
+      return true;
+    } catch (err: unknown) {
+      if (err === 'cancel' || err === 'close') return false;
+      ElMessage.error(err instanceof Error ? err.message : '删除答卷失败');
+      return false;
+    } finally {
+      loading.value = false;
     }
   }
 
@@ -294,8 +408,13 @@ export function useSubmissionList() {
     allSubmissions,
     total,
     stats,
+    aiThinkingVisible,
+    aiThinkingTitle,
+    handleAbortSubmissionGrade,
     loadCourses,
     fetchAllSubmissions,
-    batchGradePending
+    batchGradePending,
+    triggerSingleRegrade,
+    removeSubmissionRecord
   };
 }

@@ -54,7 +54,7 @@
               :grouped-sections="groupedSections"
               :view-mode="viewMode"
               skin="detail"
-              :show-point-badge="true"
+              :show-point-badge="false"
             />
           </div>
         </div>

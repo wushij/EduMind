@@ -83,16 +83,55 @@ public class MockOcrEngineAdapter implements OcrEngineAdapter {
 
     private String getMockPageText(int pageNo) {
         if (pageNo == 1) {
-            return "## 第一章：极限论基础与无穷小分析\n\n定义 1.1（极限的存在准则）设函数 $f(x)$ 在点 $x_0$ 的去心邻域内有定义。如果对于任意给定的正数 $\\varepsilon > 0$，总存在正数 $\\delta > 0$，使得对于所有满足 $0 < |x - x_0| < \\delta$ 的 $x$，恒有 $|f(x) - A| < \\varepsilon$，则称常数 $A$ 为函数 $f(x)$ 当 $x \\to x_0$ 时的极限，记作 $\\lim_{x \\to x_0} f(x) = A$。";
+            return "### 一、选择题（本大题共 3 小题，每小题 5 分，共 15 分）\n\n" +
+                    "**1. 导数与单调性**\n" +
+                    "已知函数 $f(x) = \\frac{\\ln x}{x} + \\frac{1}{2}ax^2$，若 $f(x)$ 在区间 $(1, +\\infty)$ 内单调递减，则实数 $a$ 的取值范围是（   ）\n" +
+                    "A. $(-\\infty, -1]$\n" +
+                    "B. $(-\\infty, 0]$\n" +
+                    "C. $[1, +\\infty)$\n" +
+                    "D. $(0, 1]$\n\n" +
+                    "**2. 复数代数运算**\n" +
+                    "设复数 $z$ 满足 $(1 + i)z = 2 - i$，则 $|z| = $（   ）\n" +
+                    "A. $\\frac{\\sqrt{10}}{2}$\n" +
+                    "B. $\\frac{5}{2}$\n" +
+                    "C. $\\sqrt{5}$\n" +
+                    "D. $\\frac{\\sqrt{5}}{2}$\n\n" +
+                    "**3. 空间立体几何**\n" +
+                    "在正三棱柱 $ABC-A_1B_1C_1$ 中，若各棱长均为 $2$，则异面直线 $AB_1$ 与 $BC_1$ 所成角的余弦值为（   ）\n" +
+                    "A. $\\frac{1}{4}$\n" +
+                    "B. $\\frac{\\sqrt{3}}{4}$\n" +
+                    "C. $\\frac{1}{2}$\n" +
+                    "D. $\\frac{\\sqrt{2}}{2}$";
         } else if (pageNo == 2) {
-            return "定理 1.2（等价无穷小替换定理）设 $\\alpha \\sim \\alpha', \\beta \\sim \\beta'$，且 $\\lim \\frac{\\beta'}{\\alpha'}$ 存在，则 $\\lim \\frac{\\beta}{\\alpha} = \\lim \\frac{\\beta'}{\\alpha'}$。\n\n【注意】等价无穷小替换原则上只适用于乘积与商的形式，在代数和中不能随意部分代换，必须满足泰勒高阶展开相同条件。";
+            return "### 二、填空题与解答题（本大题共 3 小题）\n\n" +
+                    "**4. 二项式展开定理**\n" +
+                    "在 $(x - \\frac{2}{x})^6$ 的二项展开式中，常数项为 ________。\n\n" +
+                    "**5. 双曲线的几何性质**\n" +
+                    "已知双曲线 $C: \\frac{x^2}{a^2} - \\frac{y^2}{b^2} = 1 (a > 0, b > 0)$ 的一条渐近线方程为 $y = \\sqrt{3}x$，则其离心率 $e = $ ________。\n\n" +
+                    "**6. 解三角形综合应用（本小题满分 12 分）**\n" +
+                    "在 $\\triangle ABC$ 中，角 $A, B, C$ 所对的边分别为 $a, b, c$，已知 $2a\\sin B = \\sqrt{3}b$。\n" +
+                    "(1) 求角 $A$ 的大小；\n" +
+                    "(2) 若 $a = \\sqrt{7}$，$b + c = 5$，求 $\\triangle ABC$ 的面积。";
         } else {
-            return "例题 1.3 求极限 $\\lim_{x \\to 0} \\frac{\\tan x - \\sin x}{x^3}$。\n\n【解析】因 $\\tan x - \\sin x = \\tan x (1 - \\cos x) \\sim x \\cdot \\frac{1}{2} x^2 = \\frac{1}{2} x^3$，故原式 $= \\lim_{x \\to 0} \\frac{\\frac{1}{2} x^3}{x^3} = \\frac{1}{2}$。";
+            return "### 三、压轴解答题（本小题满分 12 分）\n\n" +
+                    "**7. 解析几何与椭圆方程**\n" +
+                    "已知椭圆 $C: \\frac{x^2}{a^2} + \\frac{y^2}{b^2} = 1 (a > b > 0)$ 的离心率为 $\\frac{\\sqrt{3}}{2}$，左焦点为 $F_1(-c, 0)$，短轴长为 $2$。\n" +
+                    "(1) 求椭圆 $C$ 的标准方程；\n" +
+                    "(2) 设直线 $l: y = kx + m$ 与椭圆 $C$ 交于不同的两点 $A, B$，以 $AB$ 为直径的圆恰好过原点 $O$，求原点 $O$ 到直线 $l$ 的距离的取值范围。";
         }
     }
 
     private String getMockBlocksJson(int pageNo) {
-        return "[{\"id\":1,\"bbox\":[40,60,520,110],\"text\":\"第一章：极限论基础与无穷小分析\",\"confidence\":0.99}," +
-                "{\"id\":2,\"bbox\":[40,130,520,240],\"text\":\"定义 1.1（极限的存在准则）\",\"confidence\":0.98}]";
+        if (pageNo == 1) {
+            return "[{\"id\":1,\"bbox\":[30,120,540,240],\"title\":\"Q1 · 导数与单调性\",\"confidence\":0.992}," +
+                    "{\"id\":2,\"bbox\":[30,260,540,380],\"title\":\"Q2 · 复数代数运算\",\"confidence\":0.987}," +
+                    "{\"id\":3,\"bbox\":[30,400,540,510],\"title\":\"Q3 · 空间立体几何\",\"confidence\":0.975}]";
+        } else if (pageNo == 2) {
+            return "[{\"id\":4,\"bbox\":[30,100,540,190],\"title\":\"Q4 · 二项式展开\",\"confidence\":0.988}," +
+                    "{\"id\":5,\"bbox\":[30,210,540,300],\"title\":\"Q5 · 双曲线离心率\",\"confidence\":0.981}," +
+                    "{\"id\":6,\"bbox\":[30,320,540,520],\"title\":\"Q6 · 解三角形综合\",\"confidence\":0.979}]";
+        } else {
+            return "[{\"id\":7,\"bbox\":[30,100,540,480],\"title\":\"Q7 · 解析几何与椭圆\",\"confidence\":0.985}]";
+        }
     }
 }

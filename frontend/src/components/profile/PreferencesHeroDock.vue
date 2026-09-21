@@ -50,13 +50,33 @@ defineProps<{
   transition: all 0.25s ease;
 
   &.primary-save-btn {
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-    border: none;
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
     box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
 
-    &:hover {
+    :deep(.el-icon),
+    span {
+      color: #ffffff !important;
+    }
+
+    &:hover,
+    &:focus {
+      background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
+      color: #ffffff !important;
+      border: none !important;
       transform: translateY(-1px);
-      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.4);
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45) !important;
+
+      :deep(.el-icon),
+      span {
+        color: #ffffff !important;
+      }
+    }
+
+    &:active {
+      background: #1e40af !important;
+      transform: translateY(0);
     }
   }
 
@@ -65,10 +85,16 @@ defineProps<{
     color: var(--el-text-color-regular, #475569);
     background: #ffffff;
 
-    &:hover {
+    &:hover,
+    &:focus {
       border-color: #94a3b8;
       color: var(--el-text-color-primary, #0f172a);
       background: #f8fafc;
+      transform: translateY(-1px);
+    }
+
+    &:active {
+      transform: translateY(0);
     }
   }
 }

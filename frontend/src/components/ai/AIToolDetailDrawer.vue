@@ -99,20 +99,55 @@ const visible = computed({
   set: (val: boolean) => emit('update:modelValue', val)
 });
 
+const TOOL_HINTS: Record<string, { input: string; output: string }> = {
+  tool_chat: {
+    input: '在课程空间内选择目标课程，直接输入学术疑问、概念难点或代码调试问题。',
+    output: '实时流式输出结合课程知识库的权威解答，支持 Markdown、LaTeX 公式与代码语法高亮。'
+  },
+  tool_question_gen: {
+    input: '选择课程及章节知识点范围，配置目标题型、难度等级、知识侧重与题目生成数量。',
+    output: '批量生成包含题干、选项、答案与解析的结构化试题，支持在线微调并一键入库试题中心。'
+  },
+  tool_exam_gen: {
+    input: '设定试卷总分、考试时长、知识覆盖面及单选/多选/简答等各类题型的数量与分值配比。',
+    output: '自动装配标准化期中/期末试卷，支持全局难易度预览、一键换题调分与试卷保存复用。'
+  },
+  tool_grading: {
+    input: '选择学生提交的作业或考试答卷，系统自动关联对应的标准参考答案与评分细则。',
+    output: '客观题秒级判分，主观题多维度评分并生成针对性错因分析与评语，支持教师复核。'
+  },
+  tool_lesson: {
+    input: '输入授课主题、适用对象、学时安排以及核心教学目标与重难点设计要求。',
+    output: '生成包含导入、讲授、互动、板书、小结与课后作业的结构化教案与课堂设计建议。'
+  },
+  tool_summary: {
+    input: '选择目标课程或上传章节课件/长篇资料，设定知识提炼深度与复习备考重点。',
+    output: '提炼章节核心要点脉络、公式定律清单与易错点陷阱，生成考前精要复习指南。'
+  },
+  tool_practice: {
+    input: '自动结合学生薄弱知识点画像与错题记录，也可由学生主动勾选需要巩固的章节模块。',
+    output: '自适应推送难度阶梯递进的针对性练习题包，实时反馈作答正误并提供变式解析。'
+  }
+};
+
 const inputHint = computed(() => {
   if (!props.tool) return '';
+  const custom = TOOL_HINTS[props.tool.id];
+  if (custom) return custom.input;
   if (props.tool.executionMode === 'V05_NOTICE') {
-    return 'V0.5 将支持在抽屉内直接输入教学文本、课件摘要或学习问题，并流式返回结果。';
+    return '该工具规划中：未来将支持在抽屉内直接输入文本并流式返回结果。';
   }
-  return '点击「立即使用」进入专用工作台，按页面向导填写课程、章节、题型等参数后提交。';
+  return '点击「立即使用」进入专用工作台，按页面向导填写相关参数后提交。';
 });
 
 const outputHint = computed(() => {
   if (!props.tool) return '';
+  const custom = TOOL_HINTS[props.tool.id];
+  if (custom) return custom.output;
   if (props.tool.executionMode === 'V05_NOTICE') {
-    return 'V0.5 将输出结构化 Markdown 结果，支持复制、导出与一键入库。';
+    return '该工具规划中：未来将输出结构化结果并支持导出。';
   }
-  return '生成结构化题目、试卷、批改结果或对话内容，可在页面内预览、编辑并保存。';
+  return '生成对应的结构化业务成果，可在专用工作台内预览、编辑与保存。';
 });
 
 function handleLaunch() {

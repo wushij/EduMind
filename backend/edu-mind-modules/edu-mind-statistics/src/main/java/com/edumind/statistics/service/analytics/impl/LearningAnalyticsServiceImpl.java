@@ -149,13 +149,17 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
                 .collect(Collectors.toMap(SubmissionStatsVO.StudentScoreVO::getStudentId, s -> s, (a, b) -> a))
                 : Collections.emptyMap();
 
+        // 批量补全学生用户与班级信息，避免逐学生跨模块查询造成 N+1
+        Map<Long, UserBriefVO> userMap = userQueryApi.mapUserBriefsByIds(studentIds);
+        Map<Long, MemberOrgBriefVO> orgMap = Collections.emptyMap();
+        try {
+            orgMap = organizationQueryApi.mapPrimaryClassesByUserIds(null, studentIds);
+        } catch (Exception ignored) {
+        }
         List<StudentLearningItemVO> list = new ArrayList<>();
         for (Long sId : studentIds) {
-            UserBriefVO user = userQueryApi.getUserById(sId);
-            MemberOrgBriefVO orgBrief = null;
-            try {
-                orgBrief = organizationQueryApi.getPrimaryClassByUserId(null, sId);
-            } catch (Exception ignored) {}
+            UserBriefVO user = userMap.get(sId);
+            MemberOrgBriefVO orgBrief = orgMap.get(sId);
 
             StudentLearningItemVO item = new StudentLearningItemVO();
             item.setStudentId(sId);
@@ -388,12 +392,14 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         if (courseId == null || studentIds == null || studentIds.isEmpty()) {
             return 0;
         }
-        int total = 0;
-        for (Long sid : studentIds) {
-            total += since != null
-                    ? learningRecordDao.getTotalDurationSince(courseId, sid, since)
-                    : learningRecordDao.getTotalDuration(courseId, sid);
-        }
+        Set<Long> studentSet = new HashSet<>(studentIds);
+        List<LearningRecordEntity> records = since != null
+                ? learningRecordDao.listByCourseSince(courseId, since)
+                : learningRecordDao.listByCourse(courseId);
+        int total = records.stream()
+                .filter(r -> r.getStudentId() != null && studentSet.contains(r.getStudentId()))
+                .mapToInt(r -> r.getDurationMinutes() != null ? r.getDurationMinutes() : 0)
+                .sum();
         return total / (double) studentIds.size();
     }
 

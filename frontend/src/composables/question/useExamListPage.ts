@@ -61,7 +61,14 @@ export function useExamListPage() {
   }
 
   function handlePublish(exam: ExamPaper) {
-    ElMessage.success(`试卷《${exam.title}》已成功发布至选课班级考试中心！`);
+    router.push({
+      path: '/question/assignments/create',
+      query: {
+        examId: exam.id,
+        courseId: exam.courseId,
+        title: exam.title
+      }
+    });
   }
 
   async function handleDelete(exam: ExamPaper) {

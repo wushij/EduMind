@@ -113,8 +113,10 @@ public class AiAuditQueryServiceImpl implements AiAuditQueryService {
         if (CollectionUtils.isEmpty(courseIds)) {
             return result;
         }
-        for (Long cid : courseIds) {
-            result.put(cid, countCallsByCourse(cid, since));
+        // 单次 GROUP BY 聚合替代逐课程 count（原实现为 N 次 count）
+        Map<Long, Long> groupedCounts = aiCallLogDao.countGroupByCourseIds(courseIds, since);
+        for (Long courseId : courseIds) {
+            result.put(courseId, groupedCounts.getOrDefault(courseId, 0L));
         }
         return result;
     }

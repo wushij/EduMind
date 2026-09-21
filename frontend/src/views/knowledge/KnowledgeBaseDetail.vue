@@ -99,7 +99,7 @@
     </div>
 
     <div class="kb-subview-content">
-      <router-view />
+      <router-view v-if="currentKnowledgeBase" />
     </div>
   </div>
 </template>
@@ -109,7 +109,7 @@ import { computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { useKnowledgeBase } from '@/composables/knowledge/useKnowledgeBase';
-import { LAST_KNOWLEDGE_ID_KEY, useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
+import { setStoredKnowledgeBaseId, clearStoredKnowledgeBaseId, useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
 
 const router = useRouter();
 const { kbId } = useKnowledgeRoute();
@@ -131,12 +131,23 @@ const statusText = computed(() => {
 
 async function loadKnowledgeBase() {
   const id = kbId.value;
-  if (!id) return;
-  localStorage.setItem(LAST_KNOWLEDGE_ID_KEY, String(id));
+  if (!id) {
+    router.replace('/knowledge');
+    return;
+  }
   try {
-    await fetchKnowledgeBaseDetail(id);
+    const kb = await fetchKnowledgeBaseDetail(id);
+    if (!kb) {
+      clearStoredKnowledgeBaseId();
+      ElMessage.warning('知识库不存在或已被移除，正在返回知识库列表...');
+      router.replace('/knowledge');
+      return;
+    }
+    setStoredKnowledgeBaseId(id);
   } catch {
-    ElMessage.error('加载知识库信息失败');
+    clearStoredKnowledgeBaseId();
+    ElMessage.warning('知识库不存在或已被移除，正在返回知识库列表...');
+    router.replace('/knowledge');
   }
 }
 

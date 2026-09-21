@@ -13,7 +13,12 @@
         style="width: 220px"
         @change="emit('course-change', $event)"
       >
-        <el-option v-for="c in courseOptions" :key="c.id" :label="c.name" :value="c.id" />
+        <el-option
+          v-for="c in courseOptions"
+          :key="c.id"
+          :label="c.name || (c as any).title || ('课程 #' + c.id)"
+          :value="c.id"
+        />
       </el-select>
       <button type="button" class="capsule-btn capsule-btn--default" @click="router.push('/learning/practice')">
         <el-icon class="btn-icon"><MagicStick /></el-icon>

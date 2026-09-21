@@ -10,7 +10,13 @@ export const mockProviderPresets: AIProviderPresetsResponse = {
       baseUrl: 'https://api.deepseek.com/v1',
       portalUrl: 'https://platform.deepseek.com',
       protocol: 'openai_compatible',
-      modelOptions: ['deepseek-v4-flash-vision-exp', 'deepseek-v4-pro', 'deepseek-v4-flash']
+      modelOptions: [
+        'deepseek-v4.1-flash',
+        'deepseek-flash',
+        'deepseek-v4-flash-vision-exp',
+        'deepseek-v4-pro',
+        'deepseek-v4-flash'
+      ]
     },
     openai: {
       label: 'OpenAI',

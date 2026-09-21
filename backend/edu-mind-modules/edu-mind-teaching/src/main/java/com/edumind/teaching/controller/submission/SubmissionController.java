@@ -96,4 +96,11 @@ public class SubmissionController {
     public ApiResult<List<SubmissionVO>> listByAssignment(@PathVariable("assignmentId") Long assignmentId) {
         return ApiResult.success(submissionService.listByAssignmentId(assignmentId));
     }
+
+    @SaCheckPermission("assignment:delete")
+    @DeleteMapping("/{id}")
+    public ApiResult<Void> delete(@PathVariable("id") Long id) {
+        submissionService.delete(id);
+        return ApiResult.success();
+    }
 }

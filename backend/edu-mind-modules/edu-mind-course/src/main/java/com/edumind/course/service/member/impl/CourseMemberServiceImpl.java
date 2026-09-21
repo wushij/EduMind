@@ -18,6 +18,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -38,8 +39,12 @@ public class CourseMemberServiceImpl implements CourseMemberService {
             throw new BusinessException("课程不存在");
         }
         courseAccessService.assertCanView(course);
-        return courseMemberDao.findByCourseId(courseId).stream()
-                .map(this::toMemberVO)
+        List<CourseMemberEntity> members = courseMemberDao.findByCourseId(courseId);
+        // 批量补全成员用户信息，避免逐成员跨模块查询（每人 3 次 DB）造成 N+1
+        Map<Long, UserBriefVO> userMap = userQueryApi.mapUserBriefsByIds(
+                members.stream().map(CourseMemberEntity::getUserId).collect(Collectors.toList()));
+        return members.stream()
+                .map(member -> toMemberVO(member, userMap.get(member.getUserId())))
                 .collect(Collectors.toList());
     }
 
@@ -71,9 +76,13 @@ public class CourseMemberServiceImpl implements CourseMemberService {
         Set<Long> existingMemberUserIds = courseMemberDao.findByCourseId(courseId).stream()
                 .map(CourseMemberEntity::getUserId)
                 .collect(Collectors.toSet());
-        return matchedIds.stream()
+        List<Long> candidateIds = matchedIds.stream()
                 .filter(id -> !existingMemberUserIds.contains(id))
-                .map(userQueryApi::getUserById)
+                .collect(Collectors.toList());
+        // 批量查询候选用户，避免逐个跨模块调用
+        Map<Long, UserBriefVO> userMap = userQueryApi.mapUserBriefsByIds(candidateIds);
+        return candidateIds.stream()
+                .map(userMap::get)
                 .filter(Objects::nonNull)
                 .map(user -> CourseMemberCandidateVO.builder()
                         .userId(user.getId())
@@ -133,8 +142,7 @@ public class CourseMemberServiceImpl implements CourseMemberService {
         return entity.getId();
     }
 
-    private CourseMemberVO toMemberVO(CourseMemberEntity entity) {
-        UserBriefVO user = userQueryApi.getUserById(entity.getUserId());
+    private CourseMemberVO toMemberVO(CourseMemberEntity entity, UserBriefVO user) {
         return CourseMemberVO.builder()
                 .id(entity.getId())
                 .courseId(entity.getCourseId())

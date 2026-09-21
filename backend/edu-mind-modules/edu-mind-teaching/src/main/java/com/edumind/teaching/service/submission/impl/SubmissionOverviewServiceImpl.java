@@ -54,8 +54,13 @@ public class SubmissionOverviewServiceImpl implements SubmissionOverviewService 
                 scope.keywordAssignmentIds(), scope.keywordStudentIds(), pageNum, size);
 
         Map<Long, AssignmentEntity> assignmentMap = loadAssignmentMap(result.getRecords());
+        Map<Long, String> courseNameMap = new HashMap<>();
+        // 预批量拉取本页涉及的学生用户与班级信息（固定次数批量查询），替代渲染时逐条跨模块查询
+        Map<Long, UserBriefVO> userMap = loadUserMap(result.getRecords());
+        Map<Long, MemberOrgBriefVO> orgMap = loadOrgMap(result.getRecords());
+
         List<SubmissionListItemVO> list = result.getRecords().stream()
-                .map(entity -> toListItem(entity, assignmentMap.get(entity.getAssignmentId())))
+                .map(entity -> toListItem(entity, assignmentMap.get(entity.getAssignmentId()), courseNameMap, userMap, orgMap))
                 .collect(Collectors.toList());
 
         return PageResult.<SubmissionListItemVO>builder()
@@ -86,16 +91,24 @@ public class SubmissionOverviewServiceImpl implements SubmissionOverviewService 
         if (dto == null) {
             throw new BusinessException("请求参数不能为空");
         }
+        boolean force = Boolean.TRUE.equals(dto.getForceRegrade());
         List<SubmissionEntity> targets;
         if (!CollectionUtils.isEmpty(dto.getSubmissionIds())) {
             targets = dto.getSubmissionIds().stream()
                     .map(submissionDao::findById)
-                    .filter(e -> e != null && "SUBMITTED".equals(e.getStatus()))
+                    .filter(e -> e != null && (force || "SUBMITTED".equals(e.getStatus())))
                     .toList();
         } else {
             QueryScope scope = resolveScope(dto.getCourseId(), dto.getAssignmentId(), null);
-            targets = submissionDao.listByScope(scope.assignmentIds(), dto.getAssignmentId(), "SUBMITTED", null,
+            String targetStatus = force ? null : "SUBMITTED";
+            targets = submissionDao.listByScope(scope.assignmentIds(), dto.getAssignmentId(), targetStatus, null,
                     scope.keywordAssignmentIds(), scope.keywordStudentIds());
+            if (force) {
+                // 不重新覆盖已经最终审阅完成（REVIEWED）的答卷，保护教师终审成绩
+                targets = targets.stream()
+                        .filter(e -> !"REVIEWED".equals(e.getStatus()))
+                        .toList();
+            }
         }
         int success = 0;
         for (SubmissionEntity entity : targets) {
@@ -148,7 +161,44 @@ public class SubmissionOverviewServiceImpl implements SubmissionOverviewService 
         return map;
     }
 
-    private SubmissionListItemVO toListItem(SubmissionEntity entity, AssignmentEntity assignment) {
+    /** 批量预取本页学生用户信息，避免列表渲染时逐条查询用户（原有 computeIfAbsent 缓存仅能去重，仍为多次查询） */
+    private Map<Long, UserBriefVO> loadUserMap(List<SubmissionEntity> records) {
+        List<Long> studentIds = records.stream()
+                .map(SubmissionEntity::getStudentId)
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+        if (studentIds.isEmpty()) {
+            return new HashMap<>();
+        }
+        try {
+            return new HashMap<>(userQueryApi.mapUserBriefsByIds(studentIds));
+        } catch (Exception ignored) {
+            return new HashMap<>();
+        }
+    }
+
+    /** 批量预取本页学生班级/学号信息，避免列表渲染时逐条解析班级造成 N+1 */
+    private Map<Long, MemberOrgBriefVO> loadOrgMap(List<SubmissionEntity> records) {
+        List<Long> studentIds = records.stream()
+                .map(SubmissionEntity::getStudentId)
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+        if (studentIds.isEmpty()) {
+            return new HashMap<>();
+        }
+        try {
+            return new HashMap<>(organizationQueryApi.mapPrimaryClassesByUserIds(DEFAULT_TENANT_ID, studentIds));
+        } catch (Exception ignored) {
+            return new HashMap<>();
+        }
+    }
+
+    private SubmissionListItemVO toListItem(SubmissionEntity entity, AssignmentEntity assignment,
+                                            Map<Long, String> courseNameMap,
+                                            Map<Long, UserBriefVO> userMap,
+                                            Map<Long, MemberOrgBriefVO> orgMap) {
         SubmissionListItemVO vo = new SubmissionListItemVO();
         vo.setId(entity.getId());
         vo.setAssignmentId(entity.getAssignmentId());
@@ -157,31 +207,37 @@ public class SubmissionOverviewServiceImpl implements SubmissionOverviewService 
         vo.setTotalScore(entity.getTotalScore());
         vo.setMaxScore(entity.getMaxScore());
         vo.setSubmitTime(entity.getSubmitTime());
-        if (assignment != null) {
+        if (assignment != null && assignment.getCourseId() != null) {
             vo.setAssignmentTitle(assignment.getTitle());
             vo.setCourseId(assignment.getCourseId());
-            try {
-                CourseDetailVO course = courseQueryApi.getCourseById(assignment.getCourseId());
-                if (course != null) {
-                    vo.setCourseName(course.getName());
+            String courseName = courseNameMap.computeIfAbsent(assignment.getCourseId(), cid -> {
+                try {
+                    CourseDetailVO course = courseQueryApi.getCourseById(cid);
+                    return course != null ? course.getName() : null;
+                } catch (Exception ignored) {
+                    return null;
                 }
-            } catch (Exception ignored) {
-                // optional enrich
+            });
+            if (courseName != null) {
+                vo.setCourseName(courseName);
             }
         }
-        enrichStudent(vo);
+        enrichStudent(vo, userMap, orgMap);
         return vo;
     }
 
-    private void enrichStudent(SubmissionListItemVO vo) {
+    private void enrichStudent(SubmissionListItemVO vo,
+                               Map<Long, UserBriefVO> userMap,
+                               Map<Long, MemberOrgBriefVO> orgMap) {
         if (vo.getStudentId() == null) {
             return;
         }
-        UserBriefVO user = userQueryApi.getUserById(vo.getStudentId());
+        // 用户与班级信息已由 pageQuery 批量预取，这里只做内存映射，不再逐条跨模块查询
+        UserBriefVO user = userMap.get(vo.getStudentId());
         if (user != null) {
             vo.setStudentName(user.getRealName() != null ? user.getRealName() : user.getUsername());
         }
-        MemberOrgBriefVO org = organizationQueryApi.getPrimaryClassByUserId(DEFAULT_TENANT_ID, vo.getStudentId());
+        MemberOrgBriefVO org = orgMap.get(vo.getStudentId());
         if (org != null && org.getMemberNo() != null) {
             vo.setStudentNo(org.getMemberNo());
         } else if (user != null) {

@@ -10,7 +10,7 @@
       :total-chunks="totalChunks"
       :last-updated-text="lastUpdatedText"
       :format-number="formatNumber"
-      @create="handleOpenCreate"
+      @create="router.push('/knowledge/create')"
       @open-retrieval="handleOpenRetrieval()"
       @open-rag-dashboard="router.push('/knowledge/rag-dashboard')"
       @refresh="handleRefresh(true)"

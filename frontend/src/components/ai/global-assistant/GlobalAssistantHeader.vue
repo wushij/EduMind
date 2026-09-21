@@ -16,6 +16,32 @@
 
               <div class="header-actions">
                 <div class="header-toolbar" role="toolbar" aria-label="操作">
+                  <!-- 大模型选择器下拉框 (与课程中心 1:1 对齐规范) -->
+                  <el-dropdown trigger="click" @command="handleModelSelect">
+                    <button type="button" class="header-model-btn" title="切换当前 AI 推理引擎">
+                      <span class="model-sparkle">✦</span>
+                      <span class="model-name">{{ currentModel }}</span>
+                      <el-icon class="model-arrow" :size="12"><ArrowDown /></el-icon>
+                    </button>
+                    <template #dropdown>
+                      <el-dropdown-menu class="model-dropdown-menu ga-model-menu">
+                        <el-dropdown-item
+                          v-for="m in modelOptions"
+                          :key="m.key"
+                          :command="m.key"
+                          :class="{ 'is-selected': currentModelKey === m.key }"
+                        >
+                          <div class="model-item-row">
+                            <span class="item-name">{{ m.name }}</span>
+                            <span class="item-badge">{{ m.desc }}</span>
+                          </div>
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+
+                  <span class="header-toolbar-sep" aria-hidden="true" />
+
                   <button
                     class="header-btn"
                     :class="{ 'is-active': isWideMode }"
@@ -78,7 +104,7 @@
 
 <script setup lang="ts">
 import { inject } from 'vue';
-import { Plus, Close, Delete, FullScreen, Aim, Clock } from '@element-plus/icons-vue';
+import { Plus, Close, Delete, FullScreen, Aim, Clock, ArrowDown } from '@element-plus/icons-vue';
 import { globalAssistantUiKey } from '@/components/ai/global-assistant/global-assistant-ui-key';
 
 const {
@@ -88,6 +114,10 @@ const {
   toggleHistoryPanel,
   startNewSession,
   clearMessages,
-  drawerVisible
+  drawerVisible,
+  modelOptions,
+  currentModel,
+  currentModelKey,
+  handleModelSelect
 } = inject(globalAssistantUiKey)!;
 </script>

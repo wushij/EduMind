@@ -35,40 +35,12 @@
         </div>
       </div>
     </div>
-
-    <!-- 分类药丸切换栏 (全面使用 Element Plus 官方矢量组件，彻底告别 Emoji) -->
-    <div class="marketplace-filter-dock">
-      <div class="pill-category-tabs">
-        <button
-          v-for="cat in visibleFilterCategories"
-          :key="cat.value"
-          type="button"
-          class="pill-cat-btn"
-          :class="{ active: currentCategory === cat.value }"
-          @click="handleCategoryClick(cat)"
-        >
-          <el-icon class="cat-icon"><component :is="cat.icon" /></el-icon>
-          <span>{{ cat.label }}</span>
-        </button>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, type Component } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { Grid, School, Reading, Star, StarFilled } from '@element-plus/icons-vue';
-import { useAuthStore } from '@/stores/auth/auth';
-import { canAccessMarketplaceCategory } from '@/utils/ai/tool-role-access';
+import { ref, watch } from 'vue';
 import marketplaceBannerImg from '@/assets/images/ai广场.png';
-
-type CategoryItem = {
-  label: string;
-  value: string;
-  route: string;
-  icon: Component;
-};
 
 const props = defineProps<{
   searchKeyword?: string;
@@ -82,10 +54,6 @@ const emit = defineEmits<{
   (e: 'category-change', val: string): void;
 }>();
 
-const router = useRouter();
-const route = useRoute();
-const authStore = useAuthStore();
-
 const searchInputRef = ref<HTMLInputElement | null>(null);
 const isFocused = ref(false);
 const inputValue = ref(props.searchKeyword ?? '');
@@ -98,49 +66,17 @@ watch(
   }
 );
 
-// 全面采用 Element Plus 官方图标组件，杜绝原生 Emoji
-const filterCategories: CategoryItem[] = [
-  { label: '全部', value: 'ALL', icon: Grid, route: '/ai/marketplace' },
-  { label: '教师提效', value: 'TEACHER', icon: School, route: '/ai/marketplace/teacher' },
-  { label: '学生助学', value: 'STUDENT', icon: Reading, route: '/ai/marketplace/student' },
-  { label: '推荐工具', value: 'RECOMMENDED', icon: Star, route: '/ai/marketplace/recommended' },
-  { label: '我的常用', value: 'MY_TOOLS', icon: StarFilled, route: '/ai/marketplace/my-tools' }
-];
-
-const visibleFilterCategories = computed(() =>
-  filterCategories.filter((cat) =>
-    canAccessMarketplaceCategory(cat.value, authStore.currentRole)
-  )
-);
-
-const currentCategory = computed(() => {
-  if (props.activeCategory) return props.activeCategory;
-  if (route.path.endsWith('/teacher')) return 'TEACHER';
-  if (route.path.endsWith('/student')) return 'STUDENT';
-  if (route.path.endsWith('/recommended')) return 'RECOMMENDED';
-  if (route.path.endsWith('/my-tools')) return 'MY_TOOLS';
-  return 'ALL';
-});
-
 // 只有点击搜索按钮或回车才触发搜索
 function emitSearch() {
   const val = inputValue.value.trim();
   emit('update:searchKeyword', val);
   emit('search', val);
 }
-
-function handleCategoryClick(cat: CategoryItem) {
-  emit('update:activeCategory', cat.value);
-  emit('category-change', cat.value);
-  if (route.path !== cat.route) {
-    router.push(cat.route);
-  }
-}
 </script>
 
 <style scoped lang="scss">
 .ai-marketplace-hero-wrapper {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .marketplace-banner-stage {
@@ -237,84 +173,6 @@ function handleCategoryClick(cat: CategoryItem) {
 
     &:active {
       background: rgba(0, 0, 0, 0.1);
-    }
-  }
-}
-
-.marketplace-filter-dock {
-  margin-top: 14px;
-  line-height: normal;
-
-  .pill-category-tabs {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: nowrap;
-    background: rgba(255, 255, 255, 0.94);
-    backdrop-filter: blur(10px);
-    padding: 4px 6px;
-    border-radius: 9999px;
-    border: 1px solid rgba(226, 232, 240, 0.92);
-    box-shadow: 0 2px 12px rgba(30, 80, 150, 0.06);
-
-    .pill-cat-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      height: 32px;
-      padding: 0 14px;
-      border-radius: 9999px;
-      border: none;
-      background: transparent;
-      color: #475569;
-      font-size: 12.5px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      white-space: nowrap;
-
-      .cat-icon {
-        font-size: 14px;
-        transition: transform 0.2s ease;
-      }
-
-      &:hover {
-        color: #1677ff;
-
-        .cat-icon {
-          transform: scale(1.1);
-        }
-      }
-
-      &.active {
-        background: #1677ff;
-        color: #ffffff;
-        font-weight: 600;
-        box-shadow: 0 2px 10px rgba(22, 119, 255, 0.32);
-
-        .cat-icon {
-          color: #ffffff;
-        }
-      }
-    }
-  }
-}
-
-@media (max-width: 1200px) {
-  .marketplace-filter-dock .pill-category-tabs .pill-cat-btn {
-    padding: 0 11px;
-    font-size: 12px;
-  }
-}
-
-@media (max-width: 768px) {
-  .marketplace-filter-dock {
-    max-width: 100%;
-    overflow-x: auto;
-
-    .pill-category-tabs {
-      width: max-content;
-      max-width: 100%;
     }
   }
 }

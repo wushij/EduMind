@@ -51,10 +51,53 @@ export function normalizeMathTextNewlines(text: string): string {
     .replace(/\\n(?![a-zA-Z])/g, '\n');
 }
 
+const COMMON_MATH_COMMANDS =
+  'ln|sin|cos|tan|cot|sec|csc|arcsin|arccos|arctan|frac|sqrt|lim|sum|int|iint|iiint|oint|prod|partial|nabla|sim|approx|ne|neq|le|leq|ge|geq|in|notin|subset|subseteq|cup|cap|to|leftarrow|rightarrow|Rightarrow|Leftarrow|Leftrightarrow|forall|exists|infty|pm|times|div|cdot|alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|phi|chi|psi|omega';
+
+const BARE_LATEX_RE = new RegExp(
+  `(?<![\\\\$a-zA-Z0-9])\\\\(?:${COMMON_MATH_COMMANDS})(?:\\\\[a-zA-Z]+|\\{[^{}]*\\}|\\[[^\\]]*\\]|\\([^()]*\\)|[0-9a-zA-Z+\\-*/=^_(),.:~\\s])*(?=[，；。！？、\\n]|$)`,
+  'g'
+);
+
+/**
+ * 将文本中未被 $ 包裹的裸 LaTeX 命令表达式（如 \\ln(1+x) \\sim x、\\sin 2x \\sim 2x）
+ * 自动识别并包裹为 $...$，便于 KaTeX 精准解析渲染
+ */
+export function wrapBareLatexExpressions(text: string): string {
+  if (!text || !text.includes('\\')) return text;
+
+  // 1. 保护已有标准数学公式占位符
+  const placeholders: string[] = [];
+  let masked = text.replace(
+    /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$[^$\n]+?\$)/g,
+    (m) => {
+      const idx = placeholders.length;
+      placeholders.push(m);
+      return `%%%MATH_TOKEN_${idx}%%%`;
+    }
+  );
+
+  // 2. 匹配裸 LaTeX 表达式
+  masked = masked.replace(BARE_LATEX_RE, (match) => {
+    const trimmed = match.trim();
+    if (!trimmed || trimmed.startsWith('%%%MATH_TOKEN_')) return match;
+    // 去除末尾可能被多吃的英文逗号句号或冒号
+    const clean = trimmed.replace(/[，；。！？]+$/, '').trim();
+    if (!clean) return match;
+    return `$${clean}$`;
+  });
+
+  // 3. 还原占位符
+  return masked.replace(/%%%MATH_TOKEN_(\d+)%%%/g, (_m, idxStr) => {
+    const idx = Number(idxStr);
+    return placeholders[idx] ?? _m;
+  });
+}
+
 type MathSegment = { kind: 'text'; value: string } | { kind: 'math'; value: string; display: boolean };
 
 function splitMathSegments(text: string): MathSegment[] {
-  const normalized = normalizeMathTextNewlines(text);
+  const normalized = wrapBareLatexExpressions(normalizeMathTextNewlines(text));
   const segments: MathSegment[] = [];
   let i = 0;
 

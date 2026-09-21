@@ -1,5 +1,6 @@
 import { onMounted, ref } from 'vue';
 import { getCourseList } from '@/api/course/course';
+import { getCourseDisplayName } from '@/utils/course/course-display';
 import type { Course } from '@/types/course/course';
 
 export function useTeacherCourses(defaultCourseId = 102) {
@@ -12,7 +13,7 @@ export function useTeacherCourses(defaultCourseId = 102) {
     try {
       const res = await getCourseList({ page: 1, pageSize: 50 });
       const list = (res.data?.list ?? []) as Course[];
-      courseOptions.value = list.map((c) => ({ id: c.id, name: c.title }));
+      courseOptions.value = list.map((c) => ({ id: c.id, name: getCourseDisplayName(c) }));
       if (courseOptions.value.length > 0 && !courseOptions.value.some((c) => c.id === courseId.value)) {
         courseId.value = courseOptions.value[0].id;
       }

@@ -66,6 +66,12 @@ export function resolveProviderTagType(provider: string) {
   return 'info';
 }
 
+export function getRecommendedModelKey(models: ModelProviderConfig[]): string | undefined {
+  if (!models || models.length === 0) return undefined;
+  const official = models.find((m) => m.isDefault);
+  return official ? official.modelKey : models[0]?.modelKey;
+}
+
 export function usePreferences() {
   const preferenceStore = usePreferenceStore();
   const modelsLoading = ref(false);
@@ -74,6 +80,21 @@ export function usePreferences() {
   /** 仅展示网关返回的已启用模型，不使用本地假数据兜底 */
   const availableModels = computed(() => dynamicModels.value);
 
+  /** 自动将未指定、已失效或仍为老占位的基座模型对齐为官方默认推荐模型 */
+  const alignDefaultModelWithRecommendations = (models: ModelProviderConfig[]) => {
+    if (!models || models.length === 0) return;
+    const recommendedKey = getRecommendedModelKey(models);
+    if (!recommendedKey) return;
+
+    const currentModel = preferenceStore.preferences.defaultModel;
+    const isCurrentModelValid = currentModel && models.some((m) => m.modelKey === currentModel);
+
+    // 如果当前未设置、当前模型已不在可用列表、或者仍为初始占位 deepseek-v3 且当前官方推荐已另有所属
+    if (!isCurrentModelValid || (currentModel === 'deepseek-v3' && recommendedKey !== 'deepseek-v3')) {
+      preferenceStore.preferences.defaultModel = recommendedKey;
+    }
+  };
+
   const fetchDynamicModels = async (options?: { notify?: boolean }) => {
     const notify = options?.notify ?? false;
     try {
@@ -81,6 +102,7 @@ export function usePreferences() {
       const list = await resolveChatModels();
       if (list && list.length > 0) {
         dynamicModels.value = list.filter((m) => m.enabled !== false);
+        alignDefaultModelWithRecommendations(dynamicModels.value);
         if (notify) {
           ElMessage.success(`已从智能网关同步 ${dynamicModels.value.length} 个可用模型`);
         }
@@ -112,7 +134,9 @@ export function usePreferences() {
           type: 'warning'
         }
       );
-      await preferenceStore.resetToDefaults();
+      // 恢复默认时，优先选中系统当前官方推荐模型
+      const recommendedModelKey = getRecommendedModelKey(availableModels.value);
+      await preferenceStore.resetToDefaults(recommendedModelKey);
     } catch {
       // 用户取消
     }
@@ -125,6 +149,9 @@ export function usePreferences() {
   onMounted(async () => {
     await preferenceStore.loadPreferences();
     await fetchDynamicModels();
+    if (dynamicModels.value.length > 0) {
+      alignDefaultModelWithRecommendations(dynamicModels.value);
+    }
   });
 
   return {

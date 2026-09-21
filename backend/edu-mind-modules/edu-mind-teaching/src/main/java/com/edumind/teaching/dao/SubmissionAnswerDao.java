@@ -13,6 +13,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SubmissionAnswerDao {
 
+    /** 批量插入单条 SQL 的最大行数，避免超出 MySQL max_allowed_packet */
+    private static final int INSERT_BATCH_SIZE = 500;
+
     private final SubmissionAnswerMapper submissionAnswerMapper;
 
     public List<SubmissionAnswerEntity> listBySubmissionId(Long submissionId) {
@@ -27,6 +30,19 @@ public class SubmissionAnswerDao {
 
     public int insert(SubmissionAnswerEntity entity) {
         return submissionAnswerMapper.insert(entity);
+    }
+
+    /** 单条 SQL 分片批量插入（参与当前事务），用于替代循环内逐条 insert */
+    public int insertBatch(List<SubmissionAnswerEntity> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return 0;
+        }
+        int affected = 0;
+        for (int i = 0; i < entities.size(); i += INSERT_BATCH_SIZE) {
+            int end = Math.min(i + INSERT_BATCH_SIZE, entities.size());
+            affected += submissionAnswerMapper.insertBatch(entities.subList(i, end));
+        }
+        return affected;
     }
 
     public int deleteBySubmissionId(Long submissionId) {

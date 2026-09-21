@@ -72,5 +72,17 @@ export default defineConfig({
         ws: true
       }
     }
+  },
+  optimizeDeps: {
+    include: [
+      'vue',
+      'vue-router',
+      'pinia',
+      'axios',
+      'element-plus',
+      '@element-plus/icons-vue',
+      'katex',
+      'echarts'
+    ]
   }
 });

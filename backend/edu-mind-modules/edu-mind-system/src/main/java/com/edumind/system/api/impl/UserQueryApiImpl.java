@@ -6,7 +6,9 @@ import com.edumind.system.vo.user.UserBriefVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +19,16 @@ public class UserQueryApiImpl implements UserQueryApi {
     @Override
     public UserBriefVO getUserById(Long userId) {
         return userQueryService.getUserById(userId);
+    }
+
+    @Override
+    public Map<Long, UserBriefVO> mapUserBriefsByIds(Collection<Long> userIds) {
+        return userQueryService.mapUserBriefsByIds(userIds);
+    }
+
+    @Override
+    public Map<Long, List<String>> mapRoleCodesByUserIds(Collection<Long> userIds) {
+        return userQueryService.mapRoleCodesByUserIds(userIds);
     }
 
     @Override

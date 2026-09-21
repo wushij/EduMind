@@ -30,6 +30,15 @@ public class UserRoleDao {
                 .collect(Collectors.toList());
     }
 
+    /** 批量按用户 ID 查询角色关联（单次 IN 查询，用于替代循环内逐条 findByUserId） */
+    public List<UserRoleEntity> findByUserIds(java.util.Collection<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return userRoleMapper.selectList(new LambdaQueryWrapper<UserRoleEntity>()
+                .in(UserRoleEntity::getUserId, userIds));
+    }
+
     public List<Long> findRoleIdsByUserId(Long userId) {
         return listRoleIdsByUserId(userId);
     }

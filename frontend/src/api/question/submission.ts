@@ -1,4 +1,4 @@
-import { get, post, put } from '@/core/http/request';
+import { get, post, put, del } from '@/core/http/request';
 import type { PageResult } from '@/types/common/api';
 import type { SubmissionItem, SubmissionOverviewStats } from '@/types/question/submission';
 
@@ -7,9 +7,12 @@ export const createSubmission = (assignmentId: number, answers: Array<{ question
 
 export const getSubmissionDetail = (id: number) => get<SubmissionItem>(`/submissions/${id}`);
 
+export const deleteSubmission = (id: number) => del<void>(`/submissions/${id}`);
+
 export const getSubmissionGrading = (id: number) => get<SubmissionItem['gradingItems']>(`/submissions/${id}/grading`);
 
-export const gradeSubmission = (id: number) => post<void>(`/submissions/${id}/grade`);
+export const gradeSubmission = (id: number, options?: { signal?: AbortSignal }) =>
+  post<void>(`/submissions/${id}/grade`, undefined, { signal: options?.signal });
 
 export const reviewGrading = (
   id: number,
@@ -35,4 +38,5 @@ export const batchGradeSubmissions = (body: {
   courseId?: number;
   assignmentId?: number;
   submissionIds?: number[];
-}) => post<{ successCount: number }>('/submissions/batch-grade', body);
+  forceRegrade?: boolean;
+}, options?: { signal?: AbortSignal }) => post<{ successCount: number }>('/submissions/batch-grade', body, { signal: options?.signal });

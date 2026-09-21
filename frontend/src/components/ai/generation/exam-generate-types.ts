@@ -6,5 +6,8 @@ export interface ExamFormState {
   totalScore: number;
   durationMinutes: number;
   chapterIds: number[];
+  knowledgePointIds?: number[];
+  promptDirective?: string;
+  aiGenerateFillShortfall?: boolean;
   rules: ExamRule[];
 }

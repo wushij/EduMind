@@ -165,7 +165,7 @@
                   <span class="streaming-badge-tag">正在生成研读解析...</span>
                 </div>
 
-                <!-- 深度思考状态卡片 (动态脉冲，正文输出时自动折叠) -->
+                <!-- 深度思考状态卡片 (动态脉冲，正文输出时自动折叠，支持计时与暂停) -->
                 <AIThinking
                   v-if="showThinkingPanel && (!streamingAnswerBody || streamingThinkingDisplay)"
                   :content="streamingThinkingDisplay"
@@ -173,6 +173,8 @@
                   :active="!streamingAnswerBody && (isReasoningActive || !streamingThinkingDisplay)"
                   :has-answer-body="!!streamingAnswerBody"
                   :phase-message="streamPhaseMessage || '正在深度研读本门课程知识大纲与切片...'"
+                  :allow-abort="true"
+                  @abort="stopStream"
                   @update:folded="isReasoningFolded = $event"
                   @user-collapse="pauseAutoScrollFollow"
                 />

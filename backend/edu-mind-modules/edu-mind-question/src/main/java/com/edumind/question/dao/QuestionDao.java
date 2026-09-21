@@ -17,6 +17,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class QuestionDao {
 
+    /** 批量插入单条 SQL 的最大行数，避免超出 MySQL max_allowed_packet */
+    private static final int INSERT_BATCH_SIZE = 500;
+
     private final QuestionMapper questionMapper;
 
     public QuestionEntity getById(Long id) {
@@ -107,6 +110,30 @@ public class QuestionDao {
             entity.setTenantId(TenantContext.getTenantId());
         }
         return questionMapper.insert(entity);
+    }
+
+    /**
+     * 单条 SQL 分片批量插入（参与当前事务），用于替代循环内逐条 insert。
+     * 与 {@link #insert(QuestionEntity)} 一致：租户为空时按当前上下文填充；
+     * id 为雪花 ID，调用方需保证已赋值（MP 在参数为实体集合时不会自动生成）。
+     */
+    public int insertBatch(List<QuestionEntity> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return 0;
+        }
+        Long tenantId = TenantContext.getTenantId();
+        int affected = 0;
+        for (int i = 0; i < entities.size(); i += INSERT_BATCH_SIZE) {
+            int end = Math.min(i + INSERT_BATCH_SIZE, entities.size());
+            List<QuestionEntity> chunk = entities.subList(i, end);
+            for (QuestionEntity entity : chunk) {
+                if (entity.getTenantId() == null && tenantId != null && tenantId > 0) {
+                    entity.setTenantId(tenantId);
+                }
+            }
+            affected += questionMapper.insertBatch(chunk);
+        }
+        return affected;
     }
 
     public int updateById(QuestionEntity entity) {

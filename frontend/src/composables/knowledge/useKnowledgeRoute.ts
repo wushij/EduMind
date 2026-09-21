@@ -16,9 +16,25 @@ export function parseKnowledgeBaseIdFromPath(path: string): number | undefined {
   return match ? parseKnowledgeBaseId(match[1]) : undefined;
 }
 
-export function getStoredKnowledgeBaseId(): number {
+export function getStoredKnowledgeBaseId(): number | undefined {
   const stored = localStorage.getItem(LAST_KNOWLEDGE_ID_KEY);
-  return parseKnowledgeBaseId(stored) ?? 1;
+  return parseKnowledgeBaseId(stored);
+}
+
+export function setStoredKnowledgeBaseId(id: number | null | undefined): void {
+  const validId = parseKnowledgeBaseId(id);
+  if (validId) {
+    localStorage.setItem(LAST_KNOWLEDGE_ID_KEY, String(validId));
+  } else {
+    localStorage.removeItem(LAST_KNOWLEDGE_ID_KEY);
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('edumind:kb-changed', { detail: validId }));
+  }
+}
+
+export function clearStoredKnowledgeBaseId(): void {
+  setStoredKnowledgeBaseId(undefined);
 }
 
 /**

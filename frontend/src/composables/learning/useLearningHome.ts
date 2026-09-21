@@ -2,6 +2,7 @@ import { ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { getLearningHomeOverview } from '@/api/learning/home';
 import { getCourseList } from '@/api/course/course';
+import { getCourseDisplayName } from '@/utils/course/course-display';
 import type {
   LearningHomeOverviewVO,
   LearningHomeTaskUI,
@@ -70,7 +71,10 @@ export function useLearningHome() {
     try {
       const res = await getCourseList({ page: 1, pageSize: 50 });
       const list = (res.data?.list ?? []) as Course[];
-      courseOptions.value = list.map((c) => ({ id: c.id, name: c.title }));
+      courseOptions.value = list.map((c) => ({
+        id: c.id,
+        name: getCourseDisplayName(c)
+      }));
     } catch {
       courseOptions.value = [];
     }
@@ -83,6 +87,12 @@ export function useLearningHome() {
         primaryCourseId != null ? { primaryCourseId } : undefined
       );
       overview.value = res.data ?? null;
+      if (overview.value?.courses && overview.value.courses.length > 0) {
+        courseOptions.value = overview.value.courses.map((c) => ({
+          id: c.courseId,
+          name: c.courseName || `课程 #${c.courseId}`
+        }));
+      }
       if (overview.value?.primaryCourseId != null) {
         selectedCourseId.value = overview.value.primaryCourseId;
       }

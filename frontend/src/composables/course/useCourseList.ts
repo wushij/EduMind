@@ -59,6 +59,9 @@ export function buildStatusTabs(total: number, activeCount: number, archivedCoun
   ];
 }
 
+// 模块级全局单例状态，保持上一次统计结果，避免跨路由切换时 Hero 与 Tab 数字频繁从 0 闪烁跳动
+const globalCourseStatusSummary = ref<CourseStatusSummary>({ total: 0, active: 0, archived: 0 });
+
 export function useCourseList() {
   const router = useRouter();
   const { courses, loading, total, fetchCourses, enrollCourseByCode } = useCourse();
@@ -74,7 +77,11 @@ export function useCourseList() {
   const courseCodeInput = ref('');
   const joining = ref(false);
 
-  const courseStatusSummary = ref<CourseStatusSummary>({ total: 0, active: 0, archived: 0 });
+  // 若已有缓存课程且汇总尚未初始化，先就地初始化，达成 0 延迟秒开
+  if (globalCourseStatusSummary.value.total === 0 && courses.value.length > 0) {
+    globalCourseStatusSummary.value = buildCourseStatusSummary(courses.value, total.value || courses.value.length);
+  }
+  const courseStatusSummary = globalCourseStatusSummary;
 
   const allCoursesTotal = computed(() => courseStatusSummary.value.total);
   const activeCourseCount = computed(() => courseStatusSummary.value.active);

@@ -111,7 +111,16 @@ export function useKnowledgeBaseCreate() {
   async function loadCourses() {
     try {
       const res = await getCourseList({ page: 1, pageSize: 50 });
-      courses.value = res.data?.list || FALLBACK_COURSES;
+      const rawList = res.data?.list || [];
+      if (rawList.length > 0) {
+        courses.value = rawList.map((c: any) => ({
+          ...c,
+          title: c.name || c.title || `课程 #${c.id}`,
+          name: c.name || c.title || `课程 #${c.id}`
+        }));
+      } else {
+        courses.value = FALLBACK_COURSES;
+      }
     } catch {
       courses.value = FALLBACK_COURSES;
     }

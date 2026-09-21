@@ -200,9 +200,12 @@ export const usePreferenceStore = defineStore('preference', () => {
     }
   };
 
-  // 5. 恢复出厂默认值
-  const resetToDefaults = async () => {
+  // 5. 恢复出厂默认值（支持优先恢复为系统/网关官方推荐模型）
+  const resetToDefaults = async (overrideDefaultModel?: string) => {
     Object.assign(preferences, DEFAULT_PREFERENCES);
+    if (overrideDefaultModel) {
+      preferences.defaultModel = overrideDefaultModel;
+    }
     await savePreferences();
   };
 
