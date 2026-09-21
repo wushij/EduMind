@@ -65,6 +65,7 @@
       :on-select-option="selectOption"
       :on-text-answer-change="setTextAnswer"
       :on-submit-current-question="submitCurrentQuestion"
+      :on-abort-grading="abortGrading"
       :on-jump-to-question="jumpToQuestion"
       :on-finish-practice="finishPractice"
       :on-confirm-exit="handleConfirmExit"
@@ -128,6 +129,7 @@ const {
   selectOption,
   setTextAnswer,
   submitCurrentQuestion,
+  abortGrading,
   jumpToQuestion,
   finishPractice,
   resetToSetup,
@@ -186,9 +188,20 @@ const goToReport = () => {
 };
 
 onMounted(async () => {
+  // 路由显式带入课程时以路由为准（错题本跳转会带 courseId），避免被课程选择器默认值覆盖
+  const routeCourseId = Number(route.query.courseId);
+  if (routeCourseId) {
+    teacherCourseId.value = routeCourseId;
+  }
   courseId.value = teacherCourseId.value;
   await loadSetupSnapshot();
-  const autoStart = route.query.autoStart === '1' || route.query.mode === 'WRONG_BATCH';
+  const mode = typeof route.query.mode === 'string' ? route.query.mode : '';
+  // 错题变式 / 单题自测等带题入口需直接开练，不能停在配置页导致"题目没带上"
+  const autoStart =
+    route.query.autoStart === '1' ||
+    mode === 'WRONG_BATCH' ||
+    mode === 'VARIANT' ||
+    mode === 'SINGLE_VARIANT';
   if (autoStart && !isPracticing.value) {
     await startPractice();
   }

@@ -123,5 +123,29 @@ export const AI_COGNITIVE_THINKING_PRESETS = {
       '联动真实大模型执行原创智能命题与题库优选',
       '试卷信度效度校验并输出教学质量评估报告'
     ]
+  },
+  wrongBookDiagnosis: {
+    title: 'AI 认知归因引擎正在深度推演错因...',
+    steps: [
+      '读取题干、题型难度、你的历史作答与标准答案',
+      '调用学科认知模型比对作答偏差并归类失分环节',
+      '输出归因结论与失分主因标签（概念/逻辑/计算/审题）'
+    ]
+  },
+  practiceGrading: {
+    title: 'AI 批改引擎正在推演解析你的作答...',
+    steps: [
+      '读取题干、题型、你的作答与标准答案',
+      '按步骤比对推导过程并定位偏差环节',
+      '生成深度解析、易错点辨析与变式溯源'
+    ]
+  },
+  wrongBookVariants: {
+    title: 'AI 命题引擎正在同构改造变式攻坚题...',
+    steps: [
+      '锁定错题考点与考查能力层级',
+      '同构改造题干情境、数据与典型干扰项',
+      '执行 LaTeX 公式排版校验并写入题库待自测'
+    ]
   }
 } as const satisfies Record<string, AiCognitiveThinkingPreset>;

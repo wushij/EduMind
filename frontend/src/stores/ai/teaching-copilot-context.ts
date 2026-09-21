@@ -26,7 +26,7 @@ export const useTeachingCopilotStore = defineStore('teaching-copilot-context', (
   function openAssistantWithContext(
     ctx: Partial<TeachingCopilotContext> & { contextModule: TeachingCopilotContext['contextModule'] },
     optionalPrefillPrompt?: string,
-    options?: { autoSend?: boolean }
+    options?: { autoSend?: boolean; startNewSession?: boolean }
   ) {
     const merged: TeachingCopilotContext = {
       ...(activeContext.value || {}),
@@ -38,7 +38,8 @@ export const useTeachingCopilotStore = defineStore('teaching-copilot-context', (
       new CustomEvent(OPEN_GLOBAL_ASSISTANT_EVENT, {
         detail: {
           prefill,
-          autoSend: options?.autoSend ?? Boolean(prefill)
+          autoSend: options?.autoSend ?? Boolean(prefill),
+          startNewSession: Boolean(options?.startNewSession)
         }
       })
     );

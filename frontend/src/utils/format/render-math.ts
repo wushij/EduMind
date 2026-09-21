@@ -94,6 +94,32 @@ export function wrapBareLatexExpressions(text: string): string {
   });
 }
 
+const CJK_OR_FULLWIDTH_RE = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/;
+const BARE_FORMULA_CHARS_RE = /^[0-9A-Za-z\s+\-*/=().,;:^_]+$/;
+/** 连续两个 3 字母以上单词（The value / value of）基本可判定为自然语言句子，而不是公式 */
+const PROSE_WORD_PAIR_RE = /[A-Za-z]{3,}\s+[A-Za-z]{3,}/;
+
+/**
+ * 纯文本公式判定：兜底渲染未加 $ 定界符的公式（如 e^6、2^h - 1、dy/dx = 3(t^2+1)/(2t)）。
+ * 这类数据来自历史导入/人工录入，KaTeX 无法识别，此前只能原样显示。
+ * 保守约束（避免把中文说明、英文句子、代码或正则误当公式）：
+ * 1. 整段不含中文/全角字符；2. 同时含数字与上标(^)或下标(_)；3. 只允许数学与标点字符；
+ * 4. 不含反斜杠/美元符/花括号/方括号等 LaTeX 或正则特征；5. 不含自然语言单词对。
+ */
+export function isBareFormulaSegment(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length > 160) {
+    return false;
+  }
+  if (CJK_OR_FULLWIDTH_RE.test(trimmed) || PROSE_WORD_PAIR_RE.test(trimmed)) {
+    return false;
+  }
+  if (!/[\^_]/.test(trimmed) || !/\d/.test(trimmed)) {
+    return false;
+  }
+  return BARE_FORMULA_CHARS_RE.test(trimmed);
+}
+
 type MathSegment = { kind: 'text'; value: string } | { kind: 'math'; value: string; display: boolean };
 
 function splitMathSegments(text: string): MathSegment[] {
@@ -162,7 +188,14 @@ export function renderMathText(text: string): string {
         return seg.display ? `<span class="math-block">${html}</span>` : html;
       }
       const parts = seg.value.replace(/\r/g, '').split(/\n{2,}/);
-      return parts.map((part) => escapeHtml(part.replace(/\n/g, ' '))).join('<br /><br />');
+      return parts
+        .map((part) => {
+          if (isBareFormulaSegment(part)) {
+            return renderKatex(part.trim(), false);
+          }
+          return escapeHtml(part.replace(/\n/g, ' '));
+        })
+        .join('<br /><br />');
     })
     .join('');
 }

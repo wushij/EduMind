@@ -14,11 +14,13 @@ import com.edumind.statistics.entity.WrongQuestionRecordEntity;
 import com.edumind.statistics.enums.WrongErrorType;
 import com.edumind.statistics.service.analytics.WrongQuestionDiagnosisService;
 import com.edumind.statistics.service.learning.WrongBookService;
+import com.edumind.common.markdown.LatexTextNormalizer;
 import com.edumind.statistics.vo.learning.WrongBookDetailVO;
 import com.edumind.statistics.vo.learning.WrongBookItemVO;
 import com.edumind.statistics.vo.learning.WrongBookListVO;
 import com.edumind.statistics.vo.learning.WrongBookOverviewVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -26,14 +28,40 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WrongBookServiceImpl implements WrongBookService {
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final double WEAK_THRESHOLD = 0.7;
+
+    /**
+     * 演示/历史预置结论的固定格式：以失分类型 code + 冒号开头（如 "CALC: 等价无穷小代换条件应用错误"）。
+     * 诊断提示词要求模型把类型标注在句末，因此句首 code 可判定为非大模型产出，
+     * 用于在 UI 上区分「演示假结论」与「AI 真结论」。
+     */
+    private static final Pattern LEGACY_DIAGNOSIS_PATTERN =
+            Pattern.compile("^(CONCEPT|LOGIC|CALC|READING)\\s*[:：]");
+
+    /**
+     * 历史遗留格式：正文里残留「类型：CONCEPT」「（READING）」「属于 LOGIC」这类标记。
+     * 这些标记只用于提取 error_types，当前链路写入前已统一剥离，
+     * 因此正文中还能匹配到它们，就说明该结论并非当前链路产出，需要引导用户重新诊断。
+     */
+    private static final Pattern STALE_TYPE_MARKER_PATTERN = Pattern.compile(
+            "(?:错因)?类型\\s*[:：]?\\s*(?:CONCEPT|LOGIC|CALC|READING)"
+                    + "|[（(]\\s*(?:CONCEPT|LOGIC|CALC|READING)\\s*[)）]"
+                    + "|(?:属于|归为|标记为|判定为|划分为)\\s*(?:CONCEPT|LOGIC|CALC|READING)",
+            Pattern.CASE_INSENSITIVE);
+
+    public static final String SOURCE_NONE = "NONE";
+    public static final String SOURCE_UNANSWERED = "UNANSWERED";
+    public static final String SOURCE_LEGACY = "LEGACY";
+    public static final String SOURCE_AI = "AI";
 
     private final WrongQuestionRecordDao wrongQuestionRecordDao;
     private final QuestionQueryApi questionQueryApi;
@@ -103,7 +131,7 @@ public class WrongBookServiceImpl implements WrongBookService {
         WrongBookDetailVO vo = new WrongBookDetailVO();
         copyItemFields(vo, toItem(entity, question, masteryMap));
         vo.setPrerequisiteNodes(buildPrerequisiteNodes(entity, masteryMap));
-        vo.setVariantQuestions(buildVariantSummaries(entity));
+        vo.setVariantQuestions(buildVariantSummaries(parseVariantIds(entity.getVariantQuestionIds())));
         return vo;
     }
 
@@ -115,6 +143,27 @@ public class WrongBookServiceImpl implements WrongBookService {
         Map<Long, Double> masteryMap = knowledgeMasteryQueryApi.getMasteryByStudentAndCourse(
                 studentId, entity.getCourseId());
         return toItem(updated, question, masteryMap);
+    }
+
+    @Override
+    public List<WrongBookDetailVO.VariantQuestionSummaryVO> generateVariants(Long studentId, Long recordId,
+                                                                            boolean regenerate) {
+        WrongQuestionRecordEntity entity = requireOwnedRecord(studentId, recordId);
+        courseAccessApi.assertCanView(entity.getCourseId());
+        return buildVariantSummaries(wrongQuestionDiagnosisService.generateVariants(recordId, regenerate));
+    }
+
+    @Override
+    public void cancelAiDiagnosis(Long studentId, Long recordId) {
+        // 所有权校验：只能中止自己的错题
+        requireOwnedRecord(studentId, recordId);
+        wrongQuestionDiagnosisService.cancelDiagnosis(recordId);
+    }
+
+    @Override
+    public void cancelAiVariants(Long studentId, Long recordId) {
+        requireOwnedRecord(studentId, recordId);
+        wrongQuestionDiagnosisService.cancelVariants(recordId);
     }
 
     @Override
@@ -158,6 +207,7 @@ public class WrongBookServiceImpl implements WrongBookService {
         item.setWrongCount(entity.getWrongCount());
         item.setStatus(entity.getStatus() != null ? entity.getStatus() : 0);
         item.setDiagnosis(entity.getDiagnosis());
+        item.setDiagnosisSource(resolveDiagnosisSource(entity));
         item.setStudentAnswer(entity.getLastStudentAnswer());
         if (entity.getCreateTime() != null) {
             item.setCreateTime(entity.getCreateTime().format(TIME_FMT));
@@ -203,6 +253,7 @@ public class WrongBookServiceImpl implements WrongBookService {
         target.setWrongCount(source.getWrongCount());
         target.setStatus(source.getStatus());
         target.setDiagnosis(source.getDiagnosis());
+        target.setDiagnosisSource(source.getDiagnosisSource());
         target.setErrorTypes(source.getErrorTypes());
         target.setErrorTypeLabels(source.getErrorTypeLabels());
         target.setVariantQuestionIds(source.getVariantQuestionIds());
@@ -243,20 +294,26 @@ public class WrongBookServiceImpl implements WrongBookService {
         return nodes;
     }
 
-    private List<WrongBookDetailVO.VariantQuestionSummaryVO> buildVariantSummaries(
-            WrongQuestionRecordEntity entity) {
-        List<Long> variantIds = parseVariantIds(entity.getVariantQuestionIds());
-        if (variantIds.isEmpty()) {
+    private List<WrongBookDetailVO.VariantQuestionSummaryVO> buildVariantSummaries(List<Long> variantIds) {
+        if (CollectionUtils.isEmpty(variantIds)) {
             return List.of();
         }
         Map<Long, QuestionVO> map = questionQueryApi.listQuestionsByIds(variantIds).stream()
                 .collect(Collectors.toMap(QuestionVO::getId, q -> q, (a, b) -> a));
         List<WrongBookDetailVO.VariantQuestionSummaryVO> list = new ArrayList<>();
         for (Long vid : variantIds) {
+            QuestionVO question = map.get(vid);
+            if (question == null) {
+                // 变式题已被删除 / 记录里的 ID 已失效：不再展示"立即自测"点进去必然报错的死题
+                log.warn("[错题变式题] 变式题 {} 已不存在，跳过展示", vid);
+                continue;
+            }
+            String stem = question.getStem();
             WrongBookDetailVO.VariantQuestionSummaryVO summary = new WrongBookDetailVO.VariantQuestionSummaryVO();
             summary.setQuestionId(vid);
-            QuestionVO q = map.get(vid);
-            summary.setStemPreview(truncateStem(q != null ? q.getStem() : null, vid));
+            summary.setStemPreview(truncateStem(stem, vid));
+            // 完整题干并补全裸 LaTeX/Unicode 数学定界符：前端按行数裁切，避免截断公式导致无法渲染
+            summary.setStem(LatexTextNormalizer.wrapBareMath(stem));
             list.add(summary);
         }
         return list;
@@ -282,6 +339,23 @@ public class WrongBookServiceImpl implements WrongBookService {
             }
         }
         return (int) Math.round(conquered * 100.0 / withVariants.size());
+    }
+
+    /** 判定归因结论来源，供前端区分演示数据与大模型实时结论 */
+    private static String resolveDiagnosisSource(WrongQuestionRecordEntity entity) {
+        String diagnosis = entity.getDiagnosis();
+        if (!StringUtils.hasText(diagnosis)) {
+            return SOURCE_NONE;
+        }
+        String trimmed = diagnosis.trim();
+        if (WrongQuestionDiagnosisService.UNANSWERED_DIAGNOSIS.equals(trimmed)) {
+            return SOURCE_UNANSWERED;
+        }
+        if (LEGACY_DIAGNOSIS_PATTERN.matcher(trimmed).find()
+                || STALE_TYPE_MARKER_PATTERN.matcher(trimmed).find()) {
+            return SOURCE_LEGACY;
+        }
+        return SOURCE_AI;
     }
 
     private String resolveKpName(Long kpId) {

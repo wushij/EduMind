@@ -15,6 +15,11 @@ export interface WrongQuestionRecordItem {
   errorTypes?: string[];
   errorTypeLabels?: string[];
   diagnosis?: string;
+  /**
+   * 归因结论来源（后端计算）：
+   * NONE=暂无结论 / UNANSWERED=未作答不作归因 / LEGACY=演示或历史预置数据（非大模型产出） / AI=大模型实时生成。
+   */
+  diagnosisSource?: 'NONE' | 'UNANSWERED' | 'LEGACY' | 'AI';
   variantQuestionIds?: number[];
   createTime?: string;
 }
@@ -42,7 +47,10 @@ export interface WrongBookKnowledgeGraphNode {
 
 export interface WrongBookVariantSummary {
   questionId: number;
+  /** 截断预览（公式可能被截断，展示请优先用 stem） */
   stemPreview: string;
+  /** 完整题干（后端已补全裸 LaTeX 的 $ 定界符），由 CSS 按行裁切展示，保证公式完整渲染 */
+  stem?: string;
 }
 
 export interface WrongBookDetailVO extends WrongQuestionRecordItem {

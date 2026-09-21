@@ -19,19 +19,31 @@
       <div class="main-content-layout">
         <WrongBookFilterBar
           :selected-error-type="selectedErrorType"
+          :show-expand-actions="wrongList.length > 0"
+          :body-expanded="listExpandAllBody"
+          :full-expanded="listExpandAllFull"
           @update:selected-error-type="onErrorTypeChange"
+          @toggle-body="toggleAllBody"
+          @toggle-details="toggleAllDetails"
           @batch-practice="handleLaunchBatchPractice"
         />
 
         <div v-if="wrongList.length > 0" class="questions-grid">
           <WrongQuestionCard
-            v-for="item in wrongList"
+            v-for="(item, index) in wrongList"
             :key="item.id"
             :item="item"
+            :index="(page - 1) * pageSize + index"
             :format-question-type="formatQuestionType"
             :get-difficulty-type="getDifficultyType"
             :parsed-options="parsedOptions"
+            :display-diagnosis="displayDiagnosis"
             :display-error-tags="displayErrorTags"
+            :default-body-expanded="false"
+            :default-analysis-expanded="false"
+            :bulk-expand-body="listExpandAllBody"
+            :bulk-expand-analysis="listExpandAllAnalysis"
+            :expand-sync-key="expandSyncKey"
             @open-diagnosis="openDiagnosisDrawer"
             @mark-mastered="handleMarkMastered"
             @start-variant="handleStartVariantPractice"
@@ -47,15 +59,14 @@
           </el-empty>
         </div>
 
-        <div v-if="totalWrongQuestions > 0" class="pagination-wrapper">
-          <el-pagination
-            v-model:current-page="page"
+        <!-- 统一分页：与答卷列表等模块共用 AppPagination（默认 10 条/页） -->
+        <div v-if="totalWrongQuestions > 0" class="pagination-footer-bar">
+          <AppPagination
+            v-model:page-num="page"
             v-model:page-size="pageSize"
             :total="totalWrongQuestions"
-            :page-sizes="[5, 10, 20]"
-            layout="total, sizes, prev, pager, next, jumper"
-            @current-change="fetchList"
-            @size-change="fetchList"
+            :page-sizes="[10, 20, 50]"
+            @change="onPageChange"
           />
         </div>
       </div>
@@ -63,10 +74,17 @@
       <WrongBookDiagnosisDrawer
         v-model:visible="drawerVisible"
         :loading="detailLoading"
+        :diagnosing="diagnosing"
+        :variants-loading="variantsLoading"
         :item="activeItem"
         :prerequisite-nodes="detailExtra.prerequisiteNodes ?? []"
         :variant-questions="detailExtra.variantQuestions ?? []"
+        :display-diagnosis="displayDiagnosis"
         :display-error-tags="displayErrorTags"
+        @regenerate-diagnosis="handleRegenerateDiagnosis"
+        @abort-diagnosis="handleAbortDiagnosis"
+        @generate-variants="handleGenerateVariants"
+        @abort-variants="handleAbortVariants"
         @practice-variant="handlePracticeSingleVariant"
         @start-practice="handleLaunchPracticeFromDrawer"
       />
@@ -75,11 +93,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import WrongBookHero from '@/components/learning/wrong-book/WrongBookHero.vue';
 import WrongBookFilterBar from '@/components/learning/wrong-book/WrongBookFilterBar.vue';
 import WrongQuestionCard from '@/components/learning/wrong-book/WrongQuestionCard.vue';
 import WrongBookDiagnosisDrawer from '@/components/learning/wrong-book/WrongBookDiagnosisDrawer.vue';
+import AppPagination from '@/components/common/AppPagination.vue';
 import { useWrongQuestionsPage } from '@/composables/learning/useWrongQuestionsPage';
 
 const {
@@ -97,14 +116,21 @@ const {
   drawerVisible,
   activeItem,
   detailLoading,
+  diagnosing,
+  variantsLoading,
   detailExtra,
   fetchList,
   formatQuestionType,
   getDifficultyType,
   parsedOptions,
+  displayDiagnosis,
   displayErrorTags,
   handleCourseChange,
   openDiagnosisDrawer,
+  handleRegenerateDiagnosis,
+  handleAbortDiagnosis,
+  handleGenerateVariants,
+  handleAbortVariants,
   handleMarkMastered,
   handleStartVariantPractice,
   handleLaunchBatchPractice,
@@ -119,6 +145,31 @@ const emptyDescription = computed(() =>
     ? '当前错因筛选下暂无记录，试试切换「全部错误类型」'
     : '太棒了！当前所选维度暂无错题记录，保持精熟状态！'
 );
+
+/** 列表级批量展开状态：与题库列表 QuestionCard 的 bulkExpand + syncKey 机制保持一致 */
+const listExpandAllBody = ref(false);
+const listExpandAllAnalysis = ref(false);
+const expandSyncKey = ref(0);
+
+const listExpandAllFull = computed(
+  () => listExpandAllBody.value && listExpandAllAnalysis.value
+);
+
+function toggleAllBody() {
+  listExpandAllBody.value = !listExpandAllBody.value;
+  expandSyncKey.value += 1;
+}
+
+function toggleAllDetails() {
+  const next = !listExpandAllFull.value;
+  listExpandAllBody.value = next;
+  listExpandAllAnalysis.value = next;
+  expandSyncKey.value += 1;
+}
+
+function onPageChange() {
+  void fetchList();
+}
 
 function onHeroCourseChange(courseId: number) {
   teacherCourseId.value = courseId;
@@ -149,20 +200,34 @@ function onErrorTypeChange(code: string) {
 .questions-grid {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .empty-container {
   background: #fff;
-  border-radius: 16px;
+  border-radius: 22px;
   padding: 40px;
   text-align: center;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e8eef7;
+  box-shadow: 0 6px 20px rgba(30, 80, 150, 0.04);
 }
 
-.pagination-wrapper {
+.pagination-footer-bar {
   display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 10px 20px;
+  background: #fff;
+  border: 1px solid #e8eef7;
+  border-radius: 22px;
+  box-shadow: 0 6px 20px rgba(30, 80, 150, 0.04);
+
+  :deep(.pagination-bar) {
+    margin-top: 0;
+    padding: 0;
+    border-top: none;
+    justify-content: flex-start !important;
+    width: 100%;
+  }
 }
 </style>

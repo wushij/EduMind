@@ -197,6 +197,7 @@ import {
   Cpu
 } from '@element-plus/icons-vue';
 import { useGrading } from '@/composables/ai/useGrading';
+import { resolveApiErrorMessage } from '@/core/http/api-error-message';
 
 const router = useRouter();
 const route = useRoute();
@@ -206,8 +207,10 @@ const reportTitle = computed(() => {
   return (route.query.title as string) || '第三周：单链表与双向链表核心算法实现测验';
 });
 
+/** 批改结果必须绑定真实答卷：参数非法时返回 null，避免兜底值请求到不存在的答卷 */
 const submissionId = computed(() => {
-  return Number(route.query.submissionId) || 201;
+  const raw = Number(route.query.submissionId);
+  return Number.isInteger(raw) && raw > 0 ? raw : null;
 });
 
 const selectedCaseType = ref('MISTAKE');
@@ -215,33 +218,36 @@ const realGradingItems = ref<any[]>([]);
 const cases = ref<any[]>([]);
 
 onMounted(async () => {
-  if (submissionId.value) {
-    try {
-      const data = await fetchGrading(submissionId.value);
-      if (Array.isArray(data) && data.length > 0) {
-        realGradingItems.value = data;
-        cases.value = data.map((item: any, idx: number) => {
-          const isErr = !item.isCorrect || ((item.score ?? 0) < (item.maxScore ?? 10));
-          return {
-            id: item.questionId || idx + 1,
-            type: isErr ? 'MISTAKE' : 'PERFECT',
-            questionTitle: `第 ${idx + 1} 题：${item.stem || '课程试题考查点'}`,
-            studentName: `答卷 #${submissionId.value}`,
-            studentAnswer: item.studentAnswer || '（考生作答内容）',
-            aiScore: item.score ?? 0,
-            confidence: 96,
-            aiComment: item.aiComment || (isErr ? '未完全答全考点要点，建议教师重点复核。' : '作答逻辑完整严密，完全符合标准答案要点。')
-          };
-        });
-      } else {
-        realGradingItems.value = [];
-        cases.value = [];
-      }
-    } catch (err: any) {
-      ElMessage.error(err?.message || '获取答卷批改结果失败');
+  const id = submissionId.value;
+  if (id === null) {
+    ElMessage.error('缺少有效的答卷标识，无法加载批改结果，请从批改列表重新进入');
+    return;
+  }
+  try {
+    const data = await fetchGrading(id);
+    if (Array.isArray(data) && data.length > 0) {
+      realGradingItems.value = data;
+      cases.value = data.map((item: any, idx: number) => {
+        const isErr = !item.isCorrect || ((item.score ?? 0) < (item.maxScore ?? 10));
+        return {
+          id: item.questionId || idx + 1,
+          type: isErr ? 'MISTAKE' : 'PERFECT',
+          questionTitle: `第 ${idx + 1} 题：${item.stem || '课程试题考查点'}`,
+          studentName: `答卷 #${id}`,
+          studentAnswer: item.studentAnswer || '（考生作答内容）',
+          aiScore: item.score ?? 0,
+          confidence: 96,
+          aiComment: item.aiComment || (isErr ? '未完全答全考点要点，建议教师重点复核。' : '作答逻辑完整严密，完全符合标准答案要点。')
+        };
+      });
+    } else {
       realGradingItems.value = [];
       cases.value = [];
     }
+  } catch (err: unknown) {
+    ElMessage.error(resolveApiErrorMessage(err, '获取答卷批改结果失败'));
+    realGradingItems.value = [];
+    cases.value = [];
   }
 });
 

@@ -42,11 +42,14 @@ import LearningHomeLeftColumn from '@/components/learning/LearningHomeLeftColumn
 import LearningHomeRecommendationsPanel from '@/components/learning/LearningHomeRecommendationsPanel.vue';
 import { useRecommendations } from '@/composables/learning/useRecommendations';
 import { useLearningHome } from '@/composables/learning/useLearningHome';
+import { useQuestionAiTutor } from '@/composables/question/useQuestionAiTutor';
 import { resolveCourseRoute } from '@/utils/learning/course-route';
+import { toTutorQuestion } from '@/utils/learning/map-recommendation';
 import type { RecommendationItem } from '@/types/learning/recommendation';
 import type { LearningHomeTaskUI, LearningHomeWeakPointUI } from '@/types/learning/home';
 
 const router = useRouter();
+const { openQuestionAiTutor } = useQuestionAiTutor();
 const {
   loading,
   heroStats,
@@ -133,11 +136,12 @@ function handleStartRecommendation(item: RecommendationItem) {
   }
 }
 
+/**
+ * 助教答疑：打开全局侧边栏 AI 并锚定该推荐项（与题库列表「AI 辅导」同一能力）。
+ * 题目与资料都锚定到侧边栏，避免与「在线研读」跳到同一个资源页。
+ */
 function handleDiscussAI(item: RecommendationItem) {
-  const courseId = item.courseId ?? primaryCourseId.value;
-  if (courseId != null) {
-    router.push(resolveCourseRoute(courseId, 'ai'));
-  }
+  openQuestionAiTutor(toTutorQuestion(item));
 }
 </script>
 

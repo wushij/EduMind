@@ -3,6 +3,7 @@ package com.edumind.teaching.service.grading.impl;
 import com.edumind.ai.dto.SubjectiveGradingDTO;
 import com.edumind.ai.api.AiGradingApi;
 import com.edumind.ai.vo.SubjectiveGradingVO;
+import com.edumind.common.api.ResultCode;
 import com.edumind.common.enums.QuestionType;
 import com.edumind.common.event.GradingCompletedEvent;
 import com.edumind.common.exception.BusinessException;
@@ -32,6 +33,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -63,7 +65,7 @@ public class GradingServiceImpl implements GradingService {
     public void gradeSubmission(Long submissionId) {
         SubmissionEntity submission = submissionDao.findById(submissionId);
         if (submission == null) {
-            throw new BusinessException("提交记录不存在");
+            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "提交记录不存在");
         }
         AssignmentEntity assignment = assignmentDao.findById(submission.getAssignmentId());
         if (assignment == null || assignment.getExamId() == null) {
@@ -97,9 +99,17 @@ public class GradingServiceImpl implements GradingService {
             result.setQuestionId(answer.getQuestionId());
             result.setMaxScore(questionMaxScore);
 
-            if (isObjectiveType(question.getType())) {
-                boolean correct = StringUtils.hasText(answer.getAnswer())
-                        && answer.getAnswer().trim().equalsIgnoreCase(question.getAnswer().trim());
+            if (!StringUtils.hasText(answer.getAnswer())) {
+                // 未作答（客观题/主观题统一处理）：不判"回答错误"，主观题也不再调用大模型，直接判未作答不得分；
+                // isCorrect 置空不参与对错统计，避免与"答错"混淆。
+                result.setScore(0);
+                result.setAiComment("未作答，不得分");
+                result.setStatus("AUTO_GRADED");
+                result.setIsCorrect(null);
+            } else if (isObjectiveType(question.getType())) {
+                String standardAnswer = question.getAnswer();
+                boolean correct = StringUtils.hasText(standardAnswer)
+                        && answer.getAnswer().trim().equalsIgnoreCase(standardAnswer.trim());
                 result.setIsCorrect(correct ? 1 : 0);
                 result.setScore(correct ? questionMaxScore : 0);
                 result.setAiComment(correct ? "回答正确" : "回答错误");
@@ -168,14 +178,19 @@ public class GradingServiceImpl implements GradingService {
     protected void doReviewGrading(Long submissionId, GradingReviewDTO dto) {
         SubmissionEntity submission = submissionDao.findById(submissionId);
         if (submission == null) {
-            throw new BusinessException("提交记录不存在");
+            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "提交记录不存在");
+        }
+        // 明细为空说明前端未拿到逐题评阅结果，直接拒绝，避免把已发布成绩整体清零
+        if (dto == null || CollectionUtils.isEmpty(dto.getItems())) {
+            throw new BusinessException("评阅明细不能为空，请先完成 AI 智能批改");
         }
         AssignmentEntity assignment = assignmentDao.findById(submission.getAssignmentId());
         int totalScore = 0;
         for (GradingReviewItemDTO item : dto.getItems()) {
             GradingResultEntity result = gradingResultDao.findBySubmissionIdAndQuestionId(submissionId, item.getQuestionId());
             if (result == null) {
-                throw new BusinessException("题目批改记录不存在: " + item.getQuestionId());
+                throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(),
+                        "题目批改记录不存在: " + item.getQuestionId());
             }
             result.setScore(item.getScore());
             result.setTeacherComment(item.getTeacherComment());

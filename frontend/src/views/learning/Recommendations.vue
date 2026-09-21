@@ -153,10 +153,13 @@ import LearningSubpageHero from '@/components/learning/LearningSubpageHero.vue';
 import RecommendationCard from '@/components/learning/RecommendationCard.vue';
 import { useRecommendations } from '@/composables/learning/useRecommendations';
 import { useLearningHome } from '@/composables/learning/useLearningHome';
+import { useQuestionAiTutor } from '@/composables/question/useQuestionAiTutor';
 import { resolveCourseRoute } from '@/utils/learning/course-route';
+import { toTutorQuestion } from '@/utils/learning/map-recommendation';
 import type { RecommendationItem } from '@/types/learning/recommendation';
 
 const router = useRouter();
+const { openQuestionAiTutor } = useQuestionAiTutor();
 const { items, loading, fetchRecommendations } = useRecommendations();
 const { courseOptions, primaryCourseId, refresh } = useLearningHome();
 
@@ -261,11 +264,13 @@ function handleStart(item: RecommendationItem) {
   }
 }
 
+/**
+ * 助教答疑：打开全局侧边栏 AI 并锚定该推荐项。
+ * 题目与资料都走同一条锚定链路——资料以标题作为上下文，
+ * 避免与「在线研读微课资料」跳到同一个资源页。
+ */
 function handleDiscuss(item: RecommendationItem) {
-  const courseId = item.courseId ?? selectedCourseId.value;
-  if (courseId != null) {
-    router.push(resolveCourseRoute(courseId, 'ai'));
-  }
+  openQuestionAiTutor(toTutorQuestion(item));
 }
 </script>
 
@@ -275,6 +280,36 @@ function handleDiscuss(item: RecommendationItem) {
   flex-direction: column;
   gap: 20px;
   width: 100%;
+
+  // 「返回我的学习」按钮渲染在 LearningSubpageHero 的 actions 插槽中，
+  // DOM 上并不存在 .header-status-capsules 这个祖先，因此样式必须挂在本容器下——
+  // 否则整条规则不匹配，按钮会退化成浏览器原生 button（黑框、直角）。
+  .capsule-switch-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 18px;
+    border-radius: 9999px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+
+    &:hover {
+      border-color: #1677ff;
+      color: #1677ff;
+      background: #f8fafc;
+    }
+
+    &:focus-visible {
+      box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.18);
+    }
+  }
 
   // 1. 顶部操作栏
   .header-status-capsules {

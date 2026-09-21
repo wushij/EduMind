@@ -81,7 +81,8 @@
               </span>
             </div>
             <div class="block-body">
-              <MathText :text="item.aiComment" />
+              <!-- AI 评语为大模型输出的 Markdown（含 ** 强调、公式、表格），需走 Markdown 渲染而非纯文本 -->
+              <MarkdownLlmOutput :content="item.aiComment" />
             </div>
           </div>
 
@@ -168,6 +169,7 @@
 <script setup lang="ts">
 import { User, Reading, MagicStick, Select, Finished } from '@element-plus/icons-vue';
 import MathText from '@/components/common/MathText.vue';
+import MarkdownLlmOutput from '@/components/system/PromptLlmOutput.vue';
 import SubmissionDetailHeroSection from '@/components/question/submission/SubmissionDetailHeroSection.vue';
 import AssignmentGradingEngineDialog from '@/components/question/assignment/AssignmentGradingEngineDialog.vue';
 import { useSubmission } from '@/composables/question/useSubmission';

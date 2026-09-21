@@ -7,6 +7,8 @@ import {
 } from '@/api/learning/ai-practice';
 import { getKnowledgePoints } from '@/api/course/knowledge-point';
 import { getStudentPortrait } from '@/api/analytics/learning';
+import { getWrongBook } from '@/api/learning/wrong-book';
+import { resolveApiErrorMessage } from '@/core/http/api-error-message';
 import { parseQuestionOptionsAsVal } from '@/utils/format/question-options';
 import { isObjectiveQuestionType } from '@/utils/format/question-answer';
 import type { PracticeQuestionVO } from '@/types/learning/ai-practice';
@@ -70,11 +72,14 @@ export function useAIPractice(initialCourseId = 102) {
   const cognitiveLevel = ref('ALL');
   const questionCount = ref(5);
   const instantFeedback = ref(true);
-  const seedQuestionIds = ref<number[]>([]);
+  /** 种子题目 ID：雪花 ID 用字符串承载，避免 Number() 丢精度 */
+  const seedQuestionIds = ref<Array<number | string>>([]);
 
   const sessionId = ref('');
   const generating = ref(false);
   const grading = ref(false);
+  /** AI 批改在途请求的中止控制器（推演面板「中止」按钮用它真正取消本次等待） */
+  let gradingAbortController: AbortController | null = null;
   const submitting = ref(false);
   const isPracticing = ref(false);
   const isFinished = ref(false);
@@ -162,9 +167,27 @@ export function useAIPractice(initialCourseId = 102) {
         practiceMode.value = mode;
       }
     }
+    // ⚠️ 题目 ID 是雪花 ID（19 位），超过 JS 安全整数范围：
+    // Number('2102008935144140801') === 2102008935144140800，转换即丢精度，后端必然查不到题目。
+    // 因此这里一律保留字符串原样传给后端（后端 Long 反序列化时可接受字符串）。
     const qid = query.questionId;
-    if (qid != null && qid !== '') {
-      seedQuestionIds.value = [Number(qid)];
+    if (typeof qid === 'string' && qid.trim()) {
+      seedQuestionIds.value = [qid.trim()];
+    }
+    // 多题入口（错题本「练习同类变式题」会带上生成的变式题 ID 列表）
+    const qids = query.questionIds;
+    if (typeof qids === 'string' && qids.trim()) {
+      const ids = qids
+        .split(',')
+        .map((v) => v.trim())
+        .filter((v) => /^\d+$/.test(v));
+      if (ids.length) {
+        seedQuestionIds.value = ids;
+      }
+    }
+    // 由外部指定题目构成练习集时，题量即这些题目本身，避免再掺入无关题目
+    if (seedQuestionIds.value.length > 0) {
+      questionCount.value = seedQuestionIds.value.length;
     }
     const cid = query.courseId;
     if (cid != null && cid !== '') {
@@ -215,8 +238,8 @@ export function useAIPractice(initialCourseId = 102) {
       });
       const data = res?.data;
       if (!data?.questions?.length) {
+        // 只在配置卡内展示，避免弹窗 + 卡片内提示重复报同一件事
         loadError.value = '暂无推荐练习题，请先完成作业或测验';
-        ElMessage.warning(loadError.value);
         return;
       }
       sessionId.value = data.sessionId;
@@ -237,8 +260,8 @@ export function useAIPractice(initialCourseId = 102) {
       isPracticing.value = true;
       isFinished.value = false;
     } catch (err: unknown) {
-      loadError.value = err instanceof Error ? err.message : '生成练习集失败';
-      ElMessage.error(loadError.value);
+      // 优先展示后端业务提示（如「指定的练习题已不存在…」），只渲染在配置卡内，不再额外弹一条相同提示
+      loadError.value = resolveApiErrorMessage(err, '生成练习集失败');
     } finally {
       generating.value = false;
     }
@@ -260,13 +283,20 @@ export function useAIPractice(initialCourseId = 102) {
       return;
     }
     if (!sessionId.value) return;
+    abortGrading(false);
+    const controller = new AbortController();
+    gradingAbortController = controller;
     grading.value = true;
     try {
-      const res = await gradeAiPracticeAnswer({
-        sessionId: sessionId.value,
-        questionId: currentQuestion.value.id,
-        studentAnswer: ans
-      });
+      const res = await gradeAiPracticeAnswer(
+        {
+          sessionId: sessionId.value,
+          questionId: currentQuestion.value.id,
+          studentAnswer: ans
+        },
+        { signal: controller.signal, silent: true }
+      );
+      if (controller.signal.aborted) return;
       const g = res?.data;
       submittedTracker.value[currentIndex.value] = true;
       answersState.value[currentIndex.value] = g?.correct ? 'CORRECT' : 'WRONG';
@@ -277,9 +307,28 @@ export function useAIPractice(initialCourseId = 102) {
         };
       }
     } catch (err: unknown) {
-      ElMessage.error(err instanceof Error ? err.message : '判题失败');
+      // 用户主动中止属于预期行为，不再弹出误导性提示
+      if (controller.signal.aborted) return;
+      ElMessage.error(resolveApiErrorMessage(err, '判题失败'));
     } finally {
+      if (gradingAbortController === controller) {
+        gradingAbortController = null;
+        grading.value = false;
+      }
+    }
+  }
+
+  /** 中止在途的 AI 批改；notify=false 用于切换题目等静默场景 */
+  function abortGrading(notify = true) {
+    if (gradingAbortController) {
+      gradingAbortController.abort();
+      gradingAbortController = null;
+    }
+    if (grading.value) {
       grading.value = false;
+      if (notify) {
+        ElMessage.info('已中止本次 AI 批改');
+      }
     }
   }
 
@@ -402,6 +451,7 @@ export function useAIPractice(initialCourseId = 102) {
     selectOption,
     setTextAnswer,
     submitCurrentQuestion,
+    abortGrading,
     jumpToQuestion,
     finishPractice,
     resetToSetup,

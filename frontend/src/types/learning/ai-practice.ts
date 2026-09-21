@@ -21,7 +21,11 @@ export interface AiPracticeStartRequest {
   knowledgePointId?: number;
   cognitiveLevel?: string;
   instantFeedback?: boolean;
-  seedQuestionIds?: number[];
+  /**
+   * 指定练习题目 ID（错题变式 / 单题自测）。
+   * 雪花 ID 超出 JS 安全整数范围，必须用字符串传递，否则精度丢失会导致后端查不到题目。
+   */
+  seedQuestionIds?: Array<number | string>;
 }
 
 export interface AiPracticeSessionVO {

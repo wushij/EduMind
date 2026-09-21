@@ -13,6 +13,7 @@ import {
 } from '@/api/question/submission';
 import { getCourseList } from '@/api/course/course';
 import { normalizeCourseListFromApi } from '@/utils/course/course-display';
+import { resolveApiErrorMessage } from '@/core/http/api-error-message';
 import type { SubmissionItem, SubmissionOverviewStats } from '@/types/question/submission';
 import type { Course } from '@/types/course/course';
 import type { QuestionType } from '@/types/question/question';
@@ -33,6 +34,12 @@ export interface GradingItem {
   teacherComment: string;
 }
 
+/** 仅接受合法正整数 ID；非法（含 NaN / 0 / 负数 / undefined 字面量）一律返回 null */
+export function parsePositiveId(raw: unknown): number | null {
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
 export function buildGradingItems(sub: any, gList: any[]): GradingItem[] {
   if (!Array.isArray(gList) || gList.length === 0) {
     return [];
@@ -40,12 +47,16 @@ export function buildGradingItems(sub: any, gList: any[]): GradingItem[] {
   const answersMap = new Map<number, string>();
   if (sub?.answers && Array.isArray(sub.answers)) {
     sub.answers.forEach((ans: any) => {
-      answersMap.set(ans.questionId, ans.answer);
+      const qid = parsePositiveId(ans.questionId);
+      if (qid !== null) {
+        answersMap.set(qid, ans.answer);
+      }
     });
   }
 
   return gList.map((g: any, idx: number) => {
-    const qid = g.questionId || idx + 1;
+    // questionId 必须来自后端真实值，缺失时不能退化成行号，否则保存时会出现「题目批改记录不存在」
+    const qid = parsePositiveId(g.questionId) ?? 0;
     const stuAns = answersMap.get(qid) || '';
     const isObj = g.isCorrect !== undefined && g.isCorrect !== null;
     const type = g.type || (isObj ? 'SINGLE_CHOICE' : 'SHORT_ANSWER');
@@ -53,7 +64,7 @@ export function buildGradingItems(sub: any, gList: any[]): GradingItem[] {
     return {
       questionId: qid,
       type,
-      stem: g.stem || `试题 #${qid}`,
+      stem: g.stem || `试题 #${qid || idx + 1}`,
       maxScore: g.maxScore ?? 10,
       studentAnswer: stuAns || '（未作答）',
       standardAnswer: g.standardAnswer || '—',
@@ -98,7 +109,12 @@ export function useSubmission() {
   const route = useRoute();
   const router = useRouter();
 
-  const submissionId = computed(() => Number(route.params.id) || 201);
+  /**
+   * 答卷 ID 来自路由参数，必须是合法正整数。
+   * 这里不再使用 `|| 201` 之类的兜底值：一旦路由参数丢失，兜底值会把「页面参数异常」
+   * 伪装成后端「提交记录不存在」，导致 500 报错难以定位。
+   */
+  const submissionId = computed(() => parsePositiveId(route.params.id));
   const loading = ref(false);
   const saving = ref(false);
   const gradingInProgress = ref(false);
@@ -108,10 +124,27 @@ export function useSubmission() {
 
   const calculatedTotalScore = computed(() => calculateGradingTotalScore(gradingItems.value));
 
+  /** 统一获取可用答卷 ID：非法时提示并中止，不发注定失败的请求 */
+  function requireSubmissionId(): number | null {
+    const id = submissionId.value;
+    if (id === null) {
+      ElMessage.error('答卷参数缺失或非法，请从答卷列表重新进入该答卷');
+      return null;
+    }
+    return id;
+  }
+
   async function loadSubmissionData() {
+    const id = requireSubmissionId();
+    if (id === null) {
+      submissionData.value = null;
+      gradingItems.value = [];
+      return;
+    }
+
     loading.value = true;
     try {
-      const res = await getSubmissionDetail(submissionId.value);
+      const res = await getSubmissionDetail(id, { silent: true });
       submissionData.value = res.data;
       if (!submissionData.value) {
         ElMessage.error('未找到该答卷详情');
@@ -120,17 +153,17 @@ export function useSubmission() {
 
       let gradingResults: any[] = [];
       try {
-        const gRes = await getSubmissionGrading(submissionId.value);
+        const gRes = await getSubmissionGrading(id, { silent: true });
         gradingResults = gRes.data || [];
       } catch {
         gradingResults = submissionData.value?.gradingItems || [];
       }
 
       gradingItems.value = buildGradingItems(submissionData.value, gradingResults);
-    } catch (err: any) {
-      ElMessage.error(err?.message || '加载答卷详情失败');
+    } catch (err: unknown) {
       submissionData.value = null;
       gradingItems.value = [];
+      ElMessage.error(resolveApiErrorMessage(err, '加载答卷详情失败'));
     } finally {
       loading.value = false;
     }
@@ -141,6 +174,11 @@ export function useSubmission() {
   let submissionAbortController: AbortController | null = null;
 
   async function handleTriggerGradeNow() {
+    const id = requireSubmissionId();
+    if (id === null) {
+      return;
+    }
+
     aiThinkingTitle.value = `AI 智能阅卷 · ${submissionData.value?.studentName || '单份答卷'}`;
     submissionAbortController = new AbortController();
     aiThinkingVisible.value = true;
@@ -149,17 +187,17 @@ export function useSubmission() {
       if (submissionAbortController.signal.aborted) {
         throw new DOMException('Aborted', 'AbortError');
       }
-      await gradeSubmission(submissionId.value);
+      await gradeSubmission(id, { signal: submissionAbortController.signal, silent: true });
       aiThinkingVisible.value = false;
       ElMessage.success('已成功触发该答卷的 AI 智能分析与评分！');
       await loadSubmissionData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       aiThinkingVisible.value = false;
       if (err instanceof DOMException && err.name === 'AbortError') {
         ElMessage.info('已中止本次 AI 阅卷推演');
         return;
       }
-      ElMessage.error(err?.message || '触发 AI 评阅失败，请稍后重试');
+      ElMessage.error(resolveApiErrorMessage(err, '触发 AI 评阅失败，请稍后重试'));
     } finally {
       aiThinkingVisible.value = false;
       gradingInProgress.value = false;
@@ -193,6 +231,21 @@ export function useSubmission() {
   }
 
   async function handleSaveGrading() {
+    const id = requireSubmissionId();
+    if (id === null) {
+      return;
+    }
+    // 明细为空时提交会把后端 totalScore 直接清零，必须拦截
+    if (gradingItems.value.length === 0) {
+      ElMessage.warning('当前没有逐题评阅明细，请先执行 AI 智能批改或确认答卷明细已加载完成');
+      return;
+    }
+    const invalidItem = gradingItems.value.find(item => parsePositiveId(item.questionId) === null);
+    if (invalidItem) {
+      ElMessage.error('评阅明细缺少有效题目标识，请重新执行 AI 智能批改后再保存');
+      return;
+    }
+
     saving.value = true;
     try {
       const payload = gradingItems.value.map(item => ({
@@ -201,7 +254,7 @@ export function useSubmission() {
         teacherComment: item.teacherComment || ''
       }));
 
-      await reviewGrading(submissionId.value, payload);
+      await reviewGrading(id, payload, { silent: true });
       if (submissionData.value) {
         submissionData.value.status = 'REVIEWED';
       }
@@ -209,8 +262,8 @@ export function useSubmission() {
       setTimeout(() => {
         router.push('/question/submissions');
       }, 800);
-    } catch (err: any) {
-      ElMessage.error(err?.message || '评阅结果保存失败，请检查网络与登录权限');
+    } catch (err: unknown) {
+      ElMessage.error(resolveApiErrorMessage(err, '评阅结果保存失败，请稍后重试'));
     } finally {
       saving.value = false;
     }
@@ -305,7 +358,7 @@ export function useSubmissionList() {
       stats.value = statsRes.data || {};
       return allSubmissions.value;
     } catch (err: unknown) {
-      ElMessage.error(err instanceof Error ? err.message : '获取提交列表失败');
+      ElMessage.error(resolveApiErrorMessage(err, '获取提交列表失败'));
       allSubmissions.value = [];
       total.value = 0;
       throw err;
@@ -328,7 +381,7 @@ export function useSubmissionList() {
           courseId: courseId ?? undefined,
           forceRegrade: !!forceRegrade
         },
-        { signal: submissionAbortController.signal }
+        { signal: submissionAbortController.signal, silent: true }
       );
       aiThinkingVisible.value = false;
       const successCount = res.data?.successCount ?? 0;
@@ -344,7 +397,7 @@ export function useSubmissionList() {
         ElMessage.info('已中止本次全队列 AI 批改推演');
         return 0;
       }
-      ElMessage.error(err instanceof Error ? err.message : '批量批改失败');
+      ElMessage.error(resolveApiErrorMessage(err, '批量批改失败'));
       return 0;
     } finally {
       aiThinkingVisible.value = false;
@@ -354,6 +407,12 @@ export function useSubmissionList() {
   }
 
   async function triggerSingleRegrade(row: SubmissionItem) {
+    const submissionId = parsePositiveId(row?.id);
+    if (submissionId === null) {
+      ElMessage.error('该答卷缺少有效标识，无法执行 AI 批改，请刷新列表后重试');
+      return;
+    }
+
     aiThinkingTitle.value = `AI 智能阅卷 · ${row.studentName || '学生答卷'}`;
     submissionAbortController = new AbortController();
     aiThinkingVisible.value = true;
@@ -361,7 +420,7 @@ export function useSubmissionList() {
       if (submissionAbortController.signal.aborted) {
         throw new DOMException('Aborted', 'AbortError');
       }
-      await gradeSubmission(row.id, { signal: submissionAbortController.signal });
+      await gradeSubmission(submissionId, { signal: submissionAbortController.signal, silent: true });
       aiThinkingVisible.value = false;
       ElMessage.success(`已为【${row.studentName || '学生'}】重新完成 AI 智能预评打分与评语生成！`);
     } catch (err: unknown) {
@@ -370,7 +429,7 @@ export function useSubmissionList() {
         ElMessage.info('已中止本次 AI 阅卷推演');
         return;
       }
-      ElMessage.error(err instanceof Error ? err.message : 'AI 批改失败');
+      ElMessage.error(resolveApiErrorMessage(err, 'AI 批改失败'));
     } finally {
       aiThinkingVisible.value = false;
       submissionAbortController = null;
@@ -378,6 +437,12 @@ export function useSubmissionList() {
   }
 
   async function removeSubmissionRecord(id: number, studentName?: string) {
+    const submissionId = parsePositiveId(id);
+    if (submissionId === null) {
+      ElMessage.error('该答卷缺少有效标识，无法删除，请刷新列表后重试');
+      return false;
+    }
+
     try {
       await ElMessageBox.confirm(
         `确定要删除${studentName ? `学生「${studentName}」的` : ''}该份答卷记录吗？删除后关联的作答与评分数据将一并清理且不可恢复。`,
@@ -389,12 +454,12 @@ export function useSubmissionList() {
         }
       );
       loading.value = true;
-      await deleteSubmission(id);
+      await deleteSubmission(submissionId, { silent: true });
       ElMessage.success('答卷记录已成功删除');
       return true;
     } catch (err: unknown) {
       if (err === 'cancel' || err === 'close') return false;
-      ElMessage.error(err instanceof Error ? err.message : '删除答卷失败');
+      ElMessage.error(resolveApiErrorMessage(err, '删除答卷失败'));
       return false;
     } finally {
       loading.value = false;

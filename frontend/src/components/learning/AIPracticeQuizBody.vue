@@ -1,5 +1,5 @@
 <template>
-  <el-card shadow="never" class="quiz-card" v-loading="grading">
+  <el-card shadow="never" class="quiz-card">
     <div class="stem-box">
       <span class="stem-no">Q{{ currentIndex + 1 }}.</span>
       <div class="stem-text">
@@ -40,9 +40,19 @@
       />
     </div>
 
+    <!-- AI 批改推演中：统一罗盘雷达 + 秒级计时 + 可中止，避免"没思考就展开答案"的观感 -->
+    <AiCognitiveThinkingPanel
+      v-if="grading"
+      :active="grading"
+      v-bind="AI_COGNITIVE_THINKING_PRESETS.practiceGrading"
+      show-footer-actions
+      abort-label="中止 AI 批改"
+      @abort="emit('abort-grading')"
+    />
+
     <transition name="el-zoom-in-top">
       <AIPracticeFeedbackPanel
-        v-if="submittedCurrent && showFeedback"
+        v-else-if="submittedCurrent && showFeedback"
         :correct="answersState[currentIndex] === 'CORRECT'"
         :kp-title="currentQuestion.kpTitle"
         :reference-answer="displayReferenceAnswer(currentIndex)"
@@ -98,7 +108,13 @@
 <script setup lang="ts">
 import MathText from '@/components/common/MathText.vue';
 import AIPracticeFeedbackPanel from '@/components/learning/AIPracticeFeedbackPanel.vue';
+import AiCognitiveThinkingPanel from '@/components/ai/common/AiCognitiveThinkingPanel.vue';
+import { AI_COGNITIVE_THINKING_PRESETS } from '@/constants/ai/cognitive-thinking';
 import type { PracticeQuestion } from '@/composables/learning/useAIPractice';
+
+const emit = defineEmits<{
+  'abort-grading': [];
+}>();
 
 defineProps<{
   currentIndex: number;

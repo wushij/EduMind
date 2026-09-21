@@ -2,6 +2,7 @@ package com.edumind.statistics.service.learning.support;
 
 import com.edumind.ai.api.QuestionGenerateApi;
 import com.edumind.ai.dto.QuestionGenerateDTO;
+import com.edumind.common.exception.BusinessException;
 import com.edumind.question.api.QuestionCommandApi;
 import com.edumind.question.api.QuestionQueryApi;
 import com.edumind.question.dto.question.QuestionBatchCreateDTO;
@@ -13,6 +14,7 @@ import com.edumind.statistics.dao.WrongQuestionRecordDao;
 import com.edumind.statistics.dto.learning.AiPracticeStartDTO;
 import com.edumind.statistics.entity.WrongQuestionRecordEntity;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -20,6 +22,7 @@ import org.springframework.util.StringUtils;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AiPracticeQuestionSelector {
@@ -34,6 +37,16 @@ public class AiPracticeQuestionSelector {
         int count = dto.getCount() != null && dto.getCount() > 0 ? dto.getCount() : 5;
         Long courseId = dto.getCourseId();
         String mode = StringUtils.hasText(dto.getMode()) ? dto.getMode() : "WEAK_POINT";
+        boolean hasSeeds = !CollectionUtils.isEmpty(dto.getSeedQuestionIds());
+
+        // 携带种子题（错题变式 / 单题自测）时，课程以种子题自身所属课程为准：
+        // 前端课程选择器与路由参数不同步时，避免把其它课程的题掺进来（表现为"点了数学题却练到 Java 题"）
+        if (hasSeeds) {
+            Long seedCourseId = resolveSeedCourseId(dto.getSeedQuestionIds().get(0));
+            if (seedCourseId != null) {
+                courseId = seedCourseId;
+            }
+        }
 
         Set<Long> weakKpIds = knowledgeMasteryQueryApi.getMasteryByStudentAndCourse(studentId, courseId).entrySet()
                 .stream()
@@ -50,14 +63,25 @@ public class AiPracticeQuestionSelector {
         LinkedHashSet<Long> pickedIds = new LinkedHashSet<>();
         List<QuestionVO> picked = new ArrayList<>();
 
-        if (!CollectionUtils.isEmpty(dto.getSeedQuestionIds())) {
+        int resolvedSeeds = 0;
+        if (hasSeeds) {
             for (Long qid : dto.getSeedQuestionIds()) {
-                addQuestionById(qid, pickedIds, picked);
+                if (addQuestionById(qid, pickedIds, picked) != null) {
+                    resolvedSeeds++;
+                }
                 if (picked.size() >= count) {
                     break;
                 }
             }
+            // 调用方明确指定了题目却一道都取不到：直接明确报错，
+            // 绝不能用池子里的无关题目顶替（否则用户"点 A 练 B"）
+            if (resolvedSeeds == 0) {
+                throw new BusinessException("指定的练习题已不存在（可能已被删除或重新生成），请返回错题本重新生成后再自测");
+            }
         }
+        // 记录选题输入，便于排查"点进去的题不对"这类问题（种子失效、课程不同步都会在这里留下证据）
+        log.info("[AI 练习] 选题 mode={} count={} courseId={} seeds={} 命中种子={}",
+                mode, count, courseId, dto.getSeedQuestionIds(), resolvedSeeds);
 
         if ("WEAK_POINT".equals(mode)) {
             fillWeakPointQuestions(studentId, courseId, count, pickedIds, picked, weakKpIds, pool);
@@ -337,14 +361,39 @@ public class AiPracticeQuestionSelector {
         return dto;
     }
 
-    private void addQuestionById(Long questionId, Set<Long> pickedIds, List<QuestionVO> picked) {
+    /** 单题加入待练集合；题目不存在/已停用则返回 null（不抛异常，避免单题失效拖垮整场练习） */
+    private QuestionVO addQuestionById(Long questionId, Set<Long> pickedIds, List<QuestionVO> picked) {
         if (questionId == null || pickedIds.contains(questionId)) {
-            return;
+            return null;
         }
-        QuestionVO q = questionQueryApi.getQuestionById(questionId);
+        QuestionVO q;
+        try {
+            q = questionQueryApi.getQuestionById(questionId);
+        } catch (Exception ex) {
+            // QuestionQueryApi 查不到题目时是抛异常而非返回 null（历史变式题 ID 失效、题目被删除都会走到这里），
+            // 单题失效不能让整场练习直接 500，跳过即可。
+            log.warn("[AI 练习] 跳过不可用题目 {}：{}", questionId, ex.getMessage());
+            return null;
+        }
         if (q != null && (q.getStatus() == null || q.getStatus() == 1)) {
             pickedIds.add(q.getId());
             picked.add(q);
+            return q;
+        }
+        return null;
+    }
+
+    /** 解析种子题所属课程；取不到返回 null（由调用方沿用请求里的课程） */
+    private Long resolveSeedCourseId(Long seedQuestionId) {
+        if (seedQuestionId == null) {
+            return null;
+        }
+        try {
+            QuestionVO seed = questionQueryApi.getQuestionById(seedQuestionId);
+            return seed != null ? seed.getCourseId() : null;
+        } catch (Exception ex) {
+            log.warn("[AI 练习] 种子题 {} 不可用，沿用请求课程：{}", seedQuestionId, ex.getMessage());
+            return null;
         }
     }
 

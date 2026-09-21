@@ -23,6 +23,9 @@ public class WrongBookDetailVO extends WrongBookItemVO {
     @Data
     public static class VariantQuestionSummaryVO {
         private Long questionId;
+        /** 截断后的题干预览（保留兼容；公式可能被截断，展示请优先用 stem） */
         private String stemPreview;
+        /** 完整题干（裸 LaTeX 已补全 $ 定界符），由前端按行数裁切展示，保证公式完整渲染 */
+        private String stem;
     }
 }

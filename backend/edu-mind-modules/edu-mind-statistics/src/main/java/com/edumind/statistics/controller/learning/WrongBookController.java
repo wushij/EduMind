@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/learning/wrong-book")
 @RequiredArgsConstructor
@@ -56,6 +58,38 @@ public class WrongBookController {
     public ApiResult<WrongBookItemVO> diagnose(@PathVariable("id") Long id) {
         Long studentId = LoginUserResolver.requireUserId();
         return ApiResult.success(wrongBookService.diagnose(studentId, id));
+    }
+
+    /** 按需生成同构变式题（大模型生成 + 落库），与诊断解耦，避免一次请求串行多次模型调用 */
+    @SaCheckPermission("learning:wrong:view")
+    @PostMapping("/{id}/variants")
+    public ApiResult<List<WrongBookDetailVO.VariantQuestionSummaryVO>> generateVariants(
+            @PathVariable("id") Long id,
+            @RequestParam(name = "regenerate", defaultValue = "false") boolean regenerate) {
+        Long studentId = LoginUserResolver.requireUserId();
+        return ApiResult.success(wrongBookService.generateVariants(studentId, id, regenerate));
+    }
+
+    /**
+     * 学生中止 AI 归因诊断。
+     * 浏览器关闭连接不会中断服务端线程，本次模型调用无法撤销；
+     * 该接口让服务端在模型返回后丢弃结果、不再落库，避免"点了中止却还是冒出新结论"。
+     */
+    @SaCheckPermission("learning:wrong:view")
+    @PostMapping("/{id}/diagnose/cancel")
+    public ApiResult<Void> cancelDiagnose(@PathVariable("id") Long id) {
+        Long studentId = LoginUserResolver.requireUserId();
+        wrongBookService.cancelAiDiagnosis(studentId, id);
+        return ApiResult.success(null);
+    }
+
+    /** 学生中止变式题生成：服务端丢弃结果，且不把题目写入题库 */
+    @SaCheckPermission("learning:wrong:view")
+    @PostMapping("/{id}/variants/cancel")
+    public ApiResult<Void> cancelVariants(@PathVariable("id") Long id) {
+        Long studentId = LoginUserResolver.requireUserId();
+        wrongBookService.cancelAiVariants(studentId, id);
+        return ApiResult.success(null);
     }
 
     @SaCheckPermission("learning:wrong:view")

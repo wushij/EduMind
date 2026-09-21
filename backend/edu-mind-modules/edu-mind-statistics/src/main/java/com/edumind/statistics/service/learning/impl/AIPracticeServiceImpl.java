@@ -9,6 +9,7 @@ import com.edumind.course.api.CourseAccessApi;
 import com.edumind.question.api.QuestionQueryApi;
 import com.edumind.question.vo.question.QuestionVO;
 import com.edumind.statistics.dao.WrongQuestionRecordDao;
+import com.edumind.common.markdown.LatexTextNormalizer;
 import com.edumind.statistics.dto.learning.AiPracticeGradeDTO;
 import com.edumind.statistics.dto.learning.AiPracticeStartDTO;
 import com.edumind.statistics.dto.learning.AiPracticeSubmitDTO;
@@ -118,7 +119,10 @@ public class AIPracticeServiceImpl implements AIPracticeService {
         if (question == null) {
             throw new BusinessException("题目不存在");
         }
-        return answerGrader.grade(question, dto.getStudentAnswer());
+        AiPracticeGradeVO vo = answerGrader.grade(question, dto.getStudentAnswer());
+        // AI 解析常是裸 LaTeX（如 \tan x\sim x），回给前端前归一化，否则 KaTeX 渲染不出来
+        vo.setAnalysis(LatexTextNormalizer.wrapBareMath(vo.getAnalysis()));
+        return vo;
     }
 
     @Override
@@ -148,6 +152,9 @@ public class AIPracticeServiceImpl implements AIPracticeService {
             if (question == null) {
                 continue;
             }
+            // 错题与掌握度必须落到题目自身所属课程：练习会话的课程可能来自前端课程选择器，
+            // 与题目实际课程不一致时（错题变式跨课程自测）会把数据写到别的课程下。
+            Long recordCourseId = question.getCourseId() != null ? question.getCourseId() : courseId;
             String studentAnswer = answerMap.getOrDefault(questionId, "");
             AiPracticeGradeVO graded = answerGrader.grade(question, studentAnswer);
 
@@ -156,24 +163,24 @@ public class AIPracticeServiceImpl implements AIPracticeService {
             item.setStudentAnswer(studentAnswer);
             item.setCorrect(Boolean.TRUE.equals(graded.getCorrect()));
             item.setReferenceAnswer(graded.getReferenceAnswer());
-            item.setAnalysis(graded.getAnalysis());
+            item.setAnalysis(LatexTextNormalizer.wrapBareMath(graded.getAnalysis()));
             item.setKnowledgePointName(graded.getKnowledgePointName());
             results.add(item);
 
             if (Boolean.TRUE.equals(graded.getCorrect())) {
                 correct++;
                 if (question.getKnowledgePointId() != null) {
-                    knowledgeMasteryService.upsertMastery(studentId, courseId, question.getKnowledgePointId(), 1.0);
+                    knowledgeMasteryService.upsertMastery(studentId, recordCourseId, question.getKnowledgePointId(), 1.0);
                 }
             } else {
                 wrongIds.add(questionId);
                 if (question.getKnowledgePointId() != null) {
                     weakKpIds.add(question.getKnowledgePointId());
-                    knowledgeMasteryService.upsertMastery(studentId, courseId, question.getKnowledgePointId(), 0.4);
+                    knowledgeMasteryService.upsertMastery(studentId, recordCourseId, question.getKnowledgePointId(), 0.4);
                 }
                 wrongQuestionDiagnosisService.recordWrong(
                         studentId,
-                        courseId,
+                        recordCourseId,
                         questionId,
                         question.getKnowledgePointId(),
                         graded.getAnalysis(),

@@ -106,7 +106,8 @@ public class AssignmentController {
         return ApiResult.success(submissionService.submit(assignmentId, dto));
     }
 
-    @SaCheckPermission("assignment:view")
+    /** 某作业下全部学生答卷，属批改场景，仅教师/管理员可读 */
+    @SaCheckPermission("assignment:grade")
     @GetMapping("/{id}/submissions")
     public ApiResult<List<SubmissionVO>> listSubmissions(@PathVariable("id") Long assignmentId) {
         return ApiResult.success(submissionService.listByAssignmentId(assignmentId));

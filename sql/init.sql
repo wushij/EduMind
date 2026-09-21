@@ -2013,6 +2013,62 @@ INSERT IGNORE INTO agent_step (id, run_id, step_index, step_type, title, tool_na
 INSERT IGNORE INTO agent_tool_call (id, run_id, step_id, tool_name, input_json, output_json, status, duration_ms) VALUES
 (1, 'run_demo_001', 2, 'generate_question', '{"count":3,"type":"SINGLE"}', '{"generated":3}', 'SUCCESS', 820);
 
+-- -----------------------------------------------------------------------------
+-- 数据修复：批改结果"未作答"语义 + 历史脏评语前缀清理
+--   背景：历史版本的客观题批改是二值判定，学生未作答也写入 is_correct = 0 + "回答错误"；
+--         主观题未作答仍会调用大模型，且模型回复被整段存为评语（形如 'score:0comment:...'）。
+--   本段修复：
+--     1) 未作答且未得分的客观题 → is_correct 置 NULL（不计入对错统计）、评语统一为"未作答，不得分"；
+--     2) 未作答的主观题 → 同上统一评语（未作答语义确定，无需保留模型原文）；
+--     3) 评语仍带 'score:0' / 'comment:' 协议前缀的记录 → 仅剥离前缀，保留评语正文。
+--   幂等：命中条件后即不再满足，可重复执行。score = 0 条件用于保护教师主动给分的记录。
+-- -----------------------------------------------------------------------------
+
+UPDATE grading_result gr
+JOIN submission_answer sa
+  ON sa.submission_id = gr.submission_id
+ AND sa.question_id = gr.question_id
+SET gr.is_correct = NULL,
+    gr.ai_comment = '未作答，不得分',
+    gr.teacher_comment = CASE
+        WHEN gr.teacher_comment = '回答错误' THEN '未作答，不得分'
+        ELSE gr.teacher_comment
+    END
+WHERE gr.is_correct = 0
+  AND IFNULL(gr.score, 0) = 0
+  AND (sa.answer IS NULL OR TRIM(sa.answer) = '');
+
+UPDATE grading_result gr
+JOIN submission_answer sa
+  ON sa.submission_id = gr.submission_id
+ AND sa.question_id = gr.question_id
+SET gr.ai_comment = '未作答，不得分',
+    gr.teacher_comment = CASE
+        WHEN gr.teacher_comment LIKE 'score:%' THEN '未作答，不得分'
+        ELSE gr.teacher_comment
+    END
+WHERE gr.is_correct IS NULL
+  AND IFNULL(gr.score, 0) = 0
+  AND (sa.answer IS NULL OR TRIM(sa.answer) = '')
+  AND (gr.ai_comment IS NULL OR gr.ai_comment LIKE 'score:%');
+
+UPDATE grading_result
+SET ai_comment = TRIM(REGEXP_REPLACE(ai_comment,
+        '^[[:space:]]*(score|得分|分数)[[:space:]]*[:：][[:space:]]*[0-9]+([[:space:]]*/[[:space:]]*[0-9]+)?[[:space:]]*(comment|评语|点评)?[[:space:]]*[:：]?[[:space:]]*', ''))
+WHERE ai_comment REGEXP '^[[:space:]]*(score|得分|分数)[[:space:]]*[:：][[:space:]]*[0-9]';
+
+UPDATE grading_result
+SET teacher_comment = TRIM(REGEXP_REPLACE(teacher_comment,
+        '^[[:space:]]*(score|得分|分数)[[:space:]]*[:：][[:space:]]*[0-9]+([[:space:]]*/[[:space:]]*[0-9]+)?[[:space:]]*(comment|评语|点评)?[[:space:]]*[:：]?[[:space:]]*', ''))
+WHERE teacher_comment REGEXP '^[[:space:]]*(score|得分|分数)[[:space:]]*[:：][[:space:]]*[0-9]';
+
+-- 参考答案中夹在中文说明里的复杂度记号 O(n^2) 未加 $ 定界符，前端只能按纯文本展示；
+-- 这里只补定界符、不改动内容（幂等：已含 $ 的记录不再命中）。
+UPDATE edu_question
+SET answer = REPLACE(answer, 'O(n^2)', '$O(n^2)$')
+WHERE answer LIKE '%O(n^2)%'
+  AND answer NOT LIKE '%$%';
+
 SELECT '=============================================================================' AS EDUMIND_INIT_NOTICE;
 SELECT ' EduMind init.sql 执行完毕（未 DROP 任何表，仅补表/补种）' AS EDUMIND_INIT_NOTICE;
 SELECT ' 如需版本升级请执行 sql/migration/ 下对应 V* 脚本' AS EDUMIND_INIT_NOTICE;

@@ -18,8 +18,8 @@
       </span>
     </div>
 
-    <!-- 标题与描述 -->
-    <h3 class="card-title">{{ item.title }}</h3>
+    <!-- 标题与描述：题干可能含 LaTeX（如 $O(n \log_2 n)$），必须走 MathText 渲染 -->
+    <MathText tag="h3" custom-class="card-title" :text="item.title" />
     <p class="card-description">{{ item.description }}</p>
 
     <!-- 课程与考点信息条 (药丸组合) -->
@@ -51,13 +51,16 @@
         </span>
       </div>
 
-      <div v-if="item.exerciseMeta" class="param-item">
+      <!-- 无统计来源时整行不渲染，避免向学生展示 “全班均正答率：—” 这类占位 -->
+      <div v-if="item.exerciseMeta?.averageAccuracy" class="param-item">
         <span class="param-label">全班均正答率：</span>
         <span class="stat-text">{{ item.exerciseMeta.averageAccuracy }}</span>
       </div>
       <div v-else-if="item.resourceMeta" class="param-item">
-        <span class="param-label">格式大小：</span>
-        <span class="stat-text">{{ item.resourceMeta.format }} · {{ item.resourceMeta.fileSize }}</span>
+        <span class="param-label">资料格式：</span>
+        <span class="stat-text">
+          {{ item.resourceMeta.format }}{{ item.resourceMeta.fileSize ? ` · ${item.resourceMeta.fileSize}` : '' }}
+        </span>
       </div>
     </div>
 
@@ -103,6 +106,7 @@ import {
   ChatDotRound,
   Right
 } from '@element-plus/icons-vue';
+import MathText from '@/components/common/MathText.vue';
 import type { RecommendationItem } from '@/types/learning/recommendation';
 
 const props = defineProps<{

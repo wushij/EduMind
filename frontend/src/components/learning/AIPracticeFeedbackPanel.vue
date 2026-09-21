@@ -20,7 +20,8 @@
       </div>
       <div class="ai-comment">
         <strong>AI 深度解析与变式溯源：</strong>
-        <p>{{ analysis }}</p>
+        <!-- 解析文本含公式（含裸 LaTeX），必须走 MathText 渲染，否则会直接显示源码 -->
+        <MathText class="analysis-text" :text="analysis" />
       </div>
     </div>
   </div>
@@ -85,6 +86,15 @@ defineProps<{
 
     .reference-ans {
       margin-bottom: 8px;
+    }
+
+    .analysis-text {
+      display: block;
+      margin-top: 6px;
+      font-size: 13px;
+      line-height: 1.75;
+      color: #334155;
+      word-break: break-word;
     }
   }
 }

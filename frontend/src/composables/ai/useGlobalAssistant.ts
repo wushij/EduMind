@@ -1166,12 +1166,18 @@ export function useGlobalAssistant() {
   );
 
   function handleOpenAssistantEvent(e: Event) {
-    const detail = (e as CustomEvent<{ prefill?: string; autoSend?: boolean }>).detail;
+    const detail = (e as CustomEvent<{ prefill?: string; autoSend?: boolean; startNewSession?: boolean }>).detail;
     const prefill = detail?.prefill?.trim();
     const autoSend = Boolean(detail?.autoSend && prefill);
     drawerVisible.value = true;
     sessions.value = readSessionsFromStorage();
-    restoreFollowUpsForLastTurn();
+    // 携带新题目/资料上下文打开时开启新会话：
+    // 否则会沿用上一轮对话与追问，既显示旧聊天记录，也会把快捷提问顶掉。
+    if (detail?.startNewSession) {
+      startNewSession();
+    } else {
+      restoreFollowUpsForLastTurn();
+    }
     if (prefill) {
       inputContent.value = prefill;
     }

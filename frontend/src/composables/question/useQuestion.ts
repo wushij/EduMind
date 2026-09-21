@@ -53,7 +53,8 @@ export function useQuestion() {
     }
   }
 
-  async function fetchQuestionDetail(id: number) {
+  /** id 支持字符串：AI 生成题使用雪花 ID，超出 JS 安全整数范围，必须按字符串传递 */
+  async function fetchQuestionDetail(id: number | string) {
     loading.value = true;
     try {
       const res = await getQuestionDetail(id);

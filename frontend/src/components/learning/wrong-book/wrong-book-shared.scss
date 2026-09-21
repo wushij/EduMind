@@ -27,11 +27,11 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    transition: all 0.22s ease;
+    transition: border-color 0.22s ease, box-shadow 0.22s ease;
 
     &:hover {
       border-color: #1677ff;
-      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(22, 119, 255, 0.12);
     }
 
     .stat-num {

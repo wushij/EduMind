@@ -26,7 +26,8 @@ export function useQuestionAiTutor(options?: { clearOnUnmount?: boolean }) {
         draftExcerpt: excerpt
       },
       '',
-      { autoSend: false }
+      // 锚定新题目时开启新会话，避免沿用上一题的历史消息与追问
+      { autoSend: false, startNewSession: true }
     );
   }
 

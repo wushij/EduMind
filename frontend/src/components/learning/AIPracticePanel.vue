@@ -52,6 +52,7 @@
         :on-submit-current-question="onSubmitCurrentQuestion"
         :on-jump-to-question="onJumpToQuestion"
         :on-finish-practice="onFinishPractice"
+        @abort-grading="onAbortGrading"
       />
     </div>
 
@@ -128,6 +129,7 @@ defineProps<{
   onSubmitCurrentQuestion: () => void;
   onJumpToQuestion: (idx: number) => void;
   onFinishPractice: () => void;
+  onAbortGrading: () => void;
   onConfirmExit: () => void;
   onResetToSetup: () => void;
   onGoToWrongQuestions: () => void;

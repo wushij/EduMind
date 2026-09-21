@@ -1,5 +1,6 @@
 package com.edumind.question.converter;
 
+import com.edumind.common.markdown.LatexTextNormalizer;
 import com.edumind.question.dto.question.QuestionCreateDTO;
 import com.edumind.question.dto.question.QuestionUpdateDTO;
 import com.edumind.question.entity.QuestionEntity;
@@ -48,6 +49,10 @@ public class QuestionConverter {
         }
         QuestionVO vo = new QuestionVO();
         BeanUtils.copyProperties(entity, vo);
+        // 大模型出题常带裸 LaTeX / Unicode 数学，这里是所有读取路径的唯一出口，
+        // 统一归一化后题库、练习、试卷、错题本各处才能正常渲染公式。
+        vo.setStem(LatexTextNormalizer.wrapBareMath(vo.getStem()));
+        vo.setAnalysis(LatexTextNormalizer.wrapBareMath(vo.getAnalysis()));
         return vo;
     }
 }

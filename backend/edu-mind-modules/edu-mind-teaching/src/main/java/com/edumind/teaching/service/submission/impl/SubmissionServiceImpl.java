@@ -1,6 +1,8 @@
 package com.edumind.teaching.service.submission.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.edumind.common.event.LearningActivityEvent;
+import com.edumind.common.api.ResultCode;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.common.model.UserContext;
 import com.edumind.infrastructure.redis.DistributedLockService;
@@ -111,8 +113,9 @@ public class SubmissionServiceImpl implements SubmissionService {
     public SubmissionVO getById(Long id) {
         SubmissionEntity entity = submissionDao.findById(id);
         if (entity == null) {
-            throw new BusinessException("提交记录不存在");
+            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "提交记录不存在");
         }
+        assertCanViewSubmission(entity);
         SubmissionVO vo = new SubmissionVO();
         vo.setId(entity.getId());
         vo.setAssignmentId(entity.getAssignmentId());
@@ -172,6 +175,28 @@ public class SubmissionServiceImpl implements SubmissionService {
         gradingResultDao.deleteBySubmissionId(id);
         submissionAnswerDao.deleteBySubmissionId(id);
         submissionDao.deleteById(id);
+    }
+
+    /**
+     * 答卷可见性校验（学生端必须能看自己的答卷，但不能看他人答卷）：
+     * 1. 答卷归属学生本人 → 放行；
+     * 2. 具备批改权限的教师/管理员（assignment:grade / ai:grading）→ 放行；
+     * 3. 其余情况拒绝，避免通过遍历 id 越权读取他人作答与评语。
+     */
+    private void assertCanViewSubmission(SubmissionEntity entity) {
+        if (entity == null) {
+            return;
+        }
+        Long currentUserId = UserContext.getUserId();
+        if (currentUserId != null && currentUserId.equals(entity.getStudentId())) {
+            return;
+        }
+        boolean canGrade = StpUtil.isLogin()
+                && (StpUtil.hasPermission("assignment:grade") || StpUtil.hasPermission("ai:grading"));
+        if (canGrade) {
+            return;
+        }
+        throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权查看他人答卷");
     }
 
     private Long requireUserId() {

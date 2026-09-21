@@ -70,7 +70,8 @@ public class SubmissionController {
         return ApiResult.success(submissionService.getById(id));
     }
 
-    @SaCheckPermission("assignment:view")
+    /** 逐题批改结果含参考答案与 AI 评语，仅教师/管理员（具备批改权限）可读；学生通过 GET /{id} 读取自己的答卷 */
+    @SaCheckPermission("assignment:grade")
     @GetMapping("/{id}/grading")
     public ApiResult<List<GradingItemVO>> getGradingResults(@PathVariable("id") Long id) {
         return ApiResult.success(gradingService.getGradingResults(id));
@@ -91,7 +92,8 @@ public class SubmissionController {
         return ApiResult.success();
     }
 
-    @SaCheckPermission("assignment:view")
+    /** 某作业下全部学生答卷，属批改场景，仅教师/管理员可读 */
+    @SaCheckPermission("assignment:grade")
     @GetMapping("/assignments/{assignmentId}")
     public ApiResult<List<SubmissionVO>> listByAssignment(@PathVariable("assignmentId") Long assignmentId) {
         return ApiResult.success(submissionService.listByAssignmentId(assignmentId));

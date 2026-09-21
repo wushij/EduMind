@@ -1,6 +1,7 @@
 package com.edumind.statistics.dao;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.edumind.statistics.entity.WrongQuestionRecordEntity;
 import com.edumind.statistics.mapper.WrongQuestionRecordMapper;
@@ -69,6 +70,19 @@ public class WrongQuestionRecordDao {
 
     public int updateById(WrongQuestionRecordEntity entity) {
         return wrongQuestionRecordMapper.updateById(entity);
+    }
+
+    /**
+     * 显式更新归因结论与失分类型标签。
+     * MyBatis-Plus 默认的更新策略会忽略 null 字段，若沿用 {@link #updateById} 传 errorTypes=null，
+     * 旧的失分类型标签会残留在库里（例如「未作答」记录仍显示上一次的「审题不清」）。
+     * 因此这里用 UpdateWrapper 显式 set，保证标签能被真正清空。
+     */
+    public int updateDiagnosisResult(Long id, String diagnosis, String errorTypes) {
+        return wrongQuestionRecordMapper.update(null, new LambdaUpdateWrapper<WrongQuestionRecordEntity>()
+                .eq(WrongQuestionRecordEntity::getId, id)
+                .set(WrongQuestionRecordEntity::getDiagnosis, diagnosis)
+                .set(WrongQuestionRecordEntity::getErrorTypes, errorTypes));
     }
 
     public WrongQuestionRecordEntity findById(Long id) {

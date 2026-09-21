@@ -52,8 +52,24 @@ describe('renderMathText', () => {
     expect(html).toContain('故正确答案为 B');
     // 验证 \ln(1+x) 和 \sin 2x 也被渲染成了 katex
     expect(html.match(/class="katex"/g)?.length).toBeGreaterThanOrEqual(4);
-  });
-});
+    });
+
+    it('renders bare plain-text formulas without dollar signs', () => {
+    expect(renderMathText('e^6')).toContain('katex');
+    expect(renderMathText('2^h - 1')).toContain('katex');
+    const parametric = renderMathText('dy/dx = 3(t^2+1)/(2t), d^2y/dx^2 = 3(t^2-1)/(4t^3)');
+    expect(parametric).toContain('katex');
+    expect(parametric).not.toContain('katex-error');
+    // 整段被公式化渲染，不应再以纯文本形式裸出
+    expect(parametric.startsWith('<span class="katex">')).toBe(true);
+    });
+
+    it('does not treat Chinese prose, English sentences or code as bare formulas', () => {
+    expect(renderMathText('时间复杂度最坏为O(n^2)')).not.toContain('katex');
+    expect(renderMathText('The value of x^2 is 4')).not.toContain('katex');
+    expect(renderMathText('\\d{3}-\\d{4}')).not.toContain('katex');
+    });
+    });
 
 describe('normalizeMathTextNewlines', () => {
   it('converts escaped newlines when not a LaTeX command', () => {

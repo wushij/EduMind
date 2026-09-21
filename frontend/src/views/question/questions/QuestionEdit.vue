@@ -38,7 +38,8 @@ const router = useRouter();
 const route = useRoute();
 const { fetchQuestionDetail, saveQuestion } = useQuestion();
 
-const questionId = Number(route.params.id);
+// 题目 ID 可能是 AI 生成题的雪花 ID（19 位），Number() 会丢精度导致查不到详情，这里保留字符串
+const questionId = String(route.params.id ?? '');
 const questionData = ref<Question | null>(null);
 const loading = ref(true);
 const submitting = ref(false);
