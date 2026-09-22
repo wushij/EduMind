@@ -35,6 +35,7 @@
         <DocumentTable
           v-loading="loading"
           :documents="documents"
+          @open-parse="handleOpenParse"
           @parse="handleParse"
           @delete="handleDelete"
           @view-chunks="handleViewChunks"
@@ -52,8 +53,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { nextTick, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Document, Refresh } from '@element-plus/icons-vue';
 import DocumentUploader from '@/components/knowledge/DocumentUploader.vue';
@@ -63,9 +64,21 @@ import { batchUploadMessage } from '@/utils/upload/coalesce-upload-files';
 import { useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
 
 const router = useRouter();
+const route = useRoute();
 const { kbId } = useKnowledgeRoute();
 const { documents, loading, uploading, fetchDocuments, uploadMany, remove, triggerParse, triggerRechunk } =
   useDocumentUpload(kbId);
+
+function checkUploadAction() {
+  if (route.query.action === 'upload') {
+    nextTick(() => {
+      const anchor = document.getElementById('kb-doc-upload');
+      if (anchor) {
+        anchor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  }
+}
 
 async function handleUploadFiles(files: File[]) {
   if (files.length === 0) return;
@@ -88,6 +101,11 @@ onMounted(() => {
   if (kbId.value) {
     fetchDocuments();
   }
+  checkUploadAction();
+});
+
+watch(() => route.query.action, () => {
+  checkUploadAction();
 });
 
 watch(kbId, (id) => {
@@ -125,6 +143,14 @@ async function handleDelete(id: number) {
   } catch {
     // 用户取消
   }
+}
+
+function handleOpenParse(documentId: number) {
+  if (!kbId.value) return;
+  router.push({
+    path: `/knowledge/${kbId.value}/parse`,
+    query: { documentId: String(documentId) }
+  });
 }
 
 function handleViewChunks(documentId: number) {

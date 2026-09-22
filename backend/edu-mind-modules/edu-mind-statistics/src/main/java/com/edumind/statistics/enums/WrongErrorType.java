@@ -93,7 +93,11 @@ public enum WrongErrorType {
             // 显式标注：类型：CONCEPT / 错因类型 CONCEPT
             Pattern.compile("(?:错因)?类型\\s*[:：]?\\s*(CONCEPT|LOGIC|CALC|READING)\\s*[。.；;]?", Pattern.CASE_INSENSITIVE),
             // 归因措辞：属于 CONCEPT / 归为 READING
-            Pattern.compile("(?:属于|归为|标记为|判定为|划分为)\\s*(CONCEPT|LOGIC|CALC|READING)\\s*[。.；;]?", Pattern.CASE_INSENSITIVE)
+            Pattern.compile("(?:属于|归为|标记为|判定为|划分为)\\s*(CONCEPT|LOGIC|CALC|READING)\\s*[。.；;]?", Pattern.CASE_INSENSITIVE),
+            // 句末裸标记：提示词要求模型把类型标注在句末，部分模型直接缀 code 而不加任何前缀，
+            // 如 “……等核心特性。 CONCEPT”。不剥离会让学生看到 CONCEPT 这类内部枚举值。
+            // 前缀只吃空格/逗号，句末的「。」保留，避免清洗后结论失去句读。
+            Pattern.compile("[\\s，,、]*(CONCEPT|LOGIC|CALC|READING)\\s*[。.；;]?\\s*$", Pattern.CASE_INSENSITIVE)
     );
 
     /**

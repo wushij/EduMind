@@ -39,19 +39,26 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="操作" min-width="300" width="300" fixed="right" align="center" class-name="action-column">
+      <el-table-column label="操作" min-width="360" width="360" fixed="right" align="center" class-name="action-column">
         <template #default="{ row }">
           <div class="action-pill-group">
             <button
               type="button"
               class="table-action-pill table-action-pill--primary"
+              @click="$emit('open-parse', row.id)"
+            >
+              解析工作台
+            </button>
+            <button
+              type="button"
+              class="table-action-pill table-action-pill--default"
               @click="$emit('view-chunks', row.id)"
             >
               查看切片
             </button>
             <button
               type="button"
-              class="table-action-pill table-action-pill--primary"
+              class="table-action-pill table-action-pill--default"
               @click="$emit('rechunk', row.id)"
             >
               重新切片
@@ -94,6 +101,7 @@ import {
 
 defineProps<{ documents: KBDocument[] }>();
 defineEmits<{
+  (e: 'open-parse', id: number): void;
   (e: 'parse', id: number): void;
   (e: 'delete', id: number): void;
   (e: 'view-chunks', id: number): void;

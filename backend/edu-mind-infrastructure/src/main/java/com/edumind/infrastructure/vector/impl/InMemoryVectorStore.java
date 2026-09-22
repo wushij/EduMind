@@ -19,8 +19,20 @@ public class InMemoryVectorStore implements VectorStore {
 
     @Override
     public void save(String collectionName, String id, List<Float> vector, Map<String, Object> metadata) {
+        Map<String, Object> safeMeta = metadata == null ? new java.util.HashMap<>() : new java.util.HashMap<>(metadata);
+        // Fail-Closed：向量必须携带有效租户归属，否则不落库，防止污染其他租户的召回结果
+        Object tenantId = safeMeta.get("tenantId");
+        if (tenantId == null) {
+            tenantId = com.edumind.common.context.TenantContext.getTenantId();
+            if (tenantId != null) {
+                safeMeta.put("tenantId", tenantId);
+            }
+        }
+        if (tenantId == null) {
+            throw new IllegalStateException("向量写入缺少有效租户上下文，已拒绝写入 (Tenant Required)");
+        }
         collections.computeIfAbsent(collectionName, key -> new ConcurrentHashMap<>())
-                .put(id, new StoredVector(vector, metadata));
+                .put(id, new StoredVector(vector, safeMeta));
     }
 
     @Override
@@ -58,11 +70,32 @@ public class InMemoryVectorStore implements VectorStore {
         return results.subList(0, Math.min(topK, results.size()));
     }
 
+    @Override
+    public String getEngineType() {
+        return "InMemory";
+    }
+
+    @Override
+    public String getVersion() {
+        return "Embedded Engine";
+    }
+
+    @Override
+    public boolean isHealthy() {
+        return true;
+    }
+
     private boolean matchesFilter(Map<String, Object> metadata, Map<String, Object> filter) {
-        if (filter == null || filter.isEmpty()) {
-            return true;
+        Map<String, Object> effective = filter == null ? new java.util.HashMap<>() : new java.util.HashMap<>(filter);
+        // Fail-Closed：没有租户维度的检索一律 0 命中，绝不退化为全量检索
+        if (effective.get("tenantId") == null) {
+            Object current = com.edumind.common.context.TenantContext.getTenantId();
+            if (current == null) {
+                return false;
+            }
+            effective.put("tenantId", current);
         }
-        for (Map.Entry<String, Object> entry : filter.entrySet()) {
+        for (Map.Entry<String, Object> entry : effective.entrySet()) {
             Object actual = metadata.get(entry.getKey());
             if (actual == null || !actual.toString().equals(entry.getValue().toString())) {
                 return false;

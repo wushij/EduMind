@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { UserInfo } from '@/types/auth/auth';
+import { UserInfo, LoginResult } from '@/types/auth/auth';
 import { RoleEnum, USER_INFO_KEY } from '@/constants/auth';
 import { tokenUtil } from '@/core/auth/token';
 import { storage } from '@/core/storage/local';
@@ -9,6 +9,7 @@ import { USE_MOCK } from '@/config/mock';
 import { MOCK_USERS } from '@/mock/users';
 import { normalizeAvatarUrl } from '@/utils/format/file';
 import { useNotifyStore } from '@/stores/notification/notify';
+import { clearTenantContext, setStoredTenantId } from '@/constants/tenant';
 
 const DEFAULT_ROLE_ACCOUNTS: Record<'ADMIN' | 'TEACHER' | 'STUDENT', { username: string; password: string }> = {
   ADMIN: { username: 'admin', password: 'admin123' },
@@ -51,6 +52,39 @@ export const useAuthStore = defineStore('auth', () => {
     permissions.value = user.permissions || [];
     userInfoLoaded.value = true;
     storage.set(USER_INFO_KEY, user);
+  };
+
+  /**
+   * 统一应用一次新的登录会话（账号登录 / 邮箱登录 / 扫码登录 / 身份切换共用）。
+   *
+   * 关键：任何会「更换会话」的入口都必须走这里，以保证租户上下文与后端会话一致。
+   * 若只更新 token 而不更新租户 ID，请求头 X-Tenant-Id 仍会携带上一个会话的租户，
+   * 后端对管理员会按该头开启代管，导致切换身份后落进错误的学校。
+   */
+  const applySession = (data: LoginResult, options?: { refetchUser?: boolean }) => {
+    setToken(data.token);
+    if (data.tenantId) {
+      setStoredTenantId(data.tenantId);
+    }
+    if (data.userInfo) {
+      const info = data.userInfo;
+      setUser({
+        id: info.id,
+        username: info.username,
+        realName: info.realName || info.username,
+        avatar: info.avatar || '',
+        roles: (info.roles || []) as RoleEnum[],
+        permissions: info.permissions || [],
+        department: info.department,
+        email: info.email,
+        phone: info.phone
+      });
+    }
+    if (options?.refetchUser || !data.userInfo) {
+      // 强制重新拉取，保证权限与角色来自当前租户上下文
+      userInfoLoaded.value = false;
+      void fetchUserInfo();
+    }
   };
 
   const hasRole = (role: string) => {
@@ -119,22 +153,9 @@ export const useAuthStore = defineStore('auth', () => {
           password: creds.password
         });
         if (res?.data?.token) {
-          setToken(res.data.token);
-          if (res.data.userInfo) {
-            setUser({
-              id: res.data.userInfo.id,
-              username: res.data.userInfo.username,
-              realName: res.data.userInfo.realName || res.data.userInfo.username,
-              avatar: res.data.userInfo.avatar || '',
-              roles: (res.data.userInfo.roles || []) as RoleEnum[],
-              permissions: res.data.userInfo.permissions || [],
-              department: res.data.userInfo.department,
-              email: res.data.userInfo.email,
-              phone: res.data.userInfo.phone
-            });
-          } else {
-            await fetchUserInfo();
-          }
+          // 必须走统一会话应用逻辑：同步 tenantId，否则切换身份后会带着上一个租户的
+          // X-Tenant-Id 发起请求，管理员身份将被代管进错误的学校
+          applySession(res.data, { refetchUser: true });
           return;
         }
       } catch (error) {
@@ -177,6 +198,15 @@ export const useAuthStore = defineStore('auth', () => {
     userInfoLoaded.value = false;
     tokenUtil.remove();
     storage.remove(USER_INFO_KEY);
+    // 清理租户/校区上下文：避免同一浏览器换账号登录时沿用上一个账号的租户
+    clearTenantContext();
+    try {
+      // 动态引入避免 store 之间在模块初始化期形成循环依赖
+      const { useTenantStore } = await import('@/stores/system/tenant');
+      useTenantStore().reset();
+    } catch {
+      // 忽略：租户上下文已通过 storage 清理，Pinia 状态会在下次进入时重置
+    }
   }
 
   return {
@@ -187,6 +217,7 @@ export const useAuthStore = defineStore('auth', () => {
     currentRole,
     setToken,
     setUser,
+    applySession,
     hasRole,
     hasAnyRole,
     hasPermission,

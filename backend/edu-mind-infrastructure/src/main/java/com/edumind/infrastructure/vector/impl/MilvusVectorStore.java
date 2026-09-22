@@ -57,6 +57,8 @@ public class MilvusVectorStore implements VectorStore {
         fields.add(new InsertParam.Field(VECTOR_FIELD, List.of(vector)));
         fields.add(new InsertParam.Field(KB_FIELD, List.of(metadata.getOrDefault("knowledgeBaseId", 0L))));
         fields.add(new InsertParam.Field(DOC_FIELD, List.of(metadata.getOrDefault("documentId", 0L))));
+        // 租户列必须真实落库，否则 searchNearest 的 tenant_id 过滤表达式将失效（跨租户向量召回）
+        fields.add(new InsertParam.Field(TENANT_FIELD, List.of(resolveTenantId(metadata.get("tenantId")))));
         R<io.milvus.grpc.MutationResult> response = client.insert(InsertParam.newBuilder()
                 .withCollectionName(collectionName)
                 .withFields(fields)
@@ -64,6 +66,31 @@ public class MilvusVectorStore implements VectorStore {
         if (response.getStatus() != R.Status.Success.getCode()) {
             throw new IllegalStateException("Milvus insert failed: " + response.getMessage());
         }
+    }
+
+    /**
+     * 解析并强制校验向量归属租户：缺失租户时 Fail-Closed，绝不写入 0/默认租户
+     * 避免无租户上下文的写入污染某个正式租户的召回结果。
+     */
+    private long resolveTenantId(Object raw) {
+        if (raw instanceof Number num && num.longValue() > 0) {
+            return num.longValue();
+        }
+        if (raw instanceof String str && !str.isBlank()) {
+            try {
+                long parsed = Long.parseLong(str.trim());
+                if (parsed > 0) {
+                    return parsed;
+                }
+            } catch (NumberFormatException ignored) {
+                // 落入下方 Fail-Closed 分支
+            }
+        }
+        Long current = com.edumind.common.context.TenantContext.getTenantId();
+        if (current != null && current > 0) {
+            return current;
+        }
+        throw new IllegalStateException("向量写入缺少有效租户上下文，已拒绝写入 (Tenant Required)");
     }
 
     @Override
@@ -94,7 +121,7 @@ public class MilvusVectorStore implements VectorStore {
                 .withTopK(topK)
                 .withFloatVectors(List.of(queryVector))
                 .withVectorFieldName(VECTOR_FIELD)
-                .withOutFields(List.of(ID_FIELD, KB_FIELD, DOC_FIELD))
+                .withOutFields(List.of(ID_FIELD, KB_FIELD, DOC_FIELD, TENANT_FIELD))
                 .withExpr(expr)
                 .build();
         R<SearchResults> response = client.search(searchParam);
@@ -112,6 +139,7 @@ public class MilvusVectorStore implements VectorStore {
             Map<String, Object> metadata = new HashMap<>();
             metadata.put("knowledgeBaseId", row.get(KB_FIELD));
             metadata.put("documentId", row.get(DOC_FIELD));
+            metadata.put("tenantId", row.get(TENANT_FIELD));
             float score = wrapper.getIDScore(0).get(i).getScore();
             results.add(VectorSearchResult.builder()
                     .id(String.valueOf(row.get(ID_FIELD)))
@@ -123,20 +151,26 @@ public class MilvusVectorStore implements VectorStore {
     }
 
     private String buildFilterExpr(Map<String, Object> filter) {
-        if (filter == null || filter.isEmpty()) {
-            return null;
+        // Fail-Closed：缺乏租户维度的检索一律不返回任何数据，绝不退化为全量检索
+        Object tenantId = filter == null ? null : filter.get("tenantId");
+        if (tenantId == null) {
+            tenantId = com.edumind.common.context.TenantContext.getTenantId();
+        }
+        if (tenantId == null) {
+            log.warn("[向量检索] 缺少租户上下文，已按 Fail-Closed 返回 0 命中");
+            return TENANT_FIELD + " < 0";
         }
         List<String> parts = new ArrayList<>();
-        if (filter.get("knowledgeBaseId") != null) {
-            parts.add(KB_FIELD + " == " + filter.get("knowledgeBaseId"));
+        parts.add(TENANT_FIELD + " == " + tenantId);
+        if (filter != null) {
+            if (filter.get("knowledgeBaseId") != null) {
+                parts.add(KB_FIELD + " == " + filter.get("knowledgeBaseId"));
+            }
+            if (filter.get("documentId") != null) {
+                parts.add(DOC_FIELD + " == " + filter.get("documentId"));
+            }
         }
-        if (filter.get("documentId") != null) {
-            parts.add(DOC_FIELD + " == " + filter.get("documentId"));
-        }
-        if (filter.get("tenantId") != null) {
-            parts.add(TENANT_FIELD + " == " + filter.get("tenantId"));
-        }
-        return parts.isEmpty() ? null : String.join(" && ", parts);
+        return String.join(" && ", parts);
     }
 
     private void ensureCollection(String collectionName) {
@@ -145,13 +179,47 @@ public class MilvusVectorStore implements VectorStore {
                 .withCollectionName(collectionName)
                 .build());
         if (Boolean.TRUE.equals(exists.getData())) {
+            // 历史遗留 collection 可能缺少 tenant_id 字段，此时租户过滤表达式必然失效（跨租户召回）。
+            // 向量可由 knowledge_chunk_index.embedding 重新生成，故安全起见重建 collection 并提示重新索引。
+            if (!hasTenantField(client, collectionName)) {
+                log.error("[严重] Milvus collection {} 缺少 {} 字段，租户隔离无法生效，正在重建（请重新触发知识库索引）",
+                        collectionName, TENANT_FIELD);
+                client.dropCollection(io.milvus.param.collection.DropCollectionParam.newBuilder()
+                        .withCollectionName(collectionName)
+                        .build());
+                createCollectionWithTenantField(client, collectionName);
+            }
             return;
         }
+        createCollectionWithTenantField(client, collectionName);
+    }
+
+    /**
+     * 校验存量 collection 是否已包含租户列，避免旧结构导致 filter 静默失效
+     */
+    private boolean hasTenantField(MilvusServiceClient client, String collectionName) {
+        try {
+            var desc = client.describeCollection(io.milvus.param.collection.DescribeCollectionParam.newBuilder()
+                    .withCollectionName(collectionName)
+                    .build());
+            if (desc == null || desc.getData() == null) {
+                return false;
+            }
+            return desc.getData().getSchema().getFieldsList().stream()
+                    .anyMatch(f -> TENANT_FIELD.equalsIgnoreCase(f.getName()));
+        } catch (Exception e) {
+            log.warn("校验 Milvus collection {} 结构失败，按缺失租户字段处理: {}", collectionName, e.getMessage());
+            return false;
+        }
+    }
+
+    private void createCollectionWithTenantField(MilvusServiceClient client, String collectionName) {
         List<FieldType> fields = List.of(
                 FieldType.newBuilder().withName(ID_FIELD).withDataType(DataType.VarChar).withMaxLength(64).withPrimaryKey(true).build(),
                 FieldType.newBuilder().withName(VECTOR_FIELD).withDataType(DataType.FloatVector).withDimension(milvusProperties.getDimension()).build(),
                 FieldType.newBuilder().withName(KB_FIELD).withDataType(DataType.Int64).build(),
-                FieldType.newBuilder().withName(DOC_FIELD).withDataType(DataType.Int64).build()
+                FieldType.newBuilder().withName(DOC_FIELD).withDataType(DataType.Int64).build(),
+                FieldType.newBuilder().withName(TENANT_FIELD).withDataType(DataType.Int64).build()
         );
         CollectionSchemaParam schema = CollectionSchemaParam.newBuilder()
                 .withFieldTypes(fields)
@@ -176,5 +244,29 @@ public class MilvusVectorStore implements VectorStore {
                         .withPort(milvusProperties.getPort())
                         .build()
         ));
+    }
+
+    @Override
+    public String getEngineType() {
+        return "Milvus";
+    }
+
+    @Override
+    public String getVersion() {
+        return "v2.3+";
+    }
+
+    @Override
+    public boolean isHealthy() {
+        try {
+            MilvusServiceClient client = client();
+            R<Boolean> res = client.hasCollection(HasCollectionParam.newBuilder()
+                    .withCollectionName(milvusProperties.getCollection())
+                    .build());
+            return res != null && res.getStatus() == R.Status.Success.getCode();
+        } catch (Exception e) {
+            log.warn("Milvus health check failed: {}", e.getMessage());
+            return false;
+        }
     }
 }

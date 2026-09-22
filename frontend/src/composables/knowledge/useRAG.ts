@@ -1,6 +1,12 @@
 import { computed, ref, unref, type MaybeRef } from 'vue';
 import { useRoute } from 'vue-router';
-import { RetrievalQuery, RetrievalResultItem, RAGDebugRequest, RAGDebugResponse } from '@/types/knowledge/rag';
+import {
+  RetrievalQuery,
+  RetrievalResultItem,
+  RAGDebugRequest,
+  RAGDebugResponse,
+  RagDebugModelOption
+} from '@/types/knowledge/rag';
 import { RAGDebugService } from '@/services/rag/rag-debug-service';
 import { RAGRetrievalFeature } from '@/features/rag/retrieval';
 import { RAGRerankFeature } from '@/features/rag/rerank';
@@ -30,12 +36,36 @@ export function useRAG(kbIdInput?: MaybeRef<number | undefined>) {
   const retrievalResults = ref<RetrievalResultItem[]>([]);
 
   const debugLoading = ref(false);
-  const selectedModel = ref('deepseek-chat');
+  /** 可选对话模型：来自后端真实模型配置，不写死任何型号 */
+  const modelOptions = ref<RagDebugModelOption[]>([]);
+  const modelsLoading = ref(false);
+  const selectedModel = ref('');
   const temperature = ref(0.3);
-  const customSystemPrompt = ref(
-    '你是一位严谨的高校教学名师与 AI 助教。请严格基于提供的课程课件参考资料回答学生疑问。'
-  );
+  /** 留空表示使用平台默认的 chat 系统提示词（不再硬编码提示词内容） */
+  const customSystemPrompt = ref('');
   const debugResponse = ref<RAGDebugResponse | null>(null);
+
+  const loadAvailableModels = async () => {
+    modelsLoading.value = true;
+    try {
+      const options = await RAGDebugService.listAvailableModels();
+      modelOptions.value = options;
+      if (options.length === 0) {
+        selectedModel.value = '';
+        return;
+      }
+      // 默认选中平台默认模型；已被选中的模型仍在列表中时保持用户选择不变
+      if (!options.some((o) => o.value === selectedModel.value)) {
+        selectedModel.value = (options.find((o) => o.isDefault) || options[0]).value;
+      }
+    } catch (err: unknown) {
+      modelOptions.value = [];
+      selectedModel.value = '';
+      ElMessage.error(err instanceof Error ? err.message : '获取可用模型列表失败');
+    } finally {
+      modelsLoading.value = false;
+    }
+  };
 
   const runRetrieval = async () => {
     if (!query.value.trim()) {
@@ -97,6 +127,10 @@ export function useRAG(kbIdInput?: MaybeRef<number | undefined>) {
       ElMessage.error('无效的知识库 ID');
       return;
     }
+    if (!selectedModel.value) {
+      ElMessage.warning('当前没有可用的对话模型，请先在「系统管理 → 模型配置」中启用模型');
+      return;
+    }
     debugLoading.value = true;
     try {
       const req: RAGDebugRequest = {
@@ -105,7 +139,7 @@ export function useRAG(kbIdInput?: MaybeRef<number | undefined>) {
         documentIds: selectedDocIds.value.length > 0 ? selectedDocIds.value : undefined,
         topK: topK.value,
         scoreThreshold: scoreThreshold.value,
-        model: selectedModel.value,
+        modelKey: selectedModel.value,
         temperature: temperature.value,
         systemPrompt: customSystemPrompt.value
       };
@@ -128,6 +162,9 @@ export function useRAG(kbIdInput?: MaybeRef<number | undefined>) {
     retrievalLoading,
     retrievalResults,
     debugLoading,
+    modelOptions,
+    modelsLoading,
+    loadAvailableModels,
     selectedModel,
     temperature,
     customSystemPrompt,

@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 public class KnowledgeDocumentEntity implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private Long knowledgeBaseId;
     /** UPLOAD | LESSON */
     private String sourceType;

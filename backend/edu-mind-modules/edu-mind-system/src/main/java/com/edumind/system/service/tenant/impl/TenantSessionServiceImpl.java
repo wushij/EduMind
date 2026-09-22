@@ -53,10 +53,8 @@ public class TenantSessionServiceImpl implements TenantSessionService {
 
     @Override
     public List<TenantListVO> listUserAvailableTenants(Long userId) {
-        boolean prevIgnore = TenantContext.isIgnoreTenant();
-        try {
-            TenantContext.setIgnoreTenant(true);
-
+        // 「可切换租户列表」本身需要跨租户视角，统一用 callWithoutTenant 管理上下文进入与恢复
+        return TenantContext.callWithoutTenant(() -> {
             boolean isGlobalAdmin = Long.valueOf(1L).equals(userId)
                     || StpUtil.hasRole("ADMIN")
                     || StpUtil.hasRole("PLATFORM_ADMIN")
@@ -84,29 +82,21 @@ public class TenantSessionServiceImpl implements TenantSessionService {
                 int campusCount = (int) sysCampusDao.countByTenantId(t.getId());
                 return tenantConverter.toListVO(t, Math.max(1, campusCount), 30);
             }).collect(Collectors.toList());
-        } finally {
-            TenantContext.setIgnoreTenant(prevIgnore);
-        }
+        });
     }
 
     @Override
     public TenantDetailVO getCurrentTenantInfo() {
-        boolean prevIgnore = TenantContext.isIgnoreTenant();
-        try {
-            TenantContext.setIgnoreTenant(true);
+        return TenantContext.callWithoutTenant(() -> {
             Long tenantId = TenantContext.requireTenantId();
             return sysTenantService.getTenantDetail(tenantId);
-        } finally {
-            TenantContext.setIgnoreTenant(prevIgnore);
-        }
+        });
     }
 
     @Override
     public Long initializeLoginTenantSession(Long userId) {
-        boolean prevIgnore = TenantContext.isIgnoreTenant();
-        try {
-            TenantContext.setIgnoreTenant(true);
-
+        // 登录初始化需要在全量租户视图中判断成员关系与管理员身份
+        return TenantContext.callWithoutTenant(() -> {
             List<SysTenantMemberEntity> members = sysTenantMemberDao.listByUserId(userId);
             Long tenantId = null;
             boolean isDelegated = false;
@@ -150,9 +140,7 @@ public class TenantSessionServiceImpl implements TenantSessionService {
                 log.warn("[登录初始化] 用户 userId={} 未能绑定租户上下文", userId);
             }
             return tenantId;
-        } finally {
-            TenantContext.setIgnoreTenant(prevIgnore);
-        }
+        });
     }
 
     @Override
@@ -189,13 +177,10 @@ public class TenantSessionServiceImpl implements TenantSessionService {
     }
 
     private boolean isUserMemberOfTenant(Long userId, Long tenantId) {
-        boolean prevIgnore = TenantContext.isIgnoreTenant();
-        try {
-            TenantContext.setIgnoreTenant(true);
+        // 使用 callWithoutTenant 统一管理「忽略租户」的进入与恢复，避免裸调用漏写 finally 导致隔离被永久关闭
+        return TenantContext.callWithoutTenant(() -> {
             SysTenantMemberEntity member = sysTenantMemberDao.findByTenantAndUser(tenantId, userId);
             return member != null && member.getStatus() == 1;
-        } finally {
-            TenantContext.setIgnoreTenant(prevIgnore);
-        }
+        });
     }
 }

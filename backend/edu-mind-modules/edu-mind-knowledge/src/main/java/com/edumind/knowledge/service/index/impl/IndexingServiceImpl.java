@@ -49,6 +49,7 @@ public class IndexingServiceImpl implements IndexingService {
     private final MilvusProperties milvusProperties;
     private final KnowledgeAccessService knowledgeAccessService;
     private final NotificationWriteApi notificationWriteApi;
+    private final com.edumind.ai.api.RagRuntimeQueryApi ragRuntimeQueryApi;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -177,28 +178,67 @@ public class IndexingServiceImpl implements IndexingService {
     public IndexStatusVO getIndexStatus(Long knowledgeBaseId) {
         KnowledgeIndexTaskEntity task = knowledgeIndexTaskDao.findLatestByKnowledgeBaseId(knowledgeBaseId);
         IndexStatusVO vo = new IndexStatusVO();
+        populateEngineMetadata(vo, knowledgeBaseId);
+
+        int currentTotalChunks = (int) knowledgeDocumentChunkDao.countByKnowledgeBaseId(knowledgeBaseId);
+        int currentIndexedChunks = (int) knowledgeChunkIndexDao.countIndexedByKnowledgeBaseId(knowledgeBaseId);
+        int currentFailedChunks = (int) knowledgeChunkIndexDao.countFailedByKnowledgeBaseId(knowledgeBaseId);
+
+        vo.setTotalChunks(currentTotalChunks);
+        vo.setIndexedChunks(currentIndexedChunks);
+        vo.setFailedChunks(currentFailedChunks);
+        vo.setEmbeddingModel(embeddingApi.getModelName());
+
         if (task == null) {
-            vo.setStatus("PENDING");
-            vo.setTotalChunks((int) knowledgeDocumentChunkDao.countByKnowledgeBaseId(knowledgeBaseId));
-            vo.setIndexedChunks((int) knowledgeChunkIndexDao.countIndexedByKnowledgeBaseId(knowledgeBaseId));
-            vo.setFailedChunks(0);
-            vo.setEmbeddingModel(embeddingApi.getModelName());
+            vo.setStatus(currentIndexedChunks > 0 ? (currentIndexedChunks >= currentTotalChunks ? "INDEXED" : "PARTIAL") : "PENDING");
+            vo.setErrors(List.of());
             return vo;
         }
         vo.setStatus(task.getStatus());
-        vo.setTotalChunks(task.getTotalChunks());
-        vo.setIndexedChunks(task.getIndexedChunks());
-        vo.setFailedChunks(task.getFailedChunks());
-        vo.setEmbeddingModel(task.getEmbeddingModel());
         vo.setStartedAt(task.getStartedAt());
-        vo.setErrors(knowledgeChunkIndexDao.findFailedByKnowledgeBaseId(knowledgeBaseId).stream()
-                .map(item -> {
-                    IndexStatusVO.IndexErrorVO error = new IndexStatusVO.IndexErrorVO();
-                    error.setChunkId(item.getChunkId());
-                    error.setMessage(item.getErrorMessage());
-                    return error;
-                }).collect(Collectors.toList()));
+
+        List<KnowledgeChunkIndexEntity> failedEntities = knowledgeChunkIndexDao.findFailedByKnowledgeBaseId(knowledgeBaseId);
+        List<IndexStatusVO.IndexErrorVO> errors = new ArrayList<>();
+        for (KnowledgeChunkIndexEntity item : failedEntities) {
+            IndexStatusVO.IndexErrorVO error = new IndexStatusVO.IndexErrorVO();
+            error.setChunkId(item.getChunkId());
+            error.setDocumentId(item.getDocumentId());
+            error.setErrorCode("INDEX_FAILED");
+            error.setMessage(item.getErrorMessage() != null ? item.getErrorMessage() : "向量计算或存储失败");
+            error.setRetryCount(0);
+            error.setFailedAt(item.getUpdateTime() != null ? item.getUpdateTime() : item.getCreateTime());
+
+            if (item.getChunkId() != null) {
+                KnowledgeDocumentChunkEntity chunk = knowledgeDocumentChunkDao.findById(item.getChunkId());
+                if (chunk != null) {
+                    error.setChunkIndex(chunk.getChunkIndex());
+                    String text = chunk.getContent();
+                    if (text != null) {
+                        error.setSnippet(text.length() > 120 ? text.substring(0, 120) + "..." : text);
+                    }
+                }
+            }
+            if (item.getDocumentId() != null) {
+                KnowledgeDocumentEntity doc = knowledgeDocumentDao.findById(item.getDocumentId());
+                error.setDocumentName(doc != null ? doc.getFileName() : "知识库文档");
+            } else {
+                error.setDocumentName("知识库文档");
+            }
+            errors.add(error);
+        }
+        vo.setErrors(errors);
         return vo;
+    }
+
+    private void populateEngineMetadata(IndexStatusVO vo, Long knowledgeBaseId) {
+        vo.setEngine(vectorStore.getEngineType());
+        vo.setEngineVersion(vectorStore.getVersion());
+        vo.setConnectionStatus(vectorStore.isHealthy() ? "ONLINE" : "DEGRADED");
+        vo.setCollectionName(milvusProperties.getCollection());
+        vo.setDimensions(embeddingApi.getDimensions());
+        vo.setIndexType(milvusProperties.isEnabled() ? "HNSW" : "FLAT");
+        vo.setMetricType("COSINE");
+        vo.setAvgQueryLatencyMs(ragRuntimeQueryApi != null ? ragRuntimeQueryApi.getAverageRecallLatencyMs(knowledgeBaseId) : 0L);
     }
 
     @Override
@@ -209,6 +249,35 @@ public class IndexingServiceImpl implements IndexingService {
         }
         knowledgeChunkIndexDao.deleteByDocumentId(documentId);
         triggerIndex(document.getKnowledgeBaseId(), "INCREMENTAL");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void reindexChunk(Long knowledgeBaseId, Long chunkId) {
+        KnowledgeDocumentChunkEntity chunk = knowledgeDocumentChunkDao.findById(chunkId);
+        if (chunk == null || !knowledgeBaseId.equals(chunk.getKnowledgeBaseId())) {
+            throw new BusinessException("切片不存在或不属于该知识库");
+        }
+        try {
+            List<List<Float>> vectors = embeddingApi.embed(List.of(chunk.getContent()));
+            if (vectors == null || vectors.isEmpty()) {
+                throw new IllegalStateException("Embedding 计算返回空向量");
+            }
+            List<Float> vector = vectors.get(0);
+            String vectorId = String.valueOf(chunk.getId());
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("chunkId", chunk.getId());
+            metadata.put("documentId", chunk.getDocumentId());
+            metadata.put("knowledgeBaseId", chunk.getKnowledgeBaseId());
+            metadata.put("pageNo", chunk.getPageNo());
+
+            vectorStore.save(milvusProperties.getCollection(), vectorId, vector, metadata);
+            upsertChunkIndex(chunk, vectorId, "INDEXED", null, vector);
+        } catch (Exception ex) {
+            log.error("单切片重试失败 chunkId={}: {}", chunkId, ex.getMessage());
+            upsertChunkIndex(chunk, String.valueOf(chunk.getId()), "FAILED", ex.getMessage(), null);
+            throw new BusinessException("重试切片索引失败: " + ex.getMessage());
+        }
     }
 
     private void upsertChunkIndex(KnowledgeDocumentChunkEntity chunk, String vectorId, String status, String error,

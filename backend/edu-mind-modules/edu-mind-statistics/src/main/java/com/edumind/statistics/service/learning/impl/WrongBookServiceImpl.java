@@ -206,7 +206,9 @@ public class WrongBookServiceImpl implements WrongBookService {
         item.setKnowledgePointId(entity.getKnowledgePointId());
         item.setWrongCount(entity.getWrongCount());
         item.setStatus(entity.getStatus() != null ? entity.getStatus() : 0);
-        item.setDiagnosis(entity.getDiagnosis());
+        // 展示层再清洗一次：历史数据可能残留 “类型：CONCEPT” 或句末裸 code，不能把内部枚举值暴露给学生
+        item.setDiagnosis(WrongErrorType.stripTypeMarker(entity.getDiagnosis()));
+        // 来源判定必须基于库中原文，否则清洗后会让「演示/历史数据」判定失效
         item.setDiagnosisSource(resolveDiagnosisSource(entity));
         item.setStudentAnswer(entity.getLastStudentAnswer());
         if (entity.getCreateTime() != null) {

@@ -14,6 +14,7 @@
 
     <template v-else-if="lesson">
       <LessonLearnHero
+        class="lesson-hero-block"
         :title="lesson.title"
         :parent-title="lesson.parentChapterTitle"
         :description="lesson.description"
@@ -181,6 +182,14 @@ function goEditLesson() {
   gap: 20px;
 }
 
+/**
+ * 顶部介绍与正文左列同宽（1200 - 300 目录列 - 20 间距 = 880）。
+ * 否则 hero 通栏 1200px、正文卡片只有 880px，会出现"顶部边框长、内容边框短"的错位。
+ */
+.lesson-hero-block {
+  width: calc(100% - 320px);
+}
+
 .lesson-main {
   background: #fff;
   border: 1px solid #e2e8f0;
@@ -236,6 +245,11 @@ function goEditLesson() {
 @media (max-width: 960px) {
   .lesson-layout {
     grid-template-columns: 1fr;
+  }
+
+  // 单列布局下没有右侧目录列，hero 恢复通栏
+  .lesson-hero-block {
+    width: 100%;
   }
 }
 </style>

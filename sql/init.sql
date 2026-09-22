@@ -79,12 +79,14 @@ CREATE TABLE IF NOT EXISTS sys_role (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统角色表';
 
 CREATE TABLE IF NOT EXISTS sys_user_role (
-    id      BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    user_id BIGINT NOT NULL COMMENT '用户ID',
-    role_id BIGINT NOT NULL COMMENT '角色ID',
+    id        BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    user_id   BIGINT NOT NULL COMMENT '用户ID',
+    role_id   BIGINT NOT NULL COMMENT '角色ID',
+    tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID(0=平台级/全租户生效，>0=仅该租户内生效)',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_user_role (user_id, role_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户角色关联表';
+    UNIQUE KEY uk_user_role (user_id, role_id, tenant_id),
+    KEY idx_ur_tenant_user (tenant_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户角色关联表(租户维度,V2.6.4)';
 
 CREATE TABLE IF NOT EXISTS sys_permission (
     id              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '权限ID',
@@ -1315,39 +1317,41 @@ INSERT IGNORE INTO sys_user (id, username, password, real_name, email, phone, av
 (3, 'student',   '$2b$10$DLVcEXn5RunOfqlY84u9S.nnXViwwLRheQgk0KIIpKr9y1im4mIOq', '李同学',     NULL, NULL, 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', 'ENABLE'),
 (4, 'student2',  '$2b$10$DLVcEXn5RunOfqlY84u9S.nnXViwwLRheQgk0KIIpKr9y1im4mIOq', '王同学',     NULL, NULL, 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', 'ENABLE');
 
--- 3. 用户与角色关联
-INSERT IGNORE INTO sys_user_role (user_id, role_id) VALUES
-(1, 1), (2, 2), (3, 3), (4, 3);
+-- 3. 用户与角色关联（V2.6.4 起按租户维度授权）
+--    tenant_id = 0 → 平台级角色，全租户生效（ADMIN）；
+--    tenant_id = 1 → 演示租户内生效（TEACHER / STUDENT），切换租户后权限随之变化。
+INSERT IGNORE INTO sys_user_role (user_id, role_id, tenant_id) VALUES
+(1, 1, 0), (2, 2, 1), (3, 3, 1), (4, 3, 1);
 
 -- 3.1 按 username 兜底绑定（防止 user id 与种子不一致时 RBAC 失效）
-INSERT IGNORE INTO sys_user_role (user_id, role_id)
-SELECT u.id, r.id
+INSERT IGNORE INTO sys_user_role (user_id, role_id, tenant_id)
+SELECT u.id, r.id, 0
 FROM sys_user u
 JOIN sys_role r ON r.role_code = 'ADMIN'
 WHERE u.username = 'admin'
   AND NOT EXISTS (
       SELECT 1 FROM sys_user_role ur
-      WHERE ur.user_id = u.id AND ur.role_id = r.id
+      WHERE ur.user_id = u.id AND ur.role_id = r.id AND ur.tenant_id = 0
   );
 
-INSERT IGNORE INTO sys_user_role (user_id, role_id)
-SELECT u.id, r.id
+INSERT IGNORE INTO sys_user_role (user_id, role_id, tenant_id)
+SELECT u.id, r.id, 1
 FROM sys_user u
 JOIN sys_role r ON r.role_code = 'TEACHER'
 WHERE u.username = 'teacher'
   AND NOT EXISTS (
       SELECT 1 FROM sys_user_role ur
-      WHERE ur.user_id = u.id AND ur.role_id = r.id
+      WHERE ur.user_id = u.id AND ur.role_id = r.id AND ur.tenant_id = 1
   );
 
-INSERT IGNORE INTO sys_user_role (user_id, role_id)
-SELECT u.id, r.id
+INSERT IGNORE INTO sys_user_role (user_id, role_id, tenant_id)
+SELECT u.id, r.id, 1
 FROM sys_user u
 JOIN sys_role r ON r.role_code = 'STUDENT'
 WHERE u.username IN ('student', 'student2')
   AND NOT EXISTS (
       SELECT 1 FROM sys_user_role ur
-      WHERE ur.user_id = u.id AND ur.role_id = r.id
+      WHERE ur.user_id = u.id AND ur.role_id = r.id AND ur.tenant_id = 1
   );
 
 -- 4. 细粒度权限

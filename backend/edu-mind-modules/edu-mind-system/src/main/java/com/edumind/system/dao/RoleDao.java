@@ -1,6 +1,7 @@
 package com.edumind.system.dao;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.edumind.common.context.TenantContext;
 import com.edumind.system.entity.RoleEntity;
 import com.edumind.system.entity.UserRoleEntity;
 import com.edumind.system.mapper.RoleMapper;
@@ -47,12 +48,32 @@ public class RoleDao {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 查询用户在当前租户上下文内的有效角色（平台级 + 当前租户）。
+     * 无租户上下文时 Fail-Closed，仅返回平台级角色（ADMIN / PLATFORM_ADMIN / ROLE_ADMIN）。
+     */
     public List<RoleEntity> findRolesByUserId(Long userId) {
+        return findRolesByUserIdAndTenant(userId, TenantContext.getTenantId());
+    }
+
+    /**
+     * 查询用户在指定租户内的有效角色（平台级 + 指定租户）。
+     * 用于跨租户判定场景（如以显式 tenantId 解析数据范围），避免依赖线程上下文造成误判。
+     */
+    public List<RoleEntity> findRolesByUserIdAndTenant(Long userId, Long tenantId) {
         if (userId == null) {
             return Collections.emptyList();
         }
-        List<UserRoleEntity> userRoles = userRoleMapper.selectList(new LambdaQueryWrapper<UserRoleEntity>()
-                .eq(UserRoleEntity::getUserId, userId));
+        LambdaQueryWrapper<UserRoleEntity> wrapper = new LambdaQueryWrapper<UserRoleEntity>()
+                .eq(UserRoleEntity::getUserId, userId);
+        if (tenantId != null && tenantId > 0) {
+            long scoped = tenantId;
+            wrapper.and(w -> w.eq(UserRoleEntity::getTenantId, UserRoleEntity.PLATFORM_TENANT_ID)
+                    .or().eq(UserRoleEntity::getTenantId, scoped));
+        } else {
+            wrapper.eq(UserRoleEntity::getTenantId, UserRoleEntity.PLATFORM_TENANT_ID);
+        }
+        List<UserRoleEntity> userRoles = userRoleMapper.selectList(wrapper);
         if (userRoles.isEmpty()) {
             return Collections.emptyList();
         }

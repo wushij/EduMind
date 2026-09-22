@@ -1,14 +1,34 @@
 import { get, post } from '@/core/http/request';
 import { VectorStoreStats, FailedVectorItem } from '@/types/knowledge/embedding';
 
+interface IndexErrorItemVO {
+  chunkId?: number;
+  chunkIndex?: number;
+  documentId?: number;
+  documentName?: string;
+  snippet?: string;
+  errorCode?: string;
+  message?: string;
+  retryCount?: number;
+  failedAt?: string;
+}
+
 interface IndexStatusVO {
   status?: string;
   totalChunks?: number;
   indexedChunks?: number;
   failedChunks?: number;
   embeddingModel?: string;
+  dimensions?: number;
+  engine?: string;
+  engineVersion?: string;
+  connectionStatus?: 'ONLINE' | 'DEGRADED' | 'OFFLINE';
+  collectionName?: string;
+  indexType?: string;
+  metricType?: string;
+  avgQueryLatencyMs?: number;
   startedAt?: string;
-  errors?: Array<{ chunkId?: number; message?: string }>;
+  errors?: IndexErrorItemVO[];
 }
 
 function mapIndexStatusToStats(status: IndexStatusVO, kbId: number): VectorStoreStats {
@@ -16,17 +36,17 @@ function mapIndexStatusToStats(status: IndexStatusVO, kbId: number): VectorStore
   const indexed = status.indexedChunks ?? 0;
   const health = total > 0 ? Math.round((indexed / total) * 100) : 0;
   return {
-    engine: 'Milvus',
-    engineVersion: 'dev',
-    connectionStatus: status.status === 'INDEX_FAILED' ? 'DEGRADED' : 'ONLINE',
-    collectionName: `kb_${kbId}_vectors`,
-    dimensions: 1536,
-    metricType: 'COSINE',
-    indexType: 'HNSW',
+    engine: status.engine || 'InMemory',
+    engineVersion: status.engineVersion || 'dev',
+    connectionStatus: status.connectionStatus || (status.status === 'INDEX_FAILED' ? 'DEGRADED' : 'ONLINE'),
+    collectionName: status.collectionName || `kb_${kbId}_vectors`,
+    dimensions: status.dimensions || 1536,
+    metricType: status.metricType || 'COSINE',
+    indexType: status.indexType || 'HNSW',
     totalVectors: indexed,
     expectedVectors: total,
     indexHealthScore: health,
-    avgQueryLatencyMs: 0,
+    avgQueryLatencyMs: status.avgQueryLatencyMs ?? 0,
     lastIndexedAt: status.startedAt || ''
   };
 }
@@ -49,13 +69,13 @@ export const getFailedVectors = async (kbId?: number): Promise<FailedVectorItem[
   const errors = res?.data?.errors || [];
   return errors.map((item, idx) => ({
     id: item.chunkId ?? idx,
-    chunkIndex: idx,
-    documentName: '未知文档',
-    snippet: item.message || '',
-    errorCode: 'INDEX_FAILED',
+    chunkIndex: item.chunkIndex ?? idx,
+    documentName: item.documentName || '知识库文档',
+    snippet: item.snippet || item.message || '',
+    errorCode: item.errorCode || 'INDEX_FAILED',
     errorReason: item.message || '索引失败',
-    retryCount: 0,
-    lastAttemptAt: new Date().toISOString()
+    retryCount: item.retryCount ?? 0,
+    lastAttemptAt: item.failedAt || new Date().toISOString()
   }));
 };
 
@@ -77,4 +97,12 @@ export const retryFailedVectors = async (
 ): Promise<{ success: boolean; message: string }> => {
   await post(`/knowledge-bases/${kbId}/index`, { mode: 'INCREMENTAL' });
   return { success: true, message: '失败切片重试任务已提交' };
+};
+
+export const reindexSingleChunk = async (
+  kbId: number,
+  chunkId: number
+): Promise<{ success: boolean; message: string }> => {
+  await post(`/knowledge-bases/${kbId}/chunks/${chunkId}/reindex`);
+  return { success: true, message: '切片重试索引成功' };
 };

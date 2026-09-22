@@ -7,18 +7,6 @@
           <el-icon class="icon"><Search /></el-icon>
           <span class="title">向量检索测试沙箱 (Vector Retrieval Sandbox)</span>
         </div>
-        <div class="quick-examples">
-          <span class="label">测试用例：</span>
-          <el-tag
-            v-for="example in presetExamples"
-            :key="example"
-            class="example-tag"
-            size="small"
-            @click="applyExample(example)"
-          >
-            {{ example }}
-          </el-tag>
-        </div>
       </div>
 
       <div class="query-input-row">
@@ -26,42 +14,51 @@
           v-model="query"
           type="textarea"
           :rows="2"
-          placeholder="请输入测试问题或语义检索词句（例如：什么是 Java 向上转型？为什么静态方法不能被重写？）..."
+          placeholder="请输入测试问题或语义检索词句..."
           class="custom-textarea"
           @keydown.enter.prevent="runRetrieval"
         />
       </div>
 
-      <!-- 参数调节器 -->
+      <!-- 参数调节与检索操作栏 -->
       <div class="parameters-row">
-        <div class="param-item">
-          <span class="param-label">召回数量 (Top-K): <strong>{{ topK }}</strong></span>
-          <el-slider v-model="topK" :min="1" :max="15" :step="1" style="width: 140px" />
+        <div class="params-left">
+          <div class="param-item">
+            <span class="param-label">召回数量 (Top-K): <strong>{{ topK }}</strong></span>
+            <el-slider v-model="topK" :min="1" :max="15" :step="1" style="width: 130px" />
+          </div>
+
+          <div class="param-item">
+            <span class="param-label">相似度阈值 (Threshold): <strong>{{ scoreThreshold.toFixed(2) }}</strong></span>
+            <el-slider v-model="scoreThreshold" :min="0.30" :max="0.95" :step="0.05" style="width: 130px" />
+          </div>
         </div>
 
-        <div class="param-item">
-          <span class="param-label">相似度阈值 (Threshold): <strong>{{ scoreThreshold.toFixed(2) }}</strong></span>
-          <el-slider v-model="scoreThreshold" :min="0.30" :max="0.95" :step="0.05" style="width: 140px" />
-        </div>
+        <div class="params-right">
+          <div class="param-item switch-item">
+            <span class="param-label">混合检索 (Hybrid)</span>
+            <el-tooltip content="沙箱专注于 Milvus 稠密向量语义检索；全链路混合检索（BM25 + 向量召回 + RRF 融合重排）已在完整 RAG 链路中默认生效">
+              <el-switch
+                v-model="hybridSearch"
+                disabled
+                active-text="混合检索"
+                inactive-text="仅向量模式"
+              />
+            </el-tooltip>
+          </div>
 
-        <div class="param-item switch-item">
-          <span class="param-label">混合检索 (Hybrid Search)</span>
-          <el-tooltip content="V0.5 仅支持向量检索，混合检索将于后续版本开放">
-            <el-switch v-model="hybridSearch" disabled active-text="V0.5 仅向量检索" />
-          </el-tooltip>
-        </div>
-
-        <div class="action-item">
-          <el-button
-            type="primary"
-            size="default"
-            :icon="Search"
-            :loading="retrievalLoading"
-            class="search-btn"
-            @click="runRetrieval"
-          >
-            执行语义检索
-          </el-button>
+          <div class="action-item">
+            <el-button
+              type="primary"
+              size="default"
+              :icon="Search"
+              :loading="retrievalLoading"
+              class="search-btn"
+              @click="runRetrieval"
+            >
+              执行语义检索
+            </el-button>
+          </div>
         </div>
       </div>
     </div>
@@ -79,13 +76,7 @@
       />
 
       <div v-else-if="!retrievalLoading" class="empty-state-box">
-        <el-empty description="在上方输入测试问题并点击【执行语义检索】，验证知识库语义召回精度">
-          <template #extra>
-            <el-button type="primary" plain @click="runRetrieval">
-              使用默认测试题召回
-            </el-button>
-          </template>
-        </el-empty>
+        <el-empty description="在上方输入测试问题并点击【执行语义检索】，验证知识库语义召回精度" />
       </div>
     </div>
   </div>
@@ -109,17 +100,6 @@ const {
   runRetrieval
 } = useRAG(kbId);
 
-const presetExamples = [
-  '什么是 Java 向上转型？',
-  '接口与抽象类的设计权衡',
-  '拉格朗日中值定理几何意义',
-  '受检异常与运行时异常区别'
-];
-
-const applyExample = (text: string) => {
-  query.value = text;
-  runRetrieval();
-};
 </script>
 
 <style scoped lang="scss">
@@ -158,62 +138,72 @@ const applyExample = (text: string) => {
           font-size: 17px;
         }
       }
-
-      .quick-examples {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-
-        .label {
-          font-size: 12px;
-          color: #94A3B8;
-        }
-
-        .example-tag {
-          cursor: pointer;
-          transition: all 0.15s;
-
-          &:hover {
-            color: #2563EB;
-            border-color: #BFDBFE;
-            background: #EFF6FF;
-          }
-        }
-      }
     }
 
     .parameters-row {
       display: flex;
       align-items: center;
-      gap: 24px;
+      justify-content: space-between;
+      gap: 16px;
       flex-wrap: wrap;
       background: #F8FAFC;
-      border: 1px solid #F1F5F9;
-      border-radius: 8px;
+      border: 1px solid #E2E8F0;
+      border-radius: 10px;
       padding: 10px 16px;
+
+      .params-left {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      .params-right {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-left: auto;
+      }
 
       .param-item {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
 
         .param-label {
           font-size: 12px;
           color: #475569;
+          white-space: nowrap;
 
           strong {
             color: #2563EB;
           }
         }
-
-        &.switch-item {
-          margin-left: auto;
-        }
       }
 
       .action-item {
         .search-btn {
+          height: 34px;
+          padding: 0 18px;
+          border-radius: 999px !important;
+          background: linear-gradient(135deg, #1677FF 0%, #3B82F6 100%) !important;
+          border: 1px solid transparent !important;
+          color: #FFFFFF !important;
+          font-size: 13px;
           font-weight: 600;
+          box-shadow: 0 3px 10px rgba(22, 119, 255, 0.28);
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+          &:hover:not(:disabled) {
+            background: linear-gradient(135deg, #0958D9 0%, #2563EB 100%) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 5px 14px rgba(22, 119, 255, 0.36);
+          }
+
+          &:active:not(:disabled) {
+            transform: translateY(0);
+          }
         }
       }
     }

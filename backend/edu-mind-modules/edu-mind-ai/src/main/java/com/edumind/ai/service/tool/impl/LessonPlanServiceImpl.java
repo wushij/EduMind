@@ -20,8 +20,12 @@ import java.util.List;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @RequiredArgsConstructor
@@ -30,9 +34,33 @@ public class LessonPlanServiceImpl implements LessonPlanService {
     /** 场景键：走网关以便统一参与场景路由、熔断降级与调用审计（此前直连 LlmClient 会绕过这些能力） */
     private static final String SCENE = "lesson_plan";
 
+    /**
+     * SSE 生成专用有界线程池。
+     * 原实现使用无界 newCachedThreadPool，存在内存与线程耗尽风险；改为有界队列 + 命名线程，便于排障。
+     */
+    private static final int SSE_CORE_POOL_SIZE = 4;
+    private static final int SSE_MAX_POOL_SIZE = 16;
+    private static final int SSE_QUEUE_CAPACITY = 64;
+    private static final AtomicInteger SSE_THREAD_SEQ = new AtomicInteger();
+
     private final AiGatewayFacade aiGatewayFacade;
     private final CourseQueryApi courseQueryApi;
-    private final ExecutorService executor = Executors.newCachedThreadPool();
+
+    private final ExecutorService executor = new ThreadPoolExecutor(
+            SSE_CORE_POOL_SIZE,
+            SSE_MAX_POOL_SIZE,
+            60L,
+            TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(SSE_QUEUE_CAPACITY),
+            new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread t = new Thread(r, "lesson-plan-sse-" + SSE_THREAD_SEQ.incrementAndGet());
+                    t.setDaemon(true);
+                    return t;
+                }
+            },
+            new ThreadPoolExecutor.AbortPolicy());
 
     @Override
     public String generate(LessonPlanDTO dto) {
@@ -42,7 +70,15 @@ public class LessonPlanServiceImpl implements LessonPlanService {
     @Override
     public SseEmitter streamGenerate(LessonPlanDTO dto) {
         SseEmitter emitter = new SseEmitter(120_000L);
+        // SSE 在新线程中执行，必须显式捕获并传递租户与用户上下文，
+        // 否则课程查询与调用审计会丢失租户归属（甚至串到上一个任务残留的租户）
+        final Long capturedTenantId = TenantContext.getTenantId();
+        final com.edumind.common.model.LoginUser capturedUser = UserContext.get();
         executor.execute(() -> {
+            TenantContext.setTenantId(capturedTenantId);
+            if (capturedUser != null) {
+                UserContext.set(capturedUser);
+            }
             try {
                 aiGatewayFacade.streamChat(SCENE, null, systemPrompt(),
                         List.of(LlmChatMessage.user(buildUserPrompt(dto))), auditContext(dto),
@@ -74,6 +110,10 @@ public class LessonPlanServiceImpl implements LessonPlanService {
                 });
             } catch (Exception ex) {
                 emitter.completeWithError(ex);
+            } finally {
+                // 无条件清理，避免线程池复用导致上下文残留串租户
+                UserContext.clear();
+                TenantContext.clear();
             }
         });
         return emitter;

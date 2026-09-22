@@ -1,5 +1,6 @@
 package com.edumind.system.service.query.impl;
 
+import com.edumind.common.context.TenantContext;
 import com.edumind.system.dao.PermissionDao;
 import com.edumind.system.dao.RoleDao;
 import com.edumind.system.dao.SysTenantMemberDao;
@@ -7,6 +8,7 @@ import com.edumind.system.dao.UserDao;
 import com.edumind.system.dao.UserRoleDao;
 import com.edumind.system.entity.PermissionEntity;
 import com.edumind.system.entity.RoleEntity;
+import com.edumind.system.entity.SysTenantMemberEntity;
 import com.edumind.system.entity.UserEntity;
 import com.edumind.system.entity.UserRoleEntity;
 import com.edumind.system.service.query.UserQueryService;
@@ -119,6 +121,18 @@ public class UserQueryServiceImpl implements UserQueryService {
         }
         return roleDao.findRolesByUserId(userId).stream()
                 .map(RoleEntity::getRoleCode)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<String> getRoleCodesByUserIdAndTenant(Long userId, Long tenantId) {
+        if (userId == null) {
+            return Collections.emptyList();
+        }
+        return roleDao.findRolesByUserIdAndTenant(userId, tenantId).stream()
+                .map(RoleEntity::getRoleCode)
+                .distinct()
                 .collect(Collectors.toList());
     }
 
@@ -131,6 +145,21 @@ public class UserQueryServiceImpl implements UserQueryService {
                 .map(PermissionEntity::getPermissionCode)
                 .distinct()
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Long> listTenantIdsByUserId(Long userId) {
+        if (userId == null) {
+            return Collections.emptyList();
+        }
+        // 跨租户查询：必须显式忽略租户过滤，否则只能查到当前租户，导致权限缓存失效不完整
+        List<Long> tenantIds = new ArrayList<>();
+        TenantContext.runWithoutTenant(() -> sysTenantMemberDao.listByUserId(userId).stream()
+                .map(SysTenantMemberEntity::getTenantId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .forEach(tenantIds::add));
+        return tenantIds;
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.edumind.ai.gateway;
 
 import com.edumind.ai.integration.llm.LlmChatMessage;
+import com.edumind.ai.integration.llm.LlmChatOptions;
 import com.edumind.ai.integration.llm.LlmClient;
 import com.edumind.ai.integration.llm.LlmClientRegistry;
 import com.edumind.ai.service.audit.AiCallAuditContext;
@@ -68,6 +69,20 @@ public class AiGatewayFacade {
 
     public String chat(String scene, String modelKey, String systemPrompt, String userPrompt,
                        AiCallAuditContext auditContext) {
+        return chatWithMeta(scene, modelKey, systemPrompt, userPrompt, null, auditContext).content();
+    }
+
+    /**
+     * 带调用元信息的对话调用（诊断工作台需要知道「实际命中的模型」与覆盖温度）。
+     *
+     * <p>除返回值外，行为与 {@link #chat(String, String, String, String, AiCallAuditContext)} 完全一致：
+     * 熔断快速回落、失败重试一次、再失败走 fallback 链路，审计与配额口径不变。</p>
+     *
+     * @param options 生成参数覆盖（温度等）；传 null 时调用 SDK 的默认重载，保持与既有链路一致
+     * @return 实际命中的模型键 + 生成结果
+     */
+    public ChatOutcome chatWithMeta(String scene, String modelKey, String systemPrompt, String userPrompt,
+                                    LlmChatOptions options, AiCallAuditContext auditContext) {
         checkRateLimit(scene != null ? scene : "default", DEFAULT_RATE_LIMIT);
         long start = System.currentTimeMillis();
         totalRequests.incrementAndGet();
@@ -75,7 +90,7 @@ public class AiGatewayFacade {
 
         if (resilienceStore.isCircuitOpen(primary)) {
             log.warn("Gateway circuit OPEN for {}, fast-falling back", primary);
-            return executeFallback(scene, primary, systemPrompt, userPrompt, start, auditContext,
+            return executeFallback(scene, primary, systemPrompt, userPrompt, options, start, auditContext,
                     new IllegalStateException("模型熔断保护中，请稍后重试"));
         }
 
@@ -83,11 +98,11 @@ public class AiGatewayFacade {
             if (shouldForceFail(primary)) {
                 throw new IllegalStateException("Simulated gateway failure for " + primary);
             }
-            String result = llmClientRegistry.get(primary).chat(systemPrompt, userPrompt);
+            String result = invoke(primary, systemPrompt, userPrompt, options);
             totalLatencyMs += System.currentTimeMillis() - start;
             resilienceStore.recordSuccess(primary);
             auditChat(scene, primary, auditContext, start, systemPrompt, userPrompt, result);
-            return result;
+            return new ChatOutcome(primary, result);
         } catch (Exception ex) {
             log.warn("Gateway primary failed for {}: {}", primary, ex.getMessage());
             resilienceStore.recordRetry();
@@ -95,29 +110,38 @@ public class AiGatewayFacade {
                 if (shouldForceFail(primary)) {
                     throw new IllegalStateException("Simulated gateway failure on retry for " + primary);
                 }
-                String retryResult = llmClientRegistry.get(primary).chat(systemPrompt, userPrompt);
+                String retryResult = invoke(primary, systemPrompt, userPrompt, options);
                 totalLatencyMs += System.currentTimeMillis() - start;
                 resilienceStore.recordSuccess(primary);
                 auditChat(scene, primary, auditContext, start, systemPrompt, userPrompt, retryResult);
-                return retryResult;
+                return new ChatOutcome(primary, retryResult);
             } catch (Exception retryEx) {
                 resilienceStore.recordFailure(primary);
-                return executeFallback(scene, primary, systemPrompt, userPrompt, start, auditContext, retryEx);
+                return executeFallback(scene, primary, systemPrompt, userPrompt, options, start, auditContext, retryEx);
             }
         }
     }
 
-    private String executeFallback(String scene, String primary, String systemPrompt, String userPrompt,
-                                   long start, AiCallAuditContext auditContext, Exception cause) {
+    /** 未指定覆盖参数时走 SDK 默认重载，避免空 options 改变既有模型参数行为 */
+    private String invoke(String modelKey, String systemPrompt, String userPrompt, LlmChatOptions options) {
+        LlmClient client = llmClientRegistry.get(modelKey);
+        return options == null
+                ? client.chat(systemPrompt, userPrompt)
+                : client.chat(systemPrompt, userPrompt, options);
+    }
+
+    private ChatOutcome executeFallback(String scene, String primary, String systemPrompt, String userPrompt,
+                                        LlmChatOptions options, long start, AiCallAuditContext auditContext,
+                                        Exception cause) {
         String fallback = modelRouter.resolveFallback(primary);
         if (fallback != null && !fallback.equals(primary)) {
             log.warn("Gateway fallback {} -> {} scene={}", primary, fallback, scene);
             resilienceStore.recordFallback();
             try {
-                String result = llmClientRegistry.get(fallback).chat(systemPrompt, userPrompt);
+                String result = invoke(fallback, systemPrompt, userPrompt, options);
                 totalLatencyMs += System.currentTimeMillis() - start;
                 auditChat(scene, fallback, auditContext, start, systemPrompt, userPrompt, result);
-                return result;
+                return new ChatOutcome(fallback, result);
             } catch (Exception fallbackEx) {
                 resilienceStore.recordFailed();
                 throw fallbackEx;
@@ -125,6 +149,10 @@ public class AiGatewayFacade {
         }
         resilienceStore.recordFailed();
         throw new BusinessException(buildUnavailableMessage(cause));
+    }
+
+    /** 对话调用结果：content 为生成内容，modelKey 为实际命中的模型配置键（可能经回落切换） */
+    public record ChatOutcome(String modelKey, String content) {
     }
 
     private void auditChat(String scene, String modelKey, AiCallAuditContext auditContext, long start,

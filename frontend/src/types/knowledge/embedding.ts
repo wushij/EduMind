@@ -1,11 +1,11 @@
 export interface VectorStoreStats {
-  engine: 'Milvus' | 'pgvector' | 'Elasticsearch';
+  engine: string;
   engineVersion: string;
   connectionStatus: 'ONLINE' | 'DEGRADED' | 'OFFLINE';
   collectionName: string;
   dimensions: number;
-  metricType: 'COSINE' | 'L2' | 'IP';
-  indexType: 'HNSW' | 'IVF_FLAT';
+  metricType: string;
+  indexType: string;
   totalVectors: number;
   expectedVectors: number;
   indexHealthScore: number; // 0 - 100

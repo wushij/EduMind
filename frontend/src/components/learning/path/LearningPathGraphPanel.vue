@@ -30,6 +30,7 @@
         <KnowledgeGraphG6
           :graph-data="graphVo"
           :height="graphHeight"
+          :bordered="false"
           show-toolbar
           @node-click="onNodeClick"
         />
@@ -252,7 +253,8 @@ function onNodeClick(node: KnowledgeGraphNode | null) {
   }
 
   .graph-body {
-    padding: 12px 14px 0;
+    // 画布已改为无边框嵌入，这里只留一点呼吸感，避免与面板边框贴死
+    padding: 4px 6px 0;
   }
 
   .graph-footer {

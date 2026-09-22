@@ -84,7 +84,13 @@ public class MybatisPlusConfig {
             "knowledge_mastery",
             "wrong_question_record",
             "course_statistics",
-            "knowledge_point_relation"
+            "knowledge_point_relation",
+            // GA Wave3 (3)：课程概览门户相关表（V2.2.4 新增，均带 tenant_id 与租户索引）
+            // 注意：任何新增带 tenant_id 的业务表都必须同步登记到本清单，
+            // 否则 TenantLineInnerInterceptor 会对其放行（ignoreTable=true），造成跨租户直读/串写。
+            "course_learning_objective",
+            "course_announcement",
+            "course_instructor_profile"
     );
 
     @Bean

@@ -1,6 +1,7 @@
 package com.edumind.knowledge.dao;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.edumind.common.context.TenantContext;
 import com.edumind.knowledge.entity.KnowledgeDocumentEntity;
 import com.edumind.knowledge.mapper.KnowledgeDocumentMapper;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,19 @@ public class KnowledgeDocumentDao {
 
     public KnowledgeDocumentEntity findById(Long id) {
         return knowledgeDocumentMapper.selectById(id);
+    }
+
+    /**
+     * 忽略租户过滤按主键查询（仅供异步流水线/调度器在缺少租户上下文时反查文档归属租户使用）。
+     * 调用方必须自行完成租户校验，禁止直接用于对外查询接口。
+     */
+    public KnowledgeDocumentEntity findByIdIgnoreTenant(Long id) {
+        if (id == null) {
+            return null;
+        }
+        KnowledgeDocumentEntity[] holder = new KnowledgeDocumentEntity[1];
+        TenantContext.runWithoutTenant(() -> holder[0] = knowledgeDocumentMapper.selectById(id));
+        return holder[0];
     }
 
     public List<KnowledgeDocumentEntity> findByKnowledgeBaseId(Long knowledgeBaseId) {

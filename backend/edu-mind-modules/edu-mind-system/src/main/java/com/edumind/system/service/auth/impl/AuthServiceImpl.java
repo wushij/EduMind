@@ -105,7 +105,7 @@ public class AuthServiceImpl implements AuthService {
         }
         return LoginVO.builder()
                 .token(StpUtil.getTokenValue())
-                .userInfo(userVoAssembler.toVO(user))
+                .userInfo(userVoAssembler.toVO(user, tenantId))
                 .tenantId(tenantId)
                 .build();
     }
@@ -150,7 +150,7 @@ public class AuthServiceImpl implements AuthService {
                 Long tenantId = sysTenantService.initializeLoginTenantSession(1L);
                 UserEntity bootstrapAdmin = userDao.findById(1L);
                 UserVO adminVO = bootstrapAdmin != null
-                        ? userVoAssembler.toVO(bootstrapAdmin)
+                        ? userVoAssembler.toVO(bootstrapAdmin, tenantId)
                         : UserVO.builder()
                                 .id(1L)
                                 .username("admin")
@@ -196,7 +196,7 @@ public class AuthServiceImpl implements AuthService {
 
         return LoginVO.builder()
                 .token(StpUtil.getTokenValue())
-                .userInfo(userVoAssembler.toVO(user))
+                .userInfo(userVoAssembler.toVO(user, tenantId))
                 .tenantId(tenantId)
                 .build();
     }
@@ -239,7 +239,7 @@ public class AuthServiceImpl implements AuthService {
 
         return LoginVO.builder()
                 .token(StpUtil.getTokenValue())
-                .userInfo(userVoAssembler.toVO(user))
+                .userInfo(userVoAssembler.toVO(user, tenantId))
                 .tenantId(tenantId)
                 .build();
     }

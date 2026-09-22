@@ -13,8 +13,6 @@ import {
 } from '@/api/auth/auth';
 import { resolveApiErrorMessage } from '@/core/http/api-error-message';
 import { toCaptchaDataUrl } from '@/utils/captcha';
-import { storage } from '@/core/storage/local';
-import { TENANT_ID_KEY } from '@/stores/system/tenant';
 import type { LoginResult } from '@/types/auth/auth';
 
 export function useLogin() {
@@ -49,23 +47,12 @@ export function useLogin() {
     isQrCodeMode.value = !isQrCodeMode.value;
   };
 
+  /**
+   * 统一应用登录会话：token + 用户信息 + 租户上下文三者必须一次性同步，
+   * 否则请求头 X-Tenant-Id 会残留在上一个会话的租户上。
+   */
   const applyLoginSession = (data: LoginResult) => {
-    authStore.setToken(data.token);
-    if (data.userInfo) {
-      authStore.setUser({
-        id: data.userInfo.id,
-        username: data.userInfo.username,
-        realName: data.userInfo.realName || data.userInfo.username,
-        avatar: data.userInfo.avatar || '',
-        roles: (data.userInfo.roles || []) as any,
-        permissions: data.userInfo.permissions || [],
-        department: data.userInfo.department,
-        email: data.userInfo.email
-      });
-    }
-    if (data.tenantId) {
-      storage.set(TENANT_ID_KEY, data.tenantId);
-    }
+    authStore.applySession(data);
   };
 
   const refreshCaptcha = async () => {
@@ -219,19 +206,9 @@ export function useLogin() {
       const res = await demoScanLogin();
 
       if (res?.data?.token) {
-        authStore.setToken(res.data.token);
-        if (res.data.userInfo) {
-          authStore.setUser({
-            id: res.data.userInfo.id,
-            username: res.data.userInfo.username,
-            realName: res.data.userInfo.realName || res.data.userInfo.username,
-            avatar: res.data.userInfo.avatar || '',
-            roles: (res.data.userInfo.roles || []) as any,
-            permissions: res.data.userInfo.permissions || [],
-            department: res.data.userInfo.department,
-            email: res.data.userInfo.email
-          });
-        } else {
+        // 扫码登录同样属于「更换会话」，必须同步租户上下文
+        authStore.applySession(res.data);
+        if (!res.data.userInfo) {
           await authStore.fetchUserInfo();
         }
 

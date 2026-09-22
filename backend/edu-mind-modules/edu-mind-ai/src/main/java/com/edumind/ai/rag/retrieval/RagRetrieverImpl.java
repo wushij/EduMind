@@ -40,6 +40,7 @@ public class RagRetrieverImpl implements RagRetriever {
     private final ChunkRetrievalApi chunkRetrievalApi;
     private final KnowledgeQueryApi knowledgeQueryApi;
     private final RagProperties ragProperties;
+    private final VectorRecallLatencyTracker latencyTracker;
 
     @Override
     public List<String> retrieve(String query, Long knowledgeBaseId, int topK, double minScore) {
@@ -116,8 +117,13 @@ public class RagRetrieverImpl implements RagRetriever {
         }
         Long tenantId = TenantContext.requireTenantId();
         filter.put("tenantId", tenantId);
+        long startTime = System.currentTimeMillis();
         List<VectorSearchResult> results = vectorStore.searchNearest(
                 milvusProperties.getCollection(), queryVector, Math.max(topK * 2, topK), filter);
+        long elapsedMs = System.currentTimeMillis() - startTime;
+        if (latencyTracker != null) {
+            latencyTracker.record(knowledgeBaseId, elapsedMs);
+        }
         Map<Long, KnowledgeDocumentVO> documentMap = loadDocumentMap(knowledgeBaseId);
         List<RetrievalHit> hits = new ArrayList<>();
         for (VectorSearchResult result : results) {

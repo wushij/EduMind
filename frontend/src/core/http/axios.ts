@@ -6,6 +6,7 @@ import { API_BASE_URL, API_TIMEOUT } from '@/config';
 import { buildRequestSecurityHeaders } from './request-signature';
 import { storage } from '../storage/local';
 import { logAppError } from './error-handler';
+import { TENANT_ID_KEY as TENANT_STORAGE_KEY, clearTenantContext } from '@/constants/tenant';
 
 /**
  * 注意：这里刻意不设置全局 Content-Type。
@@ -33,10 +34,11 @@ axiosInstance.interceptors.request.use(
       config.headers['satoken'] = token;
     }
 
-    // 注入多租户隔离上下文
-    const tenantId = storage.get('edumind_tenant_id');
-    if (tenantId) {
-      config.headers['X-Tenant-Id'] = String(tenantId);
+    // 注入多租户隔离上下文（仅接受合法正整数，脏数据一律忽略，避免伪造租户头）
+    const tenantId = storage.get(TENANT_STORAGE_KEY);
+    const parsedTenantId = Number(tenantId);
+    if (tenantId !== undefined && tenantId !== null && Number.isFinite(parsedTenantId) && parsedTenantId > 0) {
+      config.headers['X-Tenant-Id'] = String(parsedTenantId);
     }
 
     const urlPath = config.url || '/';
@@ -83,6 +85,9 @@ function isAuthEntryPath() {
 function handleUnauthorized(message = '登录状态已失效，请重新登录') {
   storage.remove(TOKEN_KEY);
   storage.remove('edumind_user_info');
+  // 必须同步清理租户/校区上下文：否则下一次登录会带着上一个账号的 X-Tenant-Id，
+  // 若新账号是管理员将被后端代管进上一个账号的租户，造成跨租户串号
+  clearTenantContext();
   // 已在登录/注册页时，通常是本地残留过期 Token 被 bootstrap 校验失败，静默清理即可
   if (isAuthEntryPath()) {
     return;

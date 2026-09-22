@@ -87,6 +87,21 @@ public final class TenantContext {
     }
 
     /**
+     * 在忽略租户上下文的环境中执行带返回值的逻辑（执行完毕自动恢复）。
+     * <p>推荐统一使用本方法而非裸调用 {@code setIgnoreTenant}：
+     * 裸调用一旦漏写 finally，会导致本线程后续所有查询永久放行租户隔离。</p>
+     */
+    public static <T> T callWithoutTenant(java.util.function.Supplier<T> supplier) {
+        boolean previous = isIgnoreTenant();
+        try {
+            setIgnoreTenant(true);
+            return supplier.get();
+        } finally {
+            setIgnoreTenant(previous);
+        }
+    }
+
+    /**
      * 在指定租户上下文中执行特定代码块（执行完毕自动恢复，专用于异步任务/事件监听器）
      */
     public static void runWithTenant(Long tenantId, Runnable runnable) {

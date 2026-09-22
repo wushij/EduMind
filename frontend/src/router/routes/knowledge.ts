@@ -1,4 +1,5 @@
 import { RouteRecordRaw } from 'vue-router';
+import { getStoredKnowledgeBaseId } from '@/composables/knowledge/useKnowledgeRoute';
 
 export const knowledgeRoutes: RouteRecordRaw[] = [
   {
@@ -10,6 +11,13 @@ export const knowledgeRoutes: RouteRecordRaw[] = [
   {
     path: '/knowledge/bases',
     redirect: '/knowledge'
+  },
+  {
+    path: '/knowledge/parse',
+    redirect: () => {
+      const storedId = getStoredKnowledgeBaseId();
+      return storedId ? `/knowledge/${storedId}/parse` : '/knowledge';
+    }
   },
   {
     path: '/knowledge/create',
@@ -74,9 +82,7 @@ export const knowledgeRoutes: RouteRecordRaw[] = [
       },
       {
         path: 'graph',
-        name: 'KnowledgeGraph',
-        component: () => import('@/views/knowledge/detail/KnowledgeGraph.vue'),
-        meta: { title: '知识图谱', requiresAuth: true }
+        redirect: to => `/knowledge/${to.params.id}/documents`
       }
     ]
   }

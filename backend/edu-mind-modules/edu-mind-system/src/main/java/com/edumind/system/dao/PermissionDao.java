@@ -1,6 +1,7 @@
 package com.edumind.system.dao;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.edumind.common.context.TenantContext;
 import com.edumind.system.entity.PermissionEntity;
 import com.edumind.system.entity.RolePermissionEntity;
 import com.edumind.system.mapper.PermissionMapper;
@@ -52,8 +53,15 @@ public class PermissionDao {
         return findByIds(permissionIds);
     }
 
+    /**
+     * 查询用户在当前租户上下文内的权限（平台级 + 当前租户），切换租户后结果随之变化。
+     */
     public List<PermissionEntity> findPermissionsByUserId(Long userId) {
-        List<Long> roleIds = userRoleDao.listRoleIdsByUserId(userId);
+        return findPermissionsByUserIdAndTenant(userId, TenantContext.getTenantId());
+    }
+
+    public List<PermissionEntity> findPermissionsByUserIdAndTenant(Long userId, Long tenantId) {
+        List<Long> roleIds = userRoleDao.listRoleIdsByUserIdAndTenant(userId, tenantId);
         return findByRoleIds(roleIds);
     }
 

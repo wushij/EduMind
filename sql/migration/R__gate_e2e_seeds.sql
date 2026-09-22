@@ -15,9 +15,10 @@ SELECT 5, 'teacher2', '$2b$10$DLVcEXn5RunOfqlY84u9S.nnXViwwLRheQgk0KIIpKr9y1im4m
        'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', 'ENABLE'
 WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 5 OR username = 'teacher2');
 
-INSERT INTO sys_user_role (user_id, role_id)
-SELECT 5, 2
-WHERE NOT EXISTS (SELECT 1 FROM sys_user_role WHERE user_id = 5 AND role_id = 2);
+-- V2.6.4 起按租户维度授权：teacher2 为演示租户(1)内的教师
+INSERT INTO sys_user_role (user_id, role_id, tenant_id)
+SELECT 5, 2, 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_user_role WHERE user_id = 5 AND role_id = 2 AND tenant_id = 1);
 
 INSERT INTO course (id, title, code, teacher_id, semester, description, cover_image, status)
 SELECT 104, 'Gate F 隔离测试课程', 'GATE104', 5, '2025秋',

@@ -40,6 +40,10 @@ public final class TenantContext {
         com.edumind.common.context.TenantContext.runWithoutTenant(runnable);
     }
 
+    public static <T> T callWithoutTenant(java.util.function.Supplier<T> supplier) {
+        return com.edumind.common.context.TenantContext.callWithoutTenant(supplier);
+    }
+
     public static void clear() {
         com.edumind.common.context.TenantContext.clear();
     }

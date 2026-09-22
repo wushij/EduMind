@@ -13,6 +13,7 @@ public class RagRuntimeQueryApiImpl implements RagRuntimeQueryApi {
 
     private final RagProperties ragProperties;
     private final EmbeddingApi embeddingApi;
+    private final com.edumind.ai.rag.retrieval.VectorRecallLatencyTracker latencyTracker;
 
     @Override
     public RagRuntimeConfigVO getRuntimeConfig() {
@@ -26,5 +27,10 @@ public class RagRuntimeQueryApiImpl implements RagRuntimeQueryApi {
                 .embeddingModelName(embeddingApi.getModelName())
                 .embeddingDimensions(embeddingApi.getDimensions())
                 .build();
+    }
+
+    @Override
+    public long getAverageRecallLatencyMs(Long knowledgeBaseId) {
+        return latencyTracker != null ? latencyTracker.getAverageLatency(knowledgeBaseId) : 0L;
     }
 }

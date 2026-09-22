@@ -37,6 +37,14 @@ public class KnowledgeChunkIndexDao {
         );
     }
 
+    public long countFailedByKnowledgeBaseId(Long knowledgeBaseId) {
+        return knowledgeChunkIndexMapper.selectCount(
+                new LambdaQueryWrapper<KnowledgeChunkIndexEntity>()
+                        .eq(KnowledgeChunkIndexEntity::getKnowledgeBaseId, knowledgeBaseId)
+                        .eq(KnowledgeChunkIndexEntity::getEmbedStatus, "FAILED")
+        );
+    }
+
     public int insert(KnowledgeChunkIndexEntity entity) {
         return knowledgeChunkIndexMapper.insert(entity);
     }

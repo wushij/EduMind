@@ -318,19 +318,6 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
         sort: 6,
         status: 1,
         visible: true
-      },
-      {
-        id: 307,
-        parentId: 300,
-        name: '学科知识图谱',
-        type: 2,
-        path: '/knowledge/graph',
-        component: 'views/knowledge/detail/KnowledgeGraph.vue',
-        icon: 'Connection',
-        permission: 'knowledge:graph:view',
-        sort: 7,
-        status: 1,
-        visible: true
       }
     ]
   },

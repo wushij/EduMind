@@ -22,9 +22,26 @@ public interface UserQueryService {
      */
     Map<Long, List<String>> mapRoleCodesByUserIds(Collection<Long> userIds);
 
+    /**
+     * 按「当前租户上下文」解析用户有效角色（平台级 + 当前租户）。
+     * 无租户上下文时仅返回平台级角色，切租户后结果随租户变化。
+     */
     List<String> getRolesByUserId(Long userId);
 
+    /**
+     * 按「显式指定租户」解析用户有效角色（平台级 + 指定租户）。
+     * 用于跨租户判定场景（如以入参 tenantId 解析数据范围），避免依赖线程上下文造成误判。
+     */
+    List<String> getRoleCodesByUserIdAndTenant(Long userId, Long tenantId);
+
+    /** 按「当前租户上下文」解析用户有效权限编码 */
     List<String> getPermissionsByUserId(Long userId);
+
+    /**
+     * 查询用户加入的全部租户 ID（跨租户，不含租户过滤）。
+     * 用于权限缓存失效等必须覆盖用户所有租户的场景。
+     */
+    List<Long> listTenantIdsByUserId(Long userId);
 
     List<Long> listUserIdsByRoleId(Long roleId);
 

@@ -20,8 +20,9 @@ const WRONG_TYPE_CODES = 'CONCEPT|LOGIC|CALC|READING';
 
 /**
  * 剥离诊断正文里的英文类型标记。
- * 这些标记（“类型：CONCEPT”“（READING）”“CONCEPT: …”）只是后端提取 error_types 的中间产物，
- * 属于内部枚举值；历史数据已原样入库，展示层需再兜底清洗一次，避免向学生暴露机器字段。
+ * 这些标记（“类型：CONCEPT”“（READING）”“CONCEPT: …”“……核心特性。 CONCEPT”）只是后端提取
+ * error_types 的中间产物，属于内部枚举值；历史数据已原样入库，展示层需再兜底清洗一次，
+ * 避免向学生暴露机器字段。
  */
 export function stripDiagnosisTypeMarker(text?: string | null): string {
   if (!text) {
@@ -32,6 +33,10 @@ export function stripDiagnosisTypeMarker(text?: string | null): string {
     .replace(new RegExp(`[（(]\\s*(?:${WRONG_TYPE_CODES})\\s*[)）]`, 'gi'), ' ')
     .replace(new RegExp(`(?:错因)?类型\\s*[:：]?\\s*(?:${WRONG_TYPE_CODES})\\s*[。.；;]?`, 'gi'), ' ')
     .replace(new RegExp(`(?:属于|归为|标记为|判定为|划分为)\\s*(?:${WRONG_TYPE_CODES})\\s*[。.；;]?`, 'gi'), ' ')
+    // 句末裸标记：模型按提示词把类型标注在句末（“……等核心特性。 CONCEPT”），
+    // 既无「类型：」前缀也无括号包裹，必须单独兜底，否则学生会看到 CONCEPT 这类内部枚举值；
+    // 前缀只吃空格/逗号，句末的「。」保留，避免清洗后结论失去句读
+    .replace(new RegExp(`[\\s，,、]*(?:${WRONG_TYPE_CODES})\\s*[。.；;]?\\s*$`, 'i'), '')
     .replace(/\s{2,}/g, ' ')
     .replace(/\s+([，,。.；;：:])/g, '$1')
     .replace(/[，,、]\s*(?=[。.；;]|$)/g, '')
@@ -124,10 +129,14 @@ export function useWrongQuestions(initialCourseId = 102) {
     try {
       const res = await diagnoseWrongBookItem(item.id, config);
       if (res?.data) {
-        item.diagnosis = res.data.diagnosis ?? item.diagnosis;
-        item.errorTypes = res.data.errorTypes ?? item.errorTypes;
-        item.errorTypeLabels = res.data.errorTypeLabels ?? item.errorTypeLabels;
-        item.variantQuestionIds = res.data.variantQuestionIds ?? item.variantQuestionIds;
+        const updated = res.data;
+        item.diagnosis = updated.diagnosis ?? item.diagnosis;
+        item.errorTypes = updated.errorTypes ?? item.errorTypes;
+        item.errorTypeLabels = updated.errorTypeLabels ?? item.errorTypeLabels;
+        item.variantQuestionIds = updated.variantQuestionIds ?? item.variantQuestionIds;
+        // 归因来源必须同步刷新：只更新正文会让面板继续挂着旧的「演示数据 · 非 AI 结论」标记，
+        // 出现「正文已是 AI 结论、标签仍说演示数据」的自相矛盾状态。
+        item.diagnosisSource = updated.diagnosisSource ?? (updated.diagnosis ? 'AI' : item.diagnosisSource);
       }
     } catch (err: unknown) {
       // 用户主动中止属于预期行为，不再弹出「暂不可用」误导提示

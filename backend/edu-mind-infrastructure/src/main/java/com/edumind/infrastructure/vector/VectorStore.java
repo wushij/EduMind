@@ -21,8 +21,26 @@ public interface VectorStore {
                 .toList();
     }
 
+    /**
+     * 带元数据过滤的近邻检索（租户隔离强制依赖此重载）。
+     * <p>刻意不做「忽略 filter 直接全量检索」的默认降级实现：任何未正确实现租户过滤的向量存储
+     * 都必须显式抛错，而不是静默返回全量结果造成跨租户召回。</p>
+     */
     default List<VectorSearchResult> searchNearest(String collectionName, List<Float> queryVector, int topK,
                                                    Map<String, Object> filter) {
-        return searchNearest(collectionName, queryVector, topK);
+        throw new UnsupportedOperationException(
+                "当前 VectorStore 实现未支持带过滤条件的近邻检索，无法保证租户隔离，已拒绝执行");
+    }
+
+    default String getEngineType() {
+        return "InMemory";
+    }
+
+    default String getVersion() {
+        return "v1.0";
+    }
+
+    default boolean isHealthy() {
+        return true;
     }
 }

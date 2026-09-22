@@ -5,13 +5,18 @@
       <div class="glow-orb glow-orb--right"></div>
 
       <div class="hero-top-toolbar">
-        <button type="button" class="capsule-btn capsule-btn--default" @click="router.push('/knowledge')">
-          <svg viewBox="0 0 24 24" class="btn-icon-svg" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="19" y1="12" x2="5" y2="12"></line>
-            <polyline points="12 19 5 12 12 5"></polyline>
-          </svg>
-          <span>返回知识库列表</span>
-        </button>
+        <div class="header-nav-bar">
+          <button type="button" class="back-btn" @click="router.push('/knowledge')">
+            <el-icon><ArrowLeft /></el-icon>
+            <span>返回知识库列表</span>
+          </button>
+          <el-divider direction="vertical" class="nav-divider" />
+          <el-breadcrumb separator="/" class="header-breadcrumb">
+            <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
+            <el-breadcrumb-item :to="{ path: '/knowledge' }">知识库中心</el-breadcrumb-item>
+            <el-breadcrumb-item>{{ currentKnowledgeBase?.name || '知识库详情' }}</el-breadcrumb-item>
+          </el-breadcrumb>
+        </div>
 
         <div class="toolbar-right-actions">
           <button type="button" class="capsule-btn capsule-btn--primary" @click="scrollToUpload">
@@ -39,6 +44,41 @@
               <span class="pulse-dot"></span>
               <span>{{ statusText }}</span>
             </span>
+
+            <!-- 切换课程/知识库快捷下拉菜单 -->
+            <el-dropdown
+              v-if="kbOptions.length > 1"
+              trigger="click"
+              class="course-switch-dropdown"
+              :max-height="340"
+              popper-class="kb-switch-popper"
+              @command="handleSwitchKb"
+            >
+              <button type="button" class="course-switch-pill" title="快速切换到其他课程知识库">
+                <el-icon><Switch /></el-icon>
+                <span>切换课程</span>
+                <el-icon class="arrow-down"><ArrowDown /></el-icon>
+              </button>
+              <template #dropdown>
+                <el-dropdown-menu class="course-dropdown-menu">
+                  <div class="dropdown-header-tip">切换至其他课程知识库</div>
+                  <el-dropdown-item
+                    v-for="kb in sortedKbOptions"
+                    :key="kb.id"
+                    :command="kb.id"
+                    :class="{ 'is-selected': Number(kb.id) === Number(kbId) }"
+                  >
+                    <div class="kb-switch-item">
+                      <div class="kb-switch-main">
+                        <span class="kb-title-text">{{ kb.name }}</span>
+                        <span v-if="kb.courseName" class="kb-course-pill">关联课程：{{ kb.courseName }}</span>
+                      </div>
+                      <span v-if="Number(kb.id) === Number(kbId)" class="current-check">当前</span>
+                    </div>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
 
           <p class="hero-description">
@@ -105,15 +145,52 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, ref, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
+import { ArrowLeft, ArrowDown, Switch } from '@element-plus/icons-vue';
+import { getKnowledgeBases } from '@/api/knowledge/knowledge-base';
+import type { KnowledgeBase } from '@/types/knowledge/knowledge-base';
 import { useKnowledgeBase } from '@/composables/knowledge/useKnowledgeBase';
 import { setStoredKnowledgeBaseId, clearStoredKnowledgeBaseId, useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
 
+const route = useRoute();
 const router = useRouter();
 const { kbId } = useKnowledgeRoute();
 const { currentKnowledgeBase, loading, fetchKnowledgeBaseDetail } = useKnowledgeBase();
+
+const kbOptions = ref<KnowledgeBase[]>([]);
+
+async function loadKbOptions() {
+  try {
+    const res = await getKnowledgeBases();
+    kbOptions.value = Array.isArray(res?.data) ? res.data : [];
+  } catch {
+    kbOptions.value = [];
+  }
+}
+
+/**
+ * 下拉列表顺序：当前所在知识库置顶，其余按名称（中文拼音）升序。
+ * 直接用后端返回顺序会出现「当前项埋在末尾、其余看似随机」的观感。
+ */
+const sortedKbOptions = computed(() => {
+  const currentId = Number(kbId.value);
+  return [...kbOptions.value].sort((a, b) => {
+    const aCurrent = Number(a.id) === currentId;
+    const bCurrent = Number(b.id) === currentId;
+    if (aCurrent !== bCurrent) return aCurrent ? -1 : 1;
+    return (a.name || '').localeCompare(b.name || '', 'zh-Hans-CN');
+  });
+});
+
+function handleSwitchKb(targetKbId: number) {
+  if (!targetKbId || targetKbId === kbId.value) return;
+  setStoredKnowledgeBaseId(targetKbId);
+  const currentSubPath = route.path.replace(/^\/knowledge\/\d+/, '');
+  const targetPath = `/knowledge/${targetKbId}${currentSubPath || '/documents'}`;
+  router.push({ path: targetPath, query: route.query });
+}
 
 const statusClass = computed(() => {
   const status = currentKnowledgeBase.value?.vectorStatus;
@@ -157,10 +234,16 @@ function scrollToUpload() {
     anchor.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
-  ElMessage.info('请进入文档管理页面上传');
+  const id = kbId.value;
+  if (id) {
+    router.push({ path: `/knowledge/${id}/documents`, query: { action: 'upload' } });
+  }
 }
 
-onMounted(loadKnowledgeBase);
+onMounted(() => {
+  loadKnowledgeBase();
+  loadKbOptions();
+});
 
 watch(kbId, (id) => {
   if (id) {
@@ -214,8 +297,58 @@ watch(kbId, (id) => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.7);
+    margin-bottom: 18px;
+
+    .header-nav-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+
+      .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0;
+        border: none;
+        background: transparent;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: #2563eb;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: color 0.15s ease;
+
+        .el-icon {
+          font-size: 14px;
+        }
+
+        &:hover {
+          color: #1d4ed8;
+        }
+      }
+
+      .nav-divider {
+        margin: 0 4px;
+        height: 14px;
+        border-color: #cbd5e1;
+      }
+
+      .header-breadcrumb {
+        :deep(.el-breadcrumb__inner) {
+          font-size: 13px;
+          color: #64748b;
+        }
+
+        :deep(.el-breadcrumb__item:last-child .el-breadcrumb__inner) {
+          color: #1e293b;
+          font-weight: 600;
+        }
+      }
+    }
   }
 
   .hero-main-row {
@@ -297,6 +430,36 @@ watch(kbId, (id) => {
       background: #f8fafc;
       border-color: #e2e8f0;
       color: #64748b;
+    }
+  }
+
+  .course-switch-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 12px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #2563eb;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.08);
+
+    &:hover {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #2563eb;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.22);
+    }
+
+    .arrow-down {
+      font-size: 11px;
+      transition: transform 0.2s ease;
     }
   }
 
@@ -436,5 +599,99 @@ watch(kbId, (id) => {
   .kb-hero-header .hero-stats-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+</style>
+
+<style lang="scss">
+/**
+ * 课程切换下拉：弹层被 teleport 到 body，scoped 的 :deep() 编译后要求存在带 scope-id 的祖先，
+ * 在 body 下永远匹配不到，因此下面这些样式此前从未生效（标题与关联课程挤成一行、当前标记被迫换行、悬停色丢失）。
+ * 改为全局样式，并用 popper-class 限定作用域，避免影响同样使用 .course-dropdown-menu 的其他下拉。
+ */
+.kb-switch-popper.el-popper {
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+  // 内边距放在弹层上，让每个条目成为带圆角的独立块
+  padding: 6px;
+}
+
+.kb-switch-popper .course-dropdown-menu {
+  min-width: 320px;
+  // 高度由 el-dropdown 的 max-height（内置 el-scrollbar）控制，此处不再自建 overflow
+  padding: 0;
+}
+
+.kb-switch-popper .dropdown-header-tip {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94A3B8;
+  letter-spacing: 0.02em;
+  padding: 4px 10px 6px;
+}
+
+.kb-switch-popper .el-dropdown-menu__item {
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 2px;
+  line-height: 1.45;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  &.is-selected {
+    background: #EFF6FF;
+
+    .kb-title-text {
+      color: #2563EB;
+      font-weight: 600;
+    }
+  }
+
+  &:hover,
+  &:focus {
+    background: #F1F5F9;
+  }
+}
+
+.kb-switch-popper .kb-switch-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.kb-switch-popper .kb-switch-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kb-switch-popper .kb-title-text {
+  font-size: 13px;
+  color: #1E293B;
+  line-height: 1.3;
+}
+
+.kb-switch-popper .kb-course-pill {
+  font-size: 11px;
+  color: #64748B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kb-switch-popper .current-check {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #2563EB;
+  background: #DBEAFE;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
 }
 </style>

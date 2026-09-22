@@ -37,8 +37,18 @@ public class UserQueryApiImpl implements UserQueryApi {
     }
 
     @Override
+    public List<String> getRoleCodesByUserIdAndTenant(Long userId, Long tenantId) {
+        return userQueryService.getRoleCodesByUserIdAndTenant(userId, tenantId);
+    }
+
+    @Override
     public List<String> getPermissionsByUserId(Long userId) {
         return userQueryService.getPermissionsByUserId(userId);
+    }
+
+    @Override
+    public List<Long> listTenantIdsByUserId(Long userId) {
+        return userQueryService.listTenantIdsByUserId(userId);
     }
 
     @Override

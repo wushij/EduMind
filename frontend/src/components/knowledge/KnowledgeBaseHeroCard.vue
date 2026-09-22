@@ -307,7 +307,7 @@ const chunkIndexPercent = computed(() => {
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
       outline: none;
       white-space: nowrap;
 
@@ -317,8 +317,8 @@ const chunkIndexPercent = computed(() => {
         border: none;
         box-shadow: 0 3px 12px rgba(22, 119, 255, 0.3);
 
+        // hover 不做位移：按钮上移会让命中区域一起移动，光标停在边缘会自激振荡（边框抖动）
         &:hover {
-          transform: translateY(-1px);
           box-shadow: 0 6px 18px rgba(22, 119, 255, 0.4);
           background: linear-gradient(135deg, #4096ff 0%, #1d4ed8 100%);
         }
@@ -333,7 +333,7 @@ const chunkIndexPercent = computed(() => {
         &:hover {
           background: #eff6ff;
           border-color: #93c5fd;
-          transform: translateY(-1px);
+          box-shadow: 0 3px 12px rgba(37, 99, 235, 0.12);
         }
       }
 

@@ -107,9 +107,8 @@ public class KnowledgeOcrTaskDispatcher {
                 log.error("[OCR Dispatcher] Failed to mark task {} as FAILED: {}", taskId, ex.getMessage());
             }
         } finally {
-            if (tenantId != null) {
-                TenantContext.clear();
-            }
+            // 无条件清理：即使 tenantId 为空也必须清理线程上可能残留的上下文，避免线程池复用串租户
+            TenantContext.clear();
         }
     }
 }

@@ -126,11 +126,13 @@ const effectiveRagCalls = computed(() => {
     border-radius: 22px;
     border: 1px solid #e2e8f0;
     overflow: hidden;
-    transition: transform 0.2s, box-shadow 0.2s;
+    // hover 只改边框色与阴影，不做位移：卡片上移会让命中区域一起移动，
+    // 光标停在边缘时会「进入→上移→脱离→落回→再进入」自激振荡，表现为边框抖动
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 
     &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
+      border-color: #cbd5e1;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
     }
 
     &--blue {

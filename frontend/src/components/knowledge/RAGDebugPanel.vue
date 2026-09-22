@@ -39,7 +39,9 @@
               <span class="stage-title">{{ stage.stageName }}</span>
               <span class="stage-code">{{ stage.stage }}</span>
             </div>
-            <span class="stage-duration-tag">{{ stage.durationMs }}ms</span>
+            <span class="stage-duration-tag" :class="`is-${(stage.status || 'SUCCESS').toLowerCase()}`">
+              {{ stage.status === 'SKIPPED' ? '已跳过' : `${stage.durationMs}ms` }}
+            </span>
           </div>
           <p v-if="stage.summary" class="stage-summary">{{ stage.summary }}</p>
         </div>
@@ -175,6 +177,16 @@ defineProps<{
             background: #ECFDF5;
             padding: 2px 8px;
             border-radius: 4px;
+
+            &.is-skipped {
+              color: #64748B;
+              background: #F1F5F9;
+            }
+
+            &.is-failed {
+              color: #DC2626;
+              background: #FEF2F2;
+            }
           }
         }
 

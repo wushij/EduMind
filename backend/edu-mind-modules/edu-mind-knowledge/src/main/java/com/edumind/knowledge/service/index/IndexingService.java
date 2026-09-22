@@ -9,4 +9,6 @@ public interface IndexingService {
     IndexStatusVO getIndexStatus(Long knowledgeBaseId);
 
     void reindexDocument(Long documentId);
+
+    void reindexChunk(Long knowledgeBaseId, Long chunkId);
 }

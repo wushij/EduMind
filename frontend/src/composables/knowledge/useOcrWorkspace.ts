@@ -1,4 +1,4 @@
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import {
@@ -17,6 +17,7 @@ export interface BBoxBlock {
   options?: string[];
   bbox: [number, number, number, number];
   confidence: number;
+  type?: 'CHOICE' | 'FILL' | 'SOLVE';
 }
 
 export interface WorkspacePage {
@@ -34,6 +35,10 @@ export interface PresetPaper {
   id: string;
   name: string;
   engine: 'MINERU' | 'PADDLE_OCR' | 'GPT4O_VISION';
+  subject?: 'math' | 'physics' | 'chemistry' | 'custom';
+  description?: string;
+  createTime?: string;
+  isCustom?: boolean;
   pages: WorkspacePage[];
 }
 
@@ -42,6 +47,10 @@ export const PRESET_PAPERS: PresetPaper[] = [
     id: 'math-2026',
     name: '2026年秋季高三开学调研测试·理科数学.pdf',
     engine: 'MINERU',
+    subject: 'math',
+    description: '官方示范卷 · 导数/复数/立体几何切片',
+    createTime: '系统内置',
+    isCustom: false,
     pages: [
       {
         pageNumber: 1,
@@ -49,6 +58,7 @@ export const PRESET_PAPERS: PresetPaper[] = [
         blocks: [
           {
             id: 1,
+            type: 'CHOICE',
             title: 'Q1 · 导数与单调性',
             stem: '1. 已知函数 $f(x) = \\frac{\\ln x}{x} + \\frac{1}{2}ax^2$，若 $f(x)$ 在区间 $(1, +\\infty)$ 内单调递减，则实数 $a$ 的取值范围是（   ）',
             options: ['A. $(-\\infty, -1]$', 'B. $(-\\infty, 0]$', 'C. $[1, +\\infty)$', 'D. $(0, 1]$'],
@@ -57,6 +67,7 @@ export const PRESET_PAPERS: PresetPaper[] = [
           },
           {
             id: 2,
+            type: 'CHOICE',
             title: 'Q2 · 复数代数运算',
             stem: '2. 设复数 $z$ 满足 $(1 + i)z = 2 - i$，则 $|z| = $（   ）',
             options: ['A. $\\frac{\\sqrt{10}}{2}$', 'B. $\\frac{5}{2}$', 'C. $\\sqrt{5}$', 'D. $\\frac{\\sqrt{5}}{2}$'],
@@ -65,6 +76,7 @@ export const PRESET_PAPERS: PresetPaper[] = [
           },
           {
             id: 3,
+            type: 'CHOICE',
             title: 'Q3 · 空间立体几何',
             stem: '3. 在正三棱柱 $ABC-A_1B_1C_1$ 中，若各棱长均为 $2$，则异面直线 $AB_1$ 与 $BC_1$ 所成角的余弦值为（   ）',
             options: ['A. $\\frac{1}{4}$', 'B. $\\frac{\\sqrt{3}}{4}$', 'C. $\\frac{1}{2}$', 'D. $\\frac{\\sqrt{2}}{2}$'],
@@ -101,6 +113,7 @@ D. $\\frac{\\sqrt{2}}{2}$`
         blocks: [
           {
             id: 4,
+            type: 'FILL',
             title: 'Q4 · 二项式展开定理',
             stem: '4. 在 $(x - \\frac{2}{x})^6$ 的二项展开式中，常数项为 ________。',
             bbox: [30, 90, 540, 180],
@@ -108,6 +121,7 @@ D. $\\frac{\\sqrt{2}}{2}$`
           },
           {
             id: 5,
+            type: 'FILL',
             title: 'Q5 · 双曲线渐近线与离心率',
             stem: '5. 已知双曲线 $C: \\frac{x^2}{a^2} - \\frac{y^2}{b^2} = 1 (a > 0, b > 0)$ 的一条渐近线方程为 $y = \\sqrt{3}x$，则其离心率 $e = $ ________。',
             bbox: [30, 200, 540, 290],
@@ -115,6 +129,7 @@ D. $\\frac{\\sqrt{2}}{2}$`
           },
           {
             id: 6,
+            type: 'SOLVE',
             title: 'Q6 · 解三角形综合计算',
             stem: '6. 在 $\\triangle ABC$ 中，已知 $2a\\sin B = \\sqrt{3}b$。\n(1) 求角 $A$ 的大小；\n(2) 若 $a = \\sqrt{7}$，$b + c = 5$，求 $\\triangle ABC$ 的面积。',
             bbox: [30, 310, 540, 520],
@@ -140,6 +155,7 @@ D. $\\frac{\\sqrt{2}}{2}$`
         blocks: [
           {
             id: 7,
+            type: 'SOLVE',
             title: 'Q7 · 压轴题：解析几何与椭圆方程',
             stem: '7. 已知椭圆 $C: \\frac{x^2}{a^2} + \\frac{y^2}{b^2} = 1 (a > b > 0)$ 的离心率为 $\\frac{\\sqrt{3}}{2}$，短轴长为 $2$。\n(1) 求椭圆 $C$ 的标准方程；\n(2) 设直线 $l: y = kx + m$ 与椭圆 $C$ 交于不同的两点 $A, B$，以 $AB$ 为直径的圆恰好过原点 $O$，求原点 $O$ 到直线 $l$ 的距离的取值范围。',
             bbox: [30, 90, 540, 480],
@@ -159,6 +175,10 @@ D. $\\frac{\\sqrt{2}}{2}$`
     id: 'physics-2026',
     name: '2026年高考物理全真模拟·力电综合计算卷.pdf',
     engine: 'GPT4O_VISION',
+    subject: 'physics',
+    description: '官方示范卷 · 运动力学与电磁场切片',
+    createTime: '系统内置',
+    isCustom: false,
     pages: [
       {
         pageNumber: 1,
@@ -233,9 +253,14 @@ export function useOcrWorkspace() {
   const currentDocTitle = ref('2026年秋季高三开学调研测试·理科数学.pdf');
   const currentPageIdx = ref(0);
   const zoomScale = ref(1.0);
-  const viewMode = ref<'split' | 'edit' | 'preview'>('split');
+  const viewMode = ref<'edit' | 'preview'>('edit');
+  const showThumbnails = ref(false);
+  const selectedBlockFilter = ref<'ALL' | 'CHOICE' | 'FILL' | 'SOLVE' | 'REVIEW'>('ALL');
   const currentTaskId = ref<number | null>(null);
   const currentTask = ref<OcrTaskVO | null>(null);
+
+  // 动态试卷列表：内置官方精选试卷，同时支持用户上传的试卷实时动态追加与切换
+  const paperList = ref<PresetPaper[]>([...PRESET_PAPERS]);
 
   // 页面数据
   const pages = ref<WorkspacePage[]>([...PRESET_PAPERS[0].pages]);
@@ -256,16 +281,161 @@ export function useOcrWorkspace() {
     return pages.value[currentPageIdx.value]?.blocks || [];
   });
 
+  const filteredBlocks = computed(() => {
+    const list = currentPageBlocks.value;
+    if (selectedBlockFilter.value === 'ALL') return list;
+    if (selectedBlockFilter.value === 'REVIEW') {
+      return list.filter((b) => b.confidence < 0.985);
+    }
+    return list.filter((b) => b.type === selectedBlockFilter.value);
+  });
+
+  const currentRawText = computed(() => {
+    return pages.value[currentPageIdx.value]?.rawText || '';
+  });
+
+  const formulaCount = computed(() => {
+    const text = currentProofreadText.value || '';
+    const inlineMatches = text.match(/\$[^$\n]+\$/g);
+    const blockMatches = text.match(/\$\$[\s\S]*?\$\$/g);
+    return (inlineMatches?.length || 0) + (blockMatches?.length || 0);
+  });
+
   const taskStatusLabel = computed(() => {
     return resolveOcrTaskStatusLabel(currentTask.value?.status || 'PROOFREADING');
   });
 
+  /** 将题目切片转换为高质量 Markdown 源码 */
+  function blocksToMarkdown(blocks: BBoxBlock[]): string {
+    if (!blocks || blocks.length === 0) {
+      return '（当前筛选条件下无切片题目）';
+    }
+    return blocks
+      .map((b) => {
+        let content = `**${b.title}**\n${b.stem}`;
+        if (b.options && b.options.length > 0) {
+          content += '\n' + b.options.join('\n');
+        }
+        return content;
+      })
+      .join('\n\n');
+  }
+
+  // 内部同步锁：防止 watch 相互触发死循环
+  let isInternalSyncing = false;
+
+  // 1. 核心联动：当左侧题型/待复核筛选改变，或翻页时，立即同步更新右侧源码！
+  watch(
+    [selectedBlockFilter, currentPageIdx],
+    ([newFilter]) => {
+      const curPage = pages.value[currentPageIdx.value];
+      if (!curPage) return;
+
+      isInternalSyncing = true;
+      if (newFilter === 'ALL') {
+        // 全量模式：展示整页全量源码
+        currentProofreadText.value = curPage.proofreadText || curPage.rawText;
+        if (curPage.blocks && curPage.blocks.length > 0 && !focusedBBoxId.value) {
+          focusedBBoxId.value = curPage.blocks[0].id;
+        }
+      } else {
+        // 筛选模式 (如「待复核」或指定题型)：立即同步过滤出匹配题目的源码
+        const matched = filteredBlocks.value;
+        currentProofreadText.value = blocksToMarkdown(matched);
+        if (matched.length > 0) {
+          focusedBBoxId.value = matched[0].id;
+        }
+      }
+      setTimeout(() => {
+        isInternalSyncing = false;
+      }, 50);
+    }
+  );
+
+  // 2. 核心联动：当右侧源码文本编辑修改时，实时双向映射更新左侧题目切片 blocks (公式与题干实时动态渲染)
+  watch(currentProofreadText, (newText) => {
+    if (isInternalSyncing) return;
+
+    const curPage = pages.value[currentPageIdx.value];
+    if (!curPage || !curPage.blocks) return;
+
+    if (selectedBlockFilter.value !== 'ALL') {
+      const matched = filteredBlocks.value;
+      if (matched.length === 1) {
+        syncSingleBlock(matched[0], newText);
+      } else if (matched.length > 1) {
+        const chunks = newText.split(/\n\s*(?=\*\*[^*]+\*\*)/);
+        chunks.forEach((chk, idx) => {
+          if (matched[idx]) syncSingleBlock(matched[idx], chk);
+        });
+      }
+      // 反向更新整页完整文本
+      updatePageFullTextFromBlocks(curPage, matched);
+    } else {
+      curPage.proofreadText = newText;
+      // 全量模式：遍历更新对应 block
+      for (const block of curPage.blocks) {
+        const cleanTitle = block.title.replace(/^Q\d+\s*·\s*/, '').trim();
+        const escaped = cleanTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`\\*\\*[^*]*${escaped}[^*]*\\*\\*([\\s\\S]*?)(?=\\n\\s*\\*\\*|$)`);
+        const match = newText.match(regex);
+        if (match && match[1]) {
+          syncSingleBlock(block, match[1]);
+        }
+      }
+    }
+  });
+
+  function syncSingleBlock(block: BBoxBlock, text: string) {
+    const lines = text
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => Boolean(l) && !/^\*\*[^*]+\*\*$/.test(l));
+
+    const options: string[] = [];
+    const stemLines: string[] = [];
+
+    for (const line of lines) {
+      if (/^[A-D][\.\、\s]/.test(line)) {
+        options.push(line);
+      } else {
+        stemLines.push(line);
+      }
+    }
+
+    if (stemLines.length > 0) {
+      block.stem = stemLines.join('\n');
+    }
+    if (options.length > 0) {
+      block.options = options;
+    }
+  }
+
+  function updatePageFullTextFromBlocks(curPage: WorkspacePage, updatedBlocks: BBoxBlock[]) {
+    let fullText = curPage.proofreadText || curPage.rawText;
+    for (const block of updatedBlocks) {
+      const cleanTitle = block.title.replace(/^Q\d+\s*·\s*/, '').trim();
+      const escaped = cleanTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(\\*\\*[^*]*${escaped}[^*]*\\*\\*[\\s\\S]*?)(?=\\n\\s*\\*\\*|$)`);
+      const newBlockMd = `**${block.title}**\n${block.stem}` + (block.options && block.options.length ? '\n' + block.options.join('\n') : '');
+      if (regex.test(fullText)) {
+        fullText = fullText.replace(regex, newBlockMd);
+      }
+    }
+    curPage.proofreadText = fullText;
+  }
+
+  function toggleThumbnails() {
+    showThumbnails.value = !showThumbnails.value;
+  }
+
   function selectBBox(id: number) {
     focusedBBoxId.value = id;
+    // 如果当前选了 ALL，但用户点击了特定题目切片，自动同步定位
   }
 
   function handlePresetChange(presetId: string) {
-    const found = PRESET_PAPERS.find((p) => p.id === presetId);
+    const found = paperList.value.find((p) => p.id === presetId);
     if (found) {
       selectedPresetId.value = presetId;
       currentDocTitle.value = found.name;
@@ -274,7 +444,7 @@ export function useOcrWorkspace() {
       currentPageIdx.value = 0;
       currentProofreadText.value = pages.value[0].proofreadText || pages.value[0].rawText;
       focusedBBoxId.value = pages.value[0].blocks?.[0]?.id || null;
-      ElMessage.success(`已载入试卷「${found.name}」切片与公式版面数据`);
+      ElMessage.success(`已载入试卷「${found.name}」切片与版面数据`);
     }
   }
 
@@ -284,32 +454,69 @@ export function useOcrWorkspace() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string;
-      const newPageNumber = pages.value.length + 1;
+      const cleanFileName = file.name.replace(/\.[^/.]+$/, '');
+      
+      let subjectType: 'math' | 'physics' | 'chemistry' | 'custom' = 'custom';
+      if (/数|代数|几何|导数|三角/i.test(file.name)) subjectType = 'math';
+      else if (/物|力学|电磁/i.test(file.name)) subjectType = 'physics';
+      else if (/化|分子|平衡/i.test(file.name)) subjectType = 'chemistry';
+
+      const newPageNumber = 1;
       const newPage: WorkspacePage = {
         pageNumber: newPageNumber,
         imageUrl: dataUrl,
-        confidenceScore: 98.7,
+        confidenceScore: 98.8,
         blocks: [
           {
             id: Date.now(),
-            title: `Q${newPageNumber} · 自定义上传试题切片`,
-            stem: `【上传试题】${file.name}\n已知函数 $f(x) = x^2 - 2x + 1$，求其在区间 $[0, 2]$ 上的最值与切线方程。`,
+            type: 'CHOICE',
+            title: `Q1 · ${cleanFileName} 试题切片`,
+            stem: `【自定义识别】${file.name}\n已知二次函数 $f(x) = x^2 - 2x + 1$，求其在区间 $[0, 2]$ 上的最值与切线方程。`,
             options: ['A. 最大值 1，最小值 0', 'B. 最大值 2，最小值 1', 'C. 最大值 3，最小值 0', 'D. 最大值 1，最小值 -1'],
             bbox: [30, 80, 540, 280],
-            confidence: 0.987
+            confidence: 0.988
           }
         ],
-        rawText: `### 自定义试题上传识别：${file.name}\n\n**1. 函数极值与切线综合**\n已知二次函数 $f(x) = x^2 - 2x + 1$，求其在闭区间 $[0, 2]$ 上的最大值与最小值，以及在点 $(1, 0)$ 处的切线方程。\n\nA. 最大值 1，最小值 0\nB. 最大值 2，最小值 1\nC. 最大值 3，最小值 0\nD. 最大值 1，最小值 -1\n\n【解析】因 $f'(x) = 2x - 2$，对称轴为 $x = 1$。在区间 $[0, 2]$ 上，最小值为 $f(1) = 0$，最大值为 $f(0) = f(2) = 1$。在点 $(1, 0)$ 处的切线斜率 $k = f'(1) = 0$，切线方程为 $y = 0$。故选 A。`
+        rawText: `### 智能试卷上传识别：${file.name}\n\n**1. 函数极值与切线综合**\n已知二次函数 $f(x) = x^2 - 2x + 1$，求其在闭区间 $[0, 2]$ 上的最大值与最小值，以及在点 $(1, 0)$ 处的切线方程。\n\nA. 最大值 1，最小值 0\nB. 最大值 2，最小值 1\nC. 最大值 3，最小值 0\nD. 最大值 1，最小值 -1\n\n【解析】因 $f'(x) = 2x - 2$，对称轴为 $x = 1$。在区间 $[0, 2]$ 上，最小值为 $f(1) = 0$，最大值为 $f(0) = f(2) = 1$。在点 $(1, 0)$ 处的切线斜率 $k = f'(1) = 0$，切线方程为 $y = 0$。故选 A。`
       };
 
-      pages.value.push(newPage);
-      currentPageIdx.value = pages.value.length - 1;
-      currentProofreadText.value = newPage.rawText;
+      const newPaperId = `custom-${Date.now()}`;
+      const newPaper: PresetPaper = {
+        id: newPaperId,
+        name: file.name,
+        engine: selectedEngine.value,
+        subject: subjectType,
+        description: '本地导入 · OCR切片与公式已就绪',
+        createTime: '刚刚上传',
+        isCustom: true,
+        pages: [newPage]
+      };
+
+      // 动态将新试卷置顶插入试卷库列表
+      paperList.value.unshift(newPaper);
+      selectedPresetId.value = newPaperId;
       currentDocTitle.value = file.name;
+      pages.value = newPaper.pages;
+      currentPageIdx.value = 0;
+      currentProofreadText.value = newPage.rawText;
+      focusedBBoxId.value = newPage.blocks?.[0]?.id || null;
       loading.value = false;
-      ElMessage.success(`已成功上传本地试卷扫描件「${file.name}」并切片识别！`);
+      ElMessage.success(`已成功导入本地试卷「${file.name}」，已追加至试卷工作台列表！`);
     };
     reader.readAsDataURL(file);
+  }
+
+  function removeCustomPaper(paperId: string) {
+    const idx = paperList.value.findIndex((p) => p.id === paperId);
+    if (idx === -1) return;
+    const removedName = paperList.value[idx].name;
+    paperList.value.splice(idx, 1);
+    ElMessage.info(`已移除试卷「${removedName}」`);
+    if (selectedPresetId.value === paperId) {
+      if (paperList.value.length > 0) {
+        handlePresetChange(paperList.value[0].id);
+      }
+    }
   }
 
   function prevPage() {
@@ -502,6 +709,56 @@ export function useOcrWorkspace() {
     }
   }
 
+  function goToPage(idx: number) {
+    if (idx < 0 || idx >= pages.value.length || idx === currentPageIdx.value) return;
+    if (pages.value[currentPageIdx.value]) {
+      pages.value[currentPageIdx.value].proofreadText = currentProofreadText.value;
+    }
+    currentPageIdx.value = idx;
+    currentProofreadText.value =
+      pages.value[idx].proofreadText || pages.value[idx].rawText;
+    focusedBBoxId.value = pages.value[idx].blocks?.[0]?.id || null;
+  }
+
+  function formatProofreadText(action: 'punctuation' | 'options' | 'latex_spaces' | 'clear_empty_lines' | 'reset') {
+    let text = currentProofreadText.value || '';
+    if (action === 'reset') {
+      currentProofreadText.value = pages.value[currentPageIdx.value]?.rawText || '';
+      ElMessage.info('已重置为 OCR 原始识别文本');
+      return;
+    }
+    if (action === 'punctuation') {
+      text = text.replace(/([^\$\n]+)/g, (match) => {
+        return match
+          .replace(/,/g, '，')
+          .replace(/\?/g, '？')
+          .replace(/!/g, '！')
+          .replace(/:/g, '：')
+          .replace(/;/g, '；');
+      });
+      ElMessage.success('已自动规范学术中文标点符号');
+    } else if (action === 'options') {
+      text = text.replace(/([A-D]\.\s*)/g, '\n$1').replace(/\n\n+/g, '\n\n');
+      ElMessage.success('已优化选择题选项排版换行');
+    } else if (action === 'latex_spaces') {
+      text = text.replace(/\$\s+([^$]+?)\s+\$/g, '$$$1$$');
+      ElMessage.success('已清理公式两端冗余空格');
+    } else if (action === 'clear_empty_lines') {
+      text = text.replace(/\n{3,}/g, '\n\n');
+      ElMessage.success('已清理连续多余空行');
+    }
+    currentProofreadText.value = text;
+  }
+
+  async function copyProofreadText() {
+    try {
+      await navigator.clipboard.writeText(currentProofreadText.value);
+      ElMessage.success('当前页 Markdown / LaTeX 源码已成功复制至剪贴板');
+    } catch {
+      ElMessage.info('复制失败，请手动选中文本复制');
+    }
+  }
+
   function applyAiText(newText: string) {
     currentProofreadText.value = newText;
     if (pages.value[currentPageIdx.value]) {
@@ -522,6 +779,11 @@ export function useOcrWorkspace() {
     currentPageIdx,
     zoomScale,
     viewMode,
+    showThumbnails,
+    selectedBlockFilter,
+    filteredBlocks,
+    currentRawText,
+    formulaCount,
     currentTaskId,
     currentTask,
     pages,
@@ -532,7 +794,13 @@ export function useOcrWorkspace() {
     taskStatusLabel,
     showAiDrawer,
     showIngestModal,
+    toggleThumbnails,
+    goToPage,
+    formatProofreadText,
+    copyProofreadText,
     selectBBox,
+    paperList,
+    removeCustomPaper,
     handlePresetChange,
     handleFileUpload,
     prevPage,

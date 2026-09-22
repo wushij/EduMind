@@ -1,5 +1,5 @@
 <template>
-  <div class="knowledge-graph-shell">
+  <div class="knowledge-graph-shell" :class="{ 'is-borderless': !bordered }">
     <div v-if="showToolbar" class="graph-toolbar">
       <button type="button" class="graph-tool-btn" title="放大" @click="zoomIn">＋</button>
       <button type="button" class="graph-tool-btn" title="缩小" @click="zoomOut">－</button>
@@ -23,10 +23,13 @@ const props = withDefaults(
     height?: number;
     /** 是否展示缩放工具条 */
     showToolbar?: boolean;
+    /** 是否自带卡片边框：嵌在已有卡片内（如学习路径面板）时传 false，避免卡中卡 */
+    bordered?: boolean;
   }>(),
   {
     height: 520,
-    showToolbar: false
+    showToolbar: false,
+    bordered: true
   }
 );
 
@@ -67,6 +70,13 @@ function resolveSize(node: KnowledgeGraphNode): number {
   return node.highlight ? base + 12 : base;
 }
 
+/** 关系类型连线色：前置/后置与普通关联区分开，避免所有边糊成一样的灰线 */
+const RELATION_COLORS: Record<string, string> = {
+  prerequisite: '#93b4f5',
+  related: '#d8e0ea',
+  successor: '#c4b5fd'
+};
+
 function toG6Data(data: KnowledgeGraphVO) {
   const nodes = (data.nodes || []).map((node) => ({
     id: node.id,
@@ -87,18 +97,23 @@ function toG6Data(data: KnowledgeGraphVO) {
       shadowColor: node.highlight ? 'rgba(37, 99, 235, 0.35)' : 'rgba(15, 23, 42, 0.08)',
       shadowBlur: node.highlight ? 14 : 8,
       shadowOffsetY: 2,
+      // 掌握状态光晕：让「薄弱 / 学习中 / 已掌握」一眼可辨，而不是只有细微的填充色差
+      halo: Boolean(node.status && STATUS_COLORS[node.status]),
+      haloStroke: node.status ? STATUS_COLORS[node.status] : undefined,
+      haloStrokeOpacity: 0.26,
+      haloLineWidth: 9,
       // 标签加浅色底并限宽换行，避免长知识点名互相压盖、糊成一团
       labelText: node.label || '',
       labelFontSize: 11.5,
       labelFontWeight: 600,
       labelFill: '#1e293b',
       labelBackground: true,
-      labelBackgroundFill: 'rgba(255, 255, 255, 0.96)',
-      labelBackgroundStroke: '#e2e8f0',
+      labelBackgroundFill: 'rgba(255, 255, 255, 0.94)',
+      labelBackgroundStroke: '#eef2f7',
       labelBackgroundLineWidth: 1,
       labelBackgroundRadius: 6,
-      labelPadding: [3, 7],
-      labelMaxWidth: 140,
+      labelPadding: [3, 8],
+      labelMaxWidth: 132,
       labelWordWrap: true,
       labelMaxLines: 2
     }
@@ -110,9 +125,10 @@ function toG6Data(data: KnowledgeGraphVO) {
     target: edge.target,
     data: { relation: edge.relation },
     style: {
-      stroke: '#cbd5e1',
-      lineWidth: 1.5,
-      endArrow: true
+      stroke: RELATION_COLORS[edge.relation || ''] || '#d8e0ea',
+      lineWidth: 1.3,
+      endArrow: true,
+      endArrowSize: 6
     }
   }));
 
@@ -147,8 +163,8 @@ async function renderGraph() {
         },
         edge: {
           style: {
-            stroke: '#cbd5e1',
-            lineWidth: 1.4,
+            stroke: '#d8e0ea',
+            lineWidth: 1.3,
             endArrow: true
           }
         },
@@ -289,5 +305,18 @@ onBeforeUnmount(() => {
   border: 1px solid #e8eef7;
   border-radius: 16px;
   overflow: hidden;
+}
+
+/**
+ * 嵌入模式：外层已有卡片（如学习路径面板）时不再自带边框与圆角，
+ * 否则会出现「卡中卡」的双层边框，视觉上非常笨重。
+ */
+.knowledge-graph-shell.is-borderless .knowledge-graph-g6 {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background:
+    radial-gradient(900px 320px at 50% -10%, rgba(22, 119, 255, 0.055), transparent 70%),
+    #fbfdff;
 }
 </style>

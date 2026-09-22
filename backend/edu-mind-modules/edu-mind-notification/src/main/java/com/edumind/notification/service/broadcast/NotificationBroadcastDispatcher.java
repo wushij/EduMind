@@ -80,9 +80,8 @@ public class NotificationBroadcastDispatcher {
             }
             log.info("Broadcast dispatched: tenantId={}, broadcastId={}, recipients={}", tenantId, broadcastId, entities.size());
         } finally {
-            if (tenantId != null) {
-                TenantContext.clear();
-            }
+            // 无条件清理：即使 tenantId 为空也必须清理线程上可能残留的上下文，避免线程池复用串租户
+            TenantContext.clear();
         }
     }
 }

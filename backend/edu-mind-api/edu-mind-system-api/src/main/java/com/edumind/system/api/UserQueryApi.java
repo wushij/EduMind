@@ -25,9 +25,25 @@ public interface UserQueryApi {
      */
     Map<Long, List<String>> mapRoleCodesByUserIds(Collection<Long> userIds);
 
+    /**
+     * 用户在当前租户上下文内的有效角色编码（平台级 + 当前租户）。
+     * 无租户上下文时仅返回平台级角色；切换租户后结果随之变化。
+     */
     List<String> getRolesByUserId(Long userId);
 
+    /**
+     * 用户在指定租户内的有效角色编码（平台级 + 指定租户）。
+     * 供跨租户判定场景使用（如以入参 tenantId 解析五级数据范围）。
+     */
+    List<String> getRoleCodesByUserIdAndTenant(Long userId, Long tenantId);
+
+    /** 用户在当前租户上下文内的有效权限编码 */
     List<String> getPermissionsByUserId(Long userId);
+
+    /**
+     * 查询用户加入的全部租户 ID（跨租户查询，用于权限缓存全量失效等场景）。
+     */
+    List<Long> listTenantIdsByUserId(Long userId);
 
     List<Long> listUserIdsByRoleId(Long roleId);
 

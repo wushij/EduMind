@@ -4,6 +4,7 @@ import com.edumind.ai.dao.AiCallLogDao;
 import com.edumind.ai.dao.AiModelConfigDao;
 import com.edumind.ai.entity.AiCallLogEntity;
 import com.edumind.ai.entity.AiModelConfigEntity;
+import com.edumind.ai.integration.llm.TokenEstimator;
 import com.edumind.ai.service.audit.AiCallAuditContext;
 import com.edumind.ai.service.audit.AiCallAuditService;
 import com.edumind.common.context.TenantContext;
@@ -68,7 +69,8 @@ public class AiCallAuditServiceImpl implements AiCallAuditService {
     @Override
     public void recordEstimated(String scene, String modelKey, AiCallAuditContext context, long startMs,
                                 String promptText, String completionText) {
-        record(scene, modelKey, context, startMs, estimateTokens(promptText), estimateTokens(completionText));
+        record(scene, modelKey, context, startMs,
+                TokenEstimator.estimate(promptText), TokenEstimator.estimate(completionText));
     }
 
     @Override
@@ -114,13 +116,6 @@ public class AiCallAuditServiceImpl implements AiCallAuditService {
 
     private String normalizeScene(String scene) {
         return StringUtils.hasText(scene) ? scene.trim() : "unknown";
-    }
-
-    private int estimateTokens(String text) {
-        if (!StringUtils.hasText(text)) {
-            return 0;
-        }
-        return Math.max(1, text.length() / 4);
     }
 
     private void consumeTenantQuota(Long tenantId, int promptTokens, int completionTokens) {

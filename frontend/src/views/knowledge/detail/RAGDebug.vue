@@ -11,6 +11,7 @@
           type="primary"
           :icon="VideoPlay"
           :loading="debugLoading"
+          :disabled="modelOptions.length === 0"
           class="run-pipeline-btn"
           @click="runDebugPipeline"
         >
@@ -41,11 +42,23 @@
 
           <div class="form-group">
             <label>生成模型 (LLM Model)</label>
-            <el-select v-model="selectedModel" style="width: 100%">
-              <el-option value="deepseek-chat" label="DeepSeek-V3 (推荐)" />
-              <el-option value="qwen-plus" label="通义千问 Qwen-Plus" />
-              <el-option value="gpt-4o-mini" label="GPT-4o Mini" />
+            <el-select
+              v-model="selectedModel"
+              style="width: 100%"
+              :loading="modelsLoading"
+              :disabled="modelOptions.length === 0"
+              :placeholder="modelsLoading ? '正在同步平台可用模型…' : '请选择模型'"
+            >
+              <el-option
+                v-for="model in modelOptions"
+                :key="model.value"
+                :value="model.value"
+                :label="model.isDefault ? `${model.label}（平台默认）` : model.label"
+              />
             </el-select>
+            <div v-if="!modelsLoading && modelOptions.length === 0" class="model-empty-tip">
+              当前没有可用的对话模型。请先在「系统管理 → 模型配置」中启用模型并配置 API Key。
+            </div>
           </div>
 
           <div class="form-row">
@@ -60,7 +73,7 @@
           </div>
 
           <div class="form-group">
-            <label>生成温度 (Temperature): {{ temperature }}</label>
+            <label>生成温度 (Temperature 覆盖): {{ temperature }}</label>
             <el-slider v-model="temperature" :min="0.0" :max="1.0" :step="0.1" />
           </div>
 
@@ -71,6 +84,7 @@
               type="textarea"
               :rows="4"
               class="prompt-textarea"
+              placeholder="留空则使用平台默认的 chat 系统提示词；填写后仅覆盖本次诊断的系统提示词"
             />
           </div>
         </div>
@@ -135,10 +149,15 @@
           <div class="response-section">
             <div class="sec-label">
               <span>模型生成回复内容 (LLM Output)</span>
-              <el-tag size="small" type="success">生成完成</el-tag>
+              <el-tag v-if="debugResponse.llmResponse" size="small" type="success">生成完成</el-tag>
+              <el-tag v-else size="small" type="info">未返回内容</el-tag>
             </div>
-            <div class="response-box">
-              {{ debugResponse.llmResponse }}
+            <div class="response-box" :class="{ 'is-empty': !debugResponse.llmResponse }">
+              {{ debugResponse.llmResponse || '本次诊断未返回生成内容（可能跳过了模型生成，或模型调用失败）。' }}
+            </div>
+            <div class="gen-meta">
+              <span>实际使用模型：<strong>{{ debugResponse.modelKey || '—' }}</strong></span>
+              <span>系统提示词：{{ debugResponse.systemPromptOverridden ? '自定义覆盖' : '平台默认' }}</span>
             </div>
           </div>
 
@@ -160,6 +179,7 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { useRAG } from '@/composables/knowledge/useRAG';
 import { useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
 import RAGDebugPanel from '@/components/knowledge/RAGDebugPanel.vue';
@@ -178,6 +198,9 @@ const {
   query,
   topK,
   scoreThreshold,
+  modelOptions,
+  modelsLoading,
+  loadAvailableModels,
   selectedModel,
   temperature,
   customSystemPrompt,
@@ -185,6 +208,9 @@ const {
   debugResponse,
   runDebugPipeline
 } = useRAG(kbId);
+
+// 模型列表读取平台真实配置（已启用 + 允许自选的对话模型），不再使用前端写死的型号
+onMounted(loadAvailableModels);
 </script>
 
 <style scoped lang="scss">
@@ -297,6 +323,16 @@ const {
 
             .prompt-textarea {
               font-size: 12.5px;
+            }
+
+            .model-empty-tip {
+              font-size: 11.5px;
+              line-height: 1.5;
+              color: #B45309;
+              background: #FFFBEB;
+              border: 1px solid #FDE68A;
+              border-radius: 6px;
+              padding: 6px 8px;
             }
           }
 
@@ -444,6 +480,24 @@ const {
               line-height: 1.7;
               color: #1E293B;
               white-space: pre-wrap;
+
+              &.is-empty {
+                color: #94A3B8;
+                font-size: 12.5px;
+              }
+            }
+
+            .gen-meta {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 14px;
+              font-size: 11.5px;
+              color: #64748B;
+
+              strong {
+                color: #1E293B;
+                font-weight: 600;
+              }
             }
           }
 

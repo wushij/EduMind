@@ -59,8 +59,17 @@
         <div class="notice-text">
           <div class="notice-title">多租户数据隔离安全合规声明</div>
           <div class="notice-desc">
-            切入后，系统将切换为目标学校独立环境（包括独立校区组织架构、在册师生数据、校本课程及专属 AI 配额空间）。此代管行为将记入系统全局操作审计日志。
+            切入后，系统将切换为目标学校独立环境（包括独立校区组织架构、在册师生数据、校本课程及专属 AI 配额空间）。角色与菜单权限将按目标租户重新计算，此代管行为将记入系统全局操作审计日志。
           </div>
+        </div>
+      </div>
+
+      <!-- 目标租户不可用预警（停用/冻结时禁止切入，与后端校验保持一致） -->
+      <div v-if="targetTenant && targetTenant.status !== undefined && targetTenant.status !== 1" class="blocked-notice-card">
+        <el-icon class="notice-icon"><WarningFilled /></el-icon>
+        <div class="notice-text">
+          <div class="notice-title">目标租户当前不可切入</div>
+          <div class="notice-desc">该学校租户已停用或冻结，请先在租户治理中心恢复服务状态后再执行切入。</div>
         </div>
       </div>
 
@@ -74,7 +83,14 @@
           maxlength="100"
           show-word-limit
           class="pill-input"
+          :disabled="submitting"
         />
+      </div>
+
+      <!-- 切换过程反馈：避免用户重复点击或误以为无响应 -->
+      <div v-if="submitting" class="switching-progress">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>正在切入目标租户，页面将自动重载并重新计算权限…</span>
       </div>
     </div>
 
@@ -87,10 +103,11 @@
           type="primary"
           class="pill-btn-action confirm"
           :loading="submitting"
+          :disabled="!canSubmit"
           @click="handleConfirm"
         >
-          <el-icon><Switch /></el-icon>
-          <span>确认一键切入</span>
+          <el-icon v-if="!submitting"><Switch /></el-icon>
+          <span>{{ submitting ? '切入中…' : '确认一键切入' }}</span>
         </el-button>
       </div>
     </template>
@@ -99,7 +116,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Right, Switch, WarningFilled } from '@element-plus/icons-vue';
+import { Right, Switch, WarningFilled, Loading } from '@element-plus/icons-vue';
 import { useTenantStore } from '@/stores/system/tenant';
 import type { TenantListVO } from '@/types/system/tenant';
 import { ElMessage } from 'element-plus';
@@ -115,8 +132,18 @@ const emit = defineEmits<{
 }>();
 
 const tenantStore = useTenantStore();
-const submitting = ref(false);
 const switchReason = ref('');
+/** 提交中 = 本地提交 或 Store 正在切换；两者取并集，避免重复提交 */
+const submitting = computed(() => tenantStore.switching);
+
+const canSubmit = computed(() => {
+  const target = targetTenant.value;
+  if (!target) return false;
+  // 已是当前租户、或目标租户已停用时不允许提交
+  if (tenantStore.currentTenant?.id === target.id) return false;
+  if (target.status !== undefined && target.status !== 1) return false;
+  return true;
+});
 
 const dialogVisible = computed({
   get: () => props.modelValue,
@@ -157,17 +184,14 @@ const handleCancel = () => {
 };
 
 const handleConfirm = async () => {
-  if (!targetTenant.value) return;
+  if (!targetTenant.value || !canSubmit.value) return;
   try {
-    submitting.value = true;
     await tenantStore.switchTenant(targetTenant.value.id, switchReason.value.trim() || undefined);
     emit('switched', targetTenant.value.id);
     dialogVisible.value = false;
     switchReason.value = '';
   } catch (err: any) {
     ElMessage.error(err?.message || '切入学校租户失败');
-  } finally {
-    submitting.value = false;
   }
 };
 </script>
@@ -367,6 +391,38 @@ const handleConfirm = async () => {
   }
 }
 
+// 目标租户停用时的阻断提示（与后端 status 校验保持一致）
+.blocked-notice-card {
+  display: flex;
+  gap: 12px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 14px;
+  padding: 12px 14px;
+
+  .notice-icon {
+    font-size: 20px;
+    color: #DC2626;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+
+  .notice-text {
+    .notice-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #991B1B;
+      margin-bottom: 3px;
+    }
+
+    .notice-desc {
+      font-size: 12px;
+      line-height: 1.55;
+      color: #B91C1C;
+    }
+  }
+}
+
 .reason-section {
   display: flex;
   flex-direction: column;
@@ -385,6 +441,30 @@ const handleConfirm = async () => {
       background: #F8FAFC;
     }
   }
+}
+
+// 切换过程反馈条
+.switching-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2563EB;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: 10px;
+  padding: 9px 12px;
+
+  .is-loading {
+    animation: rotating 1.4s linear infinite;
+    font-size: 15px;
+  }
+}
+
+@keyframes rotating {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .dialog-footer-actions {

@@ -289,8 +289,7 @@ function buildModuleDefinitions(): NavModule[] {
         { path: knowledgePath('embeddings'), name: '向量状态', icon: PieChart, requireKb: true },
         { path: knowledgePath('parse'), name: '文档解析', icon: SetUp, requireKb: true },
         { path: knowledgePath('retrieval'), name: '检索测试', icon: Search, requireKb: true },
-        { path: knowledgePath('rag-debug'), name: 'RAG 诊断', icon: Operation, requireKb: true },
-        { path: knowledgePath('graph'), name: '知识图谱', icon: Connection, requireKb: true }
+        { path: knowledgePath('rag-debug'), name: 'RAG 诊断', icon: Operation, requireKb: true }
       ]
     },
 
@@ -462,7 +461,6 @@ const activeMenu = computed(() => {
     if (path.includes('/embeddings')) return knowledgePath('embeddings');
     if (path.includes('/retrieval')) return knowledgePath('retrieval');
     if (path.includes('/rag-debug')) return knowledgePath('rag-debug');
-    if (path.includes('/graph')) return knowledgePath('graph');
   }
   return path;
 });

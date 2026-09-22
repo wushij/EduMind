@@ -11,6 +11,31 @@
     </PageHeroBanner>
 
     <div class="main-content-layout">
+      <!-- 当前租户上下文提示：让管理者明确「看到/操作的数据属于哪个租户」 -->
+      <div v-if="tenantStore.currentTenant" class="current-tenant-banner">
+        <div class="banner-left">
+          <el-icon class="banner-icon"><School /></el-icon>
+          <span class="banner-label">当前租户上下文</span>
+          <span class="banner-name">{{ tenantStore.currentTenant.name }}</span>
+          <el-tag size="small" type="success" effect="light">{{ tenantStore.activeCampusName }}</el-tag>
+        </div>
+        <span class="banner-hint">列表中的「切入」操作将切换全局数据与权限范围</span>
+      </div>
+
+      <!-- 列表加载失败可重试，避免只有瞬时 toast 导致用户无从恢复 -->
+      <el-alert
+        v-if="listError"
+        class="list-error-alert"
+        type="error"
+        :closable="false"
+        show-icon
+        :title="listError"
+      >
+        <template #default>
+          <el-button link type="primary" @click="loadTenants">重新加载</el-button>
+        </template>
+      </el-alert>
+
       <TenantFilterBar
         v-model:search-keyword="searchKeyword"
         :status-filter="statusFilter"
@@ -73,11 +98,14 @@ import CampusManagementDrawer from '@/components/system/tenant/CampusManagementD
 import TenantQuotaDrawer from '@/components/system/tenant/TenantQuotaDrawer.vue';
 import TenantEditDialog from '@/components/system/tenant/TenantEditDialog.vue';
 import TenantSwitchDialog from '@/components/system/tenant/TenantSwitchDialog.vue';
+import { School } from '@element-plus/icons-vue';
 import { useTenant } from '@/composables/system/useTenant';
 
 const {
   tenantStore,
   loading,
+  listError,
+  loadTenants,
   searchKeyword,
   statusFilter,
   planFilter,
@@ -114,6 +142,58 @@ const {
 
 <style scoped lang="scss">
 @use '@/styles/system-page-shell.scss';
+
+/* 当前租户上下文提示条：黑金治理风格，与页面主色一致 */
+.current-tenant-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(212, 168, 83, 0.12) 0%, rgba(212, 168, 83, 0.04) 100%);
+  border: 1px solid #f0d78c;
+
+  .banner-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .banner-icon {
+    color: #b8860b;
+    font-size: 16px;
+  }
+
+  .banner-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: #8a6d1f;
+  }
+
+  .banner-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .banner-hint {
+    font-size: 12px;
+    color: #8a6d1f;
+  }
+}
+
+.list-error-alert {
+  margin-bottom: 14px;
+  border-radius: 12px;
+}
 
 .tenant-management-page {
   padding-bottom: 40px;

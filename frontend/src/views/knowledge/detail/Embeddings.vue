@@ -10,9 +10,9 @@
           <div class="title-row">
             <h3>{{ stats.engine }} 向量引擎</h3>
             <span class="version-tag">{{ stats.engineVersion }}</span>
-            <span class="status-indicator-badge online">
+            <span class="status-indicator-badge" :class="stats.connectionStatus === 'ONLINE' ? 'online' : 'offline'">
               <span class="ping-circle"></span>
-              {{ stats.connectionStatus === 'ONLINE' ? '运行中 (ONLINE)' : '离线' }}
+              {{ stats.connectionStatus === 'ONLINE' ? '运行中 (ONLINE)' : stats.connectionStatus === 'DEGRADED' ? '降级运行 (DEGRADED)' : '离线 (OFFLINE)' }}
             </span>
           </div>
           <p class="collection-desc">
@@ -85,7 +85,7 @@
         <div class="info-content">
           <span class="info-label">向量空间维度 (Dimension)</span>
           <span class="info-val">{{ stats.dimensions }} <span class="sub">维稠密向量</span></span>
-          <span class="info-hint">采用 text-embedding-3-small / BGE 算法</span>
+          <span class="info-hint">底层 {{ stats.engine }} · {{ stats.metricType }} 距离度量</span>
         </div>
       </div>
 
@@ -96,8 +96,22 @@
         </div>
         <div class="info-content">
           <span class="info-label">平均检索耗时 (Recall Latency)</span>
-          <span class="info-val text-emerald">{{ stats.avgQueryLatencyMs }} <span class="sub">ms</span></span>
-          <span class="info-hint">Top-10 相似度计算耗时 P95 &lt; 25ms</span>
+          <span class="info-val text-emerald">
+            <template v-if="stats.avgQueryLatencyMs > 0">
+              {{ stats.avgQueryLatencyMs }} <span class="sub">ms</span>
+            </template>
+            <template v-else>
+              <span style="font-size: 18px; font-weight: 500; color: #64748B;">暂无记录</span>
+            </template>
+          </span>
+          <span class="info-hint">
+            <router-link v-if="stats.avgQueryLatencyMs === 0" :to="`/knowledge/${kbId}/retrieval`" style="color: #2563EB;">
+              前往检索测试 &gt;
+            </router-link>
+            <template v-else>
+              Top-10 相似度计算耗时 P95 &lt; 25ms
+            </template>
+          </span>
         </div>
       </div>
 
@@ -179,7 +193,7 @@
 
           <el-table-column label="操作" width="120" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" size="small" :loading="retrying" @click="handleRetryFailed">
+              <el-button link type="primary" size="small" :loading="retryingChunkId === row.id" @click="handleRetrySingleChunk(row.id)">
                 单独重试
               </el-button>
             </template>
@@ -218,15 +232,17 @@ const {
   loading,
   reindexing,
   retrying,
+  retryingChunkId,
   stats,
   failedItems,
   fetchStatus,
   startReindex,
-  handleRetryFailed
+  handleRetryFailed,
+  handleRetrySingleChunk
 } = useEmbeddingIndex(kbId);
 
 const completionPercentage = computed(() => {
-  if (!stats.value.expectedVectors || stats.value.expectedVectors <= 0) return 100;
+  if (!stats.value.expectedVectors || stats.value.expectedVectors <= 0) return 0;
   return Math.min(100, Math.round((stats.value.totalVectors / stats.value.expectedVectors) * 100));
 });
 

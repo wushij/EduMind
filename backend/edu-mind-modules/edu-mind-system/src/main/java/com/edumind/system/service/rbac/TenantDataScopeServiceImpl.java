@@ -40,7 +40,9 @@ public class TenantDataScopeServiceImpl implements TenantDataScopeApi {
         }
         Long resolvedTenantId = tenantId != null ? tenantId : TenantContext.getTenantId();
 
-        List<String> roles = userQueryApi.getRolesByUserId(userId);
+        // 必须按「该租户内」的有效角色判定：平台级角色(ADMIN/PLATFORM_ADMIN)对所有租户生效，
+        // 而 TENANT_ADMIN 等租户级角色仅在授权租户内生效，杜绝切租户后跨租户越权。
+        List<String> roles = userQueryApi.getRoleCodesByUserIdAndTenant(userId, resolvedTenantId);
         if (roles == null) {
             roles = Collections.emptyList();
         }

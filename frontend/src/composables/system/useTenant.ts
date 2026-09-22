@@ -85,6 +85,8 @@ export function useTenant() {
   const tenantStore = useTenantStore();
 
   const loading = ref(false);
+  /** 列表加载失败提示：用于展示可重试的错误态，避免只有一闪而过的 toast */
+  const listError = ref<string>('');
   const searchKeyword = ref('');
   const statusFilter = ref<number | ''>('');
   const planFilter = ref<string>('');
@@ -123,13 +125,17 @@ export function useTenant() {
   const loadTenants = async () => {
     try {
       loading.value = true;
+      listError.value = '';
       const res = await pageTenants({ page: 1, pageSize: 100 });
       if (res?.data?.list) {
         tenants.value = res.data.list;
+      } else {
+        tenants.value = [];
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : '加载租户列表失败';
-      ElMessage.error(message);
+      listError.value = message;
+      tenants.value = [];
     } finally {
       loading.value = false;
     }
@@ -272,6 +278,7 @@ export function useTenant() {
   return {
     tenantStore,
     loading,
+    listError,
     searchKeyword,
     statusFilter,
     planFilter,

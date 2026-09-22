@@ -1,12 +1,14 @@
-import { computed, ref, unref, watch, onMounted, type MaybeRef, type Ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, ref, unref, watch, onMounted, onUnmounted, type MaybeRef, type Ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { getDocuments, uploadDocument, deleteDocument, parseDocument, getDocumentDetail } from '@/api/knowledge/document';
 import { getChunks, triggerChunk } from '@/api/knowledge/chunk';
 import { getVectorStats, triggerReindex } from '@/api/knowledge/embedding';
+import { getKnowledgeBases } from '@/api/knowledge/knowledge-base';
+import type { KnowledgeBase } from '@/types/knowledge/knowledge-base';
 import { KBDocument } from '@/types/knowledge/document';
 import type { DocumentChunk } from '@/types/knowledge/chunk';
-import { parseKnowledgeBaseId } from '@/composables/knowledge/useKnowledgeRoute';
+import { parseKnowledgeBaseId, setStoredKnowledgeBaseId } from '@/composables/knowledge/useKnowledgeRoute';
 import { normalizeKBDocument } from '@/utils/knowledge/document';
 import {
   batchUploadMessage,
@@ -28,8 +30,9 @@ export function useDocumentUpload(kbIdInput: MaybeRef<number | undefined>) {
     loading.value = true;
     try {
       const res = await getDocuments(id);
-      const list = Array.isArray(res.data) ? res.data : [];
-      documents.value = list.map((item) => normalizeKBDocument(item as unknown as Record<string, unknown>));
+      documents.value = Array.isArray(res?.data)
+        ? res.data.map((item) => normalizeKBDocument(item as unknown as Record<string, unknown>))
+        : [];
     } catch {
       documents.value = [];
     } finally {
@@ -38,33 +41,30 @@ export function useDocumentUpload(kbIdInput: MaybeRef<number | undefined>) {
   }
 
   async function upload(file: File) {
-    const result = await uploadMany([file]);
-    if (result.failed > 0) {
-      throw new Error(result.failedNames[0] || '文档上传失败');
+    const id = kbId.value;
+    if (!id) throw new Error('未选择知识库');
+    uploading.value = true;
+    try {
+      const res = await uploadDocument(id, file);
+      await fetchDocuments();
+      return res;
+    } finally {
+      uploading.value = false;
     }
-    return result.lastUploaded;
   }
 
-  async function uploadMany(files: File[]): Promise<BatchUploadResult & { lastUploaded?: unknown }> {
+  async function uploadMany(files: File[]): Promise<BatchUploadResult> {
     const id = kbId.value;
-    if (!id || files.length === 0) {
-      return { ...emptyBatchUploadResult(), lastUploaded: undefined };
-    }
-
+    if (!id || files.length === 0) return emptyBatchUploadResult();
     uploading.value = true;
-    const result: BatchUploadResult & { lastUploaded?: unknown } = {
-      ...emptyBatchUploadResult(),
-      lastUploaded: undefined
-    };
-
+    const result: BatchUploadResult = { succeeded: 0, failed: 0, failedNames: [] };
     try {
       for (const file of files) {
         try {
-          const res = await uploadDocument(id, file);
-          result.succeeded += 1;
-          result.lastUploaded = res.data;
-        } catch {
-          result.failed += 1;
+          await uploadDocument(id, file);
+          result.succeeded++;
+        } catch (err) {
+          result.failed++;
           result.failedNames.push(file.name);
         }
       }
@@ -77,14 +77,14 @@ export function useDocumentUpload(kbIdInput: MaybeRef<number | undefined>) {
 
   async function remove(documentId: number) {
     const id = kbId.value;
-    if (!id) return;
+    if (!id) throw new Error('未选择知识库');
     await deleteDocument(id, documentId);
-    documents.value = documents.value.filter(d => d.id !== documentId);
+    await fetchDocuments();
   }
 
   async function triggerParse(documentId: number) {
     const id = kbId.value;
-    if (!id) return;
+    if (!id) throw new Error('未选择知识库');
     await parseDocument(id, documentId);
     await fetchDocuments();
   }
@@ -119,7 +119,7 @@ export function buildDocumentInfo(doc: KBDocument | undefined) {
   const sizeBytes = doc.fileSize;
   const sizeMb = sizeBytes ? `${(sizeBytes / 1024 / 1024).toFixed(2)} MB` : '-';
   return {
-    fileName: doc.name ?? doc.fileName,
+    fileName: doc.fileName || doc.name || '未知文件',
     fileSize: sizeMb,
     fileType: doc.fileType || 'FILE',
     status: doc.parseStatus ?? doc.chunkStatus ?? 'PENDING'
@@ -132,36 +132,75 @@ export function isPipelineStepDone(
   chunkCount: number,
   indexedChunks: number
 ): boolean {
-  if (step === 1) return docStatus === 'COMPLETED';
-  if (step === 2) return chunkCount > 0;
-  if (step === 3) return indexedChunks > 0;
+  const normStatus = (docStatus || '').toUpperCase();
+  if (step === 1) {
+    return (
+      ['COMPLETED', 'SUCCESS', 'PARSED', 'CHUNKED', 'INDEXED'].includes(normStatus) ||
+      chunkCount > 0
+    );
+  }
+  if (step === 2) {
+    return chunkCount > 0 || ['CHUNKED', 'INDEXED'].includes(normStatus);
+  }
+  if (step === 3) {
+    return indexedChunks > 0 || normStatus === 'INDEXED';
+  }
   return false;
 }
 
 export function useDocumentParse(kbId: Ref<number | undefined>) {
   const route = useRoute();
+  const router = useRouter();
+
+  const knowledgeBases = ref<KnowledgeBase[]>([]);
+  const kbLoading = ref(false);
   const documents = ref<KBDocument[]>([]);
   const selectedDocumentId = ref<number | undefined>();
   const chunks = ref<DocumentChunk[]>([]);
   const loading = ref(false);
   const pipelineRunning = ref(false);
   const indexStatus = ref<{ status?: string; indexedChunks?: number; totalChunks?: number }>({});
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
 
   const docInfo = computed(() => {
     const doc = documents.value.find((d) => d.id === selectedDocumentId.value);
     return buildDocumentInfo(doc);
   });
 
+  async function loadKnowledgeBases() {
+    kbLoading.value = true;
+    try {
+      const res = await getKnowledgeBases();
+      knowledgeBases.value = Array.isArray(res?.data) ? res.data : [];
+    } catch {
+      knowledgeBases.value = [];
+    } finally {
+      kbLoading.value = false;
+    }
+  }
+
+  function handleKbChange(newKbId: number) {
+    if (!newKbId || newKbId === kbId.value) return;
+    setStoredKnowledgeBaseId(newKbId);
+    router.push({ path: `/knowledge/${newKbId}/parse` });
+  }
+
   async function loadDocuments() {
     if (!kbId.value) return;
     try {
       const res = await getDocuments(kbId.value);
-      documents.value = Array.isArray(res?.data) ? res.data : [];
+      documents.value = Array.isArray(res?.data)
+        ? res.data.map((item) => normalizeKBDocument(item as unknown as Record<string, unknown>))
+        : [];
       const queryDocId = Number(route.query.documentId);
       if (queryDocId && documents.value.some((d) => d.id === queryDocId)) {
         selectedDocumentId.value = queryDocId;
       } else if (documents.value.length > 0) {
-        selectedDocumentId.value = documents.value[0].id;
+        if (!selectedDocumentId.value || !documents.value.some((d) => d.id === selectedDocumentId.value)) {
+          selectedDocumentId.value = documents.value[0].id;
+        }
+      } else {
+        selectedDocumentId.value = undefined;
       }
     } catch {
       ElMessage.error('加载文档列表失败');
@@ -208,15 +247,35 @@ export function useDocumentParse(kbId: Ref<number | undefined>) {
       ElMessage.warning('请先选择文档');
       return;
     }
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
     pipelineRunning.value = true;
     try {
       await parseDocument(kbId.value, selectedDocumentId.value);
       await triggerChunk(selectedDocumentId.value);
       await triggerReindex(kbId.value, 'INCREMENTAL');
       ElMessage.success('文档流水线已启动：解析 → 切片 → 向量化');
+
       await loadDocuments();
       await loadChunks();
       await loadIndexStatus();
+
+      // 异步轻量轮询追踪进度（最多轮询 6 次，每 1.2 秒一次）
+      let count = 0;
+      pollTimer = setInterval(async () => {
+        count++;
+        await loadDocuments();
+        await loadChunks();
+        await loadIndexStatus();
+        if ((chunks.value.length > 0 && (indexStatus.value.indexedChunks ?? 0) > 0) || count >= 6) {
+          if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+          }
+        }
+      }, 1200);
     } catch (err) {
       ElMessage.error(err instanceof Error ? err.message : '流水线执行失败');
     } finally {
@@ -225,17 +284,29 @@ export function useDocumentParse(kbId: Ref<number | undefined>) {
   }
 
   watch(kbId, () => {
-    loadDocuments();
-    loadIndexStatus();
+    loadDocuments().then(() => {
+      loadChunks();
+      loadIndexStatus();
+    });
   });
 
   onMounted(async () => {
+    await loadKnowledgeBases();
     await loadDocuments();
     await loadChunks();
     await loadIndexStatus();
   });
 
+  onUnmounted(() => {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  });
+
   return {
+    knowledgeBases,
+    kbLoading,
     documents,
     selectedDocumentId,
     chunks,
@@ -243,6 +314,8 @@ export function useDocumentParse(kbId: Ref<number | undefined>) {
     pipelineRunning,
     indexStatus,
     docInfo,
+    loadKnowledgeBases,
+    handleKbChange,
     loadDocuments,
     loadChunks,
     loadIndexStatus,

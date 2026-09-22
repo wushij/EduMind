@@ -42,4 +42,13 @@ public class KnowledgeIndexController {
         indexingService.reindexDocument(documentId);
         return ApiResult.success();
     }
+
+    @SaCheckPermission("knowledge:edit")
+    @PostMapping("/api/knowledge-bases/{id}/chunks/{chunkId}/reindex")
+    public ApiResult<Void> reindexChunk(@PathVariable("id") Long knowledgeBaseId,
+                                        @PathVariable("chunkId") Long chunkId) {
+        knowledgeAccessService.assertAccessible(knowledgeBaseId);
+        indexingService.reindexChunk(knowledgeBaseId, chunkId);
+        return ApiResult.success();
+    }
 }

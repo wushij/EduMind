@@ -125,7 +125,6 @@ export const COMPONENT_SUGGESTIONS = [
   { value: 'views/knowledge/detail/Chunks.vue' },
   { value: 'views/knowledge/detail/Embeddings.vue' },
   { value: 'views/knowledge/detail/RAGDebug.vue' },
-  { value: 'views/knowledge/detail/KnowledgeGraph.vue' },
   { value: 'views/question/QuestionList.vue' },
   { value: 'views/question/QuestionBankList.vue' },
   { value: 'views/question/ExamList.vue' },

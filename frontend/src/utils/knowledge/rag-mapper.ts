@@ -1,4 +1,8 @@
-import type { RetrievalResultItem, RAGDebugResponse } from '@/types/knowledge/rag';
+import type {
+  PipelineStageTiming,
+  RetrievalResultItem,
+  RAGDebugResponse
+} from '@/types/knowledge/rag';
 
 export function mapRetrievalItem(raw: Record<string, unknown>): RetrievalResultItem {
   return {
@@ -13,10 +17,28 @@ export function mapRetrievalItem(raw: Record<string, unknown>): RetrievalResultI
   };
 }
 
+function mapStageTiming(raw: Record<string, unknown>): PipelineStageTiming {
+  return {
+    stage: (raw.stage as PipelineStageTiming['stage']) ?? 'vector_search',
+    stageName: (raw.stageName as string) || '',
+    durationMs: (raw.durationMs as number) ?? 0,
+    status: (raw.status as PipelineStageTiming['status']) ?? 'SUCCESS',
+    summary: raw.summary as string | undefined
+  };
+}
+
 export function mapRagDebugResponse(raw: Record<string, unknown>): RAGDebugResponse {
   const retrievalResults = Array.isArray(raw.retrievalResults)
     ? (raw.retrievalResults as Record<string, unknown>[]).map(mapRetrievalItem)
     : [];
+
+  // 阶段耗时与 Token 均由后端埋点/估算返回，缺失时保持空值而不是伪造 0 值展示
+  const timings = Array.isArray(raw.stageTimings)
+    ? (raw.stageTimings as Record<string, unknown>[]).map(mapStageTiming)
+    : [];
+
+  const promptTokens = (raw.promptTokens as number) ?? 0;
+  const completionTokens = (raw.completionTokens as number) ?? 0;
 
   return {
     query: (raw.originalQuery as string) || '',
@@ -24,12 +46,14 @@ export function mapRagDebugResponse(raw: Record<string, unknown>): RAGDebugRespo
     retrievedChunks: retrievalResults,
     assembledPrompt: [raw.context, raw.promptPreview].filter(Boolean).join('\n\n'),
     llmResponse: (raw.answer as string) || '',
-    timings: [],
+    timings,
     tokenUsage: {
-      promptTokens: 0,
-      completionTokens: 0,
-      totalTokens: 0
+      promptTokens,
+      completionTokens,
+      totalTokens: (raw.totalTokens as number) ?? promptTokens + completionTokens
     },
-    totalLatencyMs: 0
+    totalLatencyMs: (raw.totalLatencyMs as number) ?? 0,
+    modelKey: raw.modelKey as string | undefined,
+    systemPromptOverridden: raw.systemPromptOverridden as boolean | undefined
   };
 }

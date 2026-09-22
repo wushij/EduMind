@@ -18,8 +18,9 @@ INSERT IGNORE INTO sys_user (id, username, password, real_name, email, phone, av
 (3, 'student',   '$2b$10$DLVcEXn5RunOfqlY84u9S.nnXViwwLRheQgk0KIIpKr9y1im4mIOq', '李同学',     NULL, NULL, 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', 'ENABLE'),
 (4, 'student2',  '$2b$10$DLVcEXn5RunOfqlY84u9S.nnXViwwLRheQgk0KIIpKr9y1im4mIOq', '王同学',     NULL, NULL, 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png', 'ENABLE');
 
-INSERT IGNORE INTO sys_user_role (user_id, role_id) VALUES
-(1, 1), (2, 2), (3, 3), (4, 3);
+-- V2.6.4 起按租户维度授权：ADMIN 为平台级(0)，教师/学生归属演示租户(1)
+INSERT IGNORE INTO sys_user_role (user_id, role_id, tenant_id) VALUES
+(1, 1, 0), (2, 2, 1), (3, 3, 1), (4, 3, 1);
 
 -- -----------------------------------------------------------------------------
 -- 2. 细粒度权限配置

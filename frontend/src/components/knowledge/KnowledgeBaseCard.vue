@@ -139,6 +139,7 @@ const defaultGradient = 'linear-gradient(135deg, #1677FF 0%, #722ED1 100%)';
 
 <style scoped lang="scss">
 .knowledge-base-card {
+  position: relative;
   background: #FFFFFF;
   border-radius: 18px;
   border: 1px solid #E2E8F0;
@@ -146,10 +147,19 @@ const defaultGradient = 'linear-gradient(135deg, #1677FF 0%, #722ED1 100%)';
   box-shadow: 0 4px 18px rgba(30, 80, 150, 0.04);
   display: flex;
   flex-direction: column;
-  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  // 只过渡真正会变化的属性，避免 transition: all 引入非预期插值
+  transition: border-color 0.22s ease,
+              box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 
+  /**
+   * hover 不再做整体位移。
+   *
+   * 历史实现是 translateY(-3px) 上移，并用一块透明伪元素补命中区域来抑制自激振荡；
+   * 但那套补偿只覆盖底边 3px 条带，一旦鼠标落在**卡片内部按钮**边缘（按钮自己也在上移）
+   * 仍会「进入→上移→脱离→落回」反复触发，表现为边框抖动。
+   * 这里直接去掉位移，只保留边框色与阴影的强化 —— 视觉反馈依旧，且不可能抖动。
+   */
   &:hover {
-    transform: translateY(-3px);
     border-color: #93C5FD;
     box-shadow: 0 10px 24px rgba(22, 119, 255, 0.1);
   }
@@ -455,7 +465,6 @@ const defaultGradient = 'linear-gradient(135deg, #1677FF 0%, #722ED1 100%)';
         &:hover {
           background: #4096FF;
           box-shadow: 0 4px 14px rgba(22, 119, 255, 0.35);
-          transform: translateY(-1px);
         }
 
         &:active {
