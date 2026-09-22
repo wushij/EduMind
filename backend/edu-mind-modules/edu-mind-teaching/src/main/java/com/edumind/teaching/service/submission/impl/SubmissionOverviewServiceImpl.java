@@ -236,6 +236,8 @@ public class SubmissionOverviewServiceImpl implements SubmissionOverviewService 
         UserBriefVO user = userMap.get(vo.getStudentId());
         if (user != null) {
             vo.setStudentName(user.getRealName() != null ? user.getRealName() : user.getUsername());
+            // 头像同样来自已批量预取的用户信息，无需额外查询
+            vo.setStudentAvatar(user.getAvatar());
         }
         MemberOrgBriefVO org = orgMap.get(vo.getStudentId());
         if (org != null && org.getMemberNo() != null) {

@@ -2,6 +2,7 @@ package com.edumind.ai.integration.embedding;
 
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
+import com.edumind.ai.util.BaseUrlNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -72,13 +73,7 @@ public class OpenAiCompatibleEmbeddingClient implements EmbeddingClient {
     }
 
     private String normalizeBaseUrl() {
-        String baseUrl = properties.getBaseUrl();
-        if (baseUrl.endsWith("/")) {
-            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
-        }
-        if (!baseUrl.endsWith("/v1")) {
-            baseUrl = baseUrl + "/v1";
-        }
-        return baseUrl;
+        String normalized = BaseUrlNormalizer.normalize(properties.getBaseUrl());
+        return normalized.isEmpty() ? "https://api.openai.com/v1" : normalized;
     }
 }

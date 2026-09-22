@@ -13,6 +13,8 @@ public class SubmissionListItemVO {
     private String assignmentTitle;
     private Long studentId;
     private String studentName;
+    /** 学生头像 URL（来自用户档案，可能为空：前端需回退到姓名首字） */
+    private String studentAvatar;
     private String studentNo;
     private String status;
     private Integer totalScore;

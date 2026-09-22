@@ -1,4 +1,5 @@
 import { get, post, del } from '@/core/http/request';
+import type { HttpRequestConfig } from '@/core/http/types';
 import {
   Assignment,
   AssignmentPaper,
@@ -36,7 +37,14 @@ export const remindAssignment = (id: number) =>
 
 export const deleteAssignment = (id: number) => del<void>(`/assignments/${id}`);
 
-export const submitAssignment = (id: number, answers: Array<{ questionId: number; answer: string }>) =>
-  post<number>(`/assignments/${id}/submit`, { answers });
+/**
+ * 提交答卷（交卷后会触发服务端 AI 评阅：客观题即时判分 + 主观题逐题串行调用大模型）。
+ * 支持传入 config 放宽超时 / 挂 AbortSignal，否则会撞上 30 秒默认超时。
+ */
+export const submitAssignment = (
+  id: number,
+  answers: Array<{ questionId: number; answer: string }>,
+  config?: HttpRequestConfig
+) => post<number>(`/assignments/${id}/submit`, { answers }, config);
 
 export const getAssignmentSubmissions = (id: number) => get<unknown[]>(`/assignments/${id}/submissions`);

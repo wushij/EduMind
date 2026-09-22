@@ -38,6 +38,78 @@ public class AuthServiceImpl implements AuthService {
             RoleCode.STUDENT.getCode(),
             RoleCode.TEACHER.getCode());
 
+    /** 登录认证平台配置：其中的 mockScanEnabled / mockScanAccount 控制"演示扫码登录" */
+    private static final String LOGIN_CONFIG_KEY = "sys.login.config";
+
+    @Override
+    public LoginVO demoScanLogin() {
+        boolean enabled = true;
+        String account = "admin";
+        try {
+            String configJson = redisService.get(com.edumind.infrastructure.redis.RedisKeyBuilder.sysConfig(LOGIN_CONFIG_KEY));
+            if (StringUtils.hasText(configJson)) {
+                com.alibaba.fastjson2.JSONObject config = com.alibaba.fastjson2.JSON.parseObject(configJson);
+                if (config != null) {
+                    Boolean switchValue = config.getBoolean("mockScanEnabled");
+                    enabled = switchValue == null || switchValue;
+                    String configuredAccount = config.getString("mockScanAccount");
+                    if (StringUtils.hasText(configuredAccount)) {
+                        account = configuredAccount.trim();
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("读取登录认证配置失败，演示扫码登录按缺省策略处理: {}", ex.getMessage());
+        }
+
+        if (!enabled) {
+            throw new BusinessException("演示扫码登录已关闭，请使用账号密码登录");
+        }
+
+        UserEntity user = userDao.findByUsername(account);
+        if (user == null && "admin".equalsIgnoreCase(account)) {
+            user = userDao.findById(1L);
+        }
+        if (user == null) {
+            throw new BusinessException("演示账号「" + account + "」不存在，请在「系统管理 → 系统配置 → 登录认证」中调整 mockScanAccount");
+        }
+
+        log.warn("[演示扫码登录] 以免密方式为账号 {} 签发登录态；生产环境请将 {}.mockScanEnabled 设为 false",
+                user.getUsername(), LOGIN_CONFIG_KEY);
+        return issueLogin(user);
+    }
+
+    /** 统一签发登录态（账号密码 / 邮箱验证码 / 演示扫码共用），避免各处重复实现遗漏租户初始化 */
+    private LoginVO issueLogin(UserEntity user) {
+        if (user == null) {
+            throw new BusinessException("账号不存在");
+        }
+        if ("DISABLE".equalsIgnoreCase(user.getStatus())) {
+            throw new BusinessException("该账号已被停用，请联系管理员");
+        }
+        permissionCacheService.evictUser(user.getId());
+        StpUtil.login(user.getId());
+        try {
+            cn.dev33.satoken.session.SaSession session = StpUtil.getSession();
+            if (session != null) {
+                session.set("username", user.getUsername());
+                session.set("realName", user.getRealName());
+                session.set("avatar", user.getAvatar());
+            }
+        } catch (Exception ignored) {
+        }
+        Long tenantId = sysTenantService.initializeLoginTenantSession(user.getId());
+        if (tenantId == null) {
+            StpUtil.logout(user.getId());
+            throw new BusinessException("未加入任何学校");
+        }
+        return LoginVO.builder()
+                .token(StpUtil.getTokenValue())
+                .userInfo(userVoAssembler.toVO(user))
+                .tenantId(tenantId)
+                .build();
+    }
+
     private final UserDao userDao;
     private final RoleDao roleDao;
     private final UserRoleDao userRoleDao;

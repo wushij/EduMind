@@ -23,4 +23,14 @@ public class SecurityKeyQueryApiImpl implements SecurityKeyQueryApi {
     public String resolveDataKey16(Long tenantId, String keyAlias, int keyVersion) {
         return securityKeyQueryService.resolveDataKey16(tenantId, keyAlias, keyVersion);
     }
+
+    @Override
+    public String resolveLegacyDataKey16(Long tenantId, String keyAlias, int keyVersion) {
+        return securityKeyQueryService.resolveLegacyDataKey16(tenantId, keyAlias, keyVersion);
+    }
+
+    @Override
+    public java.util.List<String> resolveDataKeyCandidates(Long tenantId, String keyAlias, int keyVersion) {
+        return securityKeyQueryService.resolveDataKeyCandidates(tenantId, keyAlias, keyVersion);
+    }
 }

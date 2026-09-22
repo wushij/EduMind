@@ -32,7 +32,14 @@ edumind:
     demo-auto-bind-enabled: true
   security:
     sm-enabled: false
-    master-secret: EduMind_Memory_Key_Seed_2026
+    # 国密主密钥：代码已移除内置默认值，缺失会启动失败(Fail-Fast)。
+    # 生产必须通过环境变量 EDUMIND_SECURITY_MASTER_SECRET 注入随机密钥；此处默认值仅供本地开发/演示。
+    master-secret: ${EDUMIND_SECURITY_MASTER_SECRET:EduMind_Memory_Key_Seed_2026}
+    # true=检测到演示主密钥时拒绝启动（生产建议开启）
+    reject-demo-master-secret: false
+    kdf-migration:
+      # 存量密文 KDF 加固迁移（幂等：新 KDF 能解开的跳过；可关闭）
+      enabled: true
     default-key-alias: edumind-data-key
     model-key-alias: edumind-model-key
   ai:

@@ -1,4 +1,5 @@
 import { get, post } from '@/core/http/request';
+import { AI_REQUEST_TIMEOUT } from '@/config';
 import type { HttpRequestConfig } from '@/core/http/types';
 import type {
   WrongBookDetailVO,
@@ -32,7 +33,10 @@ export function getWrongBookDetail(id: number) {
  * 支持传入 AbortSignal 以便用户在推演面板上「中止」时真正取消本次模型请求。
  */
 export function diagnoseWrongBookItem(id: number, config?: HttpRequestConfig) {
-  return post<WrongQuestionRecordItem>(`/learning/wrong-book/${id}/diagnose`, undefined, config);
+  return post<WrongQuestionRecordItem>(`/learning/wrong-book/${id}/diagnose`, undefined, {
+    timeout: AI_REQUEST_TIMEOUT,
+    ...config
+  });
 }
 
 /**
@@ -48,7 +52,7 @@ export function generateWrongBookVariants(
   return post<WrongBookVariantSummary[]>(
     `/learning/wrong-book/${id}/variants`,
     undefined,
-    { params: { regenerate }, ...config }
+    { timeout: AI_REQUEST_TIMEOUT, params: { regenerate }, ...config }
   );
 }
 

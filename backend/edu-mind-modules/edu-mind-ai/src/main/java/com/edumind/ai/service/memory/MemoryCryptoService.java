@@ -14,6 +14,7 @@ import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.List;
 
 /**
  * 长期记忆敏感数据国密 SM4 加解密服务 (集成 KMS 密钥版本追踪与 Fail-Closed 隐私安全设计)
@@ -85,18 +86,24 @@ public class MemoryCryptoService {
         }
         int effectiveVersion = (keyVersion != null && keyVersion > 0) ? keyVersion : 1;
         try {
-            String key16;
-            if (securityKeyQueryApi != null) {
-                key16 = securityKeyQueryApi.resolveDataKey16(tenantId, defaultKeyAlias, effectiveVersion);
-            } else {
-                key16 = resolveTenantKey16(tenantId);
-            }
-            return sm4Service.decryptFromBase64(key16, cipherText.trim());
+            // 先试 KDF 加固后的新密钥，失败再回退加固前的旧密钥（保证历史密文仍可解密）
+            return sm4Service.decryptTryingKeys(resolveKeyCandidates(tenantId, effectiveVersion), cipherText.trim());
         } catch (Exception ex) {
             log.warn("[长期记忆SM4解密失败 (Fail-Closed)] 租户 ID: {}, 密钥版本: v{}, 拒绝暴露未认证敏感数据",
                     tenantId, effectiveVersion);
             return null;
         }
+    }
+
+    /**
+     * 解密候选密钥列表：新 KDF 密钥在前、旧 KDF 密钥在后。
+     * 旧 KDF 分支只用于兼容加固前写入的存量密文，不参与任何加密。
+     */
+    private List<String> resolveKeyCandidates(Long tenantId, int keyVersion) {
+        if (securityKeyQueryApi != null) {
+            return securityKeyQueryApi.resolveDataKeyCandidates(tenantId, defaultKeyAlias, keyVersion);
+        }
+        return List.of(resolveTenantKey16(tenantId));
     }
 
     /**
@@ -134,7 +141,8 @@ public class MemoryCryptoService {
             }
             return sb.toString();
         } catch (Exception ex) {
-            return "EduMindMemKey16!";
+            // Fail-Fast：不再回退到硬编码密钥
+            throw new IllegalStateException("离线派生长期记忆SM4密钥失败: " + ex.getMessage(), ex);
         }
     }
 }

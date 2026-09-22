@@ -55,13 +55,13 @@
               :key="stage.key"
               class="pipeline-item"
               :class="{
-                'is-done': currentStageIndex > idx || isFinished,
+                'is-done': isFinished,
                 'is-running': currentStageIndex === idx && !isFinished,
-                'is-pending': currentStageIndex < idx && !isFinished
+                'is-pending': currentStageIndex !== idx && !isFinished
               }"
             >
               <div class="stage-icon-wrap">
-                <el-icon v-if="currentStageIndex > idx || isFinished" class="icon-done"><Check /></el-icon>
+                <el-icon v-if="isFinished" class="icon-done"><Check /></el-icon>
                 <span v-else-if="currentStageIndex === idx && !isFinished" class="stage-spinner"></span>
                 <span v-else class="stage-dot"></span>
               </div>
@@ -72,10 +72,13 @@
             </div>
           </div>
 
-          <!-- 底部总进度长条 -->
+          <!-- 底部总进度长条：服务端为一次性返回的评阅调用，前端拿不到真实百分比，
+               用不确定进度条 + 秒级计时，避免展示伪造的 80% 这类进度 -->
           <div class="progress-section">
             <el-progress
-              :percentage="progressPercentage"
+              :percentage="isFinished ? 100 : 0"
+              :indeterminate="!isFinished"
+              :duration="2"
               :stroke-width="6"
               :show-text="false"
               class="modal-progress-bar"
@@ -129,7 +132,10 @@ const formattedTimer = computed(() => {
   return seconds;
 });
 
-// 四阶段评阅流水线
+// 四阶段评阅流水线（用于说明评阅流程）。
+// 注意：服务端四步是在同一次请求内串行完成的，前端无法获知每一步的真实完成时刻，
+// 因此这里只做「当前进行中」的动效提示，完成标记（打勾）一律等评阅真正返回后统一点亮，
+// 不再按固定秒数伪造逐步完成。
 const stages = [
   { key: 'verify', title: '试卷有效性核验', detail: '作答数据完整性加密校验' },
   { key: 'objective', title: '客观试题即时判分', detail: '单选、多选、判断与填空题核对' },
@@ -137,13 +143,9 @@ const stages = [
   { key: 'portrait', title: '学情画像与错题沉淀', detail: '更新知识点掌握图谱与强化推荐' }
 ];
 
+/** 当前「进行中」阶段的提示下标：仅驱动动效，不代表该阶段已完成 */
 const currentStageIndex = ref(0);
 let stageHandle: ReturnType<typeof setTimeout> | null = null;
-
-const progressPercentage = computed(() => {
-  if (isFinished.value) return 100;
-  return Math.min(95, Math.round(((currentStageIndex.value + 1) / (stages.length + 0.5)) * 100));
-});
 
 function startAnimation() {
   elapsedTenths.value = 0;
@@ -155,18 +157,16 @@ function startAnimation() {
     elapsedTenths.value++;
   }, 100);
 
-  simulateStages();
+  hintStageProgress();
 }
 
-function simulateStages() {
+function hintStageProgress() {
   if (stageHandle) clearTimeout(stageHandle);
-  // 阶段 0 -> 1: 0.6s
+  // 仅在「等待期间」把高亮提示往后挪，让用户知道流程走到哪一步（不点亮完成标记）
   stageHandle = setTimeout(() => {
     if (currentStageIndex.value < 1) currentStageIndex.value = 1;
-    // 阶段 1 -> 2: 1.2s
     stageHandle = setTimeout(() => {
       if (currentStageIndex.value < 2) currentStageIndex.value = 2;
-      // 阶段 2 -> 3: 2.2s (大模型推理阶段)
       stageHandle = setTimeout(() => {
         if (currentStageIndex.value < 3) currentStageIndex.value = 3;
       }, 2200);

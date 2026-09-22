@@ -79,28 +79,7 @@
             </div>
 
             <div class="toolbar-right-actions">
-              <!-- 大模型选择器下拉框 -->
-              <el-dropdown trigger="click" @command="handleModelSelect">
-                <button type="button" class="toolbar-pill-btn model-selector-btn">
-                  <span class="model-name">{{ currentModel }}</span>
-                  <el-icon class="arrow"><ArrowDown /></el-icon>
-                </button>
-                <template #dropdown>
-                  <el-dropdown-menu class="model-dropdown-menu">
-                    <el-dropdown-item
-                      v-for="m in modelOptions"
-                      :key="m.key"
-                      :command="m.key"
-                      :class="{ 'is-selected': currentModelKey === m.key }"
-                    >
-                      <div class="model-item-row">
-                        <span class="item-name">{{ m.name }}</span>
-                        <span class="item-badge">{{ m.desc }}</span>
-                      </div>
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              <!-- 不再提供模型自选入口：统一使用后台「AI 模型配置」中标为默认(is_default)的对话模型 -->
 
               <!-- 开启新对话 -->
               <button
@@ -301,10 +280,6 @@ const {
   modeTabs,
   currentModeTab,
   switchModeTab,
-  modelOptions,
-  currentModel,
-  currentModelKey,
-  handleModelSelect,
   historyDrawerVisible,
   handleCreateNewSession,
   chatInputRef,

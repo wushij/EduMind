@@ -30,6 +30,8 @@ export interface SubmissionItem {
   assignmentTitle?: string;
   studentId: number;
   studentName?: string;
+  /** 学生头像 URL；为空时前端回退显示姓名首字 */
+  studentAvatar?: string;
   studentNo?: string;
   courseId?: number;
   courseName?: string;

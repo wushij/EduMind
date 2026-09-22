@@ -85,7 +85,7 @@
                     @change="() => onRoleSelectChange(row)"
                   >
                     <el-option
-                      v-for="role in roleOptions"
+                      v-for="role in normalizedRoleOptions"
                       :key="role.id"
                       :label="`${role.name}（${role.code}）`"
                       :value="role.id"
@@ -148,6 +148,7 @@
 <script setup lang="ts">
 import { Coin, Plus, InfoFilled } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
+import { computed, onMounted } from 'vue';
 import type { AiConfig, RoleOption } from '@/types/system/config';
 
 const props = withDefaults(
@@ -161,9 +162,36 @@ const props = withDefaults(
   }
 );
 
+/**
+ * 统一归一化为数字。
+ * 历史数据里 roleId 存在两种形态："5"/"1"（字符串，来自 JSON 里被写成了带引号的数字）
+ * 与 3/2（数字）。el-select 用全等比较，字符串 "5" 匹配不到 :value="5" 的选项，
+ * Element Plus 就会把原始值 "5" 直接回显在输入框里 —— 这正是下拉框显示 1/2/3/4/5 的原因。
+ */
+function toRoleId(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
+}
+
+/** 角色选项的 value 也统一用数字，保证与归一化后的 roleId 全等匹配 */
+const normalizedRoleOptions = computed(() =>
+  props.roleOptions
+    .map((role) => ({ ...role, id: toRoleId(role.id) }))
+    .filter((role): role is RoleOption => role.id !== undefined)
+);
+
+// 进入页面时把已保存的脏数据就地归一化，避免下拉框回显数字
+onMounted(() => {
+  props.draft.roleTokenQuotas?.forEach((quota) => {
+    quota.roleId = toRoleId(quota.roleId);
+  });
+});
+
 function onRoleSelectChange(row: any) {
-  const match = props.roleOptions.find((r) => r.id === row.roleId);
+  const match = normalizedRoleOptions.value.find((r) => r.id === toRoleId(row.roleId));
   if (match) {
+    row.roleId = match.id;
     row.roleCode = match.code;
   }
 }
@@ -173,10 +201,11 @@ function onTokensChange(row: any) {
 }
 
 /** 已被其它行选用的角色置灰（当前行已选值除外），避免重复配置同一角色 */
-function isRoleUsed(roleId: number, currentRoleId?: number): boolean {
-  if (roleId === currentRoleId) return false;
+function isRoleUsed(roleId: number, currentRoleId?: unknown): boolean {
+  const current = toRoleId(currentRoleId);
+  if (roleId === current) return false;
   if (!props.draft.roleTokenQuotas) return false;
-  return props.draft.roleTokenQuotas.some((q) => q.roleId === roleId);
+  return props.draft.roleTokenQuotas.some((q) => toRoleId(q.roleId) === roleId);
 }
 
 function addRow() {

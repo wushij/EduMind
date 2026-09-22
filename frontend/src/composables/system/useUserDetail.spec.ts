@@ -38,7 +38,7 @@ describe('useUserDetail helpers', () => {
     expect(getRoleLabel('ROLE_ADMIN')).toBe('系统管理员');
     expect(getRoleLabel('UNKNOWN')).toBe('UNKNOWN');
     expect(getRoleDescription('ROLE_TEACHER')).toContain('教学大纲');
-    expect(getRoleDescription('CUSTOM')).toBe('系统常规授权');
+    expect(getRoleDescription('CUSTOM')).toBe('拥有对应领域标准业务操作与资源访问权限。');
   });
 
   it('parses oper log summary from operParam', () => {

@@ -73,7 +73,7 @@ public class AiApiKeyCipherService {
 
     /**
      * 按指定 KMS 密钥版本解密，支持 3 层容错：
-     * 1. 优先使用 KMS 指定版本密钥材料解密
+     * 1. 优先使用 KMS 指定版本密钥材料解密（内部依次尝试新 KDF 与加固前旧 KDF 密钥）
      * 2. 失败时降级使用遗留 modelKeySecret 派生旧密钥解密
      * 3. 仍失败或以 sk-/Bearer 开头时，直接返回明文容错
      */
@@ -88,13 +88,14 @@ public class AiApiKeyCipherService {
         }
 
         // 第1层：优先使用 KMS 指定版本或 active 版本解密
+        // 候选密钥中：新 KDF 密钥在前、加固前旧 KDF 密钥在后，两者都试完才降级到第2层
         int ver = (keyVersion != null && keyVersion > 0)
                 ? keyVersion
                 : (securityKeyQueryApi != null ? securityKeyQueryApi.getActiveKeyVersion(1L, modelKeyAlias) : 1);
         if (securityKeyQueryApi != null) {
             try {
-                String kmsKey16 = securityKeyQueryApi.resolveDataKey16(1L, modelKeyAlias, ver);
-                return sm4Service.decryptFromBase64(kmsKey16, trimmed);
+                return sm4Service.decryptTryingKeys(
+                        securityKeyQueryApi.resolveDataKeyCandidates(1L, modelKeyAlias, ver), trimmed);
             } catch (Exception ex) {
                 log.debug("[AI Key KMS] Versioned decrypt with v{} failed, trying fallback: {}", ver, ex.getMessage());
             }
@@ -129,7 +130,8 @@ public class AiApiKeyCipherService {
             }
             return sb.toString();
         } catch (Exception ex) {
-            return "EduMindAIKey16!!";
+            // Fail-Fast：不再回退到硬编码密钥
+            throw new IllegalStateException("离线派生 AI API Key 遗留密钥失败: " + ex.getMessage(), ex);
         }
     }
 }

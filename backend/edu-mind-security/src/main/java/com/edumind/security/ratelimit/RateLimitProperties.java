@@ -27,6 +27,8 @@ public class RateLimitProperties {
     private static List<Rule> defaultRules() {
         List<Rule> rules = new ArrayList<>();
         rules.add(rule("POST", "/api/auth/login", "ip", 10));
+        // 演示扫码登录是免密入口，同样按 IP 限流，防止被刷
+        rules.add(rule("POST", "/api/auth/demo-scan-login", "ip", 10));
         rules.add(rule("POST", "/api/auth/register", "ip", 5));
         rules.add(rule("GET", "/api/auth/captcha", "ip", 30));
         rules.add(rule("POST", "/api/ai/chat/stream", "user", 20));

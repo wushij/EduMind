@@ -23,6 +23,8 @@ public class Sm4GcmService {
 
     private static final int TAG_BIT_LENGTH = 128; // 认证标签长度 128 位 (16 字节)
     public static final int DEFAULT_IV_LENGTH = 12; // GCM 模式推荐 96 位 (12 字节) IV
+    /** SM4 密钥长度固定为 16 字节 (128 bit) */
+    private static final int SM4_KEY_LENGTH = 16;
 
     static {
         if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
@@ -80,10 +82,31 @@ public class Sm4GcmService {
     }
 
     /**
+     * 密钥字符串 -> 16 字节密钥材料。
+     *
+     * <p>使用 ISO-8859-1（Latin-1）而不是 UTF-8：Latin-1 下每个字符恰好编码为 1 字节，
+     * 因此密钥字符串可以承载完整的 0x00~0xFF 字节范围（128 bit 熵）。
+     * 历史密钥仅由 'a'~'p' 组成（ASCII &lt; 0x80），两种编码结果完全一致，
+     * 所以本次调整不会影响任何已加密的存量密文。</p>
+     */
+    private static byte[] resolveKeyBytes(String secretKey16) {
+        if (secretKey16 == null) {
+            throw new IllegalArgumentException("SM4 密钥不能为空");
+        }
+        byte[] keyBytes = secretKey16.getBytes(StandardCharsets.ISO_8859_1);
+        // Fail-Fast：长度不足会被 BC 静默补零/截断，必须显式拒绝
+        if (keyBytes.length != SM4_KEY_LENGTH) {
+            throw new IllegalArgumentException(
+                    "SM4 密钥必须为 " + SM4_KEY_LENGTH + " 字节，当前为 " + keyBytes.length + " 字节");
+        }
+        return keyBytes;
+    }
+
+    /**
      * 字符串加密（返回 Base64 编码，格式：Base64(IV + CipherWithTag)）
      */
     public String encryptToBase64(String secretKey16, String plainText) throws Exception {
-        byte[] keyBytes = secretKey16.getBytes(StandardCharsets.UTF_8);
+        byte[] keyBytes = resolveKeyBytes(secretKey16);
         byte[] iv = generateIv();
         byte[] plainBytes = plainText.getBytes(StandardCharsets.UTF_8);
         byte[] cipherWithTag = encrypt(keyBytes, iv, plainBytes, null);
@@ -112,7 +135,7 @@ public class Sm4GcmService {
         byte[] cipherWithTag = new byte[cipherLen];
         System.arraycopy(combined, DEFAULT_IV_LENGTH, cipherWithTag, 0, cipherLen);
 
-        byte[] keyBytes = secretKey16.getBytes(StandardCharsets.UTF_8);
+        byte[] keyBytes = resolveKeyBytes(secretKey16);
         byte[] plainBytes = decrypt(keyBytes, iv, cipherWithTag, null);
 
         return new String(plainBytes, StandardCharsets.UTF_8);

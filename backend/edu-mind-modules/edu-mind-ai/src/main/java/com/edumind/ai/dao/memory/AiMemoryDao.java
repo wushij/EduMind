@@ -87,6 +87,22 @@ public class AiMemoryDao {
         return itemMapper.selectById(id);
     }
 
+    /**
+     * 扫描存在 SM4 密文的记忆条目（按 id 升序分页）。
+     * 用于 KDF 加固迁移：分页读取，避免一次性把全表加载进内存。
+     *
+     * @param lastId 上一批的最大 id（游标），null 表示从头开始
+     * @param limit  单批数量
+     */
+    public List<AiMemoryItemEntity> listItemsWithCiphertextAfterId(Long lastId, int limit) {
+        return itemMapper.selectList(new LambdaQueryWrapper<AiMemoryItemEntity>()
+                .gt(AiMemoryItemEntity::getId, lastId == null ? 0L : lastId)
+                .isNotNull(AiMemoryItemEntity::getContentCiphertext)
+                .ne(AiMemoryItemEntity::getContentCiphertext, "")
+                .orderByAsc(AiMemoryItemEntity::getId)
+                .last("LIMIT " + Math.max(1, limit)));
+    }
+
     public int insertItem(AiMemoryItemEntity entity) {
         return itemMapper.insert(entity);
     }

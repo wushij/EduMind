@@ -3,6 +3,7 @@ import { ElMessage } from 'element-plus';
 import { getMyAssignments, getAssignmentPaper, submitAssignment } from '@/api/question/assignment';
 import { getSubmissionDetail } from '@/api/question/submission';
 import type { AssignmentPaper, StudentAssignment } from '@/types/question/assignment';
+import type { HttpRequestConfig } from '@/core/http/types';
 
 export function useStudentAssignments() {
   const loading = ref(false);
@@ -39,8 +40,12 @@ export function useStudentAssignments() {
     }
   }
 
-  async function submitPaper(assignmentId: number, answers: Array<{ questionId: number; answer: string }>) {
-    const res = await submitAssignment(assignmentId, answers);
+  async function submitPaper(
+    assignmentId: number,
+    answers: Array<{ questionId: number; answer: string }>,
+    config?: HttpRequestConfig
+  ) {
+    const res = await submitAssignment(assignmentId, answers, config);
     return res.data;
   }
 

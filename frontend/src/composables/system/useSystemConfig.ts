@@ -26,6 +26,7 @@ import type {
   UserOption,
 } from '@/types/system/config';
 import type { StorageConfigDTO } from '@/types/system';
+import { applyAssistantEnabled } from '@/composables/system/useAssistantVisibility';
 
 export const GROUP_CODES: readonly ConfigGroupCode[] = [
   'site',
@@ -432,11 +433,15 @@ export function useSystemConfig() {
         if (aiCfg?.tokensPerUserDaily) {
           try {
             localStorage.setItem('edumind_sys_ai_tokens_per_user_daily', String(aiCfg.tokensPerUserDaily));
-            window.dispatchEvent(new CustomEvent('edumind:ai-config-changed', { detail: aiCfg }));
           } catch {
             // ignore
           }
         }
+        // 助手开关需即时生效（隐藏/显示悬浮 AI 助手），不能只写 localStorage 等下次刷新
+        if (typeof aiCfg?.assistantEnabled === 'boolean') {
+          applyAssistantEnabled(aiCfg.assistantEnabled);
+        }
+        window.dispatchEvent(new CustomEvent('edumind:ai-config-changed', { detail: aiCfg }));
       }
       checkDirty();
       ElMessage.success('配置已保存并即时生效');
@@ -465,11 +470,15 @@ export function useSystemConfig() {
           if (aiCfg?.tokensPerUserDaily) {
             try {
               localStorage.setItem('edumind_sys_ai_tokens_per_user_daily', String(aiCfg.tokensPerUserDaily));
-              window.dispatchEvent(new CustomEvent('edumind:ai-config-changed', { detail: aiCfg }));
             } catch {
               // ignore
             }
           }
+          // 助手开关需即时生效（隐藏/显示悬浮 AI 助手），不能只写 localStorage 等下次刷新
+          if (typeof aiCfg?.assistantEnabled === 'boolean') {
+            applyAssistantEnabled(aiCfg.assistantEnabled);
+          }
+          window.dispatchEvent(new CustomEvent('edumind:ai-config-changed', { detail: aiCfg }));
         }
       }
       checkDirty();

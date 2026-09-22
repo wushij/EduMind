@@ -1,5 +1,9 @@
 <template>
-  <div class="global-assistant-root">
+  <!--
+    AI 助手总开关（系统配置 → AI → AI 助手）关闭时，
+    悬浮入口与抽屉整体不渲染，与「关闭后悬浮 AI 助手小窗将不再显示」的说明一致。
+  -->
+  <div v-if="assistantEnabled" class="global-assistant-root">
     <GlobalAssistantTrigger
       :active="drawerVisible"
       :is-streaming="isStreaming"
@@ -33,6 +37,7 @@ import GlobalAssistantMessageList from '@/components/ai/global-assistant/GlobalA
 import GlobalAssistantScrollFab from '@/components/ai/global-assistant/GlobalAssistantScrollFab.vue';
 import GlobalAssistantComposer from '@/components/ai/global-assistant/GlobalAssistantComposer.vue';
 import { useGlobalAssistant } from '@/composables/ai/useGlobalAssistant';
+import { useAssistantVisibility } from '@/composables/system/useAssistantVisibility';
 import { renderChatMarkdown } from '@/utils/ai/chat-markdown';
 import { useAuthStore } from '@/stores/auth/auth';
 import { DEFAULT_AVATAR } from '@/constants/auth';
@@ -42,6 +47,8 @@ import {
   globalAssistantUiKey,
   type GlobalAssistantUiContext
 } from '@/components/ai/global-assistant/global-assistant-ui-key';
+
+const { assistantEnabled } = useAssistantVisibility();
 
 const authStore = useAuthStore();
 const userAvatarBroken = ref(false);
@@ -113,10 +120,6 @@ const {
   handleViewportScroll,
   getIntentTagType,
   formatMatchScore,
-  modelOptions,
-  currentModel,
-  currentModelKey,
-  handleModelSelect,
   streamTimerText
 } = ga;
 
@@ -210,10 +213,6 @@ const uiContext: GlobalAssistantUiContext = {
   formatMatchScore,
   renderChatMarkdown,
   resolveReasoningFolded,
-  modelOptions,
-  currentModel,
-  currentModelKey,
-  handleModelSelect,
   streamTimerText
 };
 

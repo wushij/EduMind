@@ -1,6 +1,7 @@
 package com.edumind.ai.integration.llm;
 
 import com.alibaba.fastjson2.JSONObject;
+import com.edumind.ai.util.BaseUrlNormalizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -80,8 +81,7 @@ public class AiModelConnectivityTester {
 
     private String resolveBaseUrl(String provider, String baseUrl) {
         if (StringUtils.hasText(baseUrl)) {
-            String trimmed = baseUrl.trim();
-            return trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
+            return BaseUrlNormalizer.normalize(baseUrl);
         }
         return switch (provider) {
             case "deepseek" -> "https://api.deepseek.com/v1";

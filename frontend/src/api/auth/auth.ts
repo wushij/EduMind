@@ -29,6 +29,12 @@ export const verifySliderCaptcha = (payload: SliderVerifyPayload) =>
 
 export const login = (params: LoginParams) => post<LoginResult>('/auth/login', params);
 
+/**
+ * 演示扫码登录（登录页「模拟扫码授权通过(Demo)」）。
+ * 免密，账号由后端 sys.login.config.mockScanAccount 指定；不再像旧实现那样在前端硬编码账号密码。
+ */
+export const demoScanLogin = () => post<LoginResult>('/auth/demo-scan-login', undefined, { silent: true });
+
 export const emailLogin = (data: { email: string; code: string }) =>
   post<LoginResult>('/auth/email-login', data);
 

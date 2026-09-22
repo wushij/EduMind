@@ -14,6 +14,13 @@ public interface AuthService {
 
     LoginVO login(LoginDTO loginDTO);
 
+    /**
+     * 演示扫码登录（登录页「模拟扫码授权通过(Demo)」专用）。
+     * 免密，但账号由 sys.login.config 的 mockScanAccount 指定、并由 mockScanEnabled 控制开关，
+     * 避免像旧实现那样在前端硬编码账号密码（密码一改按钮就失效）。
+     */
+    LoginVO demoScanLogin();
+
     LoginVO emailLogin(EmailLoginDTO emailLoginDTO);
 
     void sendEmailCode(EmailSendCodeDTO sendCodeDTO);

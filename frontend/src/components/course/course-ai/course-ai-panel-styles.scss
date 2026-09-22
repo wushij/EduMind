@@ -679,6 +679,8 @@
               font-size: 9.5px;
               font-weight: 700;
               flex-shrink: 0;
+              // 兜底：扩展名再长也不允许溢出徽标去压住右侧标题
+              overflow: hidden;
 
               &--pdf { background: #FEE2E2; color: #DC2626; }
               &--zip { background: #F3E8FF; color: #7C3AED; }

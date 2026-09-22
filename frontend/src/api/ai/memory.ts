@@ -1,4 +1,5 @@
 import { get, post, put, del } from '@/core/http/request';
+import { AI_REQUEST_TIMEOUT } from '@/config';
 import type { ApiResponse } from '@/types/common/api';
 import type {
   MemoryNamespaceVO,
@@ -52,7 +53,12 @@ export function seedSampleMemories(courseId?: number): Promise<ApiResponse<numbe
 }
 
 export function extractMemories(courseId?: number, signal?: AbortSignal): Promise<ApiResponse<MemoryItemVO[]>> {
-  return post<MemoryItemVO[]>('/ai/memories/extract', null, { params: { courseId }, signal });
+  // 大模型抽取长期记忆耗时较长，需放宽超时
+  return post<MemoryItemVO[]>('/ai/memories/extract', null, {
+    timeout: AI_REQUEST_TIMEOUT,
+    params: { courseId },
+    signal
+  });
 }
 
 export function decryptMemoryItem(id: number): Promise<ApiResponse<MemoryDecryptVO>> {

@@ -34,10 +34,10 @@ public class SubmissionStatsQueryServiceImpl implements SubmissionStatsQueryServ
         for (AssignmentEntity assignment : assignments) {
             List<SubmissionEntity> subs = submissionDao.listByAssignmentId(assignment.getId());
             for (SubmissionEntity sub : subs) {
-                if ("SUBMITTED".equals(sub.getStatus()) || "GRADED".equals(sub.getStatus())) {
+                if (isSubmitted(sub.getStatus())) {
                     submitted++;
                 }
-                if ("GRADED".equals(sub.getStatus()) && sub.getTotalScore() != null && sub.getMaxScore() != null
+                if (isGraded(sub.getStatus()) && sub.getTotalScore() != null && sub.getMaxScore() != null
                         && sub.getMaxScore() > 0) {
                     graded++;
                     scoreSum += sub.getTotalScore() * 100.0 / sub.getMaxScore();
@@ -51,6 +51,19 @@ public class SubmissionStatsQueryServiceImpl implements SubmissionStatsQueryServ
         stats.setAvgSubmissionRate(expected > 0 ? submitted * 100.0 / expected : 0);
         stats.setAvgScore(scoreCount > 0 ? scoreSum / scoreCount : 0);
         return stats;
+    }
+
+    /**
+     * 已提交：SUBMITTED（待批改）/ GRADED（AI 已评）/ REVIEWED（教师已终审）。
+     * 教师终审后的答卷不应从"已提交"里消失——早期漏算 REVIEWED，导致课程统计偏低。
+     */
+    private static boolean isSubmitted(String status) {
+        return "SUBMITTED".equals(status) || "GRADED".equals(status) || "REVIEWED".equals(status);
+    }
+
+    /** 已批改：AI 已评待确认 / 教师已终审；终审成绩是最权威成绩，理应计入平均分 */
+    private static boolean isGraded(String status) {
+        return "GRADED".equals(status) || "REVIEWED".equals(status);
     }
 
     @Override

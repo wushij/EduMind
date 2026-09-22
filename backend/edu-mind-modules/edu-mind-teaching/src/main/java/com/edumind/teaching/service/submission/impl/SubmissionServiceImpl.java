@@ -146,6 +146,7 @@ public class SubmissionServiceImpl implements SubmissionService {
         UserBriefVO user = userQueryApi.getUserById(vo.getStudentId());
         if (user != null) {
             vo.setStudentName(user.getRealName() != null ? user.getRealName() : user.getUsername());
+            vo.setStudentAvatar(user.getAvatar());
         }
         MemberOrgBriefVO org = organizationQueryApi.getPrimaryClassByUserId(DEFAULT_TENANT_ID, vo.getStudentId());
         if (org != null && org.getMemberNo() != null) {

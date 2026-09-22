@@ -14,9 +14,7 @@ import type { Chapter } from '@/types/course/chapter';
 import { getCourseList } from '@/api/course/course';
 import { getChapters } from '@/api/course/chapter';
 import { getCourseResources } from '@/api/course/resource';
-import { resolveChatModels } from '@/services/ai/chat-service';
 import { useAIStream } from '@/composables/ai/useAIStream';
-import { usePreferenceStore } from '@/stores/user/preference';
 import {
   getCourseAiPersonaPromptPrefix,
   normalizeCourseAiPersona
@@ -276,43 +274,8 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     }
   }
 
-  const modelOptions = ref<Array<{ name: string; key: string; desc: string }>>([]);
-  const currentModel = ref('默认模型');
-  const currentModelKey = ref<string | undefined>(undefined);
-
-  async function loadModels() {
-    try {
-      const chatModels = await resolveChatModels();
-      modelOptions.value = chatModels
-        .filter((m) => m.modelKey !== 'mock' && (m.provider || '').toLowerCase() !== 'mock')
-        .map((m) => ({
-          name: m.name,
-          key: m.modelKey,
-          desc: m.provider || 'LLM'
-        }));
-      const prefStore = usePreferenceStore();
-      const userPreferredKey = prefStore.preferences.defaultModel;
-      const preferredModel = userPreferredKey
-        ? chatModels.find((m) => m.modelKey === userPreferredKey)
-        : undefined;
-      const defaultModel = preferredModel || chatModels.find((m) => m.isDefault) || chatModels[0];
-      if (defaultModel) {
-        currentModel.value = defaultModel.name;
-        currentModelKey.value = defaultModel.modelKey;
-      }
-    } catch {
-      modelOptions.value = [];
-    }
-  }
-
-  function handleModelSelect(modelKey: string) {
-    const found = modelOptions.value.find((m) => m.key === modelKey);
-    if (found) {
-      currentModel.value = found.name;
-      currentModelKey.value = found.key;
-      ElMessage.success(`已切换推理引擎为：${found.name}`);
-    }
-  }
+  // 模型选择已移除：统一由后端按「场景路由 → 平台默认模型(is_default)」决定，
+  // 与后台「AI 模型配置」里标了默认的对话模型保持一致，前端不再提供自选入口。
 
   const historyDrawerVisible = ref(false);
   const chatInputRef = ref<{ focus?: () => void } | null>(null);
@@ -424,7 +387,7 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     sendMessage(finalPrompt, courseId, {
       chapterId: activeChapterId.value,
       lessonChapterId: Number.isFinite(lessonChapterId) ? lessonChapterId : undefined,
-      modelKey: currentModelKey.value,
+      // 不传 modelKey：由后端按「场景路由 → 平台默认对话模型(is_default)」自动选择
       useRag: Boolean(course.value?.knowledgeBaseId)
     });
   }
@@ -437,8 +400,7 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     const courseId = resolveCourseId();
     if (!courseId) return;
     regenerateStreamMessage(idx, courseId, {
-      chapterId: activeChapterId.value,
-      modelKey: currentModelKey.value
+      chapterId: activeChapterId.value
     });
   }
 
@@ -458,12 +420,18 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
       const res = await getCourseResources(cid);
       const list = Array.isArray(res?.data) ? res.data : [];
       realResources.value = list.map((item) => {
-        const ext = (item.title?.split('.').pop() || item.resourceType || 'DOC').toUpperCase();
+        // 无扩展名时 lastIndexOf('.') 为 -1，不能用 split('.').pop()——那会把整个标题当成扩展名，
+        // 于是 30px 的徽标里渲染出完整文件名并溢出，与右侧标题文字重叠（微课节 MD 资源即为此例）
+        const rawTitle = (item.title || '').trim();
+        const dotIndex = rawTitle.lastIndexOf('.');
+        const extFromTitle = dotIndex > 0 ? rawTitle.slice(dotIndex + 1).toUpperCase() : '';
+        const ext = (extFromTitle || item.resourceType || 'DOC').toUpperCase();
         let cat = '课件';
         if (['MP4', 'AVI', 'MKV', 'WEBM', 'VIDEO'].includes(ext)) cat = '视频';
         else if (['ZIP', 'RAR', '7Z', 'CODE', 'TAR'].includes(ext)) cat = '项目';
         else if (['EXAM', 'QUIZ'].includes(item.resourceType || '') || ext === 'DOCX') cat = '习题';
-        else if (['PDF', 'DOC', 'TXT', 'MD'].includes(ext)) cat = '文档';
+        // 注意：MD 是微课节课件正文，保持归入「课件」，不要挪到「文档」
+        else if (['PDF', 'DOC', 'TXT'].includes(ext)) cat = '文档';
 
         return {
           title: item.title,
@@ -515,7 +483,6 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
   }
 
   onMounted(() => {
-    loadModels();
     loadTenantCourses();
     nextTick(() => {
       const appContent = document.querySelector('.app-content');
@@ -553,10 +520,6 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     modeTabs,
     currentModeTab,
     switchModeTab,
-    modelOptions,
-    currentModel,
-    currentModelKey,
-    handleModelSelect,
     historyDrawerVisible,
     chatInputRef,
     sessions,

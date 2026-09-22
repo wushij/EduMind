@@ -3,6 +3,7 @@ package com.edumind.ai.integration.llm;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
+import com.edumind.ai.util.BaseUrlNormalizer;
 import com.edumind.ai.util.ReasoningEffortNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -315,17 +316,8 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     }
 
     private String normalizeBaseUrl() {
-        String baseUrl = properties.getBaseUrl();
-        if (!StringUtils.hasText(baseUrl)) {
-            baseUrl = "https://api.deepseek.com";
-        }
-        if (baseUrl.endsWith("/")) {
-            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
-        }
-        if (!baseUrl.endsWith("/v1")) {
-            baseUrl = baseUrl + "/v1";
-        }
-        return baseUrl;
+        String normalized = BaseUrlNormalizer.normalize(properties.getBaseUrl());
+        return normalized.isEmpty() ? "https://api.deepseek.com/v1" : normalized;
     }
 
     private String extractContent(JSONObject response) {

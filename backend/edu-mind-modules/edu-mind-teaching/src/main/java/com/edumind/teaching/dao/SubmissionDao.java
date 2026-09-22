@@ -16,6 +16,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SubmissionDao {
 
+    /** 提交流程状态：SUBMITTED=待批改 / GRADED=AI 已评待确认 / REVIEWED=教师已终审 */
+    private static final String STATUS_SUBMITTED = "SUBMITTED";
+    private static final String STATUS_GRADED = "GRADED";
+    private static final String STATUS_REVIEWED = "REVIEWED";
+
     private final SubmissionMapper submissionMapper;
 
     public SubmissionEntity findById(Long id) {
@@ -58,6 +63,14 @@ public class SubmissionDao {
         );
     }
 
+    /**
+     * 已提交答卷数（累计口径）。
+     *
+     * <p>REVIEWED（教师已终审）同样属于"已提交"——与
+     * {@code AssignmentServiceImpl#remindUnsubmitted} 的已提交定义保持一致。
+     * 早期只统计 SUBMITTED/GRADED，导致答卷被教师终审后，
+     * 作业列表卡片的提交进度会回落为 0（详情页仍显示正确的已提交人数），两处数据自相矛盾。</p>
+     */
     public long countByAssignmentId(Long assignmentId) {
         if (assignmentId == null) {
             return 0L;
@@ -65,10 +78,11 @@ public class SubmissionDao {
         return submissionMapper.selectCount(
                 new LambdaQueryWrapper<SubmissionEntity>()
                         .eq(SubmissionEntity::getAssignmentId, assignmentId)
-                        .in(SubmissionEntity::getStatus, "SUBMITTED", "GRADED")
+                        .in(SubmissionEntity::getStatus, STATUS_SUBMITTED, STATUS_GRADED, STATUS_REVIEWED)
         );
     }
 
+    /** 待批改答卷数：仅 SUBMITTED 需要 AI 初次批改 */
     public long countPendingGradingByAssignmentId(Long assignmentId) {
         if (assignmentId == null) {
             return 0L;
@@ -76,10 +90,11 @@ public class SubmissionDao {
         return submissionMapper.selectCount(
                 new LambdaQueryWrapper<SubmissionEntity>()
                         .eq(SubmissionEntity::getAssignmentId, assignmentId)
-                        .eq(SubmissionEntity::getStatus, "SUBMITTED")
+                        .eq(SubmissionEntity::getStatus, STATUS_SUBMITTED)
         );
     }
 
+    /** 已批改答卷数（含 AI 已评待确认与教师已终审），供"AI 已批改"统计使用 */
     public long countGradedByAssignmentId(Long assignmentId) {
         if (assignmentId == null) {
             return 0L;
@@ -87,7 +102,7 @@ public class SubmissionDao {
         return submissionMapper.selectCount(
                 new LambdaQueryWrapper<SubmissionEntity>()
                         .eq(SubmissionEntity::getAssignmentId, assignmentId)
-                        .eq(SubmissionEntity::getStatus, "GRADED")
+                        .in(SubmissionEntity::getStatus, STATUS_GRADED, STATUS_REVIEWED)
         );
     }
 

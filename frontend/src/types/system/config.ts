@@ -157,7 +157,12 @@ export interface SecurityPlatformConfig {
 
 /** AI 角色差异化每日 Token 配额 */
 export interface RoleTokenQuota {
-  roleId?: number;
+  /**
+   * 角色 ID。
+   * 兼容 string：历史配置 JSON 里存在 "5"、"1" 这类带引号的数字，
+   * 读取时会归一化为 number 后再参与 el-select 匹配。
+   */
+  roleId?: number | string;
   roleCode?: string;
   tokensDaily?: number;
   maxTokensDaily?: number;

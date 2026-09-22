@@ -77,7 +77,10 @@
           <el-table-column label="学生姓名" prop="studentName" width="130">
             <template #default="{ row }">
               <div class="student-name-cell">
-                <span class="avatar-dot"></span>
+                <!-- 有头像显示头像；无头像 / 加载失败时自动回退到姓名首字 -->
+                <el-avatar :size="26" :src="row.studentAvatar" class="student-avatar">
+                  {{ (row.studentName || '学').slice(0, 1) }}
+                </el-avatar>
                 <span class="font-medium text-slate-800">{{ row.studentName || '—' }}</span>
               </div>
             </template>

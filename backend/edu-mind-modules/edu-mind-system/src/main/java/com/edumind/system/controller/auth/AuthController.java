@@ -28,6 +28,12 @@ public class AuthController {
         return ApiResult.success(authService.login(loginDTO));
     }
 
+    /** 演示扫码登录：登录页「模拟扫码授权通过(Demo)」，免密但受 sys.login.config 开关与账号配置约束 */
+    @PostMapping("/demo-scan-login")
+    public ApiResult<LoginVO> demoScanLogin() {
+        return ApiResult.success(authService.demoScanLogin());
+    }
+
     @PostMapping("/email-login")
     public ApiResult<LoginVO> emailLogin(@Valid @RequestBody com.edumind.system.dto.auth.EmailLoginDTO emailLoginDTO) {
         return ApiResult.success(authService.emailLogin(emailLoginDTO));

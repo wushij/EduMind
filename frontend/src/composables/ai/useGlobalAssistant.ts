@@ -35,8 +35,6 @@ import type {
 import { useTeachingCopilotStore, OPEN_GLOBAL_ASSISTANT_EVENT } from '@/stores/ai/teaching-copilot-context';
 import { buildTeachingContextRequestPayload } from '@/types/ai/teaching-copilot-context';
 import { useAuthStore } from '@/stores/auth/auth';
-import { resolveChatModels } from '@/services/ai/chat-service';
-import { usePreferenceStore } from '@/stores/user/preference';
 import {
   getDefaultReasoningFolded,
   isThinkingPanelHidden
@@ -501,44 +499,8 @@ export function useGlobalAssistant() {
     return DEFAULT_PRESET_CHIPS;
   });
 
-  // 大模型选择与引擎配置 (对标课程中心同款规范，接入真实后端模型)
-  const modelOptions = ref<Array<{ name: string; key: string; desc: string }>>([]);
-  const currentModel = ref('默认推理模型');
-  const currentModelKey = ref<string | undefined>(undefined);
-
-  async function loadModels() {
-    try {
-      const chatModels = await resolveChatModels();
-      modelOptions.value = chatModels
-        .filter((m) => m.modelKey !== 'mock' && (m.provider || '').toLowerCase() !== 'mock')
-        .map((m) => ({
-          name: m.name,
-          key: m.modelKey,
-          desc: m.provider || 'LLM'
-        }));
-      const prefStore = usePreferenceStore();
-      const userPreferredKey = prefStore.preferences.defaultModel;
-      const preferredModel = userPreferredKey
-        ? chatModels.find((m) => m.modelKey === userPreferredKey)
-        : undefined;
-      const defaultModel = preferredModel || chatModels.find((m) => m.isDefault) || chatModels[0];
-      if (defaultModel) {
-        currentModel.value = defaultModel.name;
-        currentModelKey.value = defaultModel.modelKey;
-      }
-    } catch {
-      modelOptions.value = [];
-    }
-  }
-
-  function handleModelSelect(modelKey: string) {
-    const found = modelOptions.value.find((m) => m.key === modelKey);
-    if (found) {
-      currentModel.value = found.name;
-      currentModelKey.value = found.key;
-      ElMessage.success(`已切换推理引擎为：${found.name}`);
-    }
-  }
+  // 模型选择已移除：统一由后端按「场景路由 → 平台默认模型(is_default)」决定，
+  // 与后台「AI 模型配置」里标了默认的对话模型保持一致，前端不再提供自选入口。
 
   // 侧边栏 AI 无需秒表计时器展示，保持轻量高效
   const streamTimerText = ref('');
@@ -570,7 +532,7 @@ export function useGlobalAssistant() {
     return {
       courseId: activeCourseId.value,
       conversationId: conversationId.value,
-      modelKey: currentModelKey.value,
+      // 不传 modelKey：由后端按「场景路由 → 平台默认对话模型(is_default)」自动选择
       promptPrefix: buildDynamicPromptPrefix(),
       ...ctxPayload
     };
@@ -1191,7 +1153,6 @@ export function useGlobalAssistant() {
   }
 
   onMounted(() => {
-    void loadModels();
     window.addEventListener(OPEN_GLOBAL_ASSISTANT_EVENT, handleOpenAssistantEvent);
   });
 
@@ -1217,11 +1178,7 @@ export function useGlobalAssistant() {
     isLessonStudioContext,
     followUpPrompts,
     showThinkingPanel: computed(() => !isThinkingPanelHidden()),
-    // 大模型选择与秒表计时状态 (对标课程中心高保真设计)
-    modelOptions,
-    currentModel,
-    currentModelKey,
-    handleModelSelect,
+    // 秒表计时状态
     streamTimerText,
     // 历史会话管理 (对标 Code Compass 原型)
     isHistoryPanelOpen,

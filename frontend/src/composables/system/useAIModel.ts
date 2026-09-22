@@ -12,6 +12,7 @@ import {
   testModelDraft as testModelDraftRaw,
   getProviderPresets as getProviderPresetsRaw
 } from '@/api/system/model';
+import { normalizeModelBaseUrl } from '@/utils/system/base-url';
 import {
   isValidProviderPresets,
   mapTestModelResponse,
@@ -311,6 +312,15 @@ export function useAIModel() {
     activeTab.value = tab;
   }
 
+  /** 保存 / 测试前统一修正 Base URL：完整端点会被二次拼接导致 404，这里回写并提示用户 */
+  function applyNormalizedBaseUrl(): void {
+    const normalized = normalizeModelBaseUrl(form.baseUrl);
+    if (normalized !== form.baseUrl.trim()) {
+      form.baseUrl = normalized;
+      ElMessage.info(`已自动修正接口地址为 ${normalized}（只需填到版本号，如 /v1）`);
+    }
+  }
+
   async function handleSave() {
     if (!form.name.trim()) {
       ElMessage.warning('请输入模型配置标识');
@@ -328,6 +338,8 @@ export function useAIModel() {
       ElMessage.warning('请设置有效的向量维度 (128–4096)');
       return;
     }
+
+    applyNormalizedBaseUrl();
 
     const proceed = await confirmDimensionChangeIfNeeded(form.dimension, form.isDefault);
     if (!proceed) return;
@@ -418,6 +430,8 @@ export function useAIModel() {
       ElMessage.warning('请先填写 API Key');
       return;
     }
+
+    applyNormalizedBaseUrl();
 
     dialogTesting.value = true;
     dialogTestResult.value = null;

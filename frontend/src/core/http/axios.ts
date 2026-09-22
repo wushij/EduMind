@@ -93,6 +93,17 @@ function handleUnauthorized(message = '登录状态已失效，请重新登录')
   }, 500);
 }
 
+/**
+ * AI / 长耗时路径判定：仅用于超时提示文案，
+ * 避免把普通接口超时统一误报成「大模型推演耗时较长，请减少生成题量」。
+ */
+function isAiHeavyRequest(url?: string): boolean {
+  const target = url || '';
+  return ['/ai/', '/grade', '/diagnose', '/variants', '/submit', '/compose'].some((key) =>
+    target.includes(key)
+  );
+}
+
 // 响应拦截器
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => {
@@ -139,7 +150,10 @@ axiosInstance.interceptors.response.use(
         : '') || error.message || '网络通信异常';
 
     if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-      apiMessage = '请求响应超时（大模型深度推演耗时较长），请稍后重试或适当减少一次生成的题量';
+      // 普通接口超时不要甩锅给大模型：只有 AI / 长耗时路径才用推演口径提示
+      apiMessage = isAiHeavyRequest(error.config?.url)
+        ? 'AI 深度推演耗时较长，本次请求已超时，请稍后重试'
+        : '请求超时：服务端响应较慢，请稍后重试';
     }
 
     if (!silent) {

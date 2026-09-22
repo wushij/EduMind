@@ -1,4 +1,5 @@
 import { get, post, put, del } from '@/core/http/request';
+import { AI_REQUEST_TIMEOUT } from '@/config';
 import { ExamPaper } from '@/types/question/exam';
 import { PageResult } from '@/types/common/api';
 
@@ -15,4 +16,5 @@ export const updateExam = (id: number, exam: Partial<ExamPaper>) => put<void>(`/
 
 export const deleteExam = (id: number) => del<void>(`/exams/${id}`);
 
-export const generateExam = (params: any) => post<any>('/ai/exams/generate', params);
+export const generateExam = (params: any) =>
+  post<any>('/ai/exams/generate', params, { timeout: AI_REQUEST_TIMEOUT });

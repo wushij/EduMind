@@ -47,7 +47,10 @@
       <el-table-column label="学生姓名" prop="studentName" width="150">
         <template #default="{ row }">
           <div class="student-cell">
-            <span class="avatar-chip">{{ (row.studentName || '学').slice(0, 1) }}</span>
+            <!-- 有头像则显示头像；无头像 / 加载失败时 el-avatar 自动回退到插槽里的姓名首字 -->
+            <el-avatar :size="26" :src="row.studentAvatar" class="student-avatar">
+              {{ (row.studentName || '学').slice(0, 1) }}
+            </el-avatar>
             <span class="student-name">{{ row.studentName }}</span>
           </div>
         </template>
@@ -260,19 +263,13 @@ watch(
       align-items: center;
       gap: 9px;
 
-      .avatar-chip {
-        width: 26px;
-        height: 26px;
-        border-radius: 50%;
+      .student-avatar {
+        flex-shrink: 0;
         background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
         border: 1px solid #bfdbfe;
         color: #2563eb;
         font-size: 12px;
         font-weight: 700;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
       }
 
       .student-name {

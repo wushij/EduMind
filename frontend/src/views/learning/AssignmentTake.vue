@@ -376,6 +376,8 @@ import {
 import MathText from '@/components/common/MathText.vue';
 import AssignmentAIGradingModal from '@/components/learning/AssignmentAIGradingModal.vue';
 import { useStudentAssignments } from '@/composables/learning/useStudentAssignments';
+import { AI_REQUEST_TIMEOUT } from '@/config';
+import { resolveApiErrorMessage } from '@/core/http/api-error-message';
 
 const route = useRoute();
 const router = useRouter();
@@ -739,7 +741,8 @@ function handleAbortGrading() {
   submitting.value = false;
   aiGradingModalVisible.value = false;
   aiGradingFinished.value = false;
-  ElMessage.warning('已中止当前智能评阅，作答进度已自动保存在草稿中');
+  // 如实说明：中止只停止前端等待，服务端评阅线程不会被打断（可在成绩页查看最终结果）
+  ElMessage.warning('已停止等待。答卷已提交，服务端评阅可能仍在进行，可稍后在成绩页查看结果');
 }
 
 // 提交答卷
@@ -762,7 +765,13 @@ async function handleSubmit() {
   submitAbortController = new AbortController();
 
   try {
-    await submitPaper(assignmentId, buildPayload());
+    await submitPaper(assignmentId, buildPayload(), {
+      // 交卷后服务端逐题串行调用大模型评阅，30 秒默认超时必然失败，这里放宽到 3 分钟
+      timeout: AI_REQUEST_TIMEOUT,
+      signal: submitAbortController.signal,
+      // 失败提示由本页统一给出，避免拦截器再弹一条重复 toast
+      silent: true
+    });
     aiGradingFinished.value = true;
     clearDraftFromStorage();
     ElMessage.success('智能评阅与学情诊断完成！');
@@ -776,7 +785,7 @@ async function handleSubmit() {
       return;
     }
     aiGradingModalVisible.value = false;
-    ElMessage.error(err instanceof Error ? err.message : '提交评阅失败，请稍后重试');
+    ElMessage.error(resolveApiErrorMessage(err, '提交评阅失败，请稍后重试'));
   } finally {
     submitting.value = false;
   }

@@ -4,7 +4,14 @@ import { ElMessage } from 'element-plus';
 import { useAuthStore } from '@/stores/auth/auth';
 import { USE_MOCK } from '@/config/mock';
 import { MOCK_USERS } from '@/mock/users';
-import { getCaptcha, getCaptchaPolicy, login as loginApi, emailLogin as emailLoginApi } from '@/api/auth/auth';
+import {
+  getCaptcha,
+  getCaptchaPolicy,
+  login as loginApi,
+  emailLogin as emailLoginApi,
+  demoScanLogin
+} from '@/api/auth/auth';
+import { resolveApiErrorMessage } from '@/core/http/api-error-message';
 import { toCaptchaDataUrl } from '@/utils/captcha';
 import { storage } from '@/core/storage/local';
 import { TENANT_ID_KEY } from '@/stores/system/tenant';
@@ -199,17 +206,17 @@ export function useLogin() {
     }
   };
 
+  /**
+   * 演示扫码登录：调用后端的免密演示接口（账号由 sys.login.config.mockScanAccount 指定）。
+   * 旧实现在这里硬编码 username/password 调密码登录接口，密码一改或用错账号就会同时弹出
+   * 「用户名或密码错误」和「扫码登录失败」两条提示 —— 与"扫码"本身毫无关系。
+   */
   const handleMockQrLogin = async () => {
     if (loading.value) return;
     loading.value = true;
 
     try {
-      const res = await loginApi({
-        username: 'admin',
-        password: 'admin123',
-        captcha: '',
-        captchaId: ''
-      });
+      const res = await demoScanLogin();
 
       if (res?.data?.token) {
         authStore.setToken(res.data.token);
@@ -234,15 +241,16 @@ export function useLogin() {
         return;
       }
 
-      throw new Error('登录失败');
-    } catch {
+      throw new Error('演示扫码登录未返回登录态');
+    } catch (err: unknown) {
       if (USE_MOCK) {
         authStore.switchMockRole('ADMIN');
         ElMessage.success('扫码授权成功，正在载入管理控制台...');
         await router.push('/dashboard');
         return;
       }
-      ElMessage.error('扫码登录失败，请使用账号密码登录');
+      // 展示后端真实原因（如"演示账号不存在""演示扫码登录已关闭"），不再误导为扫码失败
+      ElMessage.error(resolveApiErrorMessage(err, '演示扫码登录失败，请使用账号密码登录'));
     } finally {
       loading.value = false;
     }

@@ -47,12 +47,14 @@
     align-items: center;
     gap: 8px;
 
-    .avatar-dot {
-      width: 8px;
-      height: 8px;
-      background: #1677ff;
-      border-radius: 50%;
+    // 学生头像：无头像时由 el-avatar 回退显示姓名首字
+    .student-avatar {
       flex-shrink: 0;
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      border: 1px solid #bfdbfe;
+      color: #2563eb;
+      font-size: 12px;
+      font-weight: 700;
     }
   }
 

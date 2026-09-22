@@ -68,7 +68,7 @@
         <el-input
           v-model="form.baseUrl"
           class="pill-input"
-          placeholder="https://api.openai.com/v1（留空使用服务商默认端点）"
+          placeholder="https://api.deepseek.com/v1（只填到 /v1）"
         />
       </el-form-item>
 
