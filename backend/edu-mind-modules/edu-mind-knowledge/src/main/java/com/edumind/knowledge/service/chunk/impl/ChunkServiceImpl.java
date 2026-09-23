@@ -48,6 +48,12 @@ public class ChunkServiceImpl implements ChunkService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ChunkTaskVO triggerChunk(Long documentId) {
+        return triggerChunk(documentId, true);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ChunkTaskVO triggerChunk(Long documentId, boolean reindex) {
         KnowledgeDocumentEntity document = knowledgeDocumentDao.findById(documentId);
         if (document == null) {
             throw new BusinessException("文档不存在");
@@ -85,10 +91,12 @@ public class ChunkServiceImpl implements ChunkService {
             document.setErrorMessage(null);
             knowledgeDocumentDao.updateById(document);
             refreshChunkCount(document.getKnowledgeBaseId());
-            try {
-                indexingService.reindexDocument(documentId);
-            } catch (Exception ex) {
-                log.warn("Reindex after chunk failed documentId={}: {}", documentId, ex.getMessage());
+            if (reindex) {
+                try {
+                    indexingService.reindexDocument(documentId);
+                } catch (Exception ex) {
+                    log.warn("Reindex after chunk failed documentId={}: {}", documentId, ex.getMessage());
+                }
             }
 
             ChunkTaskVO vo = new ChunkTaskVO();

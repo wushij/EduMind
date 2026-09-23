@@ -372,13 +372,12 @@ public class ChatServiceImpl implements ChatService {
     private void removeLastAssistantMessage(ConversationEntity conversation) {
         MessageEntity lastAssistant = messageDao.findLastByConversationIdAndRole(
                 conversation.getId(), "assistant");
-        if (lastAssistant == null) {
-            throw new BusinessException("没有可重新生成的回复");
+        if (lastAssistant != null) {
+            messageDao.deleteById(lastAssistant.getId());
+            int count = conversation.getMessageCount() != null ? conversation.getMessageCount() : 0;
+            conversation.setMessageCount(Math.max(0, count - 1));
+            conversationDao.updateById(conversation);
         }
-        messageDao.deleteById(lastAssistant.getId());
-        int count = conversation.getMessageCount() != null ? conversation.getMessageCount() : 0;
-        conversation.setMessageCount(Math.max(0, count - 1));
-        conversationDao.updateById(conversation);
     }
 
     private void updateConversationStats(ConversationEntity conversation, boolean regenerateTurn) {

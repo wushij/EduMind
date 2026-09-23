@@ -102,6 +102,10 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({
+  name: 'CourseAIPage'
+});
+
 import { useRouter } from 'vue-router';
 import {
   Loading,

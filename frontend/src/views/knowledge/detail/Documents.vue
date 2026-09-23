@@ -62,6 +62,7 @@ import DocumentTable from '@/components/knowledge/DocumentTable.vue';
 import { useDocumentUpload } from '@/composables/knowledge/useDocumentUpload';
 import { batchUploadMessage } from '@/utils/upload/coalesce-upload-files';
 import { useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
+import { resolveApiErrorMessage } from '@/core/http/api-error-message';
 
 const router = useRouter();
 const route = useRoute();
@@ -140,8 +141,13 @@ async function handleDelete(id: number) {
     );
     await remove(id);
     ElMessage.success('文档已删除');
-  } catch {
-    // 用户取消
+  } catch (err) {
+    // ElMessageBox 取消时 reject 的是 'cancel' / 'close' 字符串，必须与真正的失败区分开：
+    // 之前这里把两者都吞掉，导致接口 500/403 时用户看不到任何提示，只觉得"点了没反应"
+    if (err === 'cancel' || err === 'close') {
+      return;
+    }
+    ElMessage.error(resolveApiErrorMessage(err, '删除文档失败，请稍后重试'));
   }
 }
 

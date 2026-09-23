@@ -27,4 +27,9 @@ public class EmbeddingApiImpl implements EmbeddingApi {
     public int getDimensions() {
         return embeddingClient.getDimensions();
     }
+
+    @Override
+    public boolean isMockVector() {
+        return embeddingClient.isMock();
+    }
 }

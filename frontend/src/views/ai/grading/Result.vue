@@ -80,8 +80,8 @@
             <el-option
               v-for="sub in assignmentSubmissions"
               :key="sub.id"
-              :label="`${sub.studentName || '学生答卷'} (#${sub.id})`"
-              :value="sub.id"
+              :label="`${sub.studentName || '学生答卷'} (${sub.studentNo || ('#' + sub.id)})`"
+              :value="Number(sub.id)"
               class="paper-card-option"
             >
               <div class="paper-card-inner">
@@ -100,7 +100,7 @@
                 </div>
 
                 <div class="paper-action-col">
-                  <span class="page-pill-badge" :class="{ 'is-active': selectedSubmissionId === sub.id }">
+                  <span class="page-pill-badge" :class="{ 'is-active': Number(selectedSubmissionId) === Number(sub.id) }">
                     {{ sub.totalScore != null ? `${sub.totalScore}分` : '待评分' }}
                   </span>
                 </div>
@@ -109,7 +109,7 @@
           </el-select>
 
           <span class="current-student-pill">
-            当前展示：<strong>{{ currentSubmission?.studentName || `答卷 #${selectedSubmissionId || '-'}` }}</strong>
+            当前展示：<strong>{{ currentSubmission?.studentName ? `${currentSubmission.studentName} (${currentSubmission.studentNo || ('#' + currentSubmission.id)})` : (selectedSubmissionId ? `答卷 #${selectedSubmissionId}` : '-') }}</strong>
             <span v-if="currentSubmission?.totalScore != null" class="score-chip">
               总分 {{ currentSubmission.totalScore }} / {{ analyticsData.maxScore }}
             </span>
@@ -257,7 +257,10 @@
               class="kp-stat-item"
             >
               <div class="kp-info-line">
-                <span class="kp-name">试题 #{{ q.questionId }}：{{ q.stem }}</span>
+                <span class="kp-name">
+                  <strong class="kp-qid">试题 #{{ q.questionId }}：</strong>
+                  <MathText :text="q.stem" />
+                </span>
                 <span class="error-rate text-red-600">失分率 {{ q.errorRate }}%</span>
               </div>
               <el-progress :percentage="q.errorRate" color="#ef4444" :show-text="false" />
@@ -265,7 +268,7 @@
                 <span>班级均分：{{ q.averageScore }} / {{ q.maxScore }}分</span>
                 <span>失分人数：{{ q.wrongCount }} 人</span>
               </div>
-              <p class="kp-ai-advice">{{ q.aiComment }}</p>
+              <MathText v-if="q.aiComment" tag="p" class="kp-ai-advice" :text="q.aiComment" />
             </div>
           </div>
           <div v-else class="empty-hint-box">
@@ -331,7 +334,9 @@
               <div class="case-top">
                 <div class="q-title-row">
                   <span class="q-badge">第 {{ idx + 1 }} 题</span>
-                  <span class="q-title">{{ item.stem || `试题 #${item.questionId}` }}</span>
+                  <div class="q-title">
+                    <MathText :text="item.stem || `试题 #${item.questionId}`" />
+                  </div>
                 </div>
                 <el-tag size="small" :type="item.isCorrect ? 'success' : 'danger'">
                   {{ item.isCorrect ? '客观正确' : '主观研判/失分' }}
@@ -341,7 +346,9 @@
               <!-- 学生真实作答展示 -->
               <div class="student-answer-box">
                 <span class="box-label">学生作答：</span>
-                <span class="box-text">{{ getStudentAnswerForQuestion(item.questionId) }}</span>
+                <div class="box-text">
+                  <MathText :text="getStudentAnswerForQuestion(item.questionId)" />
+                </div>
               </div>
 
               <!-- AI 深度评分与点评 -->
@@ -353,7 +360,7 @@
                   </span>
                   <span class="confidence">状态：{{ item.status || 'AI_GRADED' }}</span>
                 </div>
-                <p class="comment-text">{{ item.aiComment || '作答逻辑完整严密，符合考查点要求。' }}</p>
+                <MathText tag="p" class="comment-text" :text="item.aiComment || '作答逻辑完整严密，符合考查点要求。'" />
               </div>
 
               <!-- 教师复核评分与批语输入 -->
@@ -411,10 +418,12 @@ import {
   Download,
   DocumentChecked,
   Clock,
-  Document
+  Document,
+  DataAnalysis
 } from '@element-plus/icons-vue';
 import { useGrading, type AssignmentAnalyticsResult } from '@/composables/ai/useGrading';
 import AssignmentGradingEngineDialog from '@/components/question/assignment/AssignmentGradingEngineDialog.vue';
+import MathText from '@/components/common/MathText.vue';
 import type { SubmissionItem, GradingItem } from '@/types/question/submission';
 
 const router = useRouter();
@@ -463,7 +472,9 @@ const activeModelName = computed(() => {
 });
 
 const currentSubmission = computed(() => {
-  return assignmentSubmissions.value.find((s) => s.id === selectedSubmissionId.value) || null;
+  if (selectedSubmissionId.value == null) return null;
+  const targetId = Number(selectedSubmissionId.value);
+  return assignmentSubmissions.value.find((s) => Number(s.id) === targetId) || null;
 });
 
 const reportStatusText = computed(() => {
@@ -501,7 +512,7 @@ onMounted(async () => {
     if (Number.isInteger(initialSubId) && initialSubId > 0) {
       selectedSubmissionId.value = initialSubId;
     } else if (assignmentSubmissions.value.length > 0) {
-      selectedSubmissionId.value = assignmentSubmissions.value[0].id;
+      selectedSubmissionId.value = Number(assignmentSubmissions.value[0].id);
     }
 
     if (selectedSubmissionId.value) {
@@ -529,9 +540,10 @@ async function loadCurrentSubmissionGrading(subId: number) {
   }
 }
 
-async function handleSubmissionChange(newSubId: number) {
-  selectedSubmissionId.value = newSubId;
-  await loadCurrentSubmissionGrading(newSubId);
+async function handleSubmissionChange(newSubId: number | string) {
+  const numId = Number(newSubId);
+  selectedSubmissionId.value = numId;
+  await loadCurrentSubmissionGrading(numId);
 }
 
 function getStudentAnswerForQuestion(qId: number): string {
@@ -618,9 +630,8 @@ function formatShortTime(timeStr: string) {
 
 <style scoped lang="scss">
 .grading-report-page-container {
-  padding: 24px;
-  background-color: #f8fafc;
-  min-height: calc(100vh - 64px);
+  width: 100%;
+  box-sizing: border-box;
 
   /* 1:1 对齐图 2 (OcrWorkspace) 大卡片顶栏样式 */
   .grading-detail-header-card {
@@ -1100,19 +1111,30 @@ function formatShortTime(timeStr: string) {
 
           .kp-info-line {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
+            gap: 12px;
             margin-bottom: 6px;
 
             .kp-name {
               font-size: 13px;
               font-weight: 600;
               color: #1e293b;
+              flex: 1;
+              line-height: 1.6;
+
+              .kp-qid {
+                color: #2563eb;
+                font-weight: 700;
+                margin-right: 4px;
+              }
             }
 
             .error-rate {
               font-size: 12px;
               font-weight: 700;
+              white-space: nowrap;
+              flex-shrink: 0;
             }
           }
 
@@ -1196,7 +1218,7 @@ function formatShortTime(timeStr: string) {
 
             .q-title-row {
               display: flex;
-              align-items: baseline;
+              align-items: flex-start;
               gap: 8px;
               flex: 1;
 
@@ -1208,13 +1230,16 @@ function formatShortTime(timeStr: string) {
                 padding: 2px 6px;
                 border-radius: 4px;
                 white-space: nowrap;
+                margin-top: 3px;
+                flex-shrink: 0;
               }
 
               .q-title {
                 font-size: 14px;
                 font-weight: 600;
                 color: #0f172a;
-                line-height: 1.4;
+                line-height: 1.6;
+                flex: 1;
               }
             }
           }
@@ -1274,10 +1299,12 @@ function formatShortTime(timeStr: string) {
             }
 
             .comment-text {
-              font-size: 12.5px;
+              font-size: 13px;
               color: #1e293b;
               margin: 0;
-              line-height: 1.5;
+              line-height: 1.7;
+              white-space: pre-wrap;
+              word-break: break-word;
             }
           }
 

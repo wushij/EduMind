@@ -174,11 +174,16 @@
     <!-- 子路由内容展示区 -->
     <div class="course-subview-content" :class="{ 'course-subview-content--immersive': isImmersiveLessonStudio }">
       <div class="course-subview-router">
-        <router-view v-slot="{ Component }">
+        <router-view v-slot="{ Component, route: childRoute }">
           <transition name="fade-slide" mode="out-in">
-            <div v-if="Component" :key="route.path" class="course-subview-inner">
-              <component :is="Component" :course="currentCourse" />
-            </div>
+            <keep-alive :include="['CourseAI']">
+              <component
+                :is="Component"
+                :key="childRoute.meta?.keepAlive ? childRoute.path : childRoute.fullPath"
+                :course="currentCourse"
+                class="course-subview-inner"
+              />
+            </keep-alive>
           </transition>
         </router-view>
       </div>
@@ -193,6 +198,10 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({
+  name: 'CourseDetail'
+});
+
 import { ref, computed, onMounted, watch, provide } from 'vue';
 import { useCourseEditable, courseDetailInjectionKey } from '@/composables/course/useCourseEditable';
 import { useRoute, useRouter } from 'vue-router';
@@ -238,7 +247,7 @@ async function refreshKnowledgeMountSummary() {
   try {
     const res = await getKnowledgeBaseDetail(kbId);
     const kb = res.data;
-    kbMountDocCount.value = kb?.documentCount ?? 0;
+    kbMountDocCount.value = kb?.docCount ?? kb?.documentCount ?? 0;
     kbMountChunkCount.value = kb?.chunkCount ?? 0;
   } catch {
     kbMountDocCount.value = 0;
@@ -303,15 +312,15 @@ function copyCourseCode() {
 
 async function loadCourse(id: string) {
   if (!id) return;
-  // 单例防抖与防重复刷新：若已有当前课程数据且ID一致，绝不重复拉取触发UI跳动闪烁
-  if (currentCourse.value && String(currentCourse.value.id) === String(id)) {
-    return;
-  }
   try {
+    // 立即基于当前课程知识库ID拉取挂载统计（避免因单例缓存命中直接跳过统计拉取）
+    const summaryPromise = refreshKnowledgeMountSummary();
     const course = await fetchCourseDetail(id);
     if (course?.id) {
       localStorage.setItem('edumind_last_course_id', String(course.id));
     }
+    await summaryPromise;
+    // 课程详情拉取后若更新了知识库绑定，再次确保统计数据为最新
     await refreshKnowledgeMountSummary();
   } catch {
     // 错误处理已在全局拦截器捕获
@@ -330,9 +339,15 @@ watch(
 
 watch(
   () => currentCourse.value?.knowledgeBaseId,
-  () => {
-    void refreshKnowledgeMountSummary();
-  }
+  (kbId) => {
+    if (kbId) {
+      void refreshKnowledgeMountSummary();
+    } else {
+      kbMountDocCount.value = 0;
+      kbMountChunkCount.value = 0;
+    }
+  },
+  { immediate: true }
 );
 
 onMounted(() => {
@@ -340,6 +355,7 @@ onMounted(() => {
     void loadCourse(courseId.value);
   }
 });
+provide('refreshCourseKbSummary', refreshKnowledgeMountSummary);
 </script>
 
 <style scoped lang="scss">

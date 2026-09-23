@@ -41,7 +41,7 @@
               v-for="doc in documents"
               :key="doc.id"
               :label="doc.fileName || doc.name"
-              :value="doc.id"
+              :value="Number(doc.id)"
             >
               <div class="doc-option-item">
                 <span class="doc-name-text" :title="doc.fileName || doc.name">

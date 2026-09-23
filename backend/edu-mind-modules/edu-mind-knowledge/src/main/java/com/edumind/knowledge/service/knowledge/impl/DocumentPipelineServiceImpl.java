@@ -2,11 +2,13 @@ package com.edumind.knowledge.service.knowledge.impl;
 
 import com.edumind.common.context.TenantContext;
 import com.edumind.knowledge.dao.KnowledgeDocumentDao;
+import com.edumind.knowledge.event.KnowledgeDocumentPipelineRequestedEvent;
 import com.edumind.knowledge.entity.KnowledgeDocumentEntity;
 import com.edumind.knowledge.service.chunk.ChunkService;
 import com.edumind.knowledge.service.index.IndexingService;
 import com.edumind.knowledge.service.knowledge.DocumentPipelineService;
 import com.edumind.knowledge.service.knowledge.DocumentService;
+import com.edumind.knowledge.support.InternalInvocationContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -27,6 +29,17 @@ public class DocumentPipelineServiceImpl implements DocumentPipelineService {
     private final ChunkService chunkService;
     private final IndexingService indexingService;
     private final KnowledgeDocumentDao knowledgeDocumentDao;
+    private final org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
+
+    @Override
+    public void requestPipeline(Long documentId) {
+        if (documentId == null) {
+            return;
+        }
+        // 交给监听器在事务提交后异步执行：调用方（如课件同步）在事务内插入文档行，
+        // 提交前启动异步线程会读不到该行，导致流水线被静默跳过
+        applicationEventPublisher.publishEvent(new KnowledgeDocumentPipelineRequestedEvent(documentId));
+    }
 
     @Override
     @Async("knowledgeTaskExecutor")
@@ -43,9 +56,13 @@ public class DocumentPipelineServiceImpl implements DocumentPipelineService {
         try {
             // 2. 显式建立租户上下文后再执行，保证拦截器与业务查询均落在正确租户内
             TenantContext.setTenantId(tenantId);
-            documentService.triggerParse(documentId);
-            chunkService.triggerChunk(documentId);
-            indexingService.reindexDocument(documentId);
+            // 3. 以内部调用身份执行：切片与索引内部带用户级权限断言，
+            //    异步线程没有登录态，不标记会抛「未登录」导致切片与向量化被静默跳过
+            InternalInvocationContext.runInternal(() -> {
+                documentService.triggerParse(documentId);
+                chunkService.triggerChunk(documentId);
+                indexingService.reindexDocument(documentId);
+            });
         } catch (Exception ex) {
             log.warn("文档流水线失败 documentId={} tenantId={}: {}", documentId, tenantId, ex.getMessage());
         } finally {

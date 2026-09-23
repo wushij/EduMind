@@ -26,6 +26,7 @@ public class RagRuntimeQueryApiImpl implements RagRuntimeQueryApi {
                 .retrievalModelDescription(retrievalDesc)
                 .embeddingModelName(embeddingApi.getModelName())
                 .embeddingDimensions(embeddingApi.getDimensions())
+                .embeddingMocked(embeddingApi.isMockVector())
                 .build();
     }
 

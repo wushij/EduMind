@@ -10,13 +10,17 @@ import com.edumind.infrastructure.vector.impl.InMemoryVectorStore;
 import com.edumind.infrastructure.vector.impl.MilvusVectorStore;
 import com.edumind.knowledge.api.LessonContentIndexApi;
 import com.edumind.knowledge.dao.KnowledgeBaseDao;
+import com.edumind.knowledge.dao.KnowledgeDocumentChunkDao;
 import com.edumind.knowledge.dao.KnowledgeDocumentDao;
+import com.edumind.knowledge.dao.KnowledgeDocumentTextDao;
 import com.edumind.knowledge.dao.KnowledgeIndexTaskDao;
 import com.edumind.knowledge.entity.KnowledgeBaseEntity;
 import com.edumind.knowledge.entity.KnowledgeDocumentEntity;
 import com.edumind.knowledge.entity.KnowledgeIndexTaskEntity;
 import com.edumind.knowledge.mapper.KnowledgeRagStatsMapper;
+import com.edumind.knowledge.service.chunk.ChunkService;
 import com.edumind.knowledge.service.index.IndexingService;
+import com.edumind.knowledge.service.knowledge.DocumentPipelineService;
 import com.edumind.knowledge.service.rag.KnowledgeRagDashboardService;
 import com.edumind.knowledge.vo.rag.KnowledgeRagDashboardVO;
 import com.edumind.knowledge.vo.rag.KnowledgeRagPurgeResultVO;
@@ -38,6 +42,10 @@ public class KnowledgeRagDashboardServiceImpl implements KnowledgeRagDashboardSe
     private final KnowledgeDocumentDao knowledgeDocumentDao;
     private final KnowledgeIndexTaskDao knowledgeIndexTaskDao;
     private final IndexingService indexingService;
+    private final KnowledgeDocumentTextDao knowledgeDocumentTextDao;
+    private final KnowledgeDocumentChunkDao knowledgeDocumentChunkDao;
+    private final DocumentPipelineService documentPipelineService;
+    private final ChunkService chunkService;
     private final LessonContentIndexApi lessonContentIndexApi;
     private final RagRuntimeQueryApi ragRuntimeQueryApi;
     private final AiQueryApi aiQueryApi;
@@ -67,6 +75,7 @@ public class KnowledgeRagDashboardServiceImpl implements KnowledgeRagDashboardSe
                 .totalSessions(aiQueryApi.countConversations())
                 .embeddingDimension(runtime.getEmbeddingDimensions())
                 .embeddingModelName(runtime.getEmbeddingModelName())
+                .embeddingMocked(runtime.isEmbeddingMocked())
                 .hybridEnabled(runtime.isHybridEnabled())
                 .retrievalModelDescription(runtime.getRetrievalModelDescription())
                 .vectorStoreLabel(resolveVectorStoreLabel())
@@ -104,17 +113,30 @@ public class KnowledgeRagDashboardServiceImpl implements KnowledgeRagDashboardSe
 
     @Override
     public KnowledgeRagSyncResultVO syncAll() {
+        // 1. 全量重跑所有已发布课节讲义的切片与索引（强制覆盖旧切片，应用最新切片规则）
+        int lessons = lessonContentIndexApi.reindexPublishedLessons(null);
+
+        // 2. 遍历所有知识库文档，真正重新分块并构建索引
         List<KnowledgeBaseEntity> bases = knowledgeBaseDao.findAll();
         int triggered = 0;
         for (KnowledgeBaseEntity base : bases) {
             try {
+                List<KnowledgeDocumentEntity> docs = knowledgeDocumentDao.findByKnowledgeBaseId(base.getId());
+                for (KnowledgeDocumentEntity doc : docs) {
+                    try {
+                        if (knowledgeDocumentTextDao.findByDocumentId(doc.getId()) != null) {
+                            chunkService.triggerChunk(doc.getId(), false);
+                        }
+                    } catch (Exception ex) {
+                        log.warn("Re-chunk doc failed docId={}: {}", doc.getId(), ex.getMessage());
+                    }
+                }
                 indexingService.triggerIndex(base.getId(), "FULL");
                 triggered++;
             } catch (Exception ex) {
                 log.warn("Full index trigger failed kbId={}: {}", base.getId(), ex.getMessage());
             }
         }
-        int lessons = lessonContentIndexApi.reindexPublishedLessons(null);
         return KnowledgeRagSyncResultVO.builder()
                 .status("task_started")
                 .knowledgeBasesTriggered(triggered)
@@ -128,7 +150,18 @@ public class KnowledgeRagDashboardServiceImpl implements KnowledgeRagDashboardSe
         if (document == null) {
             throw new BusinessException("文档不存在");
         }
-        indexingService.reindexDocument(documentId);
+        boolean missingText = knowledgeDocumentTextDao.findByDocumentId(documentId) == null;
+        if (missingText) {
+            documentPipelineService.requestPipeline(documentId);
+            log.info("文档 {} 缺少正文，已重新触发完整流水线（解析 → 切片 → 向量化）", documentId);
+            return KnowledgeRagSyncResultVO.builder()
+                    .status("pipeline_started")
+                    .documentId(documentId)
+                    .knowledgeBasesTriggered(1)
+                    .build();
+        }
+        // 真正触发全量重新切片（清除旧切片 -> 运行最新分块算法 -> 重新向量化落库）
+        chunkService.triggerChunk(documentId);
         return KnowledgeRagSyncResultVO.builder()
                 .status("ok")
                 .documentId(documentId)

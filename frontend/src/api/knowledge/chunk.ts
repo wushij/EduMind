@@ -1,4 +1,5 @@
 import { get, post } from '@/core/http/request';
+import { LONG_TASK_TIMEOUT } from '@/config';
 import { DocumentChunk, ChunkQueryRequest, ChunkStatsVO, ChunkOperationResult } from '@/types/knowledge/chunk';
 
 interface PageResult<T> {
@@ -72,8 +73,11 @@ export const getChunks = async (docId?: number, params?: ChunkQueryRequest): Pro
   return [];
 };
 
+/** 切片：接口内部还会触发向量化任务，服务端耗时明显长于普通接口，走长耗时超时 */
 export const triggerChunk = async (docId: number): Promise<ChunkOperationResult> => {
-  const res = await post<ChunkTaskResponse>(`/documents/${docId}/chunk`);
+  const res = await post<ChunkTaskResponse>(`/documents/${docId}/chunk`, undefined, {
+    timeout: LONG_TASK_TIMEOUT
+  });
   const data = res?.data;
   return {
     success: true,

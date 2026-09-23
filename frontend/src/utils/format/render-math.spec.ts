@@ -64,12 +64,34 @@ describe('renderMathText', () => {
     expect(parametric.startsWith('<span class="katex">')).toBe(true);
     });
 
+    it('renders bare math expressions embedded in AI Chinese grading comments', () => {
+      const comment =
+        '遗漏采分项：-分母处理：x^2(e^x-1)中 e^x-1 ~ x，故分母等价于 x^3；-分子处理：x - sin x需用泰勒展开，sin x = x - x^3/6 + o(x^3)，所以 x - sin x = x^3/6 + o(x^3)；-约分求极限：原式 = (x^3/6 + o(x^3))/x^3 ->1/6；尤其是 sin x、e^x、ln(1+x)等。';
+      const html = renderMathText(comment);
+      expect(html).toContain('katex');
+      // 验证至少识别出多个公式
+      const matches = html.match(/class="katex"/g);
+      expect(matches).not.toBeNull();
+      expect(matches!.length).toBeGreaterThanOrEqual(6);
+    });
+
+    it('renders markdown bold markers *** and ** into strong tags without raw asterisks', () => {
+      const comment =
+        '**采分点对照：** - **求导并分析单调性：**未命中。应求出 $f\'(x) = 6x^2 - 18x + 12$。- **极值：**未命中。';
+      const html = renderMathText(comment);
+      expect(html).not.toContain('**');
+      expect(html).toContain('<strong>采分点对照：</strong>');
+      expect(html).toContain('<strong>求导并分析单调性：</strong>');
+      expect(html).toContain('<strong>极值：</strong>');
+      expect(html).toContain('katex');
+    });
+
     it('does not treat Chinese prose, English sentences or code as bare formulas', () => {
-    expect(renderMathText('时间复杂度最坏为O(n^2)')).not.toContain('katex');
-    expect(renderMathText('The value of x^2 is 4')).not.toContain('katex');
-    expect(renderMathText('\\d{3}-\\d{4}')).not.toContain('katex');
+      expect(renderMathText('时间复杂度最坏为O(n^2)')).not.toContain('katex');
+      expect(renderMathText('The value of x^2 is 4')).not.toContain('katex');
+      expect(renderMathText('\\d{3}-\\d{4}')).not.toContain('katex');
     });
-    });
+  });
 
 describe('normalizeMathTextNewlines', () => {
   it('converts escaped newlines when not a LaTeX command', () => {

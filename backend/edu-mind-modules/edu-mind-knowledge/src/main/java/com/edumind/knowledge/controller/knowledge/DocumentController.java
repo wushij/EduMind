@@ -25,7 +25,7 @@ public class DocumentController {
             @PathVariable("knowledgeBaseId") Long knowledgeBaseId,
             @RequestParam("file") MultipartFile file) {
         KnowledgeDocumentVO document = documentService.upload(knowledgeBaseId, file);
-        documentPipelineService.parseAndChunkAsync(document.getId());
+        documentPipelineService.requestPipeline(document.getId());
         return ApiResult.success(document);
     }
 

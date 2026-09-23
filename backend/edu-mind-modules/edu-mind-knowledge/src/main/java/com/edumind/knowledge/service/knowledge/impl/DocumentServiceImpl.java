@@ -12,10 +12,12 @@ import com.edumind.knowledge.dao.KnowledgeDocumentTextDao;
 import com.edumind.knowledge.entity.KnowledgeBaseEntity;
 import com.edumind.knowledge.entity.KnowledgeDocumentEntity;
 import com.edumind.knowledge.entity.KnowledgeDocumentTextEntity;
+import com.edumind.knowledge.service.index.IndexingService;
 import com.edumind.knowledge.service.knowledge.DocumentParseService;
 import com.edumind.knowledge.service.knowledge.DocumentService;
 import com.edumind.knowledge.vo.knowledge.KnowledgeDocumentVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DocumentServiceImpl implements DocumentService {
@@ -38,6 +41,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final KnowledgeBaseConverter knowledgeBaseConverter;
     private final DocumentParseService documentParseService;
     private final FileStorageService fileStorageService;
+    private final IndexingService indexingService;
 
     @Value("${minio.bucketName:edumind}")
     private String bucketName;
@@ -96,13 +100,37 @@ public class DocumentServiceImpl implements DocumentService {
         if (entity == null) {
             throw new BusinessException("文档不存在");
         }
-        if (entity.getObjectKey() != null) {
-            fileStorageService.deleteFile(bucketName, entity.getObjectKey());
+        // 先清向量与索引行：切片删掉后这些行会变成孤儿，让「已向量化」统计与检索召回失真
+        indexingService.purgeDocumentVectors(documentId);
+        if (ownsStoredObject(entity)) {
+            deleteStoredObject(entity.getObjectKey());
         }
         knowledgeDocumentChunkDao.deleteByDocumentId(documentId);
         knowledgeDocumentTextDao.deleteByDocumentId(documentId);
         knowledgeDocumentDao.deleteById(documentId);
         refreshDocCount(entity.getKnowledgeBaseId());
+    }
+
+    /**
+     * 只有「上传文档」的文件才归知识库自己所有。
+     * 课件同步（COURSE_RESOURCE）与课节讲义（LESSON）的 objectKey 指向课程资料/讲义本体，
+     * 删除知识库文档时不能连带删掉课程侧仍在使用的源文件。
+     */
+    private boolean ownsStoredObject(KnowledgeDocumentEntity entity) {
+        if (!StringUtils.hasText(entity.getObjectKey())) {
+            return false;
+        }
+        String sourceType = entity.getSourceType();
+        return !StringUtils.hasText(sourceType) || "UPLOAD".equalsIgnoreCase(sourceType);
+    }
+
+    private void deleteStoredObject(String objectKey) {
+        try {
+            fileStorageService.deleteFile(bucketName, objectKey);
+        } catch (Exception ex) {
+            // 对象存储不可用时也必须允许清理知识库记录，否则用户会卡在"删不掉"
+            log.warn("删除文档存储对象失败 objectKey={}: {}", objectKey, ex.getMessage());
+        }
     }
 
     @Override

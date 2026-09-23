@@ -141,6 +141,26 @@
         </el-col>
       </el-row>
 
+      <!-- Mock 伪向量：所有"已向量化"指标都会失真，必须显式提示 -->
+      <el-alert
+        v-if="stats.embeddingMocked"
+        class="embedding-mock-alert"
+        type="warning"
+        effect="light"
+        show-icon
+        :closable="false"
+        title="当前向量为 Mock 伪向量，命中率与健康度不具参考性"
+      >
+        <div class="embedding-mock-body">
+          <span>
+            未检测到可用的 Embedding 模型（标识：{{ stats.embeddingModelName || '未知' }}），
+            向量由本地哈希生成、不具备语义。请在「系统管理 → AI 模型」新增 embedding 类型模型并填写 API Key，
+            再对知识库重新执行向量化。
+          </span>
+          <router-link class="embedding-mock-link" to="/system/models">前往配置</router-link>
+        </div>
+      </el-alert>
+
       <el-card shadow="never" class="health-card">
         <template #header>
           <div class="card-header-flex">
@@ -385,6 +405,28 @@ onMounted(() => fetchStats())
   .el-input {
     flex: 1;
     min-width: 200px;
+  }
+}
+
+/* Mock 伪向量警示条 */
+.embedding-mock-alert {
+  margin-bottom: 16px;
+  border-radius: 12px;
+
+  .embedding-mock-body {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+
+  .embedding-mock-link {
+    color: #b45309;
+    font-weight: 600;
+    text-decoration: underline;
+    white-space: nowrap;
   }
 }
 </style>

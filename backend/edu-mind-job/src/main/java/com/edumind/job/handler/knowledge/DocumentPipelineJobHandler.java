@@ -14,6 +14,7 @@ public class DocumentPipelineJobHandler {
 
     public void handleParseAndChunk(Long documentId) {
         log.info("Job: parse and chunk documentId={}", documentId);
-        documentPipelineService.parseAndChunkAsync(documentId);
+        // 走统一业务入口：由监听器在事务提交后异步执行，避免异步线程读不到未提交的文档行
+        documentPipelineService.requestPipeline(documentId);
     }
 }

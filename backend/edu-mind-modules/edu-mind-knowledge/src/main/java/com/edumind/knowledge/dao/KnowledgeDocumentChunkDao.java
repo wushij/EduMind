@@ -21,6 +21,17 @@ public class KnowledgeDocumentChunkDao {
         return knowledgeDocumentChunkMapper.selectById(id);
     }
 
+    /** 按文档列出全部切片（用于删除文档前清理向量与索引行） */
+    public List<KnowledgeDocumentChunkEntity> listByDocumentId(Long documentId) {
+        if (documentId == null) {
+            return Collections.emptyList();
+        }
+        return knowledgeDocumentChunkMapper.selectList(
+                new LambdaQueryWrapper<KnowledgeDocumentChunkEntity>()
+                        .eq(KnowledgeDocumentChunkEntity::getDocumentId, documentId)
+        );
+    }
+
     public List<KnowledgeDocumentChunkEntity> findByIds(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return Collections.emptyList();

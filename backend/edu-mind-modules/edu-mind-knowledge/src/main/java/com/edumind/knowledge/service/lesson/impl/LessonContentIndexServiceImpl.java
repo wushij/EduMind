@@ -56,6 +56,16 @@ public class LessonContentIndexServiceImpl {
 
     @Transactional(rollbackFor = Exception.class)
     public void ingestLesson(Long courseId, Long lessonChapterId) {
+        ingestLesson(courseId, lessonChapterId, false, true);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void ingestLesson(Long courseId, Long lessonChapterId, boolean forceRechunk) {
+        ingestLesson(courseId, lessonChapterId, forceRechunk, true);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void ingestLesson(Long courseId, Long lessonChapterId, boolean forceRechunk, boolean triggerIndex) {
         if (courseId == null || lessonChapterId == null) {
             throw new BusinessException("课节索引参数不完整");
         }
@@ -70,7 +80,7 @@ public class LessonContentIndexServiceImpl {
         }
         Long knowledgeBaseId = resolveKnowledgeBaseId(courseId);
         KnowledgeDocumentEntity existing = knowledgeDocumentDao.findLessonDocument(courseId, lessonChapterId);
-        if (existing != null && source.getContentHash().equals(existing.getContentHash())) {
+        if (!forceRechunk && existing != null && source.getContentHash().equals(existing.getContentHash())) {
             long chunkCount = knowledgeDocumentChunkDao.countByDocumentId(existing.getId());
             if (chunkCount > 0) {
                 log.info("Lesson index unchanged courseId={} lessonId={}", courseId, lessonChapterId);
@@ -79,7 +89,9 @@ public class LessonContentIndexServiceImpl {
             log.warn("Lesson document {} has no chunks, rebuilding slices courseId={} lessonId={}",
                     existing.getId(), courseId, lessonChapterId);
             chunkMarkdown(existing, source.getMarkdown());
-            indexingService.triggerIndex(knowledgeBaseId, "INCREMENTAL");
+            if (triggerIndex) {
+                indexingService.triggerIndex(knowledgeBaseId, "INCREMENTAL");
+            }
             return;
         }
         if (existing != null) {
@@ -105,7 +117,9 @@ public class LessonContentIndexServiceImpl {
         }
         upsertDocumentText(document.getId(), source.getMarkdown());
         chunkMarkdown(document, source.getMarkdown());
-        indexingService.triggerIndex(knowledgeBaseId, "INCREMENTAL");
+        if (triggerIndex) {
+            indexingService.triggerIndex(knowledgeBaseId, "INCREMENTAL");
+        }
         log.info("Lesson indexed courseId={} lessonId={} documentId={}", courseId, lessonChapterId, document.getId());
     }
 
@@ -129,13 +143,22 @@ public class LessonContentIndexServiceImpl {
     public int reindexPublishedLessons(Long courseId) {
         List<PublishedLessonRefVO> refs = courseLessonCatalogApi.listPublishedLessonChapters(courseId);
         int count = 0;
+        java.util.Set<Long> affectedKbIds = new java.util.HashSet<>();
         for (PublishedLessonRefVO ref : refs) {
             try {
-                ingestLesson(ref.getCourseId(), ref.getLessonChapterId());
+                ingestLesson(ref.getCourseId(), ref.getLessonChapterId(), true, false);
+                affectedKbIds.add(resolveKnowledgeBaseId(ref.getCourseId()));
                 count++;
             } catch (Exception ex) {
                 log.error("Reindex lesson failed courseId={} lessonId={}: {}",
                         ref.getCourseId(), ref.getLessonChapterId(), ex.getMessage());
+            }
+        }
+        for (Long kbId : affectedKbIds) {
+            try {
+                indexingService.triggerIndex(kbId, "FULL");
+            } catch (Exception ex) {
+                log.warn("Trigger full index failed kbId={}: {}", kbId, ex.getMessage());
             }
         }
         return count;

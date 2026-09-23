@@ -132,11 +132,35 @@
           <span class="stat-label">向量索引状态</span>
         </div>
         <div class="hero-stat-card">
-          <span class="stat-num text-warning">{{ currentKnowledgeBase?.embeddingModel || '默认模型' }}</span>
+          <span class="stat-num text-warning" :title="currentKnowledgeBase?.embeddingModel || '未配置向量模型'">
+            {{ currentKnowledgeBase?.embeddingModel || '未配置' }}
+          </span>
           <span class="stat-label">Embedding 模型</span>
         </div>
       </div>
     </div>
+
+    <!--
+      未接入真实向量模型时必须显式提示：
+      否则「已向量化」会被误读成语义检索可用，而实际向量是本地哈希生成的伪向量。
+    -->
+    <el-alert
+      v-if="currentKnowledgeBase?.embeddingMocked"
+      class="embedding-mock-alert"
+      type="warning"
+      effect="light"
+      show-icon
+      :closable="false"
+      title="当前向量为 Mock 伪向量，检索结果不可信"
+    >
+      <div class="embedding-mock-body">
+        <span>
+          平台没有可用的 Embedding 模型配置，切片向量由本地哈希生成、不具备语义（当前标识：
+          {{ currentKnowledgeBase?.embeddingModel || '未知' }}）。请配置向量模型后重新执行「解析 → 切片 → 向量化」。
+        </span>
+        <router-link class="embedding-mock-link" to="/system/models">前往配置向量模型</router-link>
+      </div>
+    </el-alert>
 
     <div class="kb-subview-content">
       <router-view v-if="currentKnowledgeBase" />
@@ -598,6 +622,28 @@ watch(kbId, (id) => {
 @media (max-width: 960px) {
   .kb-hero-header .hero-stats-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Mock 伪向量警示条：与 hero 卡片保持同宽、同圆角语言 */
+.embedding-mock-alert {
+  margin-top: 12px;
+  border-radius: 12px;
+
+  .embedding-mock-body {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+
+  .embedding-mock-link {
+    color: #b45309;
+    font-weight: 600;
+    text-decoration: underline;
+    white-space: nowrap;
   }
 }
 

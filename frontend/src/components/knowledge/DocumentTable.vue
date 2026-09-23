@@ -39,7 +39,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="操作" min-width="360" width="360" fixed="right" align="center" class-name="action-column">
+      <el-table-column label="操作" min-width="368" width="368" fixed="right" align="center" class-name="action-column">
         <template #default="{ row }">
           <div class="action-pill-group">
             <button
@@ -165,7 +165,7 @@ const formatUploadTime = (time?: string): string => {
       min-width: 0;
 
       .file-title {
-        font-size: 14px;
+        font-size: 13.5px;
         font-weight: 600;
         color: #0f172a;
         white-space: nowrap;
@@ -174,7 +174,7 @@ const formatUploadTime = (time?: string): string => {
       }
 
       .file-meta {
-        font-size: 12px;
+        font-size: 11.5px;
         color: #94a3b8;
       }
     }
@@ -246,18 +246,20 @@ const formatUploadTime = (time?: string): string => {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    flex-wrap: nowrap;
-    gap: 8px;
+    // 允许换行：列宽不足时按钮换到第二行，而不是被单元格裁掉半个
+    flex-wrap: wrap;
+    gap: 6px;
     width: 100%;
   }
 }
 
 .table-action-pill {
-  height: 30px;
-  padding: 0 14px;
+  // 5 个操作按钮需要在一列内排开，尺寸收小一档才能完整显示
+  height: 26px;
+  padding: 0 10px;
   border-radius: 9999px;
   border: 1px solid transparent;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   line-height: 1;
   display: inline-flex;

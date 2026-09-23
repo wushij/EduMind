@@ -159,11 +159,17 @@ export function useDocumentParse(kbId: Ref<number | undefined>) {
   const chunks = ref<DocumentChunk[]>([]);
   const loading = ref(false);
   const pipelineRunning = ref(false);
-  const indexStatus = ref<{ status?: string; indexedChunks?: number; totalChunks?: number }>({});
+  const indexStatus = ref<{
+    status?: string;
+    indexedChunks?: number;
+    totalChunks?: number;
+    embeddingMocked?: boolean;
+    embeddingModel?: string;
+  }>({});
   let pollTimer: ReturnType<typeof setInterval> | null = null;
 
   const docInfo = computed(() => {
-    const doc = documents.value.find((d) => d.id === selectedDocumentId.value);
+    const doc = documents.value.find((d) => Number(d.id) === Number(selectedDocumentId.value));
     return buildDocumentInfo(doc);
   });
 
@@ -193,11 +199,11 @@ export function useDocumentParse(kbId: Ref<number | undefined>) {
         ? res.data.map((item) => normalizeKBDocument(item as unknown as Record<string, unknown>))
         : [];
       const queryDocId = Number(route.query.documentId);
-      if (queryDocId && documents.value.some((d) => d.id === queryDocId)) {
+      if (queryDocId && documents.value.some((d) => Number(d.id) === queryDocId)) {
         selectedDocumentId.value = queryDocId;
       } else if (documents.value.length > 0) {
-        if (!selectedDocumentId.value || !documents.value.some((d) => d.id === selectedDocumentId.value)) {
-          selectedDocumentId.value = documents.value[0].id;
+        if (!selectedDocumentId.value || !documents.value.some((d) => Number(d.id) === Number(selectedDocumentId.value))) {
+          selectedDocumentId.value = Number(documents.value[0].id);
         }
       } else {
         selectedDocumentId.value = undefined;
@@ -216,7 +222,9 @@ export function useDocumentParse(kbId: Ref<number | undefined>) {
     try {
       chunks.value = await getChunks(selectedDocumentId.value, { page: 1, pageSize: 100 });
     } catch {
+      // 静默清空会让「切片其实已完成」看起来像「什么都没生成」，必须显式提示
       chunks.value = [];
+      ElMessage.error('加载切片列表失败，请稍后重试或重新选择文档');
       ElMessage.error('加载切片失败');
     } finally {
       loading.value = false;
@@ -230,7 +238,9 @@ export function useDocumentParse(kbId: Ref<number | undefined>) {
       indexStatus.value = {
         status: stats.connectionStatus === 'ONLINE' ? 'INDEXED' : 'INDEXING',
         indexedChunks: stats.totalVectors,
-        totalChunks: stats.expectedVectors
+        totalChunks: stats.expectedVectors,
+        embeddingMocked: stats.embeddingMocked,
+        embeddingModel: stats.embeddingModel
       };
     } catch {
       indexStatus.value = {};
@@ -261,6 +271,14 @@ export function useDocumentParse(kbId: Ref<number | undefined>) {
       await loadChunks();
       await loadIndexStatus();
 
+      // 未接入真实向量模型时明确告知：这类向量没有语义，不要把"已向量化"当成检索可用
+      if (indexStatus.value.embeddingMocked) {
+        ElMessage.warning({
+          message: '当前未接入真实向量模型，本次向量为 Mock 伪向量，检索结果不可信；请先配置 Embedding 模型后重新执行',
+          duration: 6000
+        });
+      }
+
       // 异步轻量轮询追踪进度（最多轮询 6 次，每 1.2 秒一次）
       let count = 0;
       pollTimer = setInterval(async () => {
@@ -276,6 +294,9 @@ export function useDocumentParse(kbId: Ref<number | undefined>) {
         }
       }, 1200);
     } catch (err) {
+      // 请求失败（尤其是超时）不代表流水线没跑：解析/切片/向量化可能仍在服务端执行，
+      // 这里主动回读一次真实状态，避免用户对着空白面板以为「什么都没发生」。
+      await Promise.allSettled([loadDocuments(), loadChunks(), loadIndexStatus()]);
       ElMessage.error(err instanceof Error ? err.message : '流水线执行失败');
     } finally {
       pipelineRunning.value = false;

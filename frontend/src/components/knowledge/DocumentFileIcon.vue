@@ -18,11 +18,11 @@
       <path d="M10 8.5h4v3h-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
     </svg>
 
-    <svg v-else-if="kind === 'md'" viewBox="0 0 24 24" class="doc-file-svg" fill="none">
-      <path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="currentColor" opacity="0.16" />
-      <path d="M14 3v5h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-      <path d="M9 13.5 10.8 16 12.6 13.5 14.4 16 16.2 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-    </svg>
+    <!--
+      Markdown 用「MD」字标而不是折线图形：
+      原来的锯齿折线在 24px 下看起来就是一个「W」，经常被误认为 Word 文档。
+    -->
+    <span v-else-if="kind === 'md'" class="doc-file-md-label">MD</span>
 
     <svg v-else viewBox="0 0 24 24" class="doc-file-svg" fill="none">
       <path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="currentColor" opacity="0.16" />
@@ -77,7 +77,14 @@ defineProps<{
   &--md {
     background: linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%);
     border-color: #cbd5e1;
-    color: #475569;
+    color: #334155;
+  }
+
+  .doc-file-md-label {
+    font-size: 11.5px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1;
   }
 
   &--default {

@@ -240,6 +240,7 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
     }
 
     // 2. 激活流式状态与阶段提示
+    deps.userStoppedGeneration.value = false;
     deps.followUpPrompts.value = [];
     deps.resetStreamingState();
     deps.streamPhaseMessage.value = '正在检索课程知识切片并深度思考...';
@@ -259,10 +260,13 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
       const streamed = await streamAssistantChatLocal(text, courseId, options);
       if (deps.userStoppedGeneration.value) return;
       if (!streamed && !deps.streamingContent.value) {
-        if (options?.isRegenerate) {
-          throw new Error('重新生成未返回有效内容，请稍后重试');
+        try {
+          await fallbackAsk(text, courseId);
+        } catch {
+          if (options?.isRegenerate) {
+            throw new Error('重新生成未返回有效内容，请稍后重试');
+          }
         }
-        await fallbackAsk(text, courseId);
       }
     } catch (err: unknown) {
       if (deps.userStoppedGeneration.value) return;

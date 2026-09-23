@@ -142,7 +142,7 @@ export function useDocumentChunk(initialDocId?: number) {
       const res = await getDocuments(kbId);
       documents.value = res.data || [];
       if (documents.value.length > 0 && !selectedDocumentId.value) {
-        selectedDocumentId.value = documents.value[0].id;
+        selectedDocumentId.value = Number(documents.value[0].id);
       }
     } catch {
       documents.value = [];

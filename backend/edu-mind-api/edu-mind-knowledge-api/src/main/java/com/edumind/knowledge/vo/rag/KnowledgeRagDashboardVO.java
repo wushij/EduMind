@@ -23,6 +23,8 @@ public class KnowledgeRagDashboardVO {
     private long totalSessions;
     private Integer embeddingDimension;
     private String embeddingModelName;
+    /** true=当前向量来自 Mock（未接入真实 Embedding Key），检索命中率不可信 */
+    private boolean embeddingMocked;
     private boolean hybridEnabled;
     private String retrievalModelDescription;
     /** 当前运行时向量存储引擎（Milvus / InMemory 等） */

@@ -25,4 +25,9 @@ public class DelegatingEmbeddingClient implements EmbeddingClient {
     public int getDimensions() {
         return embeddingClientRegistry.getClient().getDimensions();
     }
+
+    @Override
+    public boolean isMock() {
+        return embeddingClientRegistry.getClient().isMock();
+    }
 }

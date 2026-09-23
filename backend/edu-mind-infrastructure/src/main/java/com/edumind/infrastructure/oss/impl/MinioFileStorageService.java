@@ -9,6 +9,7 @@ import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
+import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +20,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -26,6 +28,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MinioFileStorageService implements FileStorageService {
 
     private static final Logger log = LoggerFactory.getLogger(MinioFileStorageService.class);
+
+    /** 对象存储连接超时：连不上要快速失败并回退本地存储，不能挂住解析线程 */
+    private static final Duration MINIO_CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    /** 对象存储读写超时（单次 socket 操作，非整文件耗时），大文件流式读取同样安全 */
+    private static final Duration MINIO_IO_TIMEOUT = Duration.ofSeconds(30);
 
     @Value("${minio.endpoint:http://localhost:9000}")
     private String endpoint;
@@ -166,9 +173,17 @@ public class MinioFileStorageService implements FileStorageService {
 
     private void initMinioClient() {
         try {
+            // 必须显式设置超时：minio 默认 OkHttp 客户端没有读/写超时，
+            // 端点不可达（被防火墙丢包、VPN 残留路由等）时 bucketExists 会长期挂起，
+            // 导致「文档解析」请求线程被永久占住（表现为界面一直转圈、任务几小时不结束）。
             minioClient = MinioClient.builder()
                     .endpoint(endpoint)
                     .credentials(accessKey, secretKey)
+                    .httpClient(new OkHttpClient.Builder()
+                            .connectTimeout(MINIO_CONNECT_TIMEOUT)
+                            .readTimeout(MINIO_IO_TIMEOUT)
+                            .writeTimeout(MINIO_IO_TIMEOUT)
+                            .build())
                     .build();
             minioClient.bucketExists(BucketExistsArgs.builder().bucket(defaultBucketName).build());
             minioAvailable = true;

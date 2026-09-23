@@ -1,5 +1,9 @@
 import { get, post } from '@/core/http/request';
+import { LONG_TASK_TIMEOUT } from '@/config';
 import { VectorStoreStats, FailedVectorItem } from '@/types/knowledge/embedding';
+
+/** 向量任务（全量/增量索引、失败重试）接口配置：服务端需要逐个切片调用向量模型 */
+const VECTOR_TASK_CONFIG = { timeout: LONG_TASK_TIMEOUT };
 
 interface IndexErrorItemVO {
   chunkId?: number;
@@ -19,6 +23,8 @@ interface IndexStatusVO {
   indexedChunks?: number;
   failedChunks?: number;
   embeddingModel?: string;
+  /** true=当前向量为 Mock 伪向量（未接入真实向量模型），检索结果不可信 */
+  embeddingMocked?: boolean;
   dimensions?: number;
   engine?: string;
   engineVersion?: string;
@@ -36,6 +42,8 @@ function mapIndexStatusToStats(status: IndexStatusVO, kbId: number): VectorStore
   const indexed = status.indexedChunks ?? 0;
   const health = total > 0 ? Math.round((indexed / total) * 100) : 0;
   return {
+    embeddingModel: status.embeddingModel,
+    embeddingMocked: Boolean(status.embeddingMocked),
     engine: status.engine || 'InMemory',
     engineVersion: status.engineVersion || 'dev',
     connectionStatus: status.connectionStatus || (status.status === 'INDEX_FAILED' ? 'DEGRADED' : 'ONLINE'),
@@ -83,7 +91,7 @@ export const triggerReindex = async (
   kbId: number,
   mode: 'FULL' | 'INCREMENTAL' = 'FULL'
 ): Promise<{ success: boolean; taskId: string; message: string }> => {
-  await post(`/knowledge-bases/${kbId}/index`, { mode });
+  await post(`/knowledge-bases/${kbId}/index`, { mode }, VECTOR_TASK_CONFIG);
   return {
     success: true,
     taskId: `TASK_IDX_${Date.now()}`,
@@ -95,7 +103,7 @@ export const retryFailedVectors = async (
   kbId: number,
   _vectorIds?: (number | string)[]
 ): Promise<{ success: boolean; message: string }> => {
-  await post(`/knowledge-bases/${kbId}/index`, { mode: 'INCREMENTAL' });
+  await post(`/knowledge-bases/${kbId}/index`, { mode: 'INCREMENTAL' }, VECTOR_TASK_CONFIG);
   return { success: true, message: '失败切片重试任务已提交' };
 };
 
@@ -103,6 +111,6 @@ export const reindexSingleChunk = async (
   kbId: number,
   chunkId: number
 ): Promise<{ success: boolean; message: string }> => {
-  await post(`/knowledge-bases/${kbId}/chunks/${chunkId}/reindex`);
+  await post(`/knowledge-bases/${kbId}/chunks/${chunkId}/reindex`, undefined, VECTOR_TASK_CONFIG);
   return { success: true, message: '切片重试索引成功' };
 };

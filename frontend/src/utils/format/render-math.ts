@@ -94,6 +94,120 @@ export function wrapBareLatexExpressions(text: string): string {
   });
 }
 
+/**
+ * 将混在中文散文/评语中未加 $ 的常用数学表达式（等价无穷小、等式、乘方多项式、初等函数）
+ * 自动识别并包裹为 $...$，以便 KaTeX 精准渲染
+ */
+export function wrapProsePlainMath(text: string): string {
+  if (!text) return '';
+  // 纯英文自然语言句子（如 "The value of x^2 is 4"）避免过度识别，交给后续严格公式判断
+  if (!/[\u4e00-\u9fa5]/.test(text) && PROSE_WORD_PAIR_RE.test(text)) {
+    return text;
+  }
+
+  // 1. 保护已有标准公式与占位符
+  const tokens: string[] = [];
+  let s = text.replace(
+    /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$[^$\n]+?\$)/g,
+    (m) => {
+      const idx = tokens.length;
+      tokens.push(m);
+      return `%%%PROSE_MATH_TOKEN_${idx}%%%`;
+    }
+  );
+
+  const CJK_OR_PUNCT_BEFORE = '(?<=[:：，,；;、。\\s\\u4e00-\\u9fa5\\uff00-\\uffef]|^)';
+  const CJK_OR_PUNCT_AFTER = '(?=[:：，,；;、。\\s\\u4e00-\\u9fa5\\uff00-\\uffef]|$)';
+
+  // 2. 极限箭头推导：例如 (x^3/6 + o(x^3))/x^3 ->1/6 或 原式 = ... -> 1/6
+  s = s.replace(
+    new RegExp(
+      `${CJK_OR_PUNCT_BEFORE}((?:[a-zA-Z0-9()+\\-*/^~]|\\s*=\\s*)+\\s*(?:->|→)\\s*[0-9a-zA-Z/+\\-]+)${CJK_OR_PUNCT_AFTER}`,
+      'g'
+    ),
+    (match) => {
+      let expr = match.trim();
+      if (!/[a-zA-Z]/.test(expr)) return match;
+      expr = expr.replace(/->|→/g, ' \\to ').replace(/~/g, ' \\sim ');
+      return `$${expr}$`;
+    }
+  );
+
+  // 3. 数学等式：例如 sin x = x - x^3/6 + o(x^3) 或 x - sin x = x^3/6 + o(x^3)
+  s = s.replace(
+    new RegExp(
+      `${CJK_OR_PUNCT_BEFORE}([a-zA-Z0-9()+\\-*/^~\\s]{2,}=\\s*[a-zA-Z0-9()+\\-*/^~\\s]{2,})${CJK_OR_PUNCT_AFTER}`,
+      'g'
+    ),
+    (match) => {
+      const expr = match.trim();
+      if (!/[a-zA-Z]/.test(expr) || /[a-zA-Z]{4,}\s+[a-zA-Z]{4,}/.test(expr)) return match;
+      if (!/(?:\^|\/|\+|-|\b(?:sin|cos|tan|cot|ln|exp|o)\b|\d)/.test(expr)) return match;
+      let clean = expr.replace(/\b(sin|cos|tan|cot|sec|csc|ln|exp)\b/g, '\\$1 ');
+      clean = clean.replace(/~/g, ' \\sim ');
+      return `$${clean}$`;
+    }
+  );
+
+  // 4. 等价无穷小：例如 e^x-1 ~ x、sin x ~ x
+  s = s.replace(
+    new RegExp(
+      `${CJK_OR_PUNCT_BEFORE}([a-zA-Z0-9()+\\-*/^]+)\\s*~\\s*([a-zA-Z0-9()+\\-*/^]+)${CJK_OR_PUNCT_AFTER}`,
+      'g'
+    ),
+    (match, left: string, right: string) => {
+      if (!/[a-zA-Z]/.test(left + right)) return match;
+      let l = left.trim().replace(/\b(sin|cos|tan|ln|exp)\b/g, '\\$1 ');
+      let r = right.trim().replace(/\b(sin|cos|tan|ln|exp)\b/g, '\\$1 ');
+      return `$${l} \\sim ${r}$`;
+    }
+  );
+
+  // 5. 代数项与含括号乘积：例如 x^2(e^x-1)、o(x^3)
+  s = s.replace(
+    new RegExp(
+      `${CJK_OR_PUNCT_BEFORE}([a-zA-Z0-9]+\\^[0-9a-zA-Z]+(?:\\([a-zA-Z0-9^/+\\-\\s~]+\\))?|o\\([a-zA-Z0-9^/+\\-\\s]+\\))${CJK_OR_PUNCT_AFTER}`,
+      'g'
+    ),
+    (match) => {
+      const expr = match.trim();
+      if (!/[a-zA-Z]/.test(expr)) return match;
+      return `$${expr}$`;
+    }
+  );
+
+  // 6. 多项式减去初等函数：例如 x - sin x、1 - cos x
+  s = s.replace(
+    new RegExp(
+      `${CJK_OR_PUNCT_BEFORE}([0-9a-zA-Z^]+\\s*[-+]\\s*(?:sin|cos|tan|ln)\\s+[a-zA-Z0-9]+)${CJK_OR_PUNCT_AFTER}`,
+      'g'
+    ),
+    (match) => {
+      const expr = match.trim().replace(/\b(sin|cos|tan|ln)\b/g, '\\$1 ');
+      return `$${expr}$`;
+    }
+  );
+
+  // 7. 单独出现的初等函数与简单幂次项：例如 sin x、e^x、ln(1+x)、x^3
+  s = s.replace(
+    new RegExp(
+      `${CJK_OR_PUNCT_BEFORE}((?:sin|cos|tan|cot|ln|exp)\\s*(?:\\([^)]+\\)|[a-zA-Z0-9]+)|[a-zA-Z]\\^[0-9a-zA-Z]+)${CJK_OR_PUNCT_AFTER}`,
+      'g'
+    ),
+    (match) => {
+      const expr = match.trim();
+      let clean = expr.replace(/\b(sin|cos|tan|cot|ln|exp)\b/g, '\\$1 ');
+      return `$${clean}$`;
+    }
+  );
+
+  // 8. 还原占位符
+  return s.replace(/%%%PROSE_MATH_TOKEN_(\d+)%%%/g, (_m, idxStr) => {
+    const idx = Number(idxStr);
+    return tokens[idx] ?? _m;
+  });
+}
+
 const CJK_OR_FULLWIDTH_RE = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/;
 const BARE_FORMULA_CHARS_RE = /^[0-9A-Za-z\s+\-*/=().,;:^_]+$/;
 /** 连续两个 3 字母以上单词（The value / value of）基本可判定为自然语言句子，而不是公式 */
@@ -123,7 +237,7 @@ export function isBareFormulaSegment(text: string): boolean {
 type MathSegment = { kind: 'text'; value: string } | { kind: 'math'; value: string; display: boolean };
 
 function splitMathSegments(text: string): MathSegment[] {
-  const normalized = wrapBareLatexExpressions(normalizeMathTextNewlines(text));
+  const normalized = wrapBareLatexExpressions(wrapProsePlainMath(normalizeMathTextNewlines(text)));
   const segments: MathSegment[] = [];
   let i = 0;
 
@@ -190,10 +304,16 @@ export function renderMathText(text: string): string {
       const parts = seg.value.replace(/\r/g, '').split(/\n{2,}/);
       return parts
         .map((part) => {
-          if (isBareFormulaSegment(part)) {
-            return renderKatex(part.trim(), false);
-          }
-          return escapeHtml(part.replace(/\n/g, ' '));
+          let escaped = escapeHtml(part.replace(/\n/g, ' '));
+          // 处理 ***加粗斜体*** 与 **加粗** 语法，消除大模型裸露的星号标记
+          escaped = escaped.replace(/\*\*\*([^*]+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+          escaped = escaped.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+          // 将采分点分项符（如「；- <strong>」或「。- <strong>」）优化为带圆点的换行分项
+          escaped = escaped.replace(/([；;。])\s*-\s*<strong>/g, '$1<br />&bull; <strong>');
+          escaped = escaped.replace(/(?:^|\s)-\s*<strong>/g, '<br />&bull; <strong>');
+          // 兜底清理孤立残留的 ** 星号
+          escaped = escaped.replace(/\*\*/g, '');
+          return escaped;
         })
         .join('<br /><br />');
     })

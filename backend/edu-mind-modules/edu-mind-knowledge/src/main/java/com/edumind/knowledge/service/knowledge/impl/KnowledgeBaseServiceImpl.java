@@ -1,5 +1,6 @@
 package com.edumind.knowledge.service.knowledge.impl;
 
+import com.edumind.ai.api.embedding.EmbeddingApi;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.course.api.CourseQueryApi;
@@ -15,6 +16,7 @@ import com.edumind.knowledge.service.knowledge.KnowledgeAccessService;
 import com.edumind.knowledge.service.knowledge.KnowledgeBaseService;
 import com.edumind.knowledge.vo.knowledge.KnowledgeBaseVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -22,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
@@ -31,6 +34,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     private final KnowledgeAccessService knowledgeAccessService;
     private final CourseQueryApi courseQueryApi;
     private final KnowledgeChunkIndexDao knowledgeChunkIndexDao;
+    private final EmbeddingApi embeddingApi;
 
     @Override
     public Long create(KnowledgeBaseCreateDTO dto) {
@@ -56,6 +60,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             }
         }
         reconcileIndexStatus(vo);
+        applyEmbeddingRuntime(vo);
         return vo;
     }
 
@@ -81,7 +86,27 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             }
         }
         vos.forEach(this::reconcileIndexStatus);
+        vos.forEach(this::applyEmbeddingRuntime);
         return vos;
+    }
+
+    /**
+     * 回填当前向量化基座信息（模型名 + 是否 Mock 伪向量）。
+     *
+     * <p>此前该字段从未赋值，前端只能显示兜底文案「默认模型」，
+     * 用户既看不到真实模型名，也无法判断当前向量是不是哈希伪向量。</p>
+     */
+    private void applyEmbeddingRuntime(KnowledgeBaseVO vo) {
+        if (vo == null) {
+            return;
+        }
+        try {
+            vo.setEmbeddingModel(embeddingApi.getModelName());
+            vo.setEmbeddingMocked(embeddingApi.isMockVector());
+        } catch (Exception ex) {
+            // 向量基座信息读取失败不应影响知识库列表本身的可用性
+            log.warn("读取 Embedding 运行信息失败 kbId={}: {}", vo.getId(), ex.getMessage());
+        }
     }
 
     /**

@@ -30,6 +30,11 @@ public class MockEmbeddingClient implements EmbeddingClient {
         return properties.getDimensions();
     }
 
+    @Override
+    public boolean isMock() {
+        return true;
+    }
+
     private List<Float> hashToVector(String text) {
         byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
         List<Float> vector = new ArrayList<>(properties.getDimensions());

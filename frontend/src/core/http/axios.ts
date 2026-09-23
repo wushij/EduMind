@@ -109,6 +109,24 @@ function isAiHeavyRequest(url?: string): boolean {
   );
 }
 
+/**
+ * 文档任务型路径判定：解析 / 切片 / 向量索引。
+ * 这类请求在服务端要拉对象存储、抽正文、写切片并调用向量模型，
+ * 超时后任务往往仍在后台继续，提示文案需要说明"稍后刷新看进度"，而不是让用户以为彻底失败。
+ */
+function isDocumentTaskRequest(url?: string): boolean {
+  const target = (url || '').split('?')[0];
+  // /index/status 这类只读查询不算任务型，避免误报
+  if (target.endsWith('/status')) {
+    return false;
+  }
+  // 只匹配「动作型」结尾，避免把 /documents/1/chunks（列表查询）也判成任务型
+  if (['/parse', '/chunk', '/index', '/reindex'].some((key) => target.endsWith(key))) {
+    return true;
+  }
+  return target.endsWith('/sync-all') || target.includes('/sync-document/');
+}
+
 // 响应拦截器
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => {
@@ -155,10 +173,15 @@ axiosInstance.interceptors.response.use(
         : '') || error.message || '网络通信异常';
 
     if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-      // 普通接口超时不要甩锅给大模型：只有 AI / 长耗时路径才用推演口径提示
-      apiMessage = isAiHeavyRequest(error.config?.url)
-        ? 'AI 深度推演耗时较长，本次请求已超时，请稍后重试'
-        : '请求超时：服务端响应较慢，请稍后重试';
+      // 普通接口超时不要甩锅给大模型：按实际业务场景给出对应口径
+      const timeoutUrl = error.config?.url;
+      if (isAiHeavyRequest(timeoutUrl)) {
+        apiMessage = 'AI 深度推演耗时较长，本次请求已超时，请稍后重试';
+      } else if (isDocumentTaskRequest(timeoutUrl)) {
+        apiMessage = '解析/切片/向量索引耗时较长，本次请求已超时；任务可能仍在后台执行，请稍后刷新查看进度';
+      } else {
+        apiMessage = '请求超时：服务端响应较慢，请稍后重试';
+      }
     }
 
     if (!silent) {

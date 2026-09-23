@@ -7,6 +7,10 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({
+  name: 'CourseAI'
+});
+
 import type { CourseVO } from '@/types/course/course';
 import CourseAIPanel from '@/components/course/CourseAIPanel.vue';
 

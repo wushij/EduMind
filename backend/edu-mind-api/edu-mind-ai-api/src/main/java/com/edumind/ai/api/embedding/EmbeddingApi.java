@@ -12,4 +12,12 @@ public interface EmbeddingApi {
     String getModelName();
 
     int getDimensions();
+
+    /**
+     * 当前向量是否来自 Mock（哈希伪向量）。
+     *
+     * <p>未接入真实 Embedding 模型 / 未配置 API Key 时为 true：此时向量没有语义，
+     * 检索命中率不可信，knowledge 模块需要据此在界面上显式提示。</p>
+     */
+    boolean isMockVector();
 }

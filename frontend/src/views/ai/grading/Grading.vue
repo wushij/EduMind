@@ -362,10 +362,11 @@ function viewGradingResults(row: GradingTaskRow) {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/ai-teaching-page-shell.scss';
+
 .ai-grading-container {
-  padding: 24px;
-  background-color: #f8fafc;
-  min-height: calc(100vh - 64px);
+  width: 100%;
+  box-sizing: border-box;
 
   .hero-action-row {
     display: flex;
@@ -409,23 +410,22 @@ function viewGradingResults(row: GradingTaskRow) {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 16px;
-    margin-top: 20px;
-    margin-bottom: 20px;
 
     .metric-card {
       background: #ffffff;
-      border-radius: 16px;
-      padding: 18px 20px;
+      border-radius: 20px;
+      padding: 20px 22px;
       display: flex;
       align-items: center;
       gap: 16px;
       border: 1px solid #e2e8f0;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+      box-shadow: 0 4px 18px rgba(30, 80, 150, 0.03);
       transition: all 0.25s ease;
 
       &:hover {
         transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+        box-shadow: 0 8px 24px rgba(30, 80, 150, 0.08);
+        border-color: #cbd5e1;
       }
 
       .metric-icon {
@@ -488,17 +488,20 @@ function viewGradingResults(row: GradingTaskRow) {
   }
 
   .settings-card {
-    border-radius: 16px;
+    border-radius: 20px;
     border: 1px solid #e2e8f0;
-    margin-bottom: 20px;
     background: #ffffff;
+    box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
+
+    :deep(.el-card__body) {
+      padding: 16px 24px;
+    }
 
     .settings-grid {
       display: flex;
       align-items: center;
       flex-wrap: wrap;
       gap: 28px;
-      padding: 6px 10px;
 
       .setting-item {
         display: flex;
@@ -523,10 +526,10 @@ function viewGradingResults(row: GradingTaskRow) {
 
   .tasks-table-card {
     background: #ffffff;
-    border-radius: 16px;
+    border-radius: 24px;
     border: 1px solid #e2e8f0;
-    padding: 20px 24px;
-    box-shadow: 0 2px 12px rgba(15, 23, 42, 0.02);
+    padding: 24px 28px;
+    box-shadow: 0 4px 20px rgba(30, 80, 150, 0.04);
 
     .table-header-line {
       display: flex;

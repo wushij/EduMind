@@ -1,4 +1,8 @@
 export interface VectorStoreStats {
+  /** 当前生效的向量模型名（Mock 实现会带 -mock 后缀） */
+  embeddingModel?: string;
+  /** true=向量来自 Mock 哈希伪向量（未接入真实向量模型），检索命中率不可信 */
+  embeddingMocked?: boolean;
   engine: string;
   engineVersion: string;
   connectionStatus: 'ONLINE' | 'DEGRADED' | 'OFFLINE';

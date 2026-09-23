@@ -17,6 +17,8 @@ public class KnowledgeBaseVO {
     private String indexStatus;
     private Integer vectorCount;
     private String embeddingModel;
+    /** true=当前向量来自 Mock（未接入真实 Embedding Key），检索结果不可信 */
+    private Boolean embeddingMocked;
     private Integer status;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

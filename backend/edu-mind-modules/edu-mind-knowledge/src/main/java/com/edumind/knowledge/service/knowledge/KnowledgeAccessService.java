@@ -7,6 +7,7 @@ import com.edumind.common.model.UserContext;
 import com.edumind.course.api.CourseQueryApi;
 import com.edumind.knowledge.dao.KnowledgeBaseDao;
 import com.edumind.knowledge.entity.KnowledgeBaseEntity;
+import com.edumind.knowledge.support.InternalInvocationContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +33,11 @@ public class KnowledgeAccessService {
     }
 
     public void assertCourseAccessible(Long courseId) {
+        // 内部流水线（解析→切片→向量化）在异步线程中执行，没有登录用户上下文，
+        // 这里的断言只面向用户发起的请求；内部调用方已在上游完成鉴权
+        if (InternalInvocationContext.isInternal()) {
+            return;
+        }
         Long userId = resolveUserId();
         if (userId == null) {
             throw new BusinessException(com.edumind.common.api.ResultCode.UNAUTHORIZED.getCode(), "未登录");

@@ -55,7 +55,8 @@ public class CourseResourceKnowledgeSyncService {
             knowledgeDocumentDao.updateById(document);
         }
         refreshDocCount(dto.getKnowledgeBaseId());
-        documentPipelineService.parseAndChunkAsync(document.getId());
+        // 必须走 requestPipeline：本方法在事务内，直接调异步方法会让流水线线程读不到未提交的文档行
+        documentPipelineService.requestPipeline(document.getId());
         log.info("Course resource synced to KB courseResourceId={} documentId={} kbId={}",
                 dto.getCourseResourceId(), document.getId(), dto.getKnowledgeBaseId());
         return document.getId();

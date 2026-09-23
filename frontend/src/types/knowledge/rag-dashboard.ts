@@ -13,6 +13,8 @@ export interface KnowledgeRagDashboardVO {
   totalSessions: number
   embeddingDimension?: number
   embeddingModelName?: string
+  /** true=当前向量为 Mock 哈希伪向量（未接入真实向量模型），检索命中率不可信 */
+  embeddingMocked?: boolean
   hybridEnabled: boolean
   retrievalModelDescription?: string
   vectorStoreLabel?: string

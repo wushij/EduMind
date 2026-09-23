@@ -1,4 +1,4 @@
-import { ref, computed, watch, nextTick, onMounted, markRaw, type Ref } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onActivated, markRaw, type Ref } from 'vue';
 import { useAuthStore } from '@/stores/auth/auth';
 import { useRouter, useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -523,6 +523,16 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
   onMounted(() => {
     loadTenantCourses();
     nextTick(() => {
+      const appContent = document.querySelector('.app-content');
+      if (appContent) {
+        appContent.scrollLeft = 0;
+      }
+    });
+  });
+
+  onActivated(() => {
+    nextTick(() => {
+      scrollToBottomInstant();
       const appContent = document.querySelector('.app-content');
       if (appContent) {
         appContent.scrollLeft = 0;

@@ -59,7 +59,7 @@
           <el-option
             v-for="doc in documents"
             :key="doc.id"
-            :value="doc.id"
+            :value="Number(doc.id)"
             :label="(doc as any).fileName || doc.name"
           />
         </el-select>

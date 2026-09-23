@@ -17,13 +17,14 @@ import com.edumind.knowledge.entity.KnowledgeDocumentChunkEntity;
 import com.edumind.knowledge.entity.KnowledgeDocumentEntity;
 import com.edumind.knowledge.entity.KnowledgeIndexTaskEntity;
 import com.edumind.common.model.UserContext;
+import com.edumind.knowledge.event.KnowledgeIndexRequestedEvent;
 import com.edumind.knowledge.service.index.IndexingService;
 import com.edumind.knowledge.service.knowledge.KnowledgeAccessService;
 import com.edumind.knowledge.vo.knowledge.IndexStatusVO;
 import com.edumind.notification.api.NotificationWriteApi;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +51,7 @@ public class IndexingServiceImpl implements IndexingService {
     private final KnowledgeAccessService knowledgeAccessService;
     private final NotificationWriteApi notificationWriteApi;
     private final com.edumind.ai.api.RagRuntimeQueryApi ragRuntimeQueryApi;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -70,11 +72,14 @@ public class IndexingServiceImpl implements IndexingService {
 
         knowledgeBase.setIndexStatus("INDEXING");
         knowledgeBaseDao.updateById(knowledgeBase);
-        runIndexAsync(task.getId(), knowledgeBaseId, task.getMode(), operatorId, tenantId);
+        // 交给监听器在事务提交后异步执行：既避免 embedding 阻塞本请求（前端 30s 超时），
+        // 又保证异步线程能读到上面刚插入的 task 行（提交前读不到会被任务守卫跳过）
+        applicationEventPublisher.publishEvent(new KnowledgeIndexRequestedEvent(
+                task.getId(), knowledgeBaseId, task.getMode(), operatorId, tenantId));
     }
 
-    @Async("knowledgeTaskExecutor")
-    public void runIndexAsync(Long taskId, Long knowledgeBaseId, String mode, Long operatorId, Long tenantId) {
+    @Override
+    public void runIndexTask(Long taskId, Long knowledgeBaseId, String mode, Long operatorId, Long tenantId) {
         if (tenantId != null && tenantId > 0) {
             TenantContext.setTenantId(tenantId);
         }
@@ -188,6 +193,8 @@ public class IndexingServiceImpl implements IndexingService {
         vo.setIndexedChunks(currentIndexedChunks);
         vo.setFailedChunks(currentFailedChunks);
         vo.setEmbeddingModel(embeddingApi.getModelName());
+        // Mock 伪向量必须显式暴露：否则界面"已向量化"会被误读为语义检索可用
+        vo.setEmbeddingMocked(embeddingApi.isMockVector());
 
         if (task == null) {
             vo.setStatus(currentIndexedChunks > 0 ? (currentIndexedChunks >= currentTotalChunks ? "INDEXED" : "PARTIAL") : "PENDING");
@@ -249,6 +256,23 @@ public class IndexingServiceImpl implements IndexingService {
         }
         knowledgeChunkIndexDao.deleteByDocumentId(documentId);
         triggerIndex(document.getKnowledgeBaseId(), "INCREMENTAL");
+    }
+
+    @Override
+    public void purgeDocumentVectors(Long documentId) {
+        if (documentId == null) {
+            return;
+        }
+        String collection = milvusProperties.getCollection();
+        for (KnowledgeDocumentChunkEntity chunk : knowledgeDocumentChunkDao.listByDocumentId(documentId)) {
+            try {
+                vectorStore.delete(collection, String.valueOf(chunk.getId()));
+            } catch (Exception ex) {
+                // 向量删除失败不能阻断文档记录清理，否则用户会卡在"删不掉"
+                log.warn("删除文档向量失败 chunkId={}: {}", chunk.getId(), ex.getMessage());
+            }
+        }
+        knowledgeChunkIndexDao.deleteByDocumentId(documentId);
     }
 
     @Override
