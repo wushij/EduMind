@@ -36,18 +36,37 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
 
     @Override
     public String chat(String systemPrompt, String userPrompt, LlmChatOptions options) {
-        StringBuilder content = new StringBuilder();
-        streamChat(systemPrompt, userPrompt, options, new StreamCallback() {
-            @Override
-            public void onChunk(String chunk) {
-                content.append(chunk);
-            }
+        return chat(systemPrompt, userPrompt, options, null);
+    }
 
-            @Override
-            public void onError(String message) {
-                throw new IllegalStateException(message);
-            }
-        });
+    /**
+     * 可取消的对话调用。
+     *
+     * <p>{@code cancelled} 会被 {@code streamFromUpstream} 在 SSE 逐行读取时轮询：
+     * 置位后立即退出读取循环并通过 try-with-resources 关闭响应流，
+     * 真正断开与上游的连接、停止继续计费（而不是只把结果丢弃）。</p>
+     */
+    @Override
+    public String chat(String systemPrompt, String userPrompt, LlmChatOptions options,
+                       BooleanSupplier cancelled) {
+        StringBuilder content = new StringBuilder();
+        streamChatWithHistory(systemPrompt, List.of(LlmChatMessage.user(userPrompt)), options, cancelled,
+                new StreamCallback() {
+                    @Override
+                    public void onChunk(String chunk) {
+                        content.append(chunk);
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        throw new IllegalStateException(message);
+                    }
+                });
+        // 被取消时上游流会正常收尾到 onComplete，此处必须显式抛出，
+        // 否则调用方会拿到半截 JSON 继续解析，白白浪费一次上游额度。
+        if (cancelled != null && cancelled.getAsBoolean()) {
+            throw new LlmCallCancelledException("大模型调用已被用户中止");
+        }
         return content.toString();
     }
 

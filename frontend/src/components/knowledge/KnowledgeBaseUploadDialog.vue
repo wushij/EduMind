@@ -41,7 +41,7 @@
             ref="fileInputRef"
             type="file"
             class="hidden-file-input"
-            accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.md"
+            accept=".pdf,.doc,.docx,.md,.markdown,.txt"
             @change="handleFileChange"
           />
 
@@ -64,7 +64,7 @@
               点击或将文件拖拽至此处上传
             </p>
             <p class="drop-hint">
-              支持 PDF、Word (.doc/.docx)、PPT (.ppt/.pptx)、Markdown、TXT，单个文件不超过 50MB
+              支持 PDF、Word (.doc/.docx)、Markdown (.md)、TXT，单个文件不超过 50MB
             </p>
           </template>
 

@@ -12,6 +12,19 @@ public interface LlmClient {
         return chat(systemPrompt, userPrompt);
     }
 
+    /**
+     * 可取消的对话调用。
+     *
+     * <p>实现方需在流式读取过程中轮询 {@code cancelled}，一旦置位立即停止读取并关闭响应流，
+     * 从而真正断开与上游的连接、停止继续计费；无法支持取消的实现退化为普通调用。</p>
+     *
+     * @throws LlmCallCancelledException 调用已被中止（不应被当作模型故障重试或 fallback）
+     */
+    default String chat(String systemPrompt, String userPrompt, LlmChatOptions options,
+                        BooleanSupplier cancelled) {
+        return chat(systemPrompt, userPrompt, options);
+    }
+
     default String chat(String systemPrompt, List<LlmChatMessage> messages) {
         if (messages == null || messages.isEmpty()) {
             return chat(systemPrompt, "");

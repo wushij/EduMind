@@ -56,7 +56,7 @@
                   class="q-opt"
                   :class="{ correct: opt.isCorrect }"
                 >
-                  <span class="opt-k">{{ opt.key }}.</span>
+                  <span class="opt-k">{{ opt.key }}</span>
                   <MathText class="opt-content" :text="opt.content" />
                 </div>
               </div>
@@ -183,28 +183,48 @@ const {
 
         .q-options {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 8px;
           margin-bottom: 12px;
 
           .q-opt {
             background: #ffffff;
             border: 1px solid #edf2f7;
-            padding: 8px 12px;
-            border-radius: 6px;
+            padding: 6px 16px 6px 8px;
+            border-radius: 9999px; // 长圆选项胶囊，与试卷预览页保持一致
             font-size: 13px;
+            line-height: 1.6;
             display: flex;
-            gap: 6px;
+            align-items: center;
+            gap: 8px;
 
             .opt-k {
-              font-weight: 600;
+              flex-shrink: 0;
+              width: 20px;
+              height: 20px;
+              border-radius: 50%;
+              background: #f1f5f9;
               color: #64748b;
+              font-weight: 600;
+              font-size: 12px;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+            }
+
+            .opt-content {
+              min-width: 0;
             }
 
             &.correct {
               border-color: #86efac;
               background: #f0fdf4;
               color: #166534;
+
+              .opt-k {
+                background: #10b981;
+                color: #ffffff;
+              }
             }
           }
         }

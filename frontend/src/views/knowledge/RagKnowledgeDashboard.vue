@@ -243,7 +243,7 @@ onMounted(() => fetchStats())
 </script>
 
 <style scoped lang="scss">
-@import '@/components/knowledge/rag-dashboard/rag-dashboard-stats.scss';
+@use '@/components/knowledge/rag-dashboard/rag-dashboard-stats.scss' as *;
 
 .rag-dashboard-page {
   padding: 0 4px 24px;

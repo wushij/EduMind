@@ -9,14 +9,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 对齐 goblog-server aisvc/presets.go · DefaultProviderPresets（2026-09-06-v4）
+ * 对齐 goblog-server aisvc/presets.go · DefaultProviderPresets。
+ *
+ * <p>2026-09-23 本地修正：MiniMax 的 API model 参数为小写（minimax-m3 / minimax-m2.7），
+ * 原大写写法在调用端会 model not found；Kimi 补上最新的 kimi-k2.8-preview 与 kimi-k2.6。</p>
  */
 @Component
 public class AiProviderPresetCatalog {
 
     public AiProviderPresetsResponseVO getPresets() {
         AiProviderPresetsResponseVO response = new AiProviderPresetsResponseVO();
-        response.setCatalogVersion("2026-09-06-v4");
+        response.setCatalogVersion("2026-09-23-v5");
         response.setChat(buildChatPresets());
         response.setEmbedding(buildEmbeddingPresets());
         return response;
@@ -64,11 +67,13 @@ public class AiProviderPresetCatalog {
         ));
         map.put("minimax", preset(
                 "MiniMax",
-                "MiniMax-M3",
+                "minimax-m3",
                 "https://api.minimaxi.com/v1",
                 "https://platform.minimaxi.com",
                 "openai_compatible",
-                List.of("MiniMax-M3", "MiniMax-M2.7-highspeed")
+                // 官方文档的展示名是大写 MiniMax-M3，但 API model 参数一律小写，
+                // 填大写会导致调用时 model not found
+                List.of("minimax-m3", "minimax-m2.7", "minimax-m2.7-highspeed")
         ));
         map.put("claude", preset(
                 "Claude（Anthropic）",
@@ -85,14 +90,16 @@ public class AiProviderPresetCatalog {
         ));
         map.put("kimi", preset(
                 "Kimi（月之暗面）",
-                "kimi-k3",
+                "kimi-k2.8-preview",
                 "https://api.moonshot.cn/v1",
                 "https://platform.moonshot.cn",
                 "openai_compatible",
                 List.of(
+                        "kimi-k2.8-preview",
                         "kimi-k3",
                         "kimi-k2.7-code",
-                        "kimi-k2.7-code-highspeed"
+                        "kimi-k2.7-code-highspeed",
+                        "kimi-k2.6"
                 )
         ));
         map.put("mock", preset(

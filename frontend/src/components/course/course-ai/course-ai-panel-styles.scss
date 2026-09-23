@@ -647,58 +647,73 @@
             }
 
             .streaming-body-box {
-              max-width: 86%;
+              flex: 1;
+              max-width: 88%;
               min-width: 0;
+              width: calc(100% - 52px);
               display: flex;
               flex-direction: column;
-              gap: 8px;
 
-              .msg-meta-header {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                margin-bottom: 5px;
-
-                .sender-name {
-                  font-size: 12.5px;
-                  font-weight: 600;
-                  color: #1E293B;
-                }
-
-                .streaming-badge-tag {
-                  font-size: 11px;
-                  padding: 1px 8px;
-                  border-radius: 999px;
-                  background: rgba(22, 119, 255, 0.1);
-                  color: #1677ff;
-                  font-weight: 500;
-                  animation: pulse 1.5s infinite ease-in-out;
-                }
-              }
-
-              .msg-bubble.is-streaming {
+              .msg-bubble.is-streaming-bubble {
                 position: relative;
-                max-width: 100%;
+                width: 100%;
                 min-width: 0;
                 box-sizing: border-box;
-                padding: 16px 20px 24px;
+                padding: 16px 20px;
                 font-size: 13.5px;
                 line-height: 1.7;
                 word-break: break-word;
-                background: #F8FAFC;
-                border: 1px solid #E2E8F0;
+                background: #FFFFFF;
+                border: 1px solid rgba(22, 119, 255, 0.35);
                 border-radius: 4px 18px 18px 18px;
-                box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+                box-shadow: 0 0 16px rgba(22, 119, 255, 0.08), 0 2px 8px rgba(15, 23, 42, 0.03);
                 color: #1E293B;
-                overflow-x: auto;
-                overflow-y: visible;
+                overflow: hidden;
 
-                .stream-cursor {
-                  display: inline-block;
-                  margin-left: 2px;
-                  color: #1677FF;
-                  font-size: 14px;
-                  animation: blink 0.9s infinite;
+                .msg-meta-header {
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  margin-bottom: 12px;
+                  padding-bottom: 10px;
+                  border-bottom: 1px dashed rgba(22, 119, 255, 0.18);
+
+                  .sender-name {
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: #1E293B;
+                  }
+
+                  .streaming-badge-tag {
+                    font-size: 11px;
+                    padding: 2px 9px;
+                    border-radius: 999px;
+                    background: rgba(22, 119, 255, 0.08);
+                    border: 1px solid rgba(22, 119, 255, 0.22);
+                    color: #1677ff;
+                    font-weight: 500;
+                    animation: pulse 1.5s infinite ease-in-out;
+                  }
+                }
+
+                :deep(.reasoning-card) {
+                  width: 100%;
+                  box-sizing: border-box;
+                  margin-bottom: 12px;
+                }
+
+                .streaming-answer-body {
+                  position: relative;
+                  min-width: 0;
+                  color: #1E293B;
+
+                  .stream-cursor {
+                    display: inline-block;
+                    margin-left: 2px;
+                    color: #1677FF;
+                    font-size: 14px;
+                    animation: blink 0.9s infinite;
+                  }
                 }
               }
             }

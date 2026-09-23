@@ -318,6 +318,12 @@ const emit = defineEmits<{
           font-weight: 600;
           cursor: pointer;
           transition: all 0.2s;
+          // <button> 默认 inline-block，图标与文字按基线排版会显得歪且没有间距，
+          // 统一改成 flex 居中，间距由 gap 控制
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
 
           &--secondary {
             background: #FFFFFF;

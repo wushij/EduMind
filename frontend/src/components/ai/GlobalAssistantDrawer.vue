@@ -220,7 +220,7 @@ provide(globalAssistantUiKey, uiContext);
 </script>
 
 <style lang="scss">
-@import '@/components/ai/global-assistant/drawer-panel-styles.scss';
+@use '@/components/ai/global-assistant/drawer-panel-styles.scss' as *;
 
 .fade-enter-active,
 .fade-leave-active {

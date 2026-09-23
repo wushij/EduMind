@@ -23,6 +23,7 @@ import {
   buildSessionTitleFromPrompt,
   generateSmartFollowUps,
   deleteRemoteMessage,
+  renameRemoteSession,
   streamAssistantChat,
   fallbackAskAssistant
 } from '@/services/ai/stream-service';
@@ -253,6 +254,9 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
       const previewTitle = buildSessionTitleFromPrompt(text);
       if (!isDefaultSessionTitle(previewTitle)) {
         curSess.title = previewTitle;
+        if (deps.currentSessionId.value) {
+          void renameRemoteSession(deps.currentSessionId.value, previewTitle).catch(() => {});
+        }
       }
     }
 

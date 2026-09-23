@@ -610,9 +610,11 @@ export function normalizeChatMarkdown(raw: string): string {
   text = normalizeGluedInlineHeadings(text);
   text = text.replace(/(^|\n)(#{1,6})([^\s#\n])/g, '$1$2 $3');
 
-  text = text.replace(/\*\*\s+([^*\n]+?)\s+\*\*/g, '**$1**');
-  text = text.replace(/\*\*\s+([^*\n]+?)\*\*/g, '**$1**');
-  text = text.replace(/\*\*([^*\n]+?)\s+\*\*/g, '**$1**');
+  // 只消除「加粗标记内侧」的水平空白：\s 会跨行匹配，把上一行的 **分组标题** 与下一行的
+  // "- **列表项**" 误配成一对加粗，导致换行与列表标记一起被吞进加粗文本
+  text = text.replace(/\*\*[ \t]+([^*\n]+?)[ \t]+\*\*/g, '**$1**');
+  text = text.replace(/\*\*[ \t]+([^*\n]+?)\*\*/g, '**$1**');
+  text = text.replace(/\*\*([^*\n]+?)[ \t]+\*\*/g, '**$1**');
   // 仅消除横向空格与制表符，避免误吞换行符 \n
   text = text.replace(/\*\*([^*\n]+?)\*\*[ \t]+(?=[\u4e00-\u9fa5（(「『【])/g, '**$1**');
 

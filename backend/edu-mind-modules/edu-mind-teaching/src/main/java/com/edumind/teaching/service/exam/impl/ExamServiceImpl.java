@@ -19,7 +19,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -121,10 +123,15 @@ public class ExamServiceImpl implements ExamService {
         if (questions == null || questions.isEmpty()) {
             return;
         }
-        // 单条 SQL 批量写入试卷题目（替代逐题 insert）
+        // exam_question 对 (exam_id, question_id) 建有唯一键，同一题被重复加入时若不剔除，
+        // 整份试卷会因 DuplicateKeyException 回滚（对外表现为 400「数据已存在，请勿重复提交」）。
         int sort = 1;
+        Set<Long> usedQuestionIds = new HashSet<>(questions.size());
         List<ExamQuestionEntity> entities = new ArrayList<>(questions.size());
         for (ExamQuestionItemDTO item : questions) {
+            if (item.getQuestionId() == null || !usedQuestionIds.add(item.getQuestionId())) {
+                continue;
+            }
             ExamQuestionEntity entity = new ExamQuestionEntity();
             entity.setExamId(examId);
             entity.setQuestionId(item.getQuestionId());

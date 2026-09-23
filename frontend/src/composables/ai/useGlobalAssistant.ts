@@ -62,6 +62,7 @@ function resolveIntentDesc(intent?: string, agentCode?: string): string {
   const code = (agentCode || '').toLowerCase();
   if (code === 'exam' || code === 'question' || intent === 'EXAM_COMPOSE') return '识别意图：AI 智能组卷与出题';
   if (code === 'tutor' || code === 'question_tutor') return '识别意图：题目答疑辅导';
+  if (code === 'platform') return '识别意图：平台能力咨询';
   if (code === 'teaching') return '识别意图：备课教学建议';
   if (code === 'grading') return '识别意图：作业智能批改';
   if (code === 'learning') return '识别意图：学情诊断分析';
@@ -152,11 +153,18 @@ function mapApiMessage(raw: Record<string, unknown>): GlobalAssistantMessage {
   };
 }
 
+/**
+ * 兜底快捷提问：仅在未锚定任何课程 / 课节 / 题目上下文时使用（全域通用教学空间）。
+ *
+ * 此处不假设任何学科与课程——用户此时恰恰最缺上下文，若把「微积分」「第一章」这类
+ * 具体学科写进提问，点下去只会得到答不到点上的内容。改为围绕「平台能做什么、怎么用」，
+ * 既能给新用户导览，也不依赖任何前置上下文。
+ */
 const DEFAULT_PRESET_CHIPS = [
-  { label: '智能组卷', prompt: '帮我出一份包含导数与微分的期中试卷，含选择、填空与大题' },
-  { label: '检索切片', prompt: '请深度检索微积分第一章的核心知识点切片与讲义资料' },
-  { label: '学情看板', prompt: '我想查看近期班级知识点掌握度与薄弱点学情报表' },
-  { label: '知识图谱', prompt: '生成并展示当前微积分课程的拓扑知识图谱' }
+  { label: '平台能力', prompt: '智教云现在都有哪些 AI 教学能力？分别适合解决什么问题？' },
+  { label: '上手流程', prompt: '我想从零做出一份可用的试卷，完整流程是怎样的？' },
+  { label: '知识入库', prompt: '上传的课件和讲义会变成什么？怎么做成可检索的知识库？' },
+  { label: '学情来源', prompt: '学情分析的数据从哪里来？能看到哪些维度的结论？' }
 ];
 
 const LESSON_STUDIO_PRESET_CHIPS = [

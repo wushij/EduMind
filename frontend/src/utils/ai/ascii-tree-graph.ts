@@ -44,23 +44,34 @@ function escapeMermaidLabel(label: string): string {
     .slice(0, 44);
 }
 
-function branchDepth(line: string): number {
-  const trimmed = line.trimStart();
-  let pipes = 0;
-  for (const ch of trimmed) {
-    if (ch === '│') pipes += 1;
-    else if (ch === '├' || ch === '└') break;
-    else if (ch === ' ') continue;
-    else break;
-  }
-  return pipes + 1;
+interface ParsedBranch {
+  label: string;
+  indent: number;
 }
 
-function branchLabel(line: string): string | null {
-  const m = line.trim().match(/^[│\s]*[├└]─?\s*(.*)$/);
+function parseBranchLine(line: string): ParsedBranch | null {
+  // 匹配前缀缩进（空格、制表符、竖线）以及分支标志（├、└、+、|）和横线
+  // 如 "│   └── com/" 或 "    ├── src/" 或 "├─── EnvDiagnostics.java"
+  const m = line.match(/^([\s│\|]*)([├└\+\|][─\-\s]*)(.*)$/);
   if (!m) return null;
-  const label = m[1].replace(/\s*│\s*$/g, '').trim();
-  return label || null;
+
+  const prefix = m[1];
+  let rawLabel = m[3] || '';
+
+  // 彻底剔除标签开头的残留连接符（如 ─、-、—、-- 以及多余空格）
+  rawLabel = rawLabel
+    .replace(/^[─\-—\s]+/, '')
+    .replace(/\s*│\s*$/g, '')
+    .trim();
+  if (!rawLabel) return null;
+
+  // 计算视觉缩进：制表符转4空格，竖线与普通字符等宽
+  const visualIndent = prefix.replace(/\t/g, '    ').length;
+
+  return {
+    label: rawLabel,
+    indent: visualIndent
+  };
 }
 
 /** 将字符树转为 Mermaid flowchart；失败时返回 null */
@@ -72,32 +83,31 @@ export function asciiTreeToMermaid(code: string): string | null {
 
   let rootLabel = '';
   let bodyLines = rawLines;
-  if (!/^[│\s]*[├└]/.test(rawLines[0])) {
+  if (!/^[│\s]*[├└\+\|]/.test(rawLines[0])) {
     rootLabel = rawLines[0].trim();
     bodyLines = rawLines.slice(1);
   }
 
   const nodeDecls: string[] = [];
   const edgeDecls: string[] = [];
-  const stack: { id: string; depth: number }[] = [];
+  const stack: { id: string; indent: number }[] = [];
   let counter = 0;
 
-  let rootId = '';
   if (rootLabel) {
-    rootId = `T${counter++}`;
+    const rootId = `T${counter++}`;
     nodeDecls.push(`${rootId}["${escapeMermaidLabel(rootLabel)}"]`);
-    stack.push({ id: rootId, depth: 0 });
+    stack.push({ id: rootId, indent: -1 });
   }
 
   for (const line of bodyLines) {
-    const label = branchLabel(line);
-    if (!label) continue;
+    const branch = parseBranchLine(line);
+    if (!branch) continue;
 
-    const depth = branchDepth(line);
     const id = `T${counter++}`;
-    nodeDecls.push(`${id}["${escapeMermaidLabel(label)}"]`);
+    nodeDecls.push(`${id}["${escapeMermaidLabel(branch.label)}"]`);
 
-    while (stack.length > 0 && stack[stack.length - 1].depth >= depth) {
+    // 如果当前缩进小于等于栈顶节点的缩进，说明当前节点是栈顶节点的兄弟或更浅层节点，依次退栈
+    while (stack.length > 1 && stack[stack.length - 1].indent >= branch.indent) {
       stack.pop();
     }
 
@@ -106,7 +116,7 @@ export function asciiTreeToMermaid(code: string): string | null {
       edgeDecls.push(`${parent.id} --> ${id}`);
     }
 
-    stack.push({ id, depth });
+    stack.push({ id, indent: branch.indent });
   }
 
   if (nodeDecls.length < 2 || edgeDecls.length < 1) return null;

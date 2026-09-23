@@ -45,18 +45,19 @@
         </div>
       </div>
 
-      <AIThinking
-        v-if="message.role === 'assistant' && showThinkingPanel && (thinkingDisplay || (message.isStreaming && !answerContent))"
-        :content="thinkingDisplay"
-        :folded="resolvedReasoningFolded"
-        :active="!!message.isStreaming && !!message.isReasoningActive"
-        :has-answer-body="!!answerContent"
-        :phase-message="message.streamPhaseMessage"
-        @update:folded="message.reasoningFolded = $event"
-        @user-collapse="$emit('reasoning-collapse')"
-      />
-
       <div ref="bubbleRef" class="msg-bubble" :class="{ 'is-streaming': message.isStreaming }">
+        <!-- 深度思考卡片 (在助手卡片内部顶部自适应铺满) -->
+        <AIThinking
+          v-if="message.role === 'assistant' && showThinkingPanel && (thinkingDisplay || (message.isStreaming && !answerContent))"
+          :content="thinkingDisplay"
+          :folded="resolvedReasoningFolded"
+          :active="!!message.isStreaming && !!message.isReasoningActive"
+          :has-answer-body="!!answerContent"
+          :phase-message="message.streamPhaseMessage"
+          @update:folded="message.reasoningFolded = $event"
+          @user-collapse="$emit('reasoning-collapse')"
+        />
+
         <!-- 统一使用标准高保真 Markdown / KaTeX / Mermaid / 代码高亮解析 -->
         <div class="markdown-body chat-md-content" v-html="renderedHtml" />
 
@@ -393,13 +394,26 @@ function handleCopy() {
 
   // 助手消息样式 (浅灰底白边，左上圆角)
   &--assistant {
+    .msg-content-wrapper {
+      flex: 1;
+      width: calc(100% - 52px);
+      max-width: 88%;
+    }
+
     .msg-bubble {
+      width: 100%;
       background: #F8FAFC;
       border: 1px solid #E2E8F0;
       border-radius: 4px 18px 18px 18px;
       box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
       color: #1E293B;
       overflow: hidden;
+
+      :deep(.reasoning-card) {
+        width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 12px;
+      }
     }
   }
 

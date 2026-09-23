@@ -53,6 +53,27 @@ public class LoggingLlmClient implements LlmClient {
         }
     }
 
+    /**
+     * 装饰器必须显式转发 cancelled，否则会退回 {@link LlmClient} 的默认实现，
+     * 导致上层置位的「用户已中止」传不到真正的 HTTP 客户端，取消静默失效。
+     */
+    @Override
+    public String chat(String systemPrompt, String userPrompt, LlmChatOptions options,
+                       BooleanSupplier cancelled) {
+        assertQuota();
+        long start = System.currentTimeMillis();
+        try {
+            String result = delegate.chat(systemPrompt, userPrompt, options, cancelled);
+            aiCallAuditService.recordEstimated("CHAT", null, null, start,
+                    joinPrompt(systemPrompt, userPrompt), result);
+            return result;
+        } catch (RuntimeException ex) {
+            aiCallAuditService.recordEstimated("CHAT", null, null, start,
+                    joinPrompt(systemPrompt, userPrompt), "");
+            throw ex;
+        }
+    }
+
     @Override
     public String generateQuestions(String prompt, Map<String, Object> params) {
         assertQuota();

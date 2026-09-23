@@ -1,5 +1,5 @@
 <template>
-  <div class="exam-preview-page">
+  <div class="exam-preview-page" :class="`print-mode--${printMode}`">
     <!-- 顶部操作栏（长圆胶囊按钮） -->
     <div class="preview-action-bar">
       <div class="left-meta">
@@ -20,6 +20,26 @@
           <span>返回修改组卷规则</span>
         </button>
 
+        <!-- 试卷版本切换：切换后页面即按对应版本渲染，打印的就是当前所见 -->
+        <div class="paper-mode-switch" role="group" aria-label="试卷版本">
+          <button
+            type="button"
+            class="mode-btn"
+            :class="{ 'is-active': printMode === 'teacher' }"
+            @click="printMode = 'teacher'"
+          >
+            教师卷
+          </button>
+          <button
+            type="button"
+            class="mode-btn"
+            :class="{ 'is-active': printMode === 'student' }"
+            @click="printMode = 'student'"
+          >
+            学生卷
+          </button>
+        </div>
+
         <button
           type="button"
           class="capsule-btn capsule-btn--ghost"
@@ -36,7 +56,7 @@
           @click="handleSaveExam"
         >
           <el-icon><Check /></el-icon>
-          <span>保存试卷并归档入库</span>
+          <span>保存试卷</span>
         </button>
       </div>
     </div>
@@ -94,8 +114,6 @@
 
         <div class="paper-rules-meta">
           <span>所属课程：{{ currentExam.courseName || '专业核心课程' }}</span>
-          <span class="dot">·</span>
-          <span>适用学期：{{ currentExam.semester || '2025-2026学年第二学期' }}</span>
           <span class="dot">·</span>
           <span>卷面满分：{{ currentExam.totalScore }} 分</span>
           <span class="dot">·</span>
@@ -162,20 +180,26 @@
                   class="q-opt-item"
                   :class="{ 'show-correct': opt.isCorrect }"
                 >
-                  <span class="opt-label">{{ opt.key }}.</span>
+                  <span class="opt-label">{{ opt.key }}</span>
                   <span class="opt-text">{{ opt.content }}</span>
                 </div>
               </div>
 
-              <!-- 解析与考点长圆小字说明 -->
+              <!-- 考点/参考答案一行，解析独占一行：避免长解析文本与胶囊挤在同一行 -->
               <div class="q-analysis-mini">
-                <span v-if="q.knowledgePointNames && q.knowledgePointNames.length" class="kp-pill">
-                  考点：{{ q.knowledgePointNames.join('、') }}
-                </span>
-                <span class="ans-pill">参考答案：{{ q.correctAnswer || q.answer || '略' }}</span>
-                <span v-if="q.analysis" class="analysis-pill">
-                  解析：{{ q.analysis }}
-                </span>
+                <div
+                  v-if="(q.knowledgePointNames && q.knowledgePointNames.length) || q.correctAnswer || q.answer"
+                  class="mini-meta-row"
+                >
+                  <span v-if="q.knowledgePointNames && q.knowledgePointNames.length" class="kp-pill">
+                    考点：{{ q.knowledgePointNames.join('、') }}
+                  </span>
+                  <span class="ans-pill">参考答案：{{ q.correctAnswer || q.answer || '略' }}</span>
+                </div>
+                <p v-if="q.analysis" class="analysis-text">
+                  <span class="analysis-label">解析</span>
+                  <span class="analysis-body">{{ q.analysis }}</span>
+                </p>
               </div>
             </div>
           </div>
@@ -186,7 +210,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   Back,
@@ -209,6 +233,12 @@ const {
 
 const saving = ref(false);
 const chineseNumbers = ['一', '二', '三', '四', '五', '六', '七'];
+
+/**
+ * 试卷版本：教师卷保留答案与解析，学生卷只留题干与选项。
+ * 该状态同时作用于屏幕预览与打印结果，保证所见即所得。
+ */
+const printMode = ref<'teacher' | 'student'>('teacher');
 
 const defaultAssessmentText = computed(() => {
   return `【AI 试卷效度综合诊断】本套试卷难度梯度符合标准正态模型，各考点题量配比均衡，兼顾基础概念识记与工程分析推导。覆盖布鲁姆认知模型前四个层级，信度效度优良，具备良好的阶段性学情诊断价值。`;
@@ -328,8 +358,33 @@ async function handleSaveExam() {
   }
 }
 
-function handlePrintPaper() {
-  window.print();
+/** 打印期间临时覆盖 @page 边距的样式节点 id */
+const PRINT_PAGE_OVERRIDE_ID = 'exam-print-page-override';
+
+/**
+ * 打印当前预览的试卷版本（可另存为 PDF）。
+ *
+ * <p>Chrome/Edge 会把「日期 / 文档标题 / 网址 / 页码」画在 {@code @page} 的边距区域内，
+ * 这不是页面元素，CSS 无法单独隐藏；把边距归零后浏览器就没有空间再绘制它们，
+ * 纸张留白改由试卷卡片自身的打印内边距提供。</p>
+ *
+ * <p>该覆盖只在打印期间注入、打印结束立即移除，不会影响导出中心等其他打印场景。</p>
+ */
+async function handlePrintPaper() {
+  const previous = document.getElementById(PRINT_PAGE_OVERRIDE_ID);
+  previous?.remove();
+
+  const override = document.createElement('style');
+  override.id = PRINT_PAGE_OVERRIDE_ID;
+  override.textContent = '@page { size: A4 portrait; margin: 0; }';
+  document.head.appendChild(override);
+
+  try {
+    await nextTick();
+    window.print();
+  } finally {
+    override.remove();
+  }
 }
 </script>
 
@@ -344,9 +399,11 @@ function handlePrintPaper() {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap; // 宽度不足时右区按钮整体下移，避免把左侧胶囊压到折行
+  gap: 12px 16px;
   margin-bottom: 20px;
   background: #ffffff;
-  padding: 16px 24px;
+  padding: 14px 20px;
   border-radius: 9999px; // 长圆边框
   border: 1px solid #e2e8f0;
   box-shadow: 0 4px 16px rgba(30, 80, 150, 0.04);
@@ -354,20 +411,24 @@ function handlePrintPaper() {
   .left-meta {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    min-width: 0;
 
     .page-title {
-      font-size: 17px;
+      font-size: 15px;
       font-weight: 700;
       color: #0f172a;
-      margin: 0 6px 0 0;
+      margin: 0 4px 0 0;
+      white-space: nowrap; // 标题整体不折行
     }
 
     .pill-badge {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
-      padding: 4px 14px;
+      padding: 3px 12px;
       border-radius: 9999px; // 长圆胶囊
+      white-space: nowrap; // 胶囊内文字整体不折行（修掉「总分：100 / 分」被拆两行）
+      flex-shrink: 0;
 
       &--primary {
         background: #eff6ff;
@@ -395,17 +456,53 @@ function handlePrintPaper() {
   .right-buttons {
     display: flex;
     align-items: center;
-    gap: 10px;
+    flex-shrink: 0;
+    gap: 8px;
+
+    // 试卷版本分段切换：教师卷 / 学生卷
+    .paper-mode-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 3px;
+      border-radius: 9999px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+
+      .mode-btn {
+        height: 28px;
+        padding: 0 14px;
+        border: none;
+        border-radius: 9999px;
+        background: transparent;
+        font-size: 12px;
+        font-weight: 600;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+          color: #1e293b;
+        }
+
+        &.is-active {
+          background: #ffffff;
+          color: #1d4ed8;
+          box-shadow: 0 2px 6px rgba(30, 80, 150, 0.12);
+        }
+      }
+    }
 
     .capsule-btn {
-      height: 38px;
+      height: 34px;
       border-radius: 9999px; // 长圆按钮
-      padding: 0 18px;
-      font-size: 13px;
+      padding: 0 14px;
+      font-size: 12px;
       font-weight: 600;
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      white-space: nowrap;
       cursor: pointer;
       transition: all 0.2s;
 
@@ -447,6 +544,11 @@ function handlePrintPaper() {
         }
       }
     }
+  }
+
+  // 窄屏下按钮会换行，长圆角会被拉成扁椭圆，降级为卡片圆角
+  @media (max-width: 1280px) {
+    border-radius: 20px;
   }
 }
 
@@ -684,25 +786,40 @@ function handlePrintPaper() {
 
         .q-options-grid {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 10px;
           margin-top: 14px;
           padding-left: 20px;
 
           .q-opt-item {
             display: flex;
-            align-items: flex-start;
-            gap: 6px;
+            align-items: center;
+            gap: 8px;
             font-size: 13.5px;
+            line-height: 1.6;
             color: #334155;
-            padding: 8px 14px;
+            padding: 7px 18px 7px 10px;
             border-radius: 9999px; // 长圆选项胶囊
             background: #ffffff;
             border: 1px solid #e2e8f0;
+            transition: all 0.2s;
 
             .opt-label {
-              font-weight: 700;
+              flex-shrink: 0;
+              width: 22px;
+              height: 22px;
+              border-radius: 50%;
+              background: #f1f5f9;
               color: #475569;
+              font-weight: 700;
+              font-size: 12px;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+            }
+
+            .opt-text {
+              min-width: 0;
             }
 
             &.show-correct {
@@ -711,7 +828,8 @@ function handlePrintPaper() {
               color: #065f46;
 
               .opt-label {
-                color: #059669;
+                background: #10b981;
+                color: #ffffff;
               }
             }
           }
@@ -719,38 +837,82 @@ function handlePrintPaper() {
 
         .q-analysis-mini {
           display: flex;
-          align-items: center;
-          flex-wrap: wrap;
+          flex-direction: column;
           gap: 8px;
-          margin-top: 12px;
-          padding-top: 10px;
+          margin-top: 14px;
+          padding-top: 12px;
           border-top: 1px dashed #e2e8f0;
-          font-size: 12px;
 
-          .kp-pill {
-            background: #eff6ff;
-            color: #1d4ed8;
-            padding: 3px 12px;
-            border-radius: 9999px; // 长圆
-            border: 1px solid #bfdbfe;
+          .mini-meta-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding-left: 20px; // 与题干缩进对齐
+
+            .kp-pill {
+              font-size: 12px;
+              background: #eff6ff;
+              color: #1d4ed8;
+              padding: 3px 12px;
+              border-radius: 9999px; // 长圆
+              border: 1px solid #bfdbfe;
+            }
+
+            .ans-pill {
+              font-size: 12px;
+              background: #f0fdf4;
+              color: #15803d;
+              font-weight: 600;
+              padding: 3px 12px;
+              border-radius: 9999px; // 长圆
+              border: 1px solid #bbf7d0;
+            }
           }
 
-          .ans-pill {
-            background: #f0fdf4;
-            color: #15803d;
-            font-weight: 600;
-            padding: 3px 12px;
-            border-radius: 9999px; // 长圆
-            border: 1px solid #bbf7d0;
-          }
+          .analysis-text {
+            display: flex;
+            gap: 10px;
+            margin: 0;
+            padding: 10px 14px;
+            border-radius: 10px;
+            background: #f8fafc;
+            border-left: 3px solid #cbd5e1;
+            font-size: 12.5px;
+            line-height: 1.75;
+            color: #475569;
 
-          .analysis-pill {
-            color: #64748b;
-            flex: 1;
-            min-width: 200px;
+            .analysis-label {
+              flex-shrink: 0;
+              font-weight: 700;
+              color: #334155;
+            }
+
+            .analysis-body {
+              flex: 1;
+              min-width: 0;
+            }
           }
         }
       }
+    }
+  }
+}
+
+/* 学生卷：隐藏考点、答案与解析，并抹掉选项的正确答案高亮，避免打印时泄露答案 */
+.exam-preview-page.print-mode--student {
+  .q-analysis-mini {
+    display: none !important;
+  }
+
+  .q-opt-item.show-correct {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    color: #334155 !important;
+
+    .opt-label {
+      background: #f1f5f9 !important;
+      color: #475569 !important;
     }
   }
 }
@@ -762,6 +924,12 @@ function handlePrintPaper() {
     display: none !important;
   }
 
+  // 避免同一道题被切到两页
+  .exam-q-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   .exam-preview-page {
     max-width: 100% !important;
     padding: 0 !important;
@@ -770,7 +938,9 @@ function handlePrintPaper() {
   .paper-sheet-card {
     box-shadow: none !important;
     border: none !important;
-    padding: 0 !important;
+    // @page 边距已在打印前归零（用于消除浏览器自带的日期/标题/网址/页码），
+    // 纸张留白改由这里提供：左右内边距对每一页都生效，上下内边距只在首页顶部与末页底部生效。
+    padding: 12mm 14mm !important;
   }
 }
 </style>

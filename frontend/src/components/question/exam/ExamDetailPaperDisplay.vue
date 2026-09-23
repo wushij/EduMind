@@ -6,11 +6,11 @@
             <span class="dock-label">卷面视图模式：</span>
             <el-radio-group v-model="viewMode" size="small">
               <el-radio-button label="PAPER">
-                <el-icon class="mr-1"><Document /></el-icon>
+                <el-icon><Document /></el-icon>
                 <span>标准考生纸质试卷</span>
               </el-radio-button>
               <el-radio-button label="ANSWER_KEY">
-                <el-icon class="mr-1"><View /></el-icon>
+                <el-icon><View /></el-icon>
                 <span>含参考答案及评分细则</span>
               </el-radio-button>
             </el-radio-group>
@@ -19,7 +19,8 @@
           <div class="right-quick">
             <span class="q-count-hint">本试卷共 {{ totalQuestionsCount }} 道题目</span>
             <el-button link type="primary" size="small" @click="emit('print')">
-              <el-icon class="mr-1"><Printer /></el-icon> 打印试卷
+              <el-icon><Printer /></el-icon>
+              <span>打印试卷</span>
             </el-button>
           </div>
         </div>
@@ -105,6 +106,15 @@ const emit = defineEmits<{
         font-weight: 600;
         color: #334155;
       }
+
+      // Element Plus 的 radio-button 内部是 inline 排版，图标会按基线对齐而显得往下跌；
+      // 改成 flex 居中，并由 gap 统一控制图标与文字的间距
+      :deep(.el-radio-button__inner) {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
     }
 
     .right-quick {
@@ -115,6 +125,13 @@ const emit = defineEmits<{
       .q-count-hint {
         font-size: 13px;
         color: #64748b;
+      }
+
+      // 同理：按钮内容被包在 span 里，需要让该 span 也走 flex 居中
+      :deep(.el-button > span) {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
       }
     }
   }

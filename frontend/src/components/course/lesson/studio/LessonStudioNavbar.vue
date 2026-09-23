@@ -226,6 +226,12 @@ const statusClass = computed(() =>
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  // <button> 默认 inline-block，图标按基线对齐会显得歪且与文字无间距；
+  // 纯文字按钮同样居中显示，不受影响
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 
   &.secondary {
     background: #f1f5f9;

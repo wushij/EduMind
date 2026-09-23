@@ -239,6 +239,8 @@ function toggleFold() {
 
 <style scoped lang="scss">
 .reasoning-card {
+  width: 100%;
+  box-sizing: border-box;
   margin-bottom: 12px;
   border-radius: 10px;
   border: 1px solid rgba(22, 119, 255, 0.2);

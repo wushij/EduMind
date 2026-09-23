@@ -8,6 +8,7 @@ import com.edumind.ai.dto.question.SmartPaperComposeDTO;
 import com.edumind.ai.dto.question.SmartPaperSwapDTO;
 import com.edumind.ai.gateway.AiGatewayFacade;
 import com.edumind.ai.prompt.exam.ExamComposePromptConstants;
+import com.edumind.ai.integration.llm.LlmCallCancelledException;
 import com.edumind.ai.service.audit.AiCallAuditContext;
 import com.edumind.ai.service.question.impl.PedagogicalQuestionFallbackEngine;
 import com.edumind.ai.vo.question.SmartPaperComposeVO;
@@ -18,7 +19,12 @@ import com.edumind.course.api.CourseQueryApi;
 import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.course.vo.knowledge.KnowledgePointVO;
 import com.edumind.infrastructure.redis.cache.AiSessionCacheService;
+import com.edumind.question.api.QuestionCommandApi;
 import com.edumind.question.api.QuestionQueryApi;
+import com.edumind.question.dto.question.QuestionBatchCreateDTO;
+import com.edumind.question.dto.question.QuestionCreateDTO;
+import com.edumind.question.util.QuestionStemValidator;
+import com.edumind.question.vo.question.QuestionBatchSaveVO;
 import com.edumind.question.vo.question.QuestionVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +33,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -36,7 +43,11 @@ public class SmartPaperComposeService {
 
     private static final long GENERATING_TTL_SECONDS = 180L;
 
+    /** 中止标记存活时长：只需覆盖「中止请求到达」到「原请求读到大模型响应」之间的窗口 */
+    private static final long CANCEL_FLAG_TTL_SECONDS = 300L;
+
     private final QuestionQueryApi questionQueryApi;
+    private final QuestionCommandApi questionCommandApi;
     private final CourseQueryApi courseQueryApi;
     private final AiGatewayFacade aiGatewayFacade;
     private final AiSessionCacheService aiSessionCacheService;
@@ -65,6 +76,8 @@ public class SmartPaperComposeService {
         if (!aiSessionCacheService.tryStartGenerating("exam_compose", userId, GENERATING_TTL_SECONDS)) {
             throw new BusinessException("智能组卷任务正在计算中，请稍候或点击中止");
         }
+        // 清掉上一轮可能残留的中止标记，否则新任务会一开始就自我中止
+        aiSessionCacheService.clearCancelled("exam_compose", userId);
 
         try {
             int targetCount = dto.getTotalCount() != null && dto.getTotalCount() > 0 ? dto.getTotalCount() : 10;
@@ -73,6 +86,8 @@ public class SmartPaperComposeService {
             // 1. 获取课程与考纲上下文
             String courseName = "目标专业课程";
             List<String> kpNames = new ArrayList<>();
+            // 知识点名称 → ID 映射：AI 原创题落库时按名称回填考点归属，避免题库里堆积无归属的孤儿题
+            Map<String, Long> kpIdByName = new HashMap<>();
             if (courseId != null) {
                 try {
                     CourseDetailVO courseDetail = courseQueryApi.getCourseById(courseId);
@@ -82,6 +97,11 @@ public class SmartPaperComposeService {
                     List<KnowledgePointVO> kps = courseQueryApi.listKnowledgePointsByCourseId(courseId);
                     if (kps != null && !kps.isEmpty()) {
                         kpNames = kps.stream().map(KnowledgePointVO::getTitle).filter(StringUtils::hasText).collect(Collectors.toList());
+                        for (KnowledgePointVO kp : kps) {
+                            if (kp != null && kp.getId() != null && StringUtils.hasText(kp.getTitle())) {
+                                kpIdByName.put(kp.getTitle().trim(), kp.getId());
+                            }
+                        }
                     }
                 } catch (Exception e) {
                     log.warn("获取课程知识图谱上下文失败，降级使用默认考纲: {}", e.getMessage());
@@ -160,24 +180,35 @@ public class SmartPaperComposeService {
                     }
                 }
 
-                List<QuestionVO> aiGenerated = generateQuestionsViaLlm(
-                        dto,
-                        courseName,
-                        kpNames,
-                        questionsToGenerate,
-                        userId
+                // AI 原创题必须先落库拿到真实主键才能入卷：exam_question 存在 (exam_id, question_id)
+                // 唯一键，且试卷详情靠 question_id 反查题干，时间戳伪 id 会造成保存冲突与详情空白。
+                List<QuestionVO> aiGenerated = persistGeneratedQuestions(
+                        generateQuestionsViaLlm(
+                                dto,
+                                courseName,
+                                kpNames,
+                                questionsToGenerate,
+                                userId
+                        ),
+                        courseId,
+                        kpIdByName
                 );
 
                 if (!aiGenerated.isEmpty()) {
                     finalQuestions.addAll(aiGenerated);
                     aiGeneratedCount = aiGenerated.size();
                 } else if (finalQuestions.size() < targetCount) {
+                    // 大模型失败或产出被判为脏数据：回落本地高质量模板引擎，同样落库后再入卷
                     QuestionGenerateDTO genDto = new QuestionGenerateDTO();
                     genDto.setCourseId(courseId);
                     genDto.setCount(targetCount - finalQuestions.size());
                     genDto.setDifficulty("MEDIUM");
-                    List<QuestionVO> fallbackQuestions = fallbackEngine.generateHighQualityQuestions(
-                            genDto, courseName, List.of("综合核心大纲"), kpNames
+                    List<QuestionVO> fallbackQuestions = persistGeneratedQuestions(
+                            fallbackEngine.generateHighQualityQuestions(
+                                    genDto, courseName, List.of("综合核心大纲"), kpNames
+                            ),
+                            courseId,
+                            kpIdByName
                     );
                     finalQuestions.addAll(fallbackQuestions);
                     aiGeneratedCount += fallbackQuestions.size();
@@ -230,20 +261,34 @@ public class SmartPaperComposeService {
             vo.setBankExtractedCount(finalQuestions.size() - aiGeneratedCount);
             vo.setExamQualityAssessment(aiAssessment);
             return vo;
+        } catch (LlmCallCancelledException cancelledEx) {
+            throw new BusinessException("已中止本次 AI 智能组卷");
         } finally {
             aiSessionCacheService.finishGenerating("exam_compose", userId);
+            aiSessionCacheService.clearCancelled("exam_compose", userId);
         }
     }
 
     /**
-     * 中止当前正在运行的组卷任务
+     * 中止当前正在运行的组卷任务。
+     *
+     * <p>只释放互斥锁是不够的 —— 原请求仍会跑完整个大模型调用并照常计费。
+     * 这里额外置位中止标记，正在进行的 LLM 流式读取会在下一行 SSE 处发现该标记，
+     * 立即关闭与上游的连接，随后组卷流程抛出中止异常并回滚。</p>
      */
     public void cancelActiveGeneration() {
         Long userId = UserContext.getUserId();
-        if (userId != null) {
-            aiSessionCacheService.finishGenerating("exam_compose", userId);
-            log.info("用户 {} 成功中止智能组卷任务", userId);
+        if (userId == null) {
+            return;
         }
+        aiSessionCacheService.markCancelled("exam_compose", userId, CANCEL_FLAG_TTL_SECONDS);
+        aiSessionCacheService.finishGenerating("exam_compose", userId);
+        log.info("用户 {} 已置位智能组卷中止标记", userId);
+    }
+
+    /** 交给 LLM 客户端轮询的中止回调：由 /compose/cancel 置位，读到即断开上游流 */
+    private BooleanSupplier composeCancelledFlag(Long userId) {
+        return () -> aiSessionCacheService.isCancelled("exam_compose", userId);
     }
 
     /**
@@ -294,20 +339,25 @@ public class SmartPaperComposeService {
                     null,
                     ExamComposePromptConstants.EXAM_SWAP_QUESTION_SYSTEM_PROMPT,
                     userPrompt,
-                    audit
+                    audit,
+                    composeCancelledFlag(userId)
             );
             QuestionVO newQ = parseSingleQuestion(jsonResp, dto);
             if (newQ != null) {
-                return newQ;
+                List<QuestionVO> persisted = persistGeneratedQuestions(List.of(newQ), courseId, null);
+                if (!persisted.isEmpty()) {
+                    return persisted.get(0);
+                }
             }
+        } catch (LlmCallCancelledException cancelledEx) {
+            throw cancelledEx;
         } catch (Exception e) {
             log.warn("大模型生成换题失败，使用兜底模板: {}", e.getMessage());
         }
 
-        // 兜底返回与课程及考点强相关的高质量新题
+        // 兜底返回与课程及考点强相关的高质量新题（真实主键由落库回填，不再使用时间戳伪 id）
         String kpTitle = StringUtils.hasText(dto.getKnowledgePointName()) ? dto.getKnowledgePointName() : "专业核心考点";
         QuestionVO fallback = new QuestionVO();
-        fallback.setId(System.currentTimeMillis());
         fallback.setCourseId(courseId);
         fallback.setType(StringUtils.hasText(dto.getType()) ? dto.getType() : "SINGLE_CHOICE");
         fallback.setDifficulty(dto.getDifficulty() != null ? dto.getDifficulty() : 3);
@@ -323,7 +373,9 @@ public class SmartPaperComposeService {
         ));
         fallback.setAnswer("A");
         fallback.setAnalysis(String.format("该题重点考查对【%s】本质内涵的理解，选项A准确表述了其核心规范，其余选项均为典型易错认知陷阱。", kpTitle));
-        return fallback;
+        List<QuestionVO> persistedFallback = persistGeneratedQuestions(List.of(fallback), courseId, null);
+        // 落库失败时仍返回题目本身（此时 id 为空），由前端在保存试卷前拦截并提示重新组卷
+        return persistedFallback.isEmpty() ? fallback : persistedFallback.get(0);
     }
 
     private List<QuestionVO> generateQuestionsViaLlm(SmartPaperComposeDTO dto, String courseName,
@@ -350,11 +402,93 @@ public class SmartPaperComposeService {
                     null,
                     ExamComposePromptConstants.EXAM_COMPOSE_SYSTEM_PROMPT,
                     userPrompt,
-                    audit
+                    audit,
+                    composeCancelledFlag(userId)
             );
             return parseBatchQuestions(jsonResp, dto.getCourseId());
+        } catch (LlmCallCancelledException cancelledEx) {
+            // 用户中止必须向上传播：若在此吞掉，流程会继续走兜底引擎再发一次请求
+            throw cancelledEx;
         } catch (Exception e) {
             log.warn("调用大模型进行智能组卷补题失败: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * 把 AI 原创题目落库到题库，并用真实雪花主键回填 VO。
+     *
+     * <p>背景：AI 命题此前只存在于内存中（id 为时间戳或 null），而试卷题目关联表 exam_question
+     * 对 (exam_id, question_id) 建有唯一键，试卷详情又依赖 question_id 反查题干。伪 id 会同时造成
+     * 「保存试卷报 400 数据已存在，请勿重复提交」与「试卷详情题目空白」两类故障，因此所有 AI 原创题
+     * 在返回前端之前必须先持久化。</p>
+     *
+     * <p>题干为空或命中垃圾题干黑名单的题目会被直接丢弃，避免拖垮整批落库；落库失败时返回空列表，
+     * 调用方据此降级（大模型失败则回落模板引擎，换题则返回无 id 的原题由前端拦截）。</p>
+     *
+     * @param generated        待落库的 AI 原创题
+     * @param fallbackCourseId 题目自身未带课程时的兜底课程
+     * @param kpIdByName       知识点名称 → ID 映射，用于回填考点归属，可为 null
+     * @return 成功落库并带真实主键的题目列表
+     */
+    private List<QuestionVO> persistGeneratedQuestions(List<QuestionVO> generated, Long fallbackCourseId,
+                                                       Map<String, Long> kpIdByName) {
+        if (CollectionUtils.isEmpty(generated)) {
+            return List.of();
+        }
+
+        List<QuestionCreateDTO> payloads = new ArrayList<>(generated.size());
+        List<QuestionVO> persistable = new ArrayList<>(generated.size());
+        for (QuestionVO vo : generated) {
+            if (vo == null || QuestionStemValidator.isGarbageStem(vo.getStem())) {
+                log.warn("丢弃题干为空或命中垃圾题干规则的 AI 原创题，不写入题库");
+                continue;
+            }
+            Long courseId = vo.getCourseId() != null ? vo.getCourseId() : fallbackCourseId;
+            if (courseId == null) {
+                log.warn("AI 原创题缺少课程归属，无法写入题库，已丢弃");
+                continue;
+            }
+            vo.setCourseId(courseId);
+            if (vo.getKnowledgePointId() == null && kpIdByName != null && StringUtils.hasText(vo.getKnowledgePointName())) {
+                vo.setKnowledgePointId(kpIdByName.get(vo.getKnowledgePointName().trim()));
+            }
+
+            QuestionCreateDTO dto = new QuestionCreateDTO();
+            dto.setCourseId(courseId);
+            dto.setKnowledgePointId(vo.getKnowledgePointId());
+            dto.setStem(vo.getStem());
+            dto.setType(StringUtils.hasText(vo.getType()) ? vo.getType() : "SINGLE_CHOICE");
+            dto.setOptions(vo.getOptions());
+            dto.setAnswer(StringUtils.hasText(vo.getAnswer()) ? vo.getAnswer() : "A");
+            dto.setAnalysis(vo.getAnalysis());
+            dto.setDifficulty(vo.getDifficulty() != null ? vo.getDifficulty() : 2);
+            dto.setScore(vo.getScore() != null ? vo.getScore() : 5);
+            payloads.add(dto);
+            persistable.add(vo);
+        }
+        if (payloads.isEmpty()) {
+            return List.of();
+        }
+
+        QuestionBatchCreateDTO batch = new QuestionBatchCreateDTO();
+        batch.setCourseId(fallbackCourseId);
+        batch.setQuestions(payloads);
+        try {
+            QuestionBatchSaveVO saved = questionCommandApi.batchSave(batch);
+            List<Long> ids = saved != null ? saved.getQuestionIds() : null;
+            if (CollectionUtils.isEmpty(ids) || ids.size() != persistable.size()) {
+                log.warn("AI 原创题落库返回的主键数量与提交数量不一致（提交 {} 题，返回 {} 个 ID），本批丢弃",
+                        persistable.size(), ids == null ? 0 : ids.size());
+                return List.of();
+            }
+            for (int i = 0; i < persistable.size(); i++) {
+                persistable.get(i).setId(ids.get(i));
+            }
+            log.info("AI 原创题已落库 {} 道，课程 {}", persistable.size(), fallbackCourseId);
+            return persistable;
+        } catch (Exception e) {
+            log.warn("AI 原创题落库失败，本批题目丢弃: {}", e.getMessage());
             return List.of();
         }
     }
@@ -376,7 +510,7 @@ public class SmartPaperComposeService {
             for (int i = 0; i < arr.size(); i++) {
                 JSONObject item = arr.getJSONObject(i);
                 QuestionVO vo = new QuestionVO();
-                vo.setId(System.currentTimeMillis() + i * 1000L);
+                // 真实主键在 persistGeneratedQuestions 落库后回填，这里不再使用时间戳伪 id
                 vo.setCourseId(courseId);
                 vo.setType(item.getString("type") != null ? item.getString("type") : "SINGLE_CHOICE");
                 vo.setDifficulty(item.getInteger("difficulty") != null ? item.getInteger("difficulty") : 2);
@@ -409,7 +543,7 @@ public class SmartPaperComposeService {
 
             JSONObject item = JSON.parseObject(cleaned);
             QuestionVO vo = new QuestionVO();
-            vo.setId(System.currentTimeMillis());
+            // 真实主键在 persistGeneratedQuestions 落库后回填，这里不再使用时间戳伪 id
             vo.setCourseId(dto.getCourseId());
             vo.setType(item.getString("type") != null ? item.getString("type") : dto.getType());
             vo.setDifficulty(item.getInteger("difficulty") != null ? item.getInteger("difficulty") : dto.getDifficulty());

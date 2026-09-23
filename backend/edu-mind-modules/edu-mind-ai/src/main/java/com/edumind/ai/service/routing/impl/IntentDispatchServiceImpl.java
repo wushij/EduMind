@@ -54,8 +54,30 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
         };
     }
 
+    /**
+     * 选择基础系统提示词。
+     *
+     * <p>以下两种情形都不能沿用课程助教的 chat 口径，否则模型会凭通用知识编排平台并不具备的能力
+     * （实测出现过「课堂互动 Agent」「口语评测」「家校沟通」这类本平台没有的内容）：</p>
+     * <ol>
+     *   <li><b>全域通用空间</b>：没有任何课程上下文可依；</li>
+     *   <li><b>问的是平台自身能力与使用方式</b>：与当前课程无关，即便锚定了课程也必须按平台口径作答。</li>
+     * </ol>
+     * <p>这两种情形统一改用 global_assistant 模板，其中载明了平台真实能力清单与回答纪律。</p>
+     */
+    private String resolveBaseSystemPrompt(IntentDispatchRequest request) {
+        IntentRouter.IntentResult intent = request.getIntent();
+        boolean platformQuery = intent != null && "platform".equalsIgnoreCase(intent.targetCode());
+        if (!request.isGlobalScope() && !platformQuery) {
+            return promptService.getSystemPrompt("chat");
+        }
+        Map<String, String> vars = new HashMap<>();
+        vars.put("extraContext", "");
+        return promptService.renderTemplate("global_assistant", vars);
+    }
+
     private IntentDispatchPlan buildChatPlan(IntentDispatchRequest request, IntentRouter.IntentResult intent) {
-        String systemPrompt = promptService.getSystemPrompt("chat");
+        String systemPrompt = resolveBaseSystemPrompt(request);
         String userPrompt = request.getMessage();
         List<CitationVO> citations = List.of();
         boolean useRag = request.getKnowledgeBaseId() != null;
@@ -80,7 +102,7 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
     }
 
     private IntentDispatchPlan buildRagPlan(IntentDispatchRequest request, IntentRouter.IntentResult intent) {
-        String systemPrompt = promptService.getSystemPrompt("chat");
+        String systemPrompt = resolveBaseSystemPrompt(request);
         String userPrompt = request.getMessage();
         List<CitationVO> citations = List.of();
         boolean useRag = request.getKnowledgeBaseId() != null;

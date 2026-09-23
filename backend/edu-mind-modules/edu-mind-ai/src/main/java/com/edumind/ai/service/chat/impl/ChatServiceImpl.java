@@ -131,6 +131,10 @@ public class ChatServiceImpl implements ChatService {
             if (existing == null || !userId.equals(existing.getUserId())) {
                 throw new BusinessException("会话不存在或无权访问");
             }
+            if (isDefaultTitle(existing.getTitle()) && StringUtils.hasText(dto.getMessage())) {
+                existing.setTitle(truncate(dto.getMessage(), 20));
+                conversationDao.updateById(existing);
+            }
             return existing;
         }
         ConversationEntity entity = new ConversationEntity();
@@ -417,6 +421,10 @@ public class ChatServiceImpl implements ChatService {
             return true;
         }
         return "chat".equalsIgnoreCase(intent.type());
+    }
+
+    private boolean isDefaultTitle(String title) {
+        return !StringUtils.hasText(title) || "新会话".equals(title) || "新问答会话".equals(title);
     }
 
     private String truncate(String text, int maxLen) {

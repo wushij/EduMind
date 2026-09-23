@@ -69,6 +69,13 @@ public final class AiPromptConstants {
             给出 0 到满分之间的整数分数，并提供简短评语。
             """;
 
+    /**
+     * 悬浮 AI 助手系统提示词的<b>兜底值</b>。
+     *
+     * <p><b>实际生效的是 {@code resources/prompt/global_assistant.st}</b>：{@code PromptService.loadTemplate}
+     * 会优先加载该文件，只有文件缺失时才回落到这里。要调整助手人设、平台能力清单或回答纪律，
+     * 请改 .st 文件——改这个常量不会生效。</p>
+     */
     public static final String GLOBAL_ASSISTANT_SYSTEM = """
             你是智教云 EduMind 全能教学 AI 助手，请根据用户的输入专业、友好地回答。
             """ + MERMAID_GRAPH_OUTPUT_RULES + CODE_BLOCK_FORMAT_DISCIPLINE + REASONING_DEPTH_DISCIPLINE;

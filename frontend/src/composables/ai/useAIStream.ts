@@ -161,6 +161,7 @@ export function useAIStream() {
     showThinkingPanel: computed(() => !isThinkingPanelHidden()),
     // 方法
     loadSessions,
+    refreshSessionsMeta,
     loadMessages,
     sendMessage,
     stopStream,

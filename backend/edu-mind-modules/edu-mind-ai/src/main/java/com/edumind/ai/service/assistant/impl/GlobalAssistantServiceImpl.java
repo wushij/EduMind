@@ -279,6 +279,9 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                 if ("tutor".equals(code) || "question_tutor".equals(code)) {
                     yield "识别意图：题目答疑辅导";
                 }
+                if ("platform".equals(code)) {
+                    yield "识别意图：平台能力咨询";
+                }
                 yield "识别意图：课程助教答疑";
             }
         };
@@ -417,6 +420,8 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                 .retrievalQuery(buildRetrievalQuery(dto))
                 .courseId(dto.getCourseId())
                 .contextModule(module)
+                // 前端在全域模式下不传 contextModule，据此判定「未锚定任何上下文」
+                .globalScope(!StringUtils.hasText(module))
                 .lessonChapterId(dto.getLessonChapterId())
                 .lessonDocumentId(lessonDocId.orElse(null))
                 .lessonEnrichmentBlock(enrichment)

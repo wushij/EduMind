@@ -177,33 +177,36 @@
               @reasoning-collapse="pauseAutoScrollFollow"
             />
 
-            <!-- 正在流式生成的进行时消息卡片 (对标侧边栏真流式) -->
+            <!-- 正在流式生成的进行时消息卡片 (对标侧边栏真流式标准大气泡卡片，结构与图2保持一致) -->
             <div v-if="streaming" class="streaming-active-row">
               <div class="streaming-avatar-box">
                 <img class="assistant-brand-logo" src="@/assets/images/logo.png" alt="EduMind" />
               </div>
               <div class="streaming-body-box">
-                <div class="msg-meta-header">
-                  <span class="sender-name">EduMind 课程 AI 助教</span>
-                  <span class="streaming-badge-tag">正在生成研读解析...</span>
-                </div>
+                <div class="msg-bubble is-streaming-bubble">
+                  <!-- 正在生成状态头 -->
+                  <div class="msg-meta-header">
+                    <span class="sender-name">EduMind 课程 AI 助教</span>
+                    <span class="streaming-badge-tag">正在生成研读解析...</span>
+                  </div>
 
-                <!-- 深度思考状态卡片 (动态脉冲，正文输出时自动折叠) -->
-                <AIThinking
-                  v-if="showThinkingPanel && (!streamingAnswerBody || streamingThinkingDisplay)"
-                  :content="streamingThinkingDisplay"
-                  :folded="isReasoningFolded"
-                  :active="!streamingAnswerBody && (isReasoningActive || !streamingThinkingDisplay)"
-                  :has-answer-body="!!streamingAnswerBody"
-                  :phase-message="streamPhaseMessage || '正在深度研读本门课程知识大纲与切片...'"
-                  @update:folded="isReasoningFolded = $event"
-                  @user-collapse="pauseAutoScrollFollow"
-                />
+                  <!-- 深度思考状态卡片 (动态脉冲，在气泡内部横向自适应铺满) -->
+                  <AIThinking
+                    v-if="showThinkingPanel && (!streamingAnswerBody || streamingThinkingDisplay)"
+                    :content="streamingThinkingDisplay"
+                    :folded="isReasoningFolded"
+                    :active="!streamingAnswerBody && (isReasoningActive || !streamingThinkingDisplay)"
+                    :has-answer-body="!!streamingAnswerBody"
+                    :phase-message="streamPhaseMessage || '正在深度研读本门课程知识大纲与切片...'"
+                    @update:folded="isReasoningFolded = $event"
+                    @user-collapse="pauseAutoScrollFollow"
+                  />
 
-                <!-- 正文流式渲染 (useStreamingMarkdown 增量输出) -->
-                <div v-if="streamingAnswerBody" class="msg-bubble is-streaming">
-                  <div class="markdown-body chat-md-content" v-html="streamingRenderedHtml" />
-                  <span class="stream-cursor">▋</span>
+                  <!-- 正文流式渲染 (useStreamingMarkdown 增量输出) -->
+                  <div v-if="streamingAnswerBody" class="streaming-answer-body">
+                    <div class="markdown-body chat-md-content" v-html="streamingRenderedHtml" />
+                    <span class="stream-cursor">▋</span>
+                  </div>
                 </div>
               </div>
             </div>

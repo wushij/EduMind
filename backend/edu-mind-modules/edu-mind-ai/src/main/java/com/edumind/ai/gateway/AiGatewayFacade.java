@@ -2,6 +2,7 @@ package com.edumind.ai.gateway;
 
 import com.edumind.ai.integration.llm.LlmChatMessage;
 import com.edumind.ai.integration.llm.LlmChatOptions;
+import com.edumind.ai.integration.llm.LlmCallCancelledException;
 import com.edumind.ai.integration.llm.LlmClient;
 import com.edumind.ai.integration.llm.LlmClientRegistry;
 import com.edumind.ai.service.audit.AiCallAuditContext;
@@ -73,6 +74,17 @@ public class AiGatewayFacade {
     }
 
     /**
+     * 可取消的对话调用。
+     *
+     * <p>{@code cancelled} 会被 LLM 客户端在流式读取过程中轮询，置位后立即关闭上游响应流，
+     * 用于「用户点击中止后马上停止后台调用与计费」；中止不会触发重试或 fallback 模型。</p>
+     */
+    public String chat(String scene, String modelKey, String systemPrompt, String userPrompt,
+                       AiCallAuditContext auditContext, BooleanSupplier cancelled) {
+        return chatWithMeta(scene, modelKey, systemPrompt, userPrompt, null, auditContext, cancelled).content();
+    }
+
+    /**
      * 带调用元信息的对话调用（诊断工作台需要知道「实际命中的模型」与覆盖温度）。
      *
      * <p>除返回值外，行为与 {@link #chat(String, String, String, String, AiCallAuditContext)} 完全一致：
@@ -83,7 +95,14 @@ public class AiGatewayFacade {
      */
     public ChatOutcome chatWithMeta(String scene, String modelKey, String systemPrompt, String userPrompt,
                                     LlmChatOptions options, AiCallAuditContext auditContext) {
+        return chatWithMeta(scene, modelKey, systemPrompt, userPrompt, options, auditContext, null);
+    }
+
+    public ChatOutcome chatWithMeta(String scene, String modelKey, String systemPrompt, String userPrompt,
+                                    LlmChatOptions options, AiCallAuditContext auditContext,
+                                    BooleanSupplier cancelled) {
         checkRateLimit(scene != null ? scene : "default", DEFAULT_RATE_LIMIT);
+        throwIfCancelled(cancelled);
         long start = System.currentTimeMillis();
         totalRequests.incrementAndGet();
         String primary = modelRouter.resolveModelKey(scene, modelKey);
@@ -91,18 +110,21 @@ public class AiGatewayFacade {
         if (resilienceStore.isCircuitOpen(primary)) {
             log.warn("Gateway circuit OPEN for {}, fast-falling back", primary);
             return executeFallback(scene, primary, systemPrompt, userPrompt, options, start, auditContext,
-                    new IllegalStateException("模型熔断保护中，请稍后重试"));
+                    cancelled, new IllegalStateException("模型熔断保护中，请稍后重试"));
         }
 
         try {
             if (shouldForceFail(primary)) {
                 throw new IllegalStateException("Simulated gateway failure for " + primary);
             }
-            String result = invoke(primary, systemPrompt, userPrompt, options);
+            String result = invoke(primary, systemPrompt, userPrompt, options, cancelled);
             totalLatencyMs += System.currentTimeMillis() - start;
             resilienceStore.recordSuccess(primary);
             auditChat(scene, primary, auditContext, start, systemPrompt, userPrompt, result);
             return new ChatOutcome(primary, result);
+        } catch (LlmCallCancelledException cancelledEx) {
+            // 用户主动中止：不算模型故障，不重试也不换模型，直接向上抛出
+            throw cancelledEx;
         } catch (Exception ex) {
             log.warn("Gateway primary failed for {}: {}", primary, ex.getMessage());
             resilienceStore.recordRetry();
@@ -110,38 +132,60 @@ public class AiGatewayFacade {
                 if (shouldForceFail(primary)) {
                     throw new IllegalStateException("Simulated gateway failure on retry for " + primary);
                 }
-                String retryResult = invoke(primary, systemPrompt, userPrompt, options);
+                String retryResult = invoke(primary, systemPrompt, userPrompt, options, cancelled);
                 totalLatencyMs += System.currentTimeMillis() - start;
                 resilienceStore.recordSuccess(primary);
                 auditChat(scene, primary, auditContext, start, systemPrompt, userPrompt, retryResult);
                 return new ChatOutcome(primary, retryResult);
+            } catch (LlmCallCancelledException cancelledEx) {
+                throw cancelledEx;
             } catch (Exception retryEx) {
                 resilienceStore.recordFailure(primary);
-                return executeFallback(scene, primary, systemPrompt, userPrompt, options, start, auditContext, retryEx);
+                return executeFallback(scene, primary, systemPrompt, userPrompt, options, start, auditContext,
+                        cancelled, retryEx);
             }
         }
     }
 
-    /** 未指定覆盖参数时走 SDK 默认重载，避免空 options 改变既有模型参数行为 */
-    private String invoke(String modelKey, String systemPrompt, String userPrompt, LlmChatOptions options) {
+    /**
+     * 未指定覆盖参数时走 SDK 默认重载，避免空 options 改变既有模型参数行为；
+     * 仅在真正需要取消的业务上才切到带 cancelled 的新重载。
+     */
+    private String invoke(String modelKey, String systemPrompt, String userPrompt, LlmChatOptions options,
+                          BooleanSupplier cancelled) {
+        throwIfCancelled(cancelled);
         LlmClient client = llmClientRegistry.get(modelKey);
-        return options == null
-                ? client.chat(systemPrompt, userPrompt)
-                : client.chat(systemPrompt, userPrompt, options);
+        if (cancelled == null) {
+            return options == null
+                    ? client.chat(systemPrompt, userPrompt)
+                    : client.chat(systemPrompt, userPrompt, options);
+        }
+        return client.chat(systemPrompt, userPrompt,
+                options != null ? options : LlmChatOptions.empty(), cancelled);
+    }
+
+    /** 中止是用户的明确指令，不是模型故障，因此不参与重试与熔断统计 */
+    private void throwIfCancelled(BooleanSupplier cancelled) {
+        if (cancelled != null && cancelled.getAsBoolean()) {
+            throw new LlmCallCancelledException("大模型调用已被用户中止");
+        }
     }
 
     private ChatOutcome executeFallback(String scene, String primary, String systemPrompt, String userPrompt,
                                         LlmChatOptions options, long start, AiCallAuditContext auditContext,
-                                        Exception cause) {
+                                        BooleanSupplier cancelled, Exception cause) {
+        throwIfCancelled(cancelled);
         String fallback = modelRouter.resolveFallback(primary);
         if (fallback != null && !fallback.equals(primary)) {
             log.warn("Gateway fallback {} -> {} scene={}", primary, fallback, scene);
             resilienceStore.recordFallback();
             try {
-                String result = invoke(fallback, systemPrompt, userPrompt, options);
+                String result = invoke(fallback, systemPrompt, userPrompt, options, cancelled);
                 totalLatencyMs += System.currentTimeMillis() - start;
                 auditChat(scene, fallback, auditContext, start, systemPrompt, userPrompt, result);
                 return new ChatOutcome(fallback, result);
+            } catch (LlmCallCancelledException cancelledEx) {
+                throw cancelledEx;
             } catch (Exception fallbackEx) {
                 resilienceStore.recordFailed();
                 throw fallbackEx;

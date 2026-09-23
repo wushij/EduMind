@@ -2,7 +2,7 @@ import type { AIModelConfigItem, AIProviderPresetsResponse, ModelProviderConfig 
 import { toLegacyModelConfig } from '@/types/system/model';
 
 export const mockProviderPresets: AIProviderPresetsResponse = {
-  catalogVersion: '2026-09-06-v4',
+  catalogVersion: '2026-09-23-v5',
   chat: {
     deepseek: {
       label: 'DeepSeek',
@@ -44,11 +44,12 @@ export const mockProviderPresets: AIProviderPresetsResponse = {
     },
     minimax: {
       label: 'MiniMax',
-      modelName: 'MiniMax-M3',
+      modelName: 'minimax-m3',
       baseUrl: 'https://api.minimaxi.com/v1',
       portalUrl: 'https://platform.minimaxi.com',
       protocol: 'openai_compatible',
-      modelOptions: ['MiniMax-M3', 'MiniMax-M2.7-highspeed']
+      // API model 参数为小写，大写会 model not found
+      modelOptions: ['minimax-m3', 'minimax-m2.7', 'minimax-m2.7-highspeed']
     },
     claude: {
       label: 'Claude（Anthropic）',
@@ -60,11 +61,11 @@ export const mockProviderPresets: AIProviderPresetsResponse = {
     },
     kimi: {
       label: 'Kimi（月之暗面）',
-      modelName: 'kimi-k3',
+      modelName: 'kimi-k2.8-preview',
       baseUrl: 'https://api.moonshot.cn/v1',
       portalUrl: 'https://platform.moonshot.cn',
       protocol: 'openai_compatible',
-      modelOptions: ['kimi-k3', 'kimi-k2.7-code', 'kimi-k2.7-code-highspeed']
+      modelOptions: ['kimi-k2.8-preview', 'kimi-k3', 'kimi-k2.7-code', 'kimi-k2.7-code-highspeed', 'kimi-k2.6']
     },
     mock: {
       label: 'Mock（开发测试）',

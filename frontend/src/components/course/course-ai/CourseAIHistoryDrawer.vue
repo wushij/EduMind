@@ -6,6 +6,7 @@
       size="320px"
       direction="rtl"
       :append-to-body="true"
+      @open="handleDrawerOpen"
     >
       <ChatSessionList
         :sessions="sessions"
@@ -28,9 +29,17 @@ const {
   historyDrawerVisible,
   sessions,
   currentSessionId,
+  currentCourseIdNum,
+  refreshSessionsMeta,
   handleSelectSession,
   handleCreateNewSession,
   handleDeleteSession,
   handleClearAllSessions
 } = inject(courseAiUiKey)!;
+
+function handleDrawerOpen() {
+  if (currentCourseIdNum?.value) {
+    void refreshSessionsMeta(currentCourseIdNum.value);
+  }
+}
 </script>

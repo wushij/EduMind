@@ -187,18 +187,27 @@ export function useExamGenerate() {
     examForm.rules = examForm.rules.filter((r) => r.type !== type);
   }
 
+  /** 最近一次主动中止的时间戳：中止会让原请求以失败返回，此时不该再弹错误提示打断用户 */
+  let lastAbortAt = 0;
+
+  /** 距离上次中止是否仍在静默窗口内（组卷、换题等多个链路共用） */
+  function isAbortedRecently() {
+    return Date.now() - lastAbortAt < 5000;
+  }
+
   /**
    * 中止当前正在运行的 AI 组卷或命题计算
    */
   async function abortGeneration() {
+    lastAbortAt = Date.now();
+    // 先关闭推演弹窗给出即时反馈，再通知后端置位中止标记以断开上游调用
+    composing.value = false;
+    generating.value = false;
+    ElMessage.info('已中止当前 AI 智能组卷推演计算');
     try {
       await cancelSmartPaperCompose();
     } catch {
-      // 容错
-    } finally {
-      composing.value = false;
-      generating.value = false;
-      ElMessage.info('已中止当前 AI 智能组卷推演计算');
+      // 容错：后端不可达时前端仍已完成中止
     }
   }
 
@@ -243,7 +252,9 @@ export function useExamGenerate() {
 
       handleProceedToPreview();
     } catch (err: any) {
-      ElMessage.error(err?.message || '智能组卷运算失败，请重试');
+      if (!isAbortedRecently()) {
+        ElMessage.error(err?.message || '智能组卷运算失败，请重试');
+      }
     } finally {
       composing.value = false;
     }
@@ -312,7 +323,9 @@ export function useExamGenerate() {
       );
       router.push('/ai/exam/preview');
     } catch (err: any) {
-      ElMessage.error(err?.message || '完整模式组卷运算失败');
+      if (!isAbortedRecently()) {
+        ElMessage.error(err?.message || '完整模式组卷运算失败');
+      }
     } finally {
       generating.value = false;
     }
@@ -395,16 +408,29 @@ export function useExamGenerate() {
       }
     } catch (err: any) {
       loadingMsg.close();
-      ElMessage.error(err?.message || '智能换题失败，请稍后重试');
+      if (!isAbortedRecently()) {
+        ElMessage.error(err?.message || '智能换题失败，请稍后重试');
+      }
     }
   }
 
   /**
-   * 保存试卷归档入库
+   * 保存试卷
    */
   async function saveExam() {
     if (!currentExam.value?.questions?.length) {
       ElMessage.warning('试卷题目为空，无法保存');
+      return;
+    }
+
+    // 试卷题目必须携带题库真实主键：exam_question 存在 (exam_id, question_id) 唯一键，
+    // 试卷详情也靠 question_id 反查题干，伪造或缺失的 id 会同时导致保存冲突与详情题干空白。
+    const missingIdCount = currentExam.value.questions.filter((q) => {
+      const id = q.id;
+      return id === null || id === undefined || id === '' || Number(id) <= 0;
+    }).length;
+    if (missingIdCount > 0) {
+      ElMessage.warning(`有 ${missingIdCount} 道题目缺少有效题目 ID，请返回重新组卷后再保存`);
       return;
     }
 
@@ -415,7 +441,7 @@ export function useExamGenerate() {
       passScore: currentExam.value.passScore || Math.round(currentExam.value.totalScore * 0.6),
       durationMinutes: currentExam.value.durationMinutes || 90,
       questions: currentExam.value.questions.map((q, idx) => ({
-        questionId: typeof q.id === 'number' ? q.id : (1000 + idx),
+        questionId: q.id,
         score: q.score || 5,
         sortOrder: idx + 1
       }))
@@ -423,7 +449,7 @@ export function useExamGenerate() {
 
     try {
       await createExam(examPayload);
-      ElMessage.success(`试卷【${currentExam.value.title}】已成功归档入库！`);
+      ElMessage.success(`试卷【${currentExam.value.title}】已保存！`);
       router.push('/question/exams');
     } catch (err: any) {
       ElMessage.error(err?.message || '保存试卷失败，请检查网络或权限');

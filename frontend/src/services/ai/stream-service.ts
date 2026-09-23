@@ -483,19 +483,20 @@ export async function syncSessionTitleIfDefault(
 ): Promise<void> {
   if (!conversationId) return;
   const sess = sessions.find((s) => s.id === conversationId);
-  if (!sess || !isDefaultSessionTitle(sess.title)) return;
-
   const prompt = promptHint || findFirstUserPrompt(messages);
-  if (!prompt) return;
 
-  const fallbackTitle = buildSessionTitleFromPrompt(prompt);
-  if (isDefaultSessionTitle(fallbackTitle)) return;
-
-  sess.title = fallbackTitle;
-  try {
-    await renameRemoteSession(conversationId, fallbackTitle);
-  } catch {
-    // keep local title
+  if (prompt) {
+    const fallbackTitle = buildSessionTitleFromPrompt(prompt);
+    if (!isDefaultSessionTitle(fallbackTitle)) {
+      if (sess && isDefaultSessionTitle(sess.title)) {
+        sess.title = fallbackTitle;
+      }
+      try {
+        await renameRemoteSession(conversationId, fallbackTitle);
+      } catch {
+        // keep local title
+      }
+    }
   }
 
   if (!options?.tryLlmTitle) return;
@@ -503,7 +504,9 @@ export async function syncSessionTitleIfDefault(
     .then((res) => {
       const aiTitle = String(res?.data || '').trim();
       if (aiTitle && !isDefaultSessionTitle(aiTitle)) {
-        sess.title = aiTitle;
+        if (sess) {
+          sess.title = aiTitle;
+        }
       }
     })
     .catch(() => {});

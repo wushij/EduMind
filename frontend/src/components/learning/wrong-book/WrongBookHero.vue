@@ -74,5 +74,5 @@ const router = useRouter();
 </script>
 
 <style scoped lang="scss">
-@import './wrong-book-shared.scss';
+@use './wrong-book-shared.scss' as *;
 </style>

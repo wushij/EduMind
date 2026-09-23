@@ -45,6 +45,24 @@ public class AiSessionCacheService {
         redisService.release(RedisKeyBuilder.aiGenerating(biz, userId));
     }
 
+    /**
+     * 标记该业务的本次生成已被用户主动中止。
+     *
+     * <p>互斥锁只负责「不允许重复发起」，无法让已经在跑的调用停下来；
+     * LLM 调用链路需要轮询本标记，才能在读到置位后立即断开与上游的连接、停止计费。</p>
+     */
+    public void markCancelled(String biz, Long userId, long ttlSeconds) {
+        redisService.set(RedisKeyBuilder.aiCancelled(biz, userId), "1", ttlSeconds);
+    }
+
+    public boolean isCancelled(String biz, Long userId) {
+        return redisService.get(RedisKeyBuilder.aiCancelled(biz, userId)) != null;
+    }
+
+    public void clearCancelled(String biz, Long userId) {
+        redisService.delete(RedisKeyBuilder.aiCancelled(biz, userId));
+    }
+
     public void appendStreamingContent(String conversationId, String chunk) {
         AiSessionState state = getSession(conversationId);
         if (state == null) {

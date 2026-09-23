@@ -30,5 +30,5 @@ provide(courseAiUiKey, workspace);
 </script>
 
 <style lang="scss">
-@import '@/components/course/course-ai/course-ai-panel-styles.scss';
+@use '@/components/course/course-ai/course-ai-panel-styles.scss' as *;
 </style>

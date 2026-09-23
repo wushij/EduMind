@@ -125,6 +125,11 @@ public final class RedisKeyBuilder {
         return tenantScoped(tenantId, "ai:generating:" + biz + ":" + userId);
     }
 
+    /** 用户主动中止标记：LLM 调用链路轮询该标记以便真正断开上游请求 */
+    public static String aiCancelled(String biz, Long userId) {
+        return tenantScoped(null, "ai:cancelled:" + biz + ":" + userId);
+    }
+
     public static String aiQuota(Long userId, String date) {
         return aiQuota(null, userId, date);
     }

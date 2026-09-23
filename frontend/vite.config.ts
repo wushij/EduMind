@@ -58,6 +58,9 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       scss: {
+        // Sass 的 legacy JS API 已废弃（Dart Sass 2.0 起移除），改用现代 API：
+        // 既消除 [legacy-js-api] 弃用警告，也避免每个样式文件重复初始化编译器带来的构建耗时。
+        api: 'modern',
         additionalData: `@use "@/styles/variables.scss" as *; @use "@/styles/mixins.scss" as *;`
       }
     }

@@ -253,19 +253,14 @@ function sectionNotice(sec: GroupedSection): string {
       font-weight: 600;
     }
 
+    // 选项文字普遍偏长，原先固定 4 列会把每列压到 100px 出头、文字被折成三四行；
+    // 改为按纸张可用宽度自适应列数，并保证每列不低于 260px。
+    // auto-fit 会自动折叠空轨道，因此 2 个选项时自然只占 2 列。
     &.layout-horizontal {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      column-gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      column-gap: 16px;
       row-gap: 6px;
-
-      &.opt-count-2 {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      &.opt-count-3 {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
     }
 
     &.layout-grid {

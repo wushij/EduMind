@@ -149,6 +149,20 @@ export function mergeQuestionAnalysisText(analysis?: string, distractorAnalysis?
   return `${a}\n\n${d}`;
 }
 
+/**
+ * 归一化题目主键：edu_question.id 是 19 位雪花 ID，超出 JS 安全整数范围，
+ * 直接 Number() 会静默丢精度，回传后端就匹配不到真实题目（试卷保存冲突、详情题干空白）。
+ * 后端已将其序列化为字符串，这里只在安全范围内还原成数字，超出则原样保留字符串。
+ */
+function normalizeQuestionId(raw: unknown): number | string {
+  if (raw === null || raw === undefined || raw === '') return 0;
+  if (typeof raw === 'number') return raw;
+  const text = String(raw).trim();
+  if (!/^\d+$/.test(text)) return text;
+  const asNumber = Number(text);
+  return Number.isSafeInteger(asNumber) ? asNumber : text;
+}
+
 export function normalizeQuestion(raw: any): Question {
   if (!raw || typeof raw !== 'object') {
     return {
@@ -172,7 +186,7 @@ export function normalizeQuestion(raw: any): Question {
   const type = String(raw.type || 'SINGLE_CHOICE') as QuestionType;
 
   return {
-    id: Number(raw.id || 0),
+    id: normalizeQuestionId(raw.id),
     courseId: Number(raw.courseId || 0),
     courseName: raw.courseName ? String(raw.courseName) : undefined,
     chapterId: raw.chapterId != null ? Number(raw.chapterId) : undefined,

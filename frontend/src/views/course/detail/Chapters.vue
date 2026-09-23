@@ -739,6 +739,11 @@ onMounted(async () => {
         font-weight: 500;
         cursor: pointer;
         transition: all 0.2s;
+        // <button> 默认 inline-block，图标按基线对齐会显得歪且与文字无间距
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
 
         &:hover {
           border-color: #CBD5E1;
