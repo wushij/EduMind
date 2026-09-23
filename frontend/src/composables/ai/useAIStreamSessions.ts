@@ -100,7 +100,7 @@ export function createAIStreamSessionActions(deps: AIStreamSessionsDeps) {
       }
       const lastUserMsg = [...messages.value].reverse().find((m) => m.role === 'user');
       if (lastUserMsg?.content) {
-        const prompts = generateSmartFollowUps(lastUserMsg.content);
+        const prompts = generateSmartFollowUps(lastUserMsg.content, lastMsg.content);
         followUpPrompts.value = prompts;
         lastMsg.followUpPrompts = prompts;
       }

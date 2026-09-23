@@ -106,7 +106,7 @@ public class IndexingServiceImpl implements IndexingService {
                     emptyKb.setIndexStatus("INDEXED");
                     knowledgeBaseDao.updateById(emptyKb);
                 }
-                notifyIndexResult(operatorId, knowledgeBaseId, "INDEXED", 0, 0);
+                log.debug("知识库 #{} 当前无待增量索引切片，任务完成", knowledgeBaseId);
                 return;
             }
             List<String> texts = chunks.stream().map(KnowledgeDocumentChunkEntity::getContent).toList();

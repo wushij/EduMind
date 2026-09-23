@@ -1,6 +1,5 @@
 <template>
   <div class="course-ai-page-wrapper">
-    <CourseAIHeroBanner />
     <CourseAIWorkbench />
     <CourseAIHistoryDrawer />
   </div>
@@ -10,7 +9,6 @@
 import { toRef, provide } from 'vue';
 import type { CourseVO } from '@/types/course/course';
 import { useCourseAIWorkspace } from '@/composables/course/useCourseAIWorkspace';
-import CourseAIHeroBanner from '@/components/course/course-ai/CourseAIHeroBanner.vue';
 import CourseAIWorkbench from '@/components/course/course-ai/CourseAIWorkbench.vue';
 import CourseAIHistoryDrawer from '@/components/course/course-ai/CourseAIHistoryDrawer.vue';
 import { courseAiUiKey } from '@/components/course/course-ai/course-ai-ui-key';

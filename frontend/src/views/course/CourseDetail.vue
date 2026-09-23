@@ -6,8 +6,8 @@
       'course-detail-container--immersive': isImmersiveLessonStudio
     }"
   >
-    <!-- 顶部课程上下文 Hero Banner (模仿课程中心 PageHeroBanner 视觉设计) -->
-    <div v-if="!isImmersiveLessonStudio" class="course-hero-header">
+    <!-- 顶部课程上下文 Hero Banner (模仿课程中心 PageHeroBanner 视觉设计，AI 工作台下隐藏) -->
+    <div v-if="!isImmersiveLessonStudio && !isAiRoute" class="course-hero-header">
       <!-- 柔光微动效光晕 -->
       <div class="glow-orb glow-orb--left"></div>
       <div class="glow-orb glow-orb--right"></div>
@@ -153,8 +153,8 @@
       </div>
     </div>
 
-    <!-- 课程空间二级导航 Tab (长圆药丸指示栏) -->
-    <div v-if="!isImmersiveLessonStudio" class="course-nav-bar">
+    <!-- 课程空间二级导航 Tab (长圆药丸指示栏，在全屏 AI 助教工作台下隐藏，留足垂直空间) -->
+    <div v-if="!isImmersiveLessonStudio && !isAiRoute" class="course-nav-bar">
       <div class="pill-nav-tabs">
         <router-link
           v-for="item in subTabs"
@@ -732,21 +732,18 @@ onMounted(() => {
     box-sizing: border-box;
   }
 
-  // AI 助教页：精简顶栏并自适应撑满高度，消除底部多余空白
+  // AI 助教页：精简顶栏并自适应撑满高度，消除顶部与底部多余空白
   &.course-detail-container--ai {
-    gap: 12px;
+    gap: 0;
     flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 0;
     height: 100%;
 
-    .course-hero-header {
-      display: none;
-    }
-
+    .course-hero-header,
     .course-nav-bar {
-      flex-shrink: 0;
+      display: none !important;
     }
 
     .course-subview-content {

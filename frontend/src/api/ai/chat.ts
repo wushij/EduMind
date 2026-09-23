@@ -36,12 +36,42 @@ export const cancelChatStream = (streamId: string) => del<void>(`/ai/chat/stream
 export const getChatModelsRaw = () =>
   get<ChatModelVO[]>('/ai/chat/models', undefined, { silent: true });
 
+import axiosInstance from '@/core/http/axios';
+
+export interface ChatAttachmentVO {
+  attachmentId: string;
+  fileName: string;
+  fileSizeText: string;
+  fileSizeBytes: number;
+  fileType: string;
+  previewText: string;
+  charCount: number;
+  parseStatus: string;
+  errorMessage?: string;
+}
+
+export async function uploadChatAttachment(file: File): Promise<ChatAttachmentVO> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await axiosInstance.post<{ code: number; data: ChatAttachmentVO; message?: string }>(
+    '/ai/chat/attachment',
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    }
+  );
+  return res.data.data;
+}
+
 export const aiChatApi = {
   getConversations,
   getMessages,
   createConversation,
   renameConversation,
-  deleteConversation
+  deleteConversation,
+  uploadChatAttachment
 };
 
 export type { ChatModelVO };

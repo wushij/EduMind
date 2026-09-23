@@ -2,21 +2,32 @@
   <div class="prototype-chat-dock">
     <!-- 附件预览标签条 -->
     <div v-if="attachedFiles.length > 0" class="attached-chips-row">
-      <div v-for="(file, fIdx) in attachedFiles" :key="fIdx" class="file-chip">
-        <el-icon class="file-icon"><Document /></el-icon>
-        <span class="file-name">{{ file.name }}</span>
-        <span class="file-size">({{ formatFileSize(file.size) }})</span>
-        <button type="button" class="remove-chip-btn" @click="removeFile(fIdx)">×</button>
+      <div
+        v-for="(item, fIdx) in attachedFiles"
+        :key="fIdx"
+        class="file-chip"
+        :class="{ 'file-chip--uploading': item.uploading, 'file-chip--failed': item.failed }"
+      >
+        <el-icon v-if="item.uploading" class="file-icon is-loading"><Loading /></el-icon>
+        <el-icon v-else-if="item.failed" class="file-icon text-danger"><Warning /></el-icon>
+        <el-icon v-else class="file-icon"><Document /></el-icon>
+
+        <span class="file-name" :title="item.file.name">{{ item.file.name }}</span>
+        <span class="file-size">({{ formatFileSize(item.file.size) }})</span>
+        <span v-if="item.uploading" class="status-tag">解析中...</span>
+        <span v-else-if="item.failed" class="status-tag failed">解析失败</span>
+        <button type="button" class="remove-chip-btn" title="移除该附件" @click="removeFile(fIdx)">×</button>
       </div>
     </div>
 
-    <!-- 主体卡片容器 (模仿 AgentOne 自适应展开模式) -->
+    <!-- 主体卡片容器 (自适应展开模式) -->
     <div class="chat-input-box-card" :class="{ 'is-expanded': isMultiline }">
       <!-- 隐藏的文件选择器 -->
       <input
         ref="fileInputRef"
         type="file"
         multiple
+        accept=".pdf,.doc,.docx,.txt,.md,.markdown,.java,.py,.js,.ts,.json,.sql,.cpp,.c,.html,.css"
         style="display: none"
         @change="handleFilesSelected"
       />
@@ -36,7 +47,7 @@
 
         <!-- 单行模式下的右侧操作区 (单行时位于输入框右侧) -->
         <div v-if="!isMultiline" class="single-row-actions">
-          <!-- 停止输出 / 暂停响应按钮 (AgentOne 胶囊同款风格) -->
+          <!-- 停止输出 / 暂停响应按钮 -->
           <button
             v-if="streaming"
             type="button"
@@ -63,13 +74,13 @@
         </div>
       </div>
 
-      <!-- 下半区：原型工具栏与多行操作区 -->
+      <!-- 下半区：工具栏与多行操作区 -->
       <div class="input-tools-bar">
         <div class="tools-left">
           <button
             type="button"
             class="tool-btn"
-            title="上传课程资料或代码附件"
+            title="上传课程资料或代码附件（支持 PDF/Word/Markdown/代码）"
             @click="triggerUpload"
           >
             <el-icon class="tool-icon"><Paperclip /></el-icon>
@@ -80,29 +91,18 @@
             type="button"
             class="tool-btn"
             :class="{ active: webSearchEnabled }"
-            title="启用联网检索以获取最新技术动态与知识"
+            :title="webSearchEnabled ? '已开启联网检索增强（点击可关闭）' : '点击开启联网检索增强以获取最新技术动态'"
             @click="toggleWebSearch"
           >
             <el-icon class="tool-icon"><Compass /></el-icon>
             <span>联网搜索</span>
-          </button>
-
-          <button
-            type="button"
-            class="tool-btn"
-            :class="{ active: codeModeActive }"
-            title="切换/插入标准代码模板"
-            @click="toggleCodeMode"
-          >
-            <el-icon class="tool-icon"><EditPen /></el-icon>
-            <span>代码模式</span>
           </button>
         </div>
 
         <div class="tools-right">
           <span class="send-hint-text">按 Enter 发送，Shift+Enter 换行</span>
 
-          <!-- 多行展开模式下：发送 / 停止按钮放置在工具栏右侧 (与 AgentOne 完全一致) -->
+          <!-- 多行展开模式下：发送 / 停止按钮放置在工具栏右侧 -->
           <div v-if="isMultiline" class="multi-row-actions">
             <!-- 停止输出 / 暂停响应按钮 -->
             <button
@@ -136,16 +136,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, watch, nextTick, reactive } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Paperclip, Compass, EditPen, Document, VideoPause, Promotion } from '@element-plus/icons-vue';
+import {
+  Paperclip,
+  Compass,
+  Document,
+  VideoPause,
+  Promotion,
+  Loading,
+  Warning
+} from '@element-plus/icons-vue';
+import { uploadChatAttachment } from '@/api/ai/chat';
+
+export interface ChatSendPayload {
+  text: string;
+  webSearch?: boolean;
+  attachmentIds?: string[];
+}
+
+export interface AttachedFileItem {
+  file: File;
+  attachmentId?: string;
+  uploading: boolean;
+  failed?: boolean;
+  previewText?: string;
+}
 
 const props = defineProps<{
   streaming?: boolean;
 }>();
 
 const emit = defineEmits<{
-  (e: 'send', text: string): void;
+  (e: 'send', payload: ChatSendPayload | string): void;
   (e: 'stop'): void;
 }>();
 
@@ -153,12 +176,13 @@ const inputText = ref('');
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const webSearchEnabled = ref(false);
-const codeModeActive = ref(false);
-const attachedFiles = ref<File[]>([]);
+const attachedFiles = ref<AttachedFileItem[]>([]);
 const isMultiline = ref(false);
 
 const canSend = computed(() => {
-  return (inputText.value.trim().length > 0 || attachedFiles.value.length > 0) && !props.streaming;
+  const hasText = inputText.value.trim().length > 0;
+  const hasReadyFiles = attachedFiles.value.some((f) => Boolean(f.attachmentId) && !f.uploading);
+  return (hasText || hasReadyFiles) && !props.streaming;
 });
 
 function checkMultiline() {
@@ -214,13 +238,16 @@ watch(
 function handleSend() {
   if (!canSend.value) return;
 
-  let textToSend = inputText.value.trim();
-  if (attachedFiles.value.length > 0) {
-    const fileNames = attachedFiles.value.map(f => f.name).join(', ');
-    textToSend = `[已附加资料: ${fileNames}]\n${textToSend}`;
-  }
+  const textToSend = inputText.value.trim();
+  const successfulAttachments = attachedFiles.value.filter((f) => f.attachmentId && !f.uploading);
+  const attachmentIds = successfulAttachments.map((f) => f.attachmentId as string);
 
-  emit('send', textToSend);
+  emit('send', {
+    text: textToSend,
+    webSearch: webSearchEnabled.value,
+    attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined
+  });
+
   inputText.value = '';
   attachedFiles.value = [];
   isMultiline.value = false;
@@ -233,13 +260,36 @@ function triggerUpload() {
   fileInputRef.value?.click();
 }
 
-function handleFilesSelected(event: Event) {
+async function handleFilesSelected(event: Event) {
   const target = event.target as HTMLInputElement;
-  if (target.files) {
-    const files = Array.from(target.files);
-    attachedFiles.value.push(...files);
-    ElMessage.success(`已添加 ${files.length} 个附件`);
+  if (!target.files || target.files.length === 0) return;
+  const files = Array.from(target.files);
+
+  for (const file of files) {
+    if (file.size > 20 * 1024 * 1024) {
+      ElMessage.warning(`文件「${file.name}」超过 20MB 限制，无法上传`);
+      continue;
+    }
+    const item = reactive<AttachedFileItem>({
+      file,
+      uploading: true
+    });
+    attachedFiles.value.push(item);
+
+    try {
+      const res = await uploadChatAttachment(file);
+      item.attachmentId = res.attachmentId;
+      item.previewText = res.previewText;
+      item.uploading = false;
+      ElMessage.success(`资料「${file.name}」解析就绪`);
+    } catch (err: unknown) {
+      item.uploading = false;
+      item.failed = true;
+      const errMsg = err instanceof Error ? err.message : '网络异常';
+      ElMessage.error(`资料「${file.name}」上传或解析失败: ${errMsg}`);
+    }
   }
+  target.value = '';
 }
 
 function removeFile(index: number) {
@@ -255,18 +305,9 @@ function formatFileSize(bytes: number): string {
 function toggleWebSearch() {
   webSearchEnabled.value = !webSearchEnabled.value;
   if (webSearchEnabled.value) {
-    ElMessage.success('已开启联网搜索增强');
+    ElMessage.success('已开启联网搜索增强，回答将实时检索网络前沿技术资讯');
   } else {
-    ElMessage.info('已关闭联网搜索');
-  }
-}
-
-function toggleCodeMode() {
-  codeModeActive.value = !codeModeActive.value;
-  if (codeModeActive.value) {
-    const codeSnippet = "\n```java\n// 请在此输入或粘贴代码\npublic class Demo {\n    public static void main(String[] args) {\n        \n    }\n}\n```\n";
-    inputText.value += codeSnippet;
-    ElMessage.success('已插入 Java 代码模板');
+    ElMessage.info('已关闭联网搜索，恢复本课程知识库定向问答');
   }
 }
 
@@ -322,6 +363,31 @@ defineExpose({
       .file-size {
         color: #60A5FA;
         font-size: 11px;
+      }
+
+      &--uploading {
+        background: #F8FAFC;
+        border-color: #E2E8F0;
+        color: #64748B;
+      }
+
+      &--failed {
+        background: #FEF2F2;
+        border-color: #FECACA;
+        color: #DC2626;
+      }
+
+      .status-tag {
+        font-size: 11px;
+        padding: 1px 4px;
+        border-radius: 4px;
+        background: #E0E7FF;
+        color: #4F46E5;
+
+        &.failed {
+          background: #FEE2E2;
+          color: #EF4444;
+        }
       }
 
       .remove-chip-btn {
@@ -434,24 +500,29 @@ defineExpose({
           align-items: center;
           gap: 5px;
           background: transparent;
-          border: none;
-          padding: 0;
+          border: 1px solid transparent;
+          border-radius: 9999px;
+          padding: 4px 12px;
           font-size: 12px;
+          font-weight: 500;
           color: #64748B;
           cursor: pointer;
-          transition: color 0.18s;
+          box-sizing: border-box;
+          transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
 
           .tool-icon {
-            font-size: 13.5px;
+            font-size: 14px;
           }
 
           &:hover {
             color: #2563EB;
+            background: #F8FAFC;
           }
 
           &.active {
             color: #2563EB;
-            font-weight: 600;
+            background: #EFF6FF;
+            border-color: #BFDBFE;
           }
         }
       }

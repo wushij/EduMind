@@ -41,7 +41,12 @@
           title="停止当前生成与推理"
           @click.stop="$emit('abort')"
         >
-          <span class="abort-icon">⏸</span>
+          <span class="abort-icon">
+            <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor">
+              <rect x="3" y="2" width="3" height="12" rx="1" />
+              <rect x="10" y="2" width="3" height="12" rx="1" />
+            </svg>
+          </span>
           <span>停止响应</span>
         </button>
 
@@ -115,7 +120,7 @@ const props = withDefaults(
     hasAnswerBody: false,
     phaseMessage: '',
     timerText: '',
-    showTimer: true,
+    showTimer: false,
     allowAbort: false
   }
 );

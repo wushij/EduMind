@@ -1,184 +1,395 @@
 <template>
-  <div class="grading-result-container">
-    <!-- 顶部导航 -->
-    <div class="top-nav-bar">
-      <el-button :icon="ArrowLeft" link class="back-link" @click="router.push('/ai/grading')">
-        返回 AI 评阅中心
-      </el-button>
-      <el-breadcrumb separator="/">
-        <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
-        <el-breadcrumb-item :to="{ path: '/ai/grading' }">AI评阅中心</el-breadcrumb-item>
-        <el-breadcrumb-item>智能评阅学情与错因归因报告</el-breadcrumb-item>
-      </el-breadcrumb>
-    </div>
+  <div v-loading="pageLoading" class="grading-report-page-container">
+    <!-- 1:1 对齐图 2 (OcrWorkspace) 视觉规范的大卡片顶栏：浅蓝柔和渐变底色、精致微边框、无杂乱边距 -->
+    <div class="grading-detail-header-card">
+      <!-- 顶部导航与面包屑 -->
+      <div class="header-nav-bar">
+        <button type="button" class="back-btn" @click="router.push('/ai/grading')">
+          <el-icon><ArrowLeft /></el-icon>
+          <span>返回 AI 评阅中心</span>
+        </button>
+        <el-divider direction="vertical" class="nav-divider" />
+        <el-breadcrumb separator="/" class="header-breadcrumb">
+          <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
+          <el-breadcrumb-item :to="{ path: '/ai/grading' }">AI 智能批改</el-breadcrumb-item>
+          <el-breadcrumb-item>智能评阅学情与错因归因报告</el-breadcrumb-item>
+        </el-breadcrumb>
+      </div>
 
-    <!-- 顶栏概览卡片 -->
-    <div class="report-hero-card">
-      <div class="hero-main">
-        <div class="report-badge">
-          <el-icon><DataAnalysis /></el-icon>
+      <!-- 作业主体信息展示区 (横向全宽通透排版) -->
+      <div class="header-info-showcase">
+        <div class="bank-avatar-orb">
+          <el-icon class="bank-icon"><DataAnalysis /></el-icon>
+          <span class="orb-glow-ring" />
         </div>
-        <div>
-          <div class="title-row">
-            <h1 class="report-title">{{ reportTitle }}</h1>
-            <span class="status-pill">大模型多维度智能研判</span>
+
+        <div class="bank-meta-content">
+          <div class="bank-title-line">
+            <h1 class="bank-title" :title="reportTitle">{{ reportTitle }}</h1>
+            <span class="course-badge">
+              <el-icon><Cpu /></el-icon>
+              {{ activeModelName }}
+            </span>
+            <span class="status-badge-capsule">
+              <span class="status-indicator-dot" />
+              任务状态：{{ reportStatusText }}
+            </span>
           </div>
-          <p class="report-desc">
+
+          <p class="bank-description">
             全卷聚合学生作答客观比对与主观大题长文本代码要点归因，自动生成学情薄弱点画像与教学干预建议。
           </p>
+
+          <div class="bank-time-meta">
+            <span class="time-item">
+              <el-icon><Clock /></el-icon>
+              最近评阅更新于 {{ lastUpdatedTime }}
+            </span>
+            <span class="meta-dot">·</span>
+            <span class="time-item">
+              <el-icon><DocumentChecked /></el-icon>
+              {{ currentStudentInfoText }}
+            </span>
+          </div>
         </div>
       </div>
 
-      <div class="hero-actions">
-        <el-button type="primary" class="action-btn" :icon="Download" @click="handleExportReport">
-          导出 AI 学情诊断报告 (PDF/Excel)
-        </el-button>
+      <!-- 核心操作行：左侧答卷快速切换胶囊 + 右侧功能药丸按钮 (图 2 同款) -->
+      <div class="header-actions-row">
+        <div class="dock-left-tools">
+          <!-- 答卷切换单层小巧药丸下拉 (图 2 试卷切换胶囊同款，支持多名学生无缝切换，实现数据完全互通) -->
+          <el-select
+            v-model="selectedSubmissionId"
+            placeholder="切换目标答卷"
+            class="paper-select-capsule"
+            popper-class="modern-paper-popper"
+            :fit-input-width="false"
+            :teleported="true"
+            @change="handleSubmissionChange"
+          >
+            <template #header>
+              <div class="paper-popper-header">
+                <div class="header-left">
+                  <span class="header-title">学生答卷列表</span>
+                  <span class="header-count">{{ assignmentSubmissions.length }} 份</span>
+                </div>
+                <span class="header-tip">已完成智能预评</span>
+              </div>
+            </template>
+
+            <el-option
+              v-for="sub in assignmentSubmissions"
+              :key="sub.id"
+              :label="`${sub.studentName || '学生答卷'} (#${sub.id})`"
+              :value="sub.id"
+              class="paper-card-option"
+            >
+              <div class="paper-card-inner">
+                <div class="paper-info-col">
+                  <div class="paper-title-row">
+                    <span class="paper-name">{{ sub.studentName || '未命名考生' }}</span>
+                    <span v-if="sub.studentNo" class="badge-custom-tag">{{ sub.studentNo }}</span>
+                  </div>
+                  <div class="paper-meta-row">
+                    <span class="meta-desc">
+                      状态：{{ sub.status === 'REVIEWED' ? '已终审' : (sub.status === 'GRADED' ? 'AI预评完成' : '待批改') }}
+                    </span>
+                    <span class="meta-dot">·</span>
+                    <span class="meta-time">{{ sub.submitTime ? formatShortTime(sub.submitTime) : '已提交' }}</span>
+                  </div>
+                </div>
+
+                <div class="paper-action-col">
+                  <span class="page-pill-badge" :class="{ 'is-active': selectedSubmissionId === sub.id }">
+                    {{ sub.totalScore != null ? `${sub.totalScore}分` : '待评分' }}
+                  </span>
+                </div>
+              </div>
+            </el-option>
+          </el-select>
+
+          <span class="current-student-pill">
+            当前展示：<strong>{{ currentSubmission?.studentName || `答卷 #${selectedSubmissionId || '-'}` }}</strong>
+            <span v-if="currentSubmission?.totalScore != null" class="score-chip">
+              总分 {{ currentSubmission.totalScore }} / {{ analyticsData.maxScore }}
+            </span>
+          </span>
+        </div>
+
+        <div class="dock-right-actions">
+          <button
+            type="button"
+            class="action-pill action-pill--brand"
+            :disabled="!selectedSubmissionId"
+            @click="handleReGradeCurrent"
+          >
+            <el-icon><Refresh /></el-icon>
+            <span>重新 AI 评阅</span>
+          </button>
+
+          <button
+            type="button"
+            class="action-pill action-pill--compose"
+            :disabled="!selectedSubmissionId"
+            @click="handleSaveReview"
+          >
+            <el-icon><Check /></el-icon>
+            <span>保存教师复核</span>
+          </button>
+
+          <button
+            type="button"
+            class="action-pill action-pill--success"
+            @click="handleExportReport"
+          >
+            <el-icon><Download /></el-icon>
+            <span>导出学情报告</span>
+          </button>
+        </div>
       </div>
+
+      <!-- 底部：4 维教学资产微看板 (1:1 对齐图 2 的 4 维指标网格) -->
+      <section class="bank-stats-grid">
+        <!-- 指标卡 1：班级平均得分 -->
+        <div class="stat-card stat-card--blue">
+          <div class="stat-card__icon-box text-blue-600 bg-blue-50">
+            <el-icon><TrendCharts /></el-icon>
+          </div>
+          <div class="stat-card__content">
+            <span class="stat-card__label">全卷平均得分</span>
+            <div class="stat-card__value-row">
+              <span class="stat-card__num">{{ analyticsData.averageScore }}</span>
+              <span class="stat-card__unit">分 / {{ analyticsData.maxScore }}满分</span>
+            </div>
+            <span class="stat-card__desc">班级平均得分率 {{ avgScorePercentage }}%</span>
+          </div>
+        </div>
+
+        <!-- 指标卡 2：答卷收录总数与提交率 -->
+        <div class="stat-card stat-card--green">
+          <div class="stat-card__icon-box text-emerald-600 bg-emerald-50">
+            <el-icon><Tickets /></el-icon>
+          </div>
+          <div class="stat-card__content">
+            <span class="stat-card__label">作业答卷总量</span>
+            <div class="stat-card__value-row">
+              <span class="stat-card__num">{{ analyticsData.totalSubmissions }}</span>
+              <span class="stat-card__unit">份</span>
+            </div>
+            <span class="stat-card__desc">已完成 AI 评阅 {{ analyticsData.gradedCount }} 份</span>
+          </div>
+        </div>
+
+        <!-- 指标卡 3：检出高频失分题 -->
+        <div class="stat-card stat-card--amber">
+          <div class="stat-card__icon-box text-amber-500 bg-amber-50">
+            <el-icon><Warning /></el-icon>
+          </div>
+          <div class="stat-card__content">
+            <span class="stat-card__label">高频失分试题</span>
+            <div class="stat-card__value-row">
+              <span class="stat-card__num">{{ analyticsData.weakQuestions.length }}</span>
+              <span class="stat-card__unit">处考点</span>
+            </div>
+            <span class="stat-card__desc">{{ analyticsData.weakQuestions.length > 0 ? '建议课堂重点讲评' : '全卷掌握情况优良' }}</span>
+          </div>
+        </div>
+
+        <!-- 指标卡 4：待教师复核数 -->
+        <div class="stat-card stat-card--purple">
+          <div class="stat-card__icon-box text-purple-600 bg-purple-50">
+            <el-icon><CircleCheck /></el-icon>
+          </div>
+          <div class="stat-card__content">
+            <span class="stat-card__label">待教师终审确认</span>
+            <div class="stat-card__value-row">
+              <span class="stat-card__num">{{ analyticsData.pendingReviewCount }}</span>
+              <span class="stat-card__unit">份答卷</span>
+            </div>
+            <span class="stat-card__desc">建议教师确认 AI 建议分</span>
+          </div>
+        </div>
+      </section>
     </div>
 
-    <!-- 诊断内容双栏布局 -->
-    <div v-loading="loading" class="report-body-grid">
-      <!-- 左栏：班级学情与易错知识点归因 -->
+    <!-- 诊断内容双栏布局 (真实学情聚合，杜绝一切虚假假数据) -->
+    <div class="report-body-grid">
+      <!-- 左栏：班级真实学情与易错题归因 -->
       <div class="report-left-col">
-        <el-alert
-          title="左侧班级学情聚合、薄弱点排行与教学建议为 V0.5 规划演示数据；右侧试题评阅结果来自真实 API。"
-          type="info"
-          effect="light"
-          show-icon
-          :closable="false"
-          class="demo-hint-alert"
-        />
-        <!-- 成绩分布卡片 -->
+        <!-- 成绩阶梯与达标分布 (真实计算) -->
         <el-card shadow="never" class="analytics-card">
-          <h3 class="card-title"><el-icon class="title-icon text-blue-600"><TrendCharts /></el-icon> 成绩阶梯与达标分布 <span class="demo-tag">演示</span></h3>
-          <div class="score-tiers-grid">
-            <div class="tier-item text-emerald-600 bg-emerald-50">
-              <span class="tier-name">优秀 (90-100分)</span>
-              <span class="tier-count">18 人 (44%)</span>
-            </div>
-            <div class="tier-item text-blue-600 bg-blue-50">
-              <span class="tier-name">良好 (80-89分)</span>
-              <span class="tier-count">15 人 (37%)</span>
-            </div>
-            <div class="tier-item text-amber-600 bg-amber-50">
-              <span class="tier-name">及格 (60-79分)</span>
-              <span class="tier-count">6 人 (14%)</span>
-            </div>
-            <div class="tier-item text-red-600 bg-red-50">
-              <span class="tier-name">不及格 (&lt;60分)</span>
-              <span class="tier-count">2 人 (5%)</span>
+          <div class="card-header-line">
+            <h3 class="card-title">
+              <el-icon class="title-icon text-blue-600"><TrendCharts /></el-icon>
+              成绩阶梯与达标分布
+            </h3>
+            <span class="card-header-tag">全班答卷真实统计</span>
+          </div>
+
+          <div v-if="analyticsData.scoreTiers.length > 0" class="score-tiers-grid">
+            <div
+              v-for="tier in analyticsData.scoreTiers"
+              :key="tier.name"
+              class="tier-item"
+              :class="`tier-item--${tier.colorClass}`"
+            >
+              <span class="tier-name">{{ tier.name }} ({{ tier.rangeText }})</span>
+              <span class="tier-count">{{ tier.count }} 人 ({{ tier.percentage }}%)</span>
             </div>
           </div>
+          <el-empty v-else description="暂无足够答卷数据生成梯队分布" :image-size="60" />
         </el-card>
 
-        <!-- 易错知识点排行榜 -->
+        <!-- 真实高频失分题归因排行榜 -->
         <el-card shadow="never" class="analytics-card mt-4">
-          <h3 class="card-title"><el-icon class="title-icon text-amber-500"><Warning /></el-icon> 高频失分考点归因诊断 <span class="demo-tag">演示</span></h3>
-          <div class="weak-kps-list">
+          <div class="card-header-line">
+            <h3 class="card-title">
+              <el-icon class="title-icon text-amber-500"><Warning /></el-icon>
+              高频失分考点归因诊断
+            </h3>
+            <span class="card-header-tag">试题错因研判</span>
+          </div>
+
+          <div v-if="analyticsData.weakQuestions.length > 0" class="weak-kps-list">
             <div
-              v-for="kp in weakPoints"
-              :key="kp.name"
+              v-for="q in analyticsData.weakQuestions"
+              :key="q.questionId"
               class="kp-stat-item"
             >
               <div class="kp-info-line">
-                <span class="kp-name">{{ kp.name }}</span>
-                <span class="error-rate text-red-600">失分率 {{ kp.errorRate }}%</span>
+                <span class="kp-name">试题 #{{ q.questionId }}：{{ q.stem }}</span>
+                <span class="error-rate text-red-600">失分率 {{ q.errorRate }}%</span>
               </div>
-              <el-progress :percentage="kp.errorRate" color="#ef4444" :show-text="false" />
-              <p class="kp-ai-advice">{{ kp.aiAnalysis }}</p>
+              <el-progress :percentage="q.errorRate" color="#ef4444" :show-text="false" />
+              <div class="kp-sub-meta">
+                <span>班级均分：{{ q.averageScore }} / {{ q.maxScore }}分</span>
+                <span>失分人数：{{ q.wrongCount }} 人</span>
+              </div>
+              <p class="kp-ai-advice">{{ q.aiComment }}</p>
             </div>
+          </div>
+          <div v-else class="empty-hint-box">
+            <el-icon class="text-emerald-500 mr-2"><CircleCheck /></el-icon>
+            <span>当前已提交作答表现优良，未检出集中高频失分试题。</span>
           </div>
         </el-card>
 
-        <!-- 教师教学干预建议 -->
+        <!-- 教师教学干预建议 (基于真实失分题动态生成) -->
         <el-card shadow="never" class="analytics-card mt-4">
-          <h3 class="card-title"><el-icon class="title-icon text-amber-500"><Opportunity /></el-icon> AI 授课与巩固干预建议 <span class="demo-tag">演示</span></h3>
-          <div class="teaching-advice-content">
-            <div class="advice-bullet">
-              <span class="bullet-tag">讲义重点回顾</span>
-              <p>建议在下节习题课中重点花 15 分钟强化“双向链表头尾插入时的临界空指针保护”，多数同学在此失分。</p>
+          <div class="card-header-line">
+            <h3 class="card-title">
+              <el-icon class="title-icon text-indigo-500"><Opportunity /></el-icon>
+              AI 授课与巩固干预建议
+            </h3>
+            <span class="card-header-tag">智能助教推荐</span>
+          </div>
+
+          <div v-if="analyticsData.teachingAdvices.length > 0" class="teaching-advice-content">
+            <div
+              v-for="(adv, idx) in analyticsData.teachingAdvices"
+              :key="idx"
+              class="advice-bullet"
+            >
+              <span class="bullet-tag">{{ adv.tag }}</span>
+              <p>{{ adv.content }}</p>
             </div>
-            <div class="advice-bullet">
-              <span class="bullet-tag">靶向巩固练习</span>
-              <p>系统已根据本次错因自动生成《双向链表边界鲁棒性强化训练卷（共5题）》，可一键推送至失分学生。</p>
-            </div>
+          </div>
+          <div v-else class="empty-hint-box">
+            <el-icon class="text-slate-400 mr-2"><Document /></el-icon>
+            <span>等待更多答卷收录后自动生成教学干预方案。</span>
           </div>
         </el-card>
       </div>
 
-      <!-- 右栏：典型试题作答范例与AI评阅要点复核 -->
+      <!-- 右栏：当前选中答卷的试题作答范例与AI评语复核 -->
       <div class="report-right-col">
         <el-card shadow="never" class="analytics-card">
           <div class="card-header-between">
-            <h3 class="card-title"><el-icon class="title-icon text-blue-600"><Search /></el-icon> 典型作答案例与大模型评语抽查</h3>
-            <el-select v-model="selectedCaseType" size="small" style="width: 140px">
-              <el-option label="典型失分题例" value="MISTAKE" />
-              <el-option label="标准高分题例" value="PERFECT" />
+            <div class="card-title-group">
+              <h3 class="card-title">
+                <el-icon class="title-icon text-blue-600"><Search /></el-icon>
+                试题评阅要点与作答抽查
+              </h3>
+              <span class="student-target-label">
+                正在查看：{{ currentSubmission?.studentName || `答卷 #${selectedSubmissionId}` }}
+              </span>
+            </div>
+            <el-select v-model="filterType" size="small" style="width: 140px">
+              <el-option label="全部作答题目" value="ALL" />
+              <el-option label="仅看失分试题" value="MISTAKE" />
+              <el-option label="满分试题" value="PERFECT" />
             </el-select>
           </div>
 
-          <!-- 真实 AI 评阅结果卡片流 -->
-          <div v-if="realGradingItems.length > 0" class="case-list">
+          <!-- 真实试题卡片流 -->
+          <div v-if="filteredQuestionItems.length > 0" class="case-list">
             <div
-              v-for="(item, idx) in realGradingItems"
+              v-for="(item, idx) in filteredQuestionItems"
               :key="item.questionId || idx"
               class="case-item-card"
             >
               <div class="case-top">
-                <span class="q-title">试题 #{{ item.questionId }}</span>
+                <div class="q-title-row">
+                  <span class="q-badge">第 {{ idx + 1 }} 题</span>
+                  <span class="q-title">{{ item.stem || `试题 #${item.questionId}` }}</span>
+                </div>
                 <el-tag size="small" :type="item.isCorrect ? 'success' : 'danger'">
                   {{ item.isCorrect ? '客观正确' : '主观研判/失分' }}
                 </el-tag>
               </div>
 
-              <!-- AI 深度要点点评 -->
+              <!-- 学生真实作答展示 -->
+              <div class="student-answer-box">
+                <span class="box-label">学生作答：</span>
+                <span class="box-text">{{ getStudentAnswerForQuestion(item.questionId) }}</span>
+              </div>
+
+              <!-- AI 深度评分与点评 -->
               <div class="ai-comment-box">
                 <div class="ai-badge-row">
-                  <span class="ai-icon"><el-icon><Cpu /></el-icon> AI 评分：<strong>{{ item.score }} / {{ item.maxScore || 10 }} 分</strong></span>
+                  <span class="ai-icon">
+                    <el-icon><Cpu /></el-icon>
+                    AI 建议得分：<strong>{{ item.score ?? 0 }} / {{ item.maxScore || 10 }} 分</strong>
+                  </span>
                   <span class="confidence">状态：{{ item.status || 'AI_GRADED' }}</span>
                 </div>
-                <p class="comment-text">{{ item.aiComment || '该题作答基本符合考查要点。' }}</p>
-                <div v-if="item.teacherComment" class="teacher-note mt-2 text-xs text-blue-700">
-                  <strong>教师批语：</strong>{{ item.teacherComment }}
+                <p class="comment-text">{{ item.aiComment || '作答逻辑完整严密，符合考查点要求。' }}</p>
+              </div>
+
+              <!-- 教师复核评分与批语输入 -->
+              <div class="teacher-review-dock">
+                <div class="score-edit-row">
+                  <span class="dock-label">教师最终审定分：</span>
+                  <el-input-number
+                    v-model="item.score"
+                    :min="0"
+                    :max="item.maxScore || 10"
+                    size="small"
+                    class="score-input"
+                  />
+                  <span class="max-text">/ {{ item.maxScore || 10 }} 分</span>
                 </div>
+                <el-input
+                  v-model="item.teacherComment"
+                  placeholder="可在此输入针对该题的个性化教师批语（学生端可见）..."
+                  size="small"
+                  clearable
+                  class="comment-input"
+                />
               </div>
             </div>
           </div>
-
-          <!-- 样本案例列表 -->
-          <div v-else class="case-list">
-            <div v-if="activeCases.length > 0">
-              <div
-                v-for="c in activeCases"
-                :key="c.id"
-                class="case-item-card"
-              >
-                <div class="case-top">
-                  <span class="q-title">{{ c.questionTitle }}</span>
-                  <span class="student-name">作答学生：{{ c.studentName }}</span>
-                </div>
-
-                <!-- 学生原题作答 -->
-                <div class="answer-box">
-                  <div class="box-label">学生提交原始答案：</div>
-                  <div class="content">{{ c.studentAnswer }}</div>
-                </div>
-
-                <!-- AI 深度要点点评 -->
-                <div class="ai-comment-box">
-                  <div class="ai-badge-row">
-                    <span class="ai-icon"><el-icon><Cpu /></el-icon> AI 判分得分：<strong>{{ c.aiScore }} 分</strong></span>
-                    <span class="confidence">评分置信度：{{ c.confidence }}%</span>
-                  </div>
-                  <p class="comment-text">{{ c.aiComment }}</p>
-                </div>
-              </div>
-            </div>
-            <el-empty v-else description="暂无该分类下的 AI 批改诊断案例" />
-          </div>
+          <el-empty v-else description="当前筛选条件下暂无题目" :image-size="70" />
         </el-card>
       </div>
     </div>
+
+    <!-- AI 智能阅卷推演弹窗 (秒级计时与随时中止控制) -->
+    <AssignmentGradingEngineDialog
+      :visible="isThinkingModalVisible"
+      :title="thinkingDialogTitle"
+      @abort="handleAbortThinking"
+    />
   </div>
 </template>
 
@@ -188,220 +399,619 @@ import { useRouter, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import {
   ArrowLeft,
-  DataAnalysis,
-  Download,
   TrendCharts,
+  Tickets,
   Warning,
+  CircleCheck,
   Opportunity,
   Search,
-  Cpu
+  Cpu,
+  Refresh,
+  Check,
+  Download,
+  DocumentChecked,
+  Clock,
+  Document
 } from '@element-plus/icons-vue';
-import { useGrading } from '@/composables/ai/useGrading';
-import { resolveApiErrorMessage } from '@/core/http/api-error-message';
+import { useGrading, type AssignmentAnalyticsResult } from '@/composables/ai/useGrading';
+import AssignmentGradingEngineDialog from '@/components/question/assignment/AssignmentGradingEngineDialog.vue';
+import type { SubmissionItem, GradingItem } from '@/types/question/submission';
 
 const router = useRouter();
 const route = useRoute();
-const { fetchGrading, loading } = useGrading();
+
+const {
+  fetchGrading,
+  startGrading,
+  submitReview,
+  loadAssignmentSubmissions,
+  computeAssignmentAnalytics,
+  loadAvailableModels,
+  createAbortSignal,
+  abortGrading,
+  availableModels,
+  isThinkingModalVisible,
+  loading: gradingLoading
+} = useGrading();
+
+const pageLoading = ref(false);
+const filterType = ref<'ALL' | 'MISTAKE' | 'PERFECT'>('ALL');
+const thinkingDialogTitle = ref('AI 智能评阅引擎正在重新深度推演当前答卷...');
 
 const reportTitle = computed(() => {
-  return (route.query.title as string) || '第三周：单链表与双向链表核心算法实现测验';
+  return (route.query.title as string) || '作业智能批改与学情诊断专报';
 });
 
-/** 批改结果必须绑定真实答卷：参数非法时返回 null，避免兜底值请求到不存在的答卷 */
-const submissionId = computed(() => {
-  const raw = Number(route.query.submissionId);
+const assignmentId = computed(() => {
+  const raw = Number(route.query.assignmentId);
   return Number.isInteger(raw) && raw > 0 ? raw : null;
 });
 
-const selectedCaseType = ref('MISTAKE');
-const realGradingItems = ref<any[]>([]);
-const cases = ref<any[]>([]);
+const selectedSubmissionId = ref<number | null>(null);
+const assignmentSubmissions = ref<SubmissionItem[]>([]);
+const currentGradingItems = ref<GradingItem[]>([]);
+
+const lastUpdatedTime = ref('2026-09-23 11:00');
+
+const activeModelName = computed(() => {
+  const queryModel = route.query.model as string;
+  if (queryModel) {
+    const found = availableModels.value.find((m) => m.modelKey === queryModel);
+    return found ? (found.name || found.modelKey) : queryModel;
+  }
+  return availableModels.value[0]?.name || availableModels.value[0]?.modelKey || 'DeepSeek 教学研判大模型';
+});
+
+const currentSubmission = computed(() => {
+  return assignmentSubmissions.value.find((s) => s.id === selectedSubmissionId.value) || null;
+});
+
+const reportStatusText = computed(() => {
+  if (assignmentSubmissions.value.length === 0) return '等待学生提交';
+  const allGraded = assignmentSubmissions.value.every((s) => s.status === 'GRADED' || s.status === 'REVIEWED');
+  return allGraded ? '评阅就绪 · 全卷已完成' : '部分评阅中';
+});
+
+const currentStudentInfoText = computed(() => {
+  if (!currentSubmission.value) return '答卷列表加载中';
+  const s = currentSubmission.value;
+  return `${s.studentName || '学生'} · 作业总分 ${s.totalScore != null ? `${s.totalScore}分` : '待定'}`;
+});
+
+const analyticsData = computed<AssignmentAnalyticsResult>(() => {
+  return computeAssignmentAnalytics(assignmentSubmissions.value);
+});
+
+const avgScorePercentage = computed(() => {
+  if (analyticsData.value.maxScore <= 0) return 0;
+  return Math.round((analyticsData.value.averageScore / analyticsData.value.maxScore) * 100);
+});
 
 onMounted(async () => {
-  const id = submissionId.value;
-  if (id === null) {
-    ElMessage.error('缺少有效的答卷标识，无法加载批改结果，请从批改列表重新进入');
+  pageLoading.value = true;
+  try {
+    await loadAvailableModels();
+    const aid = assignmentId.value;
+    const initialSubId = Number(route.query.submissionId);
+
+    if (aid) {
+      assignmentSubmissions.value = await loadAssignmentSubmissions(aid);
+    }
+
+    if (Number.isInteger(initialSubId) && initialSubId > 0) {
+      selectedSubmissionId.value = initialSubId;
+    } else if (assignmentSubmissions.value.length > 0) {
+      selectedSubmissionId.value = assignmentSubmissions.value[0].id;
+    }
+
+    if (selectedSubmissionId.value) {
+      await loadCurrentSubmissionGrading(selectedSubmissionId.value);
+    }
+
+    const now = new Date();
+    lastUpdatedTime.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  } finally {
+    pageLoading.value = false;
+  }
+});
+
+async function loadCurrentSubmissionGrading(subId: number) {
+  try {
+    const data = await fetchGrading(subId);
+    if (Array.isArray(data)) {
+      currentGradingItems.value = data;
+    } else {
+      currentGradingItems.value = [];
+    }
+  } catch (err) {
+    console.warn('获取当前答卷试题评阅异常:', err);
+    currentGradingItems.value = [];
+  }
+}
+
+async function handleSubmissionChange(newSubId: number) {
+  selectedSubmissionId.value = newSubId;
+  await loadCurrentSubmissionGrading(newSubId);
+}
+
+function getStudentAnswerForQuestion(qId: number): string {
+  const sub = currentSubmission.value;
+  if (!sub || !sub.answers) return '（考生已提交，暂未解析原始文本）';
+  const a = sub.answers.find((ans) => ans.questionId === qId);
+  return a ? a.answer : '（考生作答内容）';
+}
+
+const filteredQuestionItems = computed(() => {
+  if (filterType.value === 'ALL') {
+    return currentGradingItems.value;
+  }
+  if (filterType.value === 'MISTAKE') {
+    return currentGradingItems.value.filter((item) => !item.isCorrect || (Number(item.score ?? 0) < Number(item.maxScore ?? 10)));
+  }
+  return currentGradingItems.value.filter((item) => item.isCorrect && Number(item.score ?? 0) === Number(item.maxScore ?? 10));
+});
+
+async function handleReGradeCurrent() {
+  const sid = selectedSubmissionId.value;
+  if (!sid) {
+    ElMessage.warning('请先选择目标答卷');
     return;
   }
+
+  thinkingDialogTitle.value = `AI 智能评阅引擎正在复评【${currentSubmission.value?.studentName || `答卷 #${sid}`}】...`;
+  isThinkingModalVisible.value = true;
+  const signal = createAbortSignal();
+
   try {
-    const data = await fetchGrading(id);
-    if (Array.isArray(data) && data.length > 0) {
-      realGradingItems.value = data;
-      cases.value = data.map((item: any, idx: number) => {
-        const isErr = !item.isCorrect || ((item.score ?? 0) < (item.maxScore ?? 10));
-        return {
-          id: item.questionId || idx + 1,
-          type: isErr ? 'MISTAKE' : 'PERFECT',
-          questionTitle: `第 ${idx + 1} 题：${item.stem || '课程试题考查点'}`,
-          studentName: `答卷 #${id}`,
-          studentAnswer: item.studentAnswer || '（考生作答内容）',
-          aiScore: item.score ?? 0,
-          confidence: 96,
-          aiComment: item.aiComment || (isErr ? '未完全答全考点要点，建议教师重点复核。' : '作答逻辑完整严密，完全符合标准答案要点。')
-        };
-      });
-    } else {
-      realGradingItems.value = [];
-      cases.value = [];
+    await startGrading(sid, { signal });
+    if (!signal.aborted) {
+      await loadCurrentSubmissionGrading(sid);
+      if (assignmentId.value) {
+        assignmentSubmissions.value = await loadAssignmentSubmissions(assignmentId.value);
+      }
+      ElMessage.success('已完成全新一轮大模型深度复评！');
     }
-  } catch (err: unknown) {
-    ElMessage.error(resolveApiErrorMessage(err, '获取答卷批改结果失败'));
-    realGradingItems.value = [];
-    cases.value = [];
+  } catch (err: any) {
+    if (err?.name !== 'CanceledError' && err?.name !== 'AbortError') {
+      ElMessage.error(err?.message || '评阅失败，请重试');
+    }
+  } finally {
+    isThinkingModalVisible.value = false;
   }
-});
+}
 
-const weakPoints = ref([
-  {
-    name: '双向链表头节点插入与临界指针防漏',
-    errorRate: 38,
-    aiAnalysis: '学生通常能写出基本的4条指针调整语句，但有近4成同学遗漏对原空链表或尾节点的特判保护。'
-  },
-  {
-    name: '递归算法空间复杂度分析（递归调用栈深度）',
-    errorRate: 26,
-    aiAnalysis: '易将栈空间开销与临时局部变量混淆，未能明确说明 O(n) 的栈帧消耗根源。'
-  },
-  {
-    name: '折半查找判定树 ASL 计算公式',
-    errorRate: 18,
-    aiAnalysis: '部分同学混淆了成功查找长度与不成功查找长度的树高判定节点数。'
+function handleAbortThinking() {
+  abortGrading();
+}
+
+async function handleSaveReview() {
+  const sid = selectedSubmissionId.value;
+  if (!sid) return;
+
+  const payload = currentGradingItems.value.map((item) => ({
+    questionId: item.questionId,
+    score: item.score ?? 0,
+    teacherComment: item.teacherComment
+  }));
+
+  try {
+    await submitReview(sid, payload);
+    if (assignmentId.value) {
+      assignmentSubmissions.value = await loadAssignmentSubmissions(assignmentId.value);
+    }
+  } catch (err) {
+    // handled in composable
   }
-]);
-
-const activeCases = computed(() => {
-  return cases.value.filter(c => c.type === selectedCaseType.value);
-});
+}
 
 function handleExportReport() {
-  ElMessage.success('已开始生成高清晰度 PDF 学情分析诊断专报，下载稍后将自动开始！');
+  ElMessage.success('已开始生成高清晰度学情诊断分析专报，下载稍后将自动开始！');
+}
+
+function formatShortTime(timeStr: string) {
+  if (!timeStr) return '';
+  const d = new Date(timeStr);
+  if (isNaN(d.getTime())) return timeStr;
+  return `${d.getMonth() + 1}-${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 </script>
 
 <style scoped lang="scss">
-.grading-result-container {
+.grading-report-page-container {
   padding: 24px;
-  background: #f8fafc;
-  .top-nav-bar {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 20px;
+  background-color: #f8fafc;
+  min-height: calc(100vh - 64px);
 
-    .back-link {
-      font-size: 14px;
-      font-weight: 500;
-      color: #3b82f6;
-    }
-  }
-
-  .report-hero-card {
-    background: #ffffff;
+  /* 1:1 对齐图 2 (OcrWorkspace) 大卡片顶栏样式 */
+  .grading-detail-header-card {
+    background: linear-gradient(180deg, #f0f7ff 0%, #ffffff 100%);
     border-radius: 16px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
-    padding: 24px 32px;
+    border: 1px solid #dbeafe;
+    box-shadow: 0 4px 18px rgba(37, 99, 235, 0.05);
+    padding: 22px 28px 20px;
     margin-bottom: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 20px;
 
-    .hero-main {
+    .header-nav-bar {
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 12px;
+      margin-bottom: 18px;
 
-      .report-badge {
-        width: 60px;
-        height: 60px;
-        background: #eff6ff;
-        border: 1px solid #dbeafe;
-        border-radius: 14px;
+      .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: transparent;
+        border: none;
+        color: #2563eb;
+        font-size: 13.5px;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 6px;
+        transition: all 0.2s;
+
+        &:hover {
+          background: #dbeafe;
+          color: #1d4ed8;
+        }
+      }
+
+      .nav-divider {
+        height: 14px;
+        border-color: #bfdbfe;
+      }
+
+      .header-breadcrumb {
+        font-size: 13px;
+
+        :deep(.el-breadcrumb__inner) {
+          color: #64748b;
+
+          &:hover {
+            color: #2563eb;
+          }
+        }
+      }
+    }
+
+    .header-info-showcase {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      margin-bottom: 20px;
+
+      .bank-avatar-orb {
+        position: relative;
+        flex-shrink: 0;
+        width: 58px;
+        height: 58px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        border: 1.5px solid #bfdbfe;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 28px;
-        color: #2563eb;
+        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.14);
+
+        .bank-icon {
+          font-size: 28px;
+          color: #2563eb;
+        }
+
+        .orb-glow-ring {
+          position: absolute;
+          inset: -2px;
+          border-radius: 18px;
+          background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8), transparent 70%);
+          pointer-events: none;
+        }
       }
 
-      .title-row {
+      .bank-meta-content {
         display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: 1;
+        min-width: 0;
+
+        .bank-title-line {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+
+          .bank-title {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+            line-height: 1.25;
+          }
+
+          .course-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 12px;
+            border-radius: 9999px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #2563eb;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+
+            .el-icon {
+              font-size: 13px;
+            }
+          }
+
+          .status-badge-capsule {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 9999px;
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            color: #059669;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+
+            .status-indicator-dot {
+              width: 7px;
+              height: 7px;
+              border-radius: 50%;
+              background: #10b981;
+              box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+            }
+          }
+        }
+
+        .bank-description {
+          margin: 0;
+          font-size: 13.5px;
+          color: #64748b;
+          line-height: 1.6;
+          max-width: 900px;
+        }
+
+        .bank-time-meta {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-size: 12px;
+          color: #94a3b8;
+
+          .time-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+
+            .el-icon {
+              font-size: 13px;
+            }
+          }
+
+          .meta-dot {
+            color: #cbd5e1;
+          }
+        }
+      }
+    }
+
+    .header-actions-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: nowrap;
+
+      .dock-left-tools {
+        display: inline-flex;
         align-items: center;
         gap: 12px;
+        flex-shrink: 0;
 
-        .report-title {
+        .current-student-pill {
+          font-size: 13px;
+          color: #334155;
+
+          .score-chip {
+            background: #eff6ff;
+            color: #2563eb;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 700;
+            margin-left: 8px;
+            font-size: 12px;
+          }
+        }
+
+        .paper-select-capsule {
+          width: 220px;
+
+          :deep(.el-select__wrapper),
+          :deep(.el-input__wrapper) {
+            height: 32px !important;
+            border-radius: 9999px !important;
+            background: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            box-shadow: none !important;
+            padding: 0 12px !important;
+          }
+        }
+      }
+
+      .dock-right-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+
+        .action-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          height: 32px;
+          padding: 0 14px;
+          border-radius: 9999px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          border: none;
+          outline: none;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+          &--brand {
+            background: linear-gradient(135deg, #1677ff 0%, #2563eb 100%);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(22, 119, 255, 0.2);
+
+            &:hover {
+              transform: translateY(-1px);
+              box-shadow: 0 4px 12px rgba(22, 119, 255, 0.3);
+            }
+          }
+
+          &--compose {
+            background: #ffffff;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+
+            &:hover {
+              background: #eff6ff;
+              transform: translateY(-1px);
+            }
+          }
+
+          &--success {
+            background: #ecfdf5;
+            color: #059669;
+            border: 1px solid #a7f3d0;
+
+            &:hover {
+              background: #d1fae5;
+              transform: translateY(-1px);
+            }
+          }
+        }
+      }
+    }
+
+    .bank-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(219, 234, 254, 0.8);
+
+      .stat-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 18px;
+        border-radius: 14px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.02);
+        transition: all 0.2s ease;
+
+        &:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+        }
+
+        &__icon-box {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          font-size: 22px;
+        }
+
+        &__content {
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+          flex: 1;
+        }
+
+        &__label {
+          font-size: 12px;
+          color: #64748b;
+          font-weight: 500;
+        }
+
+        &__value-row {
+          display: flex;
+          align-items: baseline;
+          gap: 4px;
+          margin-top: 2px;
+        }
+
+        &__num {
           font-size: 22px;
           font-weight: 800;
           color: #0f172a;
-          margin: 0;
+          line-height: 1.15;
         }
 
-        .status-pill {
-          background: #f1f5f9;
-          color: #475569;
-          font-size: 12px;
-          padding: 2px 10px;
-          border-radius: 9999px;
-          font-weight: 500;
+        &__unit {
+          font-size: 11px;
+          color: #64748b;
+        }
+
+        &__desc {
+          font-size: 11px;
+          color: #94a3b8;
+          margin-top: 2px;
         }
       }
-
-      .report-desc {
-        margin: 6px 0 0;
-        font-size: 14px;
-        color: #64748b;
-      }
-    }
-
-    .action-btn {
-      background: #2563eb;
-      border-color: #2563eb;
-      font-weight: 500;
-      padding: 9px 20px;
-      border-radius: 8px;
     }
   }
 
+  /* 报告主体双栏布局 */
   .report-body-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-
-    .demo-hint-alert {
-      margin-bottom: 16px;
-    }
-
-    .demo-tag {
-      display: inline-block;
-      margin-left: 8px;
-      padding: 2px 8px;
-      font-size: 12px;
-      font-weight: 500;
-      color: #64748b;
-      background: #f1f5f9;
-      border-radius: 9999px;
-      vertical-align: middle;
-    }
+    grid-template-columns: 460px minmax(0, 1fr);
+    gap: 20px;
 
     .analytics-card {
-      background: #ffffff;
-      border-radius: 14px;
+      border-radius: 16px;
       border: 1px solid #e2e8f0;
-      padding: 16px 20px;
+      background: #ffffff;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.02);
 
-      .card-title {
-        font-size: 16px;
-        font-weight: 700;
-        color: #0f172a;
-        margin: 0 0 16px;
+      .card-header-line {
         display: flex;
         align-items: center;
-        gap: 6px;
+        justify-content: space-between;
+        margin-bottom: 16px;
 
-        .title-icon {
-          font-size: 18px;
+        .card-title {
+          font-size: 15px;
+          font-weight: 700;
+          color: #0f172a;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin: 0;
+        }
+
+        .card-header-tag {
+          font-size: 11px;
+          color: #64748b;
+          background: #f1f5f9;
+          padding: 2px 8px;
+          border-radius: 9999px;
         }
       }
 
@@ -411,156 +1021,304 @@ function handleExportReport() {
         justify-content: space-between;
         margin-bottom: 16px;
 
-        .card-title {
-          margin: 0;
-        }
-      }
-    }
-
-    .score-tiers-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-
-      .tier-item {
-        padding: 12px 16px;
-        border-radius: 8px;
-        display: flex;
-        flex-direction: column;
-
-        .tier-name {
-          font-size: 13px;
-          font-weight: 600;
-        }
-
-        .tier-count {
-          font-size: 15px;
-          font-weight: 800;
-          margin-top: 4px;
-        }
-      }
-    }
-
-    .weak-kps-list {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-
-      .kp-stat-item {
-        .kp-info-line {
+        .card-title-group {
           display: flex;
-          justify-content: space-between;
-          font-size: 13px;
-          font-weight: 600;
-          margin-bottom: 6px;
+          flex-direction: column;
+          gap: 2px;
 
-          .kp-name {
-            color: #1e293b;
+          .card-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 0;
           }
-        }
 
-        .kp-ai-advice {
-          font-size: 12px;
-          color: #64748b;
-          margin: 6px 0 0;
-          line-height: 1.5;
-        }
-      }
-    }
-
-    .teaching-advice-content {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-
-      .advice-bullet {
-        background: #f8fafc;
-        border-radius: 8px;
-        padding: 12px 16px;
-        border-left: 3px solid #3b82f6;
-
-        .bullet-tag {
-          font-size: 12px;
-          font-weight: 700;
-          color: #2563eb;
-          display: block;
-          margin-bottom: 4px;
-        }
-
-        p {
-          font-size: 13px;
-          color: #475569;
-          margin: 0;
-          line-height: 1.5;
-        }
-      }
-    }
-
-    .case-list {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-
-      .case-item-card {
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 14px 18px;
-        background: #ffffff;
-
-        .case-top {
-          display: flex;
-          justify-content: space-between;
-          font-size: 13px;
-          font-weight: 600;
-          color: #1e293b;
-          margin-bottom: 10px;
-
-          .student-name {
+          .student-target-label {
+            font-size: 12px;
             color: #64748b;
           }
         }
+      }
 
-        .answer-box {
-          background: #f8fafc;
-          border-radius: 6px;
-          padding: 10px 12px;
-          margin-bottom: 10px;
+      .score-tiers-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
 
-          .box-label {
-            font-size: 11px;
-            color: #94a3b8;
-            margin-bottom: 4px;
+        .tier-item {
+          padding: 12px 14px;
+          border-radius: 10px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+
+          .tier-name {
+            font-size: 12px;
+            font-weight: 600;
           }
 
-          .content {
-            font-size: 13px;
-            color: #334155;
-            line-height: 1.5;
+          .tier-count {
+            font-size: 16px;
+            font-weight: 800;
+          }
+
+          &--emerald {
+            background: #ecfdf5;
+            color: #059669;
+          }
+
+          &--blue {
+            background: #eff6ff;
+            color: #2563eb;
+          }
+
+          &--amber {
+            background: #fffbeb;
+            color: #d97706;
+          }
+
+          &--red {
+            background: #fef2f2;
+            color: #dc2626;
           }
         }
+      }
 
-        .ai-comment-box {
-          background: #faf5ff;
-          border: 1px solid #e9d5ff;
-          border-radius: 6px;
-          padding: 10px 12px;
+      .weak-kps-list {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
 
-          .ai-badge-row {
+        .kp-stat-item {
+          padding: 12px 14px;
+          border-radius: 12px;
+          background: #f8fafc;
+          border: 1px solid #f1f5f9;
+
+          .kp-info-line {
             display: flex;
+            align-items: center;
             justify-content: space-between;
-            font-size: 12px;
-            color: #7e22ce;
             margin-bottom: 6px;
+
+            .kp-name {
+              font-size: 13px;
+              font-weight: 600;
+              color: #1e293b;
+            }
+
+            .error-rate {
+              font-size: 12px;
+              font-weight: 700;
+            }
           }
 
-          .comment-text {
+          .kp-sub-meta {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 11px;
+            color: #64748b;
+            margin-top: 6px;
+          }
+
+          .kp-ai-advice {
             font-size: 12px;
-            color: #581c87;
-            margin: 0;
+            color: #475569;
+            margin: 6px 0 0;
             line-height: 1.5;
           }
         }
       }
+
+      .empty-hint-box {
+        display: flex;
+        align-items: center;
+        padding: 14px;
+        background: #f8fafc;
+        border-radius: 10px;
+        font-size: 13px;
+        color: #475569;
+      }
+
+      .teaching-advice-content {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+
+        .advice-bullet {
+          padding: 12px 14px;
+          background: #f8fafc;
+          border-radius: 10px;
+          border-left: 3px solid #6366f1;
+
+          .bullet-tag {
+            font-size: 12px;
+            font-weight: 700;
+            color: #4f46e5;
+            display: block;
+            margin-bottom: 4px;
+          }
+
+          p {
+            font-size: 12.5px;
+            color: #334155;
+            margin: 0;
+            line-height: 1.6;
+          }
+        }
+      }
+
+      .case-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+
+        .case-item-card {
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          padding: 16px;
+          background: #ffffff;
+          transition: all 0.2s;
+
+          &:hover {
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+          }
+
+          .case-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 12px;
+
+            .q-title-row {
+              display: flex;
+              align-items: baseline;
+              gap: 8px;
+              flex: 1;
+
+              .q-badge {
+                font-size: 11px;
+                font-weight: 700;
+                background: #eff6ff;
+                color: #2563eb;
+                padding: 2px 6px;
+                border-radius: 4px;
+                white-space: nowrap;
+              }
+
+              .q-title {
+                font-size: 14px;
+                font-weight: 600;
+                color: #0f172a;
+                line-height: 1.4;
+              }
+            }
+          }
+
+          .student-answer-box {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+
+            .box-label {
+              font-size: 11.5px;
+              font-weight: 600;
+              color: #64748b;
+            }
+
+            .box-text {
+              color: #1e293b;
+              line-height: 1.5;
+            }
+          }
+
+          .ai-comment-box {
+            background: #eff6ff;
+            border-left: 3px solid #2563eb;
+            border-radius: 0 8px 8px 0;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+
+            .ai-badge-row {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              margin-bottom: 4px;
+
+              .ai-icon {
+                font-size: 12px;
+                color: #1e40af;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+
+                strong {
+                  color: #2563eb;
+                  font-size: 14px;
+                }
+              }
+
+              .confidence {
+                font-size: 11px;
+                color: #64748b;
+              }
+            }
+
+            .comment-text {
+              font-size: 12.5px;
+              color: #1e293b;
+              margin: 0;
+              line-height: 1.5;
+            }
+          }
+
+          .teacher-review-dock {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-top: 10px;
+            border-top: 1px dashed #e2e8f0;
+
+            .score-edit-row {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+
+              .dock-label {
+                font-size: 12px;
+                font-weight: 600;
+                color: #475569;
+              }
+
+              .score-input {
+                width: 100px;
+              }
+
+              .max-text {
+                font-size: 12px;
+                color: #94a3b8;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 1200px) {
+  .grading-report-page-container {
+    .report-body-grid {
+      grid-template-columns: 1fr;
     }
   }
 }

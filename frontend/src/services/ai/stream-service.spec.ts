@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeServerWithLocalDrafts, type ChatMessage } from './stream-service';
+import { mergeServerWithLocalDrafts, generateSmartFollowUps, type ChatMessage } from './stream-service';
 
 describe('mergeServerWithLocalDrafts', () => {
   it('does not duplicate user prompts when local has persona/chapter prefixes and server does not', () => {
@@ -37,5 +37,27 @@ describe('mergeServerWithLocalDrafts', () => {
     const userMsgs = merged.filter((m) => m.role === 'user');
     expect(userMsgs).toHaveLength(1);
     expect(userMsgs[0].id).toBe('1');
+  });
+
+  it('extracts key topics from markdown headings and generates specific follow-ups', () => {
+    const query = '请结合大纲为我梳理【Java学习】的核心知识图谱架构';
+    const answer = `
+## 1. JDK、JRE与JVM的包含关系
+JDK包含开发工具与JRE，JRE包含JVM与核心类库。
+
+## 2. 字节码跨平台机制与WORA
+Java源码通过 javac 编译成 .class 字节码。
+`;
+    const prompts = generateSmartFollowUps(query, answer);
+    expect(prompts).toHaveLength(3);
+    expect(prompts[0]).toContain('JDK、JRE与JVM的包含关系');
+    expect(prompts[1]).toContain('字节码跨平台机制与WORA');
+  });
+
+  it('falls back gracefully to intent-based prompts if answer has no headings', () => {
+    const query = '请为我讲解这个算法的时间复杂度';
+    const prompts = generateSmartFollowUps(query);
+    expect(prompts).toHaveLength(3);
+    expect(prompts[0]).toContain('时空复杂度');
   });
 });

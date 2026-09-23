@@ -3,6 +3,8 @@ package com.edumind.ai.dto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class ChatStreamDTO {
     private String conversationId;
@@ -16,6 +18,12 @@ public class ChatStreamDTO {
     private Long chapterId;
     private Long lessonChapterId;
     private Long documentId;
+
+    /** 临时上传的附件ID列表（用于文档解析与上下文理解） */
+    private List<String> attachmentIds;
+
+    /** 是否启用联网搜索增强 */
+    private Boolean webSearch;
 
     /** 前端选择的模型配置标识（config_name / model_key），为空时使用默认对话模型 */
     private String modelKey;

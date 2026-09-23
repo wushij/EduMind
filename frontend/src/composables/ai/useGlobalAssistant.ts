@@ -25,6 +25,7 @@ import {
 import { useStreamingMarkdown } from '@/composables/ai/useStreamingMarkdown';
 import { bindMarkdownCodeCopy } from '@/utils/ai/chat-markdown';
 import { formatCitationMatchLabel } from '@/utils/ai/citation-score';
+import { generateSmartFollowUps } from '@/services/ai/stream-service';
 import type {
   CitationItem,
   GlobalAssistantChatRequest,
@@ -68,51 +69,6 @@ function resolveIntentDesc(intent?: string, agentCode?: string): string {
   if (intent === 'navigate') return '识别意图：页面功能直达';
   if (intent && INTENT_DESC_MAP[intent]) return `识别意图：${INTENT_DESC_MAP[intent]}`;
   return agentCode || intent || '智能助手';
-}
-
-function generateSmartFollowUps(query: string): string[] {
-  const cleanQuery = query.replace(/^\[[^\]]+\]\s*/g, '').trim().toLowerCase();
-  const q = cleanQuery || query.toLowerCase();
-  if (/卷|题|考|试|做题|作业|数列|数学|考点/.test(q)) {
-    return [
-      '根据此题型衍生 3 道同等难度的变式训练题',
-      '导出试题解析与评分细则标准',
-      '分析这道题目考察的底层核心知识点与易错陷阱'
-    ];
-  }
-  if (/切片|检索|文档|资料|知识库/.test(q)) {
-    return [
-      '将这些切片资料汇总为教学大纲概要',
-      '查看切片关联的知识图谱上下游节点',
-      '提炼切片中的关键定义与公式要点'
-    ];
-  }
-  if (/学情|分析|学生|成绩|分布/.test(q)) {
-    return [
-      '生成班级薄弱知识点的针对性强化策略',
-      '查看掌握度低于 60% 的预警学员名单',
-      '导出近 30 天学生学习趋势对比'
-    ];
-  }
-  if (/图谱|关系|拓扑/.test(q)) {
-    return [
-      '展开当前知识点的前驱依赖与后继拓展',
-      '为零基础学员规划最佳学习路径',
-      '推荐与本图谱相关的配套教案课件'
-    ];
-  }
-  if (/算法|数据结构|复杂度|渐进表示/.test(q)) {
-    return [
-      '分析该算法在最好、最坏与平均情况下的时空复杂度',
-      '用简明步骤图解该算法的执行推演过程',
-      '对比该算法与其他替代方案的核心优缺点'
-    ];
-  }
-  return [
-    '用更通俗生动的教学案例进一步解释',
-    '为该考点出 2 道课堂即兴互动提问',
-    '结合实际场景列举典型的应用实例'
-  ];
 }
 
 const SESSION_STORAGE_PREFIX = 'edumind_global_assistant_session:';
@@ -596,7 +552,7 @@ export function useGlobalAssistant() {
       }
       const lastUserMsg = [...messages.value].reverse().find((m) => m.role === 'user');
       if (lastUserMsg?.content) {
-        const prompts = generateSmartFollowUps(lastUserMsg.content);
+        const prompts = generateSmartFollowUps(lastUserMsg.content, lastMsg.content);
         followUpPrompts.value = prompts;
         lastMsg.followUpPrompts = prompts;
       }
@@ -813,7 +769,7 @@ export function useGlobalAssistant() {
 
     resetStreamingState();
     saveCurrentSessionToHistory();
-    ElMessage.info('已停止生成（已中断流式推理）');
+    ElMessage.info('已停止生成');
     nextTick(() => bindMarkdownCodeCopy(messagesScrollRef.value));
   }
 
@@ -904,7 +860,7 @@ export function useGlobalAssistant() {
           if (d.reasoningContent && !streamingReasoning.value) {
             streamingReasoning.value = String(d.reasoningContent);
           }
-          followUpPrompts.value = generateSmartFollowUps(query);
+          followUpPrompts.value = generateSmartFollowUps(query, streamingContent.value);
           finalizeAssistantMessage();
         },
         onFollowOutput: scheduleFollowStreamOutput
@@ -934,7 +890,7 @@ export function useGlobalAssistant() {
       streamingCitations.value = data.citations as CitationItem[];
     }
     streamingContent.value = data.content || '已处理您的教学助手请求。';
-    followUpPrompts.value = generateSmartFollowUps(query);
+    followUpPrompts.value = generateSmartFollowUps(query, streamingContent.value);
     finalizeAssistantMessage();
   }
 

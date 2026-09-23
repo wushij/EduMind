@@ -29,11 +29,19 @@ public class ChatStreamController {
 
     private final ChatService chatService;
     private final GatewayManageService gatewayManageService;
+    private final com.edumind.ai.service.chat.ChatAttachmentService chatAttachmentService;
 
     @SaCheckPermission("ai:chat")
     @GetMapping("/models")
     public ApiResult<List<AiModelConfigVO>> listChatModels() {
         return ApiResult.success(gatewayManageService.listEnabledChatModels());
+    }
+
+    @SaCheckPermission("ai:chat")
+    @PostMapping(value = "/attachment", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResult<com.edumind.ai.vo.chat.ChatAttachmentVO> uploadAttachment(
+            @org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return ApiResult.success(chatAttachmentService.uploadAndParse(file));
     }
 
     @SaCheckPermission("ai:chat")

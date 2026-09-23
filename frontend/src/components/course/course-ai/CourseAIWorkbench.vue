@@ -4,8 +4,44 @@
       <!-- 左栏：课程章节 (240px) -->
       <aside class="workbench-col workbench-col--chapters">
         <div class="col-card chapters-card">
-          <div class="col-card-header">
-            <span class="header-title">课程章节</span>
+          <div class="col-card-header chapters-card-header">
+            <el-dropdown
+              v-if="tenantCourseOptions.length > 1"
+              trigger="click"
+              placement="bottom-start"
+              popper-class="left-course-dropdown-popper"
+              class="course-left-dropdown"
+              @command="handleSwitchCourse"
+            >
+              <button
+                type="button"
+                class="left-course-trigger-btn"
+                :title="'当前课程：' + displayCourseTitle + '（点击切换课程）'"
+              >
+                <el-icon class="course-icon"><Reading /></el-icon>
+                <span class="course-title-text">{{ displayCourseTitle }}</span>
+                <el-icon class="arrow-icon"><ArrowDown /></el-icon>
+              </button>
+              <template #dropdown>
+                <el-dropdown-menu class="left-course-dropdown-menu">
+                  <div class="dropdown-header-tip">切换当前课程</div>
+                  <el-dropdown-item
+                    v-for="c in tenantCourseOptions"
+                    :key="c.id"
+                    :command="c.id"
+                    :class="{ 'is-selected': Number(c.id) === currentCourseIdNum }"
+                  >
+                    <el-icon v-if="Number(c.id) === currentCourseIdNum" class="selected-check"><Check /></el-icon>
+                    <span class="dropdown-item-title">{{ c.title || c.name }}</span>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <div v-else class="left-course-trigger-btn is-static" :title="displayCourseTitle">
+              <el-icon class="course-icon"><Reading /></el-icon>
+              <span class="course-title-text">{{ displayCourseTitle }}</span>
+            </div>
+
             <span class="count-badge">{{ chaptersData.length }}章</span>
           </div>
 
@@ -63,20 +99,37 @@
       <!-- 中栏：AI 问答主工作台 (Flex 1) -->
       <main class="workbench-col workbench-col--chat">
         <div class="col-card chat-workbench-card">
-          <!-- 工作台顶栏：模式切换、模型选择、历史记录 -->
+          <!-- 工作台顶栏：知识锚定章节状态指示（固定置顶）、历史记录与新对话 -->
           <div class="chat-top-toolbar">
-            <div class="mode-capsule-tabs">
-              <button
-                v-for="tab in modeTabs"
-                :key="tab.key"
-                type="button"
-                class="mode-pill-tab"
-                :class="{ active: currentModeTab === tab.key }"
-                @click="switchModeTab(tab.key)"
+            <div class="toolbar-anchor-area">
+              <div
+                v-if="activeSectionTitle"
+                class="context-anchor-chip"
+                :title="'当前聚焦章节：' + activeSectionTitle"
               >
-                {{ tab.label }}
-              </button>
-            </div>
+                  <el-icon class="pin-icon"><Connection /></el-icon>
+                  <span class="anchor-label">当前知识锚定章节：</span>
+                  <span class="anchor-title">{{ activeSectionTitle }}</span>
+                  <button
+                    type="button"
+                    class="clear-anchor-btn"
+                    title="解除章节锚定（切换至全课通用问答）"
+                    @click="clearSectionAnchor"
+                  >
+                    <el-icon><Close /></el-icon>
+                  </button>
+                </div>
+                <div
+                  v-else
+                  class="context-anchor-chip is-global"
+                  title="未指定章节，基于整门课程知识库进行答疑"
+                >
+                  <el-icon class="pin-icon"><Document /></el-icon>
+                  <span class="anchor-label">知识检索范围：</span>
+                  <span class="anchor-title">全门课程知识库</span>
+                  <span class="anchor-tip">（点击左侧章节可精准锚定）</span>
+                </div>
+              </div>
 
             <div class="toolbar-right-actions">
               <!-- 不再提供模型自选入口：统一使用后台「AI 模型配置」中标为默认(is_default)的对话模型 -->
@@ -111,15 +164,6 @@
             data-chat-scroll="true"
             @scroll="handleViewportScroll"
           >
-            <!-- 章节锚定上下文小浮条 -->
-            <div v-if="activeSectionTitle" class="context-anchor-chip">
-              <el-icon class="pin-icon"><Connection /></el-icon>
-              <span>当前知识锚定章节：<strong>{{ activeSectionTitle }}</strong></span>
-              <button type="button" class="clear-anchor-btn" @click="activeSectionId = null; activeChapterId = undefined; activeSectionTitle = ''">
-                <el-icon><Close /></el-icon>
-              </button>
-            </div>
-
             <!-- 历史已结算消息列表 -->
             <ChatMessage
               v-for="(msg, idx) in allDisplayMessages"
@@ -144,7 +188,7 @@
                   <span class="streaming-badge-tag">正在生成研读解析...</span>
                 </div>
 
-                <!-- 深度思考状态卡片 (动态脉冲，正文输出时自动折叠，支持计时与暂停) -->
+                <!-- 深度思考状态卡片 (动态脉冲，正文输出时自动折叠) -->
                 <AIThinking
                   v-if="showThinkingPanel && (!streamingAnswerBody || streamingThinkingDisplay)"
                   :content="streamingThinkingDisplay"
@@ -152,8 +196,6 @@
                   :active="!streamingAnswerBody && (isReasoningActive || !streamingThinkingDisplay)"
                   :has-answer-body="!!streamingAnswerBody"
                   :phase-message="streamPhaseMessage || '正在深度研读本门课程知识大纲与切片...'"
-                  :allow-abort="true"
-                  @abort="stopStream"
                   @update:folded="isReasoningFolded = $event"
                   @user-collapse="pauseAutoScrollFollow"
                 />
@@ -263,7 +305,9 @@ import {
   Download,
   Plus,
   Document,
-  Close
+  Close,
+  Reading,
+  Check
 } from '@element-plus/icons-vue';
 import ChatMessage from '@/components/ai/ChatMessage.vue';
 import ChatInput from '@/components/ai/ChatInput.vue';
@@ -271,15 +315,17 @@ import AIThinking from '@/components/ai/AIChat/AIThinking.vue';
 import { courseAiUiKey } from '@/components/course/course-ai/course-ai-ui-key';
 
 const {
+  displayCourseTitle,
+  tenantCourseOptions,
+  currentCourseIdNum,
+  handleSwitchCourse,
   chapterKeyword,
   chaptersData,
   filteredChapters,
   activeChapterId,
   activeSectionId,
   selectSection,
-  modeTabs,
-  currentModeTab,
-  switchModeTab,
+  clearSectionAnchor,
   historyDrawerVisible,
   handleCreateNewSession,
   chatInputRef,

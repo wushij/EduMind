@@ -1,7 +1,7 @@
 import { ref, computed, watch, nextTick, onMounted, markRaw, type Ref } from 'vue';
 import { useAuthStore } from '@/stores/auth/auth';
 import { useRouter, useRoute } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   ChatDotRound,
   Monitor,
@@ -249,6 +249,27 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     activeSectionTitle.value = sec.title;
   }
 
+  async function clearSectionAnchor() {
+    try {
+      await ElMessageBox.confirm(
+        `确定解除对章节「${activeSectionTitle.value || '当前章节'}」的知识锚定吗？解除后 AI 答疑将恢复为全门课程知识库检索模式。`,
+        '解除章节锚定确认',
+        {
+          confirmButtonText: '确定解除',
+          cancelButtonText: '取消',
+          type: 'warning',
+          lockScroll: false
+        }
+      );
+      activeSectionId.value = null;
+      activeChapterId.value = undefined;
+      activeSectionTitle.value = '';
+      ElMessage.success('已解除章节知识锚定，恢复全门课程通用检索模式');
+    } catch {
+      // 用户取消操作，无需任何操作
+    }
+  }
+
   function handlePillClick(pill: (typeof quickActionPills)[0]) {
     handleSend(pill.prompt);
   }
@@ -369,26 +390,31 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     return getCourseAiPersonaPromptPrefix(persona);
   }
 
-  function handleSend(promptText: string) {
+  function handleSend(input: string | { text: string; webSearch?: boolean; attachmentIds?: string[] }) {
     const courseId = resolveCourseId();
     if (!courseId) {
       ElMessage.warning('课程信息加载中，请稍后再试');
       return;
     }
-    let finalPrompt = promptText;
-    if (activeSectionTitle.value) {
-      finalPrompt = `[针对课时: ${activeSectionTitle.value}] ${finalPrompt}`;
-    }
-    // 注入人设风格指导
-    if (course.value?.aiPersona && messages.value.length === 0) {
-      finalPrompt = `${getPersonaPromptPrefix(course.value.aiPersona)}${finalPrompt}`;
-    }
-    const lessonChapterId = route.query.lessonId ? Number(route.query.lessonId) : undefined;
-    sendMessage(finalPrompt, courseId, {
+    const text = typeof input === 'string' ? input : input.text;
+    const cleanPrompt = (text || '').trim();
+    if (!cleanPrompt) return;
+
+    const webSearch = typeof input === 'object' ? input.webSearch : false;
+    const attachmentIds = typeof input === 'object' ? input.attachmentIds : undefined;
+
+    const queryLessonId = route.query.lessonId ? Number(route.query.lessonId) : undefined;
+    const resolvedLessonId = Number.isFinite(queryLessonId)
+      ? queryLessonId
+      : (activeSectionId.value ?? activeChapterId.value ?? undefined);
+
+    sendMessage(cleanPrompt, courseId, {
       chapterId: activeChapterId.value,
-      lessonChapterId: Number.isFinite(lessonChapterId) ? lessonChapterId : undefined,
+      lessonChapterId: resolvedLessonId,
       // 不传 modelKey：由后端按「场景路由 → 平台默认对话模型(is_default)」自动选择
-      useRag: Boolean(course.value?.knowledgeBaseId)
+      useRag: Boolean(course.value?.knowledgeBaseId),
+      webSearch,
+      attachmentIds
     });
   }
 
@@ -468,13 +494,25 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
   }
 
   const recommendedQuestions = computed(() => {
-    const name = displayCourseTitle.value;
+    const courseName = displayCourseTitle.value;
+    const secTitle = activeSectionTitle.value?.trim();
+
+    if (secTitle) {
+      return [
+        `请结合「${secTitle}」，用通俗易懂的逻辑讲透其核心底层原理与运行机制`,
+        `学习「${secTitle}」时，有哪些最容易混淆的概念或踩坑点？该如何规避？`,
+        `请针对「${secTitle}」，提供一个典型的工程实战代码示例并解析关键实现`,
+        `请围绕「${secTitle}」出一道考查深度理解的典型思考自测题，并附解析`,
+        `「${secTitle}」在【${courseName}】整个知识脉络中起到了怎样的承上启下作用？`
+      ];
+    }
+
     return [
-      `请结合大纲为我梳理【${name}】的核心知识图谱架构`,
-      `当前阶段如何高效复习【${name}】？请给出科学备考指引`,
-      `在【${name}】中，有哪些最易混淆的重点概念？请对比解析`,
-      `请针对当前章节出一道典型综合解析题并附解题思路`,
-      `【${name}】在实际工程研发与学科前沿中有哪些典型应用？`
+      `请结合教学大纲，为我梳理【${courseName}】的核心知识图谱架构与系统学习路径`,
+      `在【${courseName}】整门课程中，有哪些公认的高频难点与最易混淆的重点？`,
+      `请结合【${courseName}】核心考点，出一道跨章节的综合业务实战题并附解题思路`,
+      `【${courseName}】在企业级实际工业研发中有哪些典型落地场景？`,
+      `当前阶段如何科学高效地复习【${courseName}】？请给出阶段性备战指引`
     ];
   });
 
@@ -496,7 +534,7 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     () => resolveCourseId(),
     (courseId) => {
       if (!courseId) return;
-      void loadSessions(courseId, { restoreLastSession: true });
+      void loadSessions(courseId, { restoreLastSession: false });
       void loadChapters();
       void loadCourseResources();
     },
@@ -517,6 +555,7 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     chaptersData,
     filteredChapters,
     selectSection,
+    clearSectionAnchor,
     modeTabs,
     currentModeTab,
     switchModeTab,

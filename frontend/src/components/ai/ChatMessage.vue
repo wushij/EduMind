@@ -75,23 +75,19 @@
         :citations="message.citations"
       />
 
-      <!-- 底部辅助长圆小工具条 (AI 回复特有) -->
-      <div v-if="message.role === 'assistant' && !message.isStreaming" class="msg-actions-bar">
-        <button type="button" class="pill-action-btn" title="复制回答" @click="handleCopy">
-          <el-icon><DocumentCopy /></el-icon>
-          <span>{{ copyText }}</span>
-        </button>
+      <!-- 底部辅助长圆小工具条 (用户与AI均支持复制与删除，AI额外支持重新生成) -->
+      <div v-if="!message.isStreaming" class="msg-actions-bar" :class="{ 'is-user-actions': message.role === 'user' }">
         <button
           type="button"
           class="pill-action-btn"
-          :class="{ active: liked }"
-          title="回答有用"
-          @click="liked = !liked"
+          :title="message.role === 'user' ? '复制提问内容' : '复制回答全文'"
+          @click="handleCopy"
         >
-          <el-icon><Star /></el-icon>
-          <span>{{ liked ? '已标记有启发' : '有启发' }}</span>
+          <el-icon><DocumentCopy /></el-icon>
+          <span>{{ isCopied ? '已复制！' : (message.role === 'user' ? '复制' : '复制全文') }}</span>
         </button>
         <button
+          v-if="message.role === 'assistant'"
           type="button"
           class="pill-action-btn"
           title="重新生成此回答"
@@ -103,7 +99,7 @@
         <button
           type="button"
           class="pill-action-btn pill-action-btn--danger"
-          title="删除本轮问答"
+          :title="message.role === 'user' ? '删除本条提问及对应回答' : '删除本轮问答'"
           @click="$emit('delete')"
         >
           <el-icon><Delete /></el-icon>
@@ -141,7 +137,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
-import { DocumentCopy, Star, RefreshRight, Delete, Cpu } from '@element-plus/icons-vue';
+import { DocumentCopy, RefreshRight, Delete, Cpu } from '@element-plus/icons-vue';
 import type { ChatMessage } from '@/composables/ai/useAIStream';
 import CitationList from '@/components/knowledge/CitationList.vue';
 import AIThinking from '@/components/ai/AIChat/AIThinking.vue';
@@ -226,16 +222,18 @@ function refreshMarkdownUi() {
 watch(renderedHtml, () => refreshMarkdownUi());
 onMounted(() => refreshMarkdownUi());
 
-const liked = ref(false);
-const copyText = ref('复制全文');
+const isCopied = ref(false);
 
 function handleCopy() {
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(answerContent.value);
-    copyText.value = '已复制全文！';
-    ElMessage.success('已复制对话内容');
+  const textToCopy = props.message.role === 'user'
+    ? (props.message.content || '')
+    : (answerContent.value || props.message.content || '');
+  if (navigator.clipboard && textToCopy) {
+    navigator.clipboard.writeText(textToCopy);
+    isCopied.value = true;
+    ElMessage.success(props.message.role === 'user' ? '已复制提问内容' : '已复制对话内容');
     setTimeout(() => {
-      copyText.value = '复制全文';
+      isCopied.value = false;
     }, 1500);
   }
 }
@@ -355,6 +353,10 @@ function handleCopy() {
       gap: 8px;
       margin-top: 8px;
 
+      &.is-user-actions {
+        justify-content: flex-end;
+      }
+
       .pill-action-btn {
         display: inline-flex;
         align-items: center;
@@ -378,6 +380,12 @@ function handleCopy() {
           background: #EFF6FF;
           border-color: #BFDBFE;
           color: #1677FF;
+        }
+
+        &--danger:hover {
+          color: #EF4444;
+          border-color: #FECACA;
+          background: #FEF2F2;
         }
       }
     }

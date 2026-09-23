@@ -101,6 +101,7 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
       }
     }
 
+    const followUps = generateSmartFollowUps(promptText, finalAnswer);
     deps.messages.value.push({
       id: serverIds?.messageId || `ai_${Date.now()}`,
       role: 'assistant',
@@ -109,11 +110,11 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
       createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       citations: [...deps.streamingCitations.value],
       recalledMemories: [...currentStreamingMemories.value],
-      followUpPrompts: generateSmartFollowUps(promptText)
+      followUpPrompts: followUps
     });
     currentStreamingMemories.value = [];
 
-    deps.followUpPrompts.value = generateSmartFollowUps(promptText);
+    deps.followUpPrompts.value = followUps;
     deps.resetStreamingState();
     persistMessageCache(
       deps.activeStreamCourseId.value,
@@ -344,7 +345,7 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
       deps.currentSessionId.value,
       deps.messages.value
     );
-    ElMessage.info('已停止生成（后续 Token 将尽快停止计费）');
+    ElMessage.info('已停止生成');
     deps.scrollToBottomInstant();
   }
 

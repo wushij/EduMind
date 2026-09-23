@@ -68,6 +68,8 @@ public class ChatServiceImpl implements ChatService {
     private final LessonContentIndexApi lessonContentIndexApi;
     private final LessonCopilotEnricher lessonCopilotEnricher;
     private final AiUserModelPolicy aiUserModelPolicy;
+    private final com.edumind.ai.service.chat.ChatAttachmentService chatAttachmentService;
+    private final com.edumind.ai.service.search.WebSearchService webSearchService;
 
     @Override
     public SseEmitter streamChat(ChatStreamDTO dto) {
@@ -167,24 +169,21 @@ public class ChatServiceImpl implements ChatService {
             String conversationHistory = chatHistoryBuilder.formatConversationHistory(recentMessages);
 
             String userQuestion = dto.getMessage();
-            boolean lessonIndexed = dto.getLessonChapterId() != null
+            Long targetLessonChapterId = dto.getLessonChapterId() != null ? dto.getLessonChapterId() : dto.getChapterId();
+            boolean lessonIndexed = targetLessonChapterId != null
                     && dto.getCourseId() != null
-                    && lessonContentIndexApi.findLessonDocumentId(dto.getCourseId(), dto.getLessonChapterId())
+                    && lessonContentIndexApi.findLessonDocumentId(dto.getCourseId(), targetLessonChapterId)
                     .isPresent();
             String dispatchMessage = userQuestion;
-            if (!lessonIndexed) {
-                if (dto.getLessonChapterId() != null) {
-                    dispatchMessage = "[当前微课节ID: " + dto.getLessonChapterId() + "] " + dispatchMessage;
-                } else if (dto.getChapterId() != null) {
-                    dispatchMessage = "[当前章节ID: " + dto.getChapterId() + "] " + dispatchMessage;
-                }
+            if (!lessonIndexed && targetLessonChapterId != null) {
+                dispatchMessage = "[当前微课节ID: " + targetLessonChapterId + "] " + dispatchMessage;
             }
-            Optional<Long> lessonDocId = dto.getLessonChapterId() != null && dto.getCourseId() != null
-                    ? lessonContentIndexApi.findLessonDocumentId(dto.getCourseId(), dto.getLessonChapterId())
+            Optional<Long> lessonDocId = targetLessonChapterId != null && dto.getCourseId() != null
+                    ? lessonContentIndexApi.findLessonDocumentId(dto.getCourseId(), targetLessonChapterId)
                     : Optional.empty();
-            String enrichment = lessonDocId.isPresent()
+            String enrichment = dto.getCourseId() != null
                     ? lessonCopilotEnricher.buildEnrichmentBlock(
-                    dto.getCourseId(), dto.getLessonChapterId(), false, userQuestion)
+                    dto.getCourseId(), targetLessonChapterId, true, userQuestion)
                     : "";
             if (lessonIndexed) {
                 useRag = knowledgeBaseId != null && !CopilotRagPolicy.shouldSkipRag(userQuestion);
@@ -193,8 +192,8 @@ public class ChatServiceImpl implements ChatService {
                     .message(lessonIndexed ? userQuestion : dispatchMessage)
                     .retrievalQuery(userQuestion)
                     .courseId(dto.getCourseId())
-                    .contextModule(lessonIndexed ? "lesson_learn" : null)
-                    .lessonChapterId(dto.getLessonChapterId())
+                    .contextModule(lessonIndexed ? "lesson_learn" : (targetLessonChapterId != null ? "lesson_learn" : null))
+                    .lessonChapterId(targetLessonChapterId)
                     .lessonDocumentId(lessonDocId.orElse(null))
                     .lessonEnrichmentBlock(enrichment)
                     .knowledgeBaseId(useRag ? knowledgeBaseId : null)
@@ -210,7 +209,34 @@ public class ChatServiceImpl implements ChatService {
 
             String systemPrompt = plan.getSystemPrompt();
             String userPrompt = plan.getUserPrompt();
-            List<CitationVO> citations = plan.getCitations() != null ? plan.getCitations() : List.of();
+            List<CitationVO> citations = new java.util.ArrayList<>(plan.getCitations() != null ? plan.getCitations() : List.of());
+
+            // 1. 用户上传附件上下文解析注入
+            if (dto.getAttachmentIds() != null && !dto.getAttachmentIds().isEmpty()) {
+                String attachmentContext = chatAttachmentService.buildAttachmentsContext(dto.getAttachmentIds());
+                if (StringUtils.hasText(attachmentContext)) {
+                    userPrompt = userPrompt + "\n" + attachmentContext;
+                }
+            }
+
+            // 2. 联网搜索增强检索与引用溯源
+            if (Boolean.TRUE.equals(dto.getWebSearch())) {
+                sendEvent(emitter, "status", Map.of("phase", "searching", "message", "正在联网检索最新技术动态与参考资料..."));
+                List<com.edumind.ai.service.search.WebSearchResult> searchResults = webSearchService.search(dto.getMessage(), 3);
+                String webPromptBlock = webSearchService.formatSearchResultsForPrompt(searchResults);
+                if (StringUtils.hasText(webPromptBlock)) {
+                    systemPrompt = systemPrompt + "\n" + webPromptBlock;
+                    for (com.edumind.ai.service.search.WebSearchResult sr : searchResults) {
+                        CitationVO webCitation = new CitationVO();
+                        webCitation.setDocumentName("【联网检索】" + sr.getTitle());
+                        webCitation.setExcerpt(sr.getSnippet());
+                        webCitation.setAnchor(sr.getUrl());
+                        webCitation.setScore(0.95);
+                        citations.add(webCitation);
+                    }
+                }
+            }
+
             if (!citations.isEmpty()) {
                 sendEvent(emitter, "citation", Map.of("citations", citations));
             }

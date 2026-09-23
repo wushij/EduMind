@@ -170,8 +170,8 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    height: max(740px, calc(100vh - 218px));
-    min-height: 740px;
+    height: max(680px, calc(100vh - 128px));
+    min-height: 640px;
     box-sizing: border-box;
     overflow-x: hidden;
 
@@ -236,6 +236,97 @@
 
       .chapters-card {
         height: 100%;
+
+        .chapters-card-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 14px 8px;
+          gap: 6px;
+          min-width: 0;
+
+          .course-left-dropdown {
+            min-width: 0;
+            flex: 1;
+            max-width: calc(100% - 46px);
+          }
+
+          .left-course-trigger-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            width: 100%;
+            max-width: 100%;
+            height: 28px;
+            padding: 0 10px;
+            border-radius: 9999px;
+            border: 1px solid #E2E8F0;
+            background: #F8FAFC;
+            color: #0F172A;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: all 0.2s ease;
+
+            .course-icon {
+              font-size: 14px;
+              color: #1677FF;
+              flex-shrink: 0;
+            }
+
+            .course-title-text {
+              flex: 1;
+              min-width: 0;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              text-align: left;
+            }
+
+            .arrow-icon {
+              font-size: 10.5px;
+              color: #94A3B8;
+              flex-shrink: 0;
+              transition: transform 0.2s;
+            }
+
+            &:hover {
+              background: #EFF6FF;
+              border-color: #93C5FD;
+              color: #1D4ED8;
+
+              .arrow-icon {
+                color: #1677FF;
+                transform: translateY(1px);
+              }
+            }
+
+            &.is-static {
+              cursor: default;
+              border-color: transparent;
+              background: transparent;
+              padding: 0;
+
+              &:hover {
+                background: transparent;
+                border-color: transparent;
+                color: #0F172A;
+              }
+            }
+          }
+
+          .count-badge {
+            font-size: 11px;
+            color: #94A3B8;
+            flex-shrink: 0;
+            background: #F1F5F9;
+            padding: 2px 6px;
+            border-radius: 9999px;
+            white-space: nowrap;
+          }
+        }
+
         .chapters-search-box {
           padding: 0 14px 10px;
 
@@ -367,38 +458,102 @@
           padding: 8px 12px;
           border-bottom: 1px solid #F1F5F9;
           background: #FFFFFF;
-          flex-wrap: wrap;
-          gap: 8px;
+          gap: 10px;
           min-width: 0;
 
-          .mode-capsule-tabs {
+          // 知识锚定区域（固定置顶于顶栏左侧，不再随消息流滚动消失）
+          .toolbar-anchor-area {
             display: flex;
             align-items: center;
-            gap: 6px;
-            flex-wrap: wrap;
+            min-width: 0;
+            flex: 1;
 
-            .mode-pill-tab {
+            .context-anchor-chip {
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              max-width: 100%;
               height: 28px;
               padding: 0 12px;
-              border-radius: 9999px; // 长圆跑道 Tab
-              border: 1px solid transparent;
-              background: #F8FAFC;
-              color: #475569;
+              border-radius: 9999px;
+              background: #EFF6FF;
+              border: 1px dashed #93C5FD;
               font-size: 12px;
-              font-weight: 500;
-              cursor: pointer;
-              transition: all 0.2s;
+              color: #1E40AF;
+              box-sizing: border-box;
+              transition: all 0.2s ease;
 
-              &:hover {
-                color: #1677FF;
-                background: #F1F5F9;
+              .pin-icon {
+                font-size: 13px;
+                flex-shrink: 0;
+                color: #2563EB;
               }
 
-              &.active {
-                background: #1677FF;
-                color: #FFFFFF;
+              .anchor-label {
+                flex-shrink: 0;
+                color: #3B82F6;
+                font-weight: 500;
+              }
+
+              .anchor-title {
                 font-weight: 600;
-                box-shadow: 0 2px 8px rgba(22, 119, 255, 0.25);
+                color: #1D4ED8;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                max-width: 420px;
+              }
+
+              .clear-anchor-btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 18px;
+                height: 18px;
+                background: transparent;
+                border: none;
+                color: #93C5FD;
+                cursor: pointer;
+                font-size: 12px;
+                padding: 0;
+                border-radius: 50%;
+                flex-shrink: 0;
+                margin-left: 2px;
+                transition: all 0.15s;
+
+                &:hover {
+                  color: #1E40AF;
+                  background: rgba(59, 130, 246, 0.16);
+                }
+              }
+
+              &.is-global {
+                height: 28px;
+                padding: 0 12px;
+                border-radius: 9999px;
+                background: #F8FAFC;
+                border: 1px dashed #CBD5E1;
+                color: #64748B;
+
+                .pin-icon {
+                  color: #94A3B8;
+                }
+
+                .anchor-label {
+                  color: #64748B;
+                  font-weight: 400;
+                }
+
+                .anchor-title {
+                  color: #334155;
+                  font-weight: 500;
+                }
+
+                .anchor-tip {
+                  font-size: 11px;
+                  color: #94A3B8;
+                  flex-shrink: 0;
+                }
               }
             }
           }
@@ -407,6 +562,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            flex-shrink: 0;
 
             .toolbar-pill-btn {
               display: inline-flex;
@@ -459,36 +615,6 @@
           flex-direction: column;
           gap: 14px;
           background: #FAFCFE;
-
-          .context-anchor-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            align-self: flex-start;
-            padding: 4px 12px;
-            border-radius: 6px;
-            background: #EFF6FF;
-            border: 1px dashed #93C5FD;
-            font-size: 12px;
-            color: #1E40AF;
-            margin-bottom: 16px;
-
-            .pin-icon {
-              font-size: 13px;
-            }
-
-            .clear-anchor-btn {
-              background: transparent;
-              border: none;
-              color: #93C5FD;
-              cursor: pointer;
-              font-size: 12px;
-
-              &:hover {
-                color: #1E40AF;
-              }
-            }
-          }
 
           /* 正在流式生成的进行时卡片 (与结算完成后的 ChatMessage 保持 100% 结构一致) */
           .streaming-active-row {
@@ -818,5 +944,65 @@
   .is-selected {
     color: #1677FF;
     background: #EFF6FF;
+  }
+}
+
+// 左栏课程切换下拉弹窗（限定宽度在左栏卡片内，绝不向左超出或盖住导航菜单）
+.el-dropdown__popper.left-course-dropdown-popper {
+  width: 220px !important;
+  max-width: 220px !important;
+
+  .left-course-dropdown-menu {
+    width: 220px;
+    max-width: 220px;
+    padding: 6px;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
+    border: 1px solid #E2E8F0;
+
+    .dropdown-header-tip {
+      padding: 4px 10px 6px;
+      font-size: 11px;
+      color: #94A3B8;
+      font-weight: 500;
+      border-bottom: 1px solid #F1F5F9;
+      margin-bottom: 4px;
+    }
+
+    .el-dropdown-menu__item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      color: #334155;
+      margin-bottom: 2px;
+      overflow: hidden;
+
+      .selected-check {
+        font-size: 12px;
+        color: #1677FF;
+        flex-shrink: 0;
+      }
+
+      .dropdown-item-title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+      }
+
+      &:hover {
+        background: #EFF6FF;
+        color: #1677FF;
+      }
+
+      &.is-selected {
+        background: #EFF6FF;
+        color: #1677FF;
+        font-weight: 600;
+      }
+    }
   }
 }

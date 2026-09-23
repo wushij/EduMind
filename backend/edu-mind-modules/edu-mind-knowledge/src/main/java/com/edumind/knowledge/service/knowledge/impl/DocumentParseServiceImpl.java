@@ -1,5 +1,6 @@
 package com.edumind.knowledge.service.knowledge.impl;
 
+import com.edumind.knowledge.api.DocumentParseApi;
 import com.edumind.knowledge.service.knowledge.DocumentParseService;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -11,7 +12,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 
 @Service
-public class DocumentParseServiceImpl implements DocumentParseService {
+public class DocumentParseServiceImpl implements DocumentParseService, DocumentParseApi {
 
     @Override
     public String extractText(byte[] fileBytes, String fileType, String fileName) {

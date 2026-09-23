@@ -64,6 +64,8 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
             RagAugmentation augmentation = augmentWithKnowledgeBase(request);
             systemPrompt = augmentation.systemPrompt();
             citations = augmentation.citations();
+        } else if (StringUtils.hasText(request.getLessonEnrichmentBlock())) {
+            systemPrompt = systemPrompt + "\n\n" + request.getLessonEnrichmentBlock().trim();
         }
 
         return IntentDispatchPlan.builder()
@@ -88,6 +90,8 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
             systemPrompt = augmentation.systemPrompt();
             userPrompt = augmentation.promptPreview() != null ? augmentation.promptPreview() : userPrompt;
             citations = augmentation.citations();
+        } else if (StringUtils.hasText(request.getLessonEnrichmentBlock())) {
+            systemPrompt = systemPrompt + "\n\n" + request.getLessonEnrichmentBlock().trim();
         }
 
         return IntentDispatchPlan.builder()

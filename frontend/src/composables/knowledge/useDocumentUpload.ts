@@ -255,7 +255,6 @@ export function useDocumentParse(kbId: Ref<number | undefined>) {
     try {
       await parseDocument(kbId.value, selectedDocumentId.value);
       await triggerChunk(selectedDocumentId.value);
-      await triggerReindex(kbId.value, 'INCREMENTAL');
       ElMessage.success('文档流水线已启动：解析 → 切片 → 向量化');
 
       await loadDocuments();
