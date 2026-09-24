@@ -1,5 +1,6 @@
 package com.edumind.knowledge.service.knowledge;
 
+import com.edumind.common.api.ResultCode;
 import com.edumind.common.constant.SecurityConstant;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.common.model.LoginUser;
@@ -26,7 +27,9 @@ public class KnowledgeAccessService {
     public KnowledgeBaseEntity assertAccessible(Long knowledgeBaseId) {
         KnowledgeBaseEntity knowledgeBase = knowledgeBaseDao.findById(knowledgeBaseId);
         if (knowledgeBase == null) {
-            throw new BusinessException("知识库不存在");
+            // 语义上是「资源不存在」而非服务故障：BusinessException(String) 的默认码是 500，
+            // 会让一个正常的 404 场景在浏览器控制台表现成 Internal Server Error
+            throw new BusinessException(ResultCode.RESOURCE_NOT_FOUND.getCode(), "知识库不存在");
         }
         assertCourseAccessible(knowledgeBase.getCourseId());
         return knowledgeBase;
@@ -40,7 +43,7 @@ public class KnowledgeAccessService {
         }
         Long userId = resolveUserId();
         if (userId == null) {
-            throw new BusinessException(com.edumind.common.api.ResultCode.UNAUTHORIZED.getCode(), "未登录");
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "未登录");
         }
         if (isAdmin()) {
             return;

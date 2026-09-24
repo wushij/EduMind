@@ -66,12 +66,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import AIUsageChart from '@/components/analytics/AIUsageChart.vue';
 import { useLearningAnalytics } from '@/composables/analytics/useLearningAnalytics';
 import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
 
-const { courseOptions, courseId } = useTeacherCourses(102);
+const { courseOptions, courseId } = useTeacherCourses();
 const range = ref('7d');
 
 const { loading, usedMockFallback, aiUsageData, fetchAiUsage } = useLearningAnalytics();
@@ -83,8 +83,13 @@ function formatTokens(value?: number) {
 }
 
 async function reload() {
+  if (!courseId.value || courseId.value <= 0) return;
   await fetchAiUsage(courseId.value, range.value);
 }
+
+watch(courseId, () => {
+  reload();
+});
 
 onMounted(reload);
 </script>

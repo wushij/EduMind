@@ -1,9 +1,11 @@
 import { get, post, del } from '@/core/http/request';
+import type { HttpRequestConfig } from '@/core/http/types';
 import { axiosInstance } from '@/core/http/axios';
 import { LONG_TASK_TIMEOUT } from '@/config';
 import { KBDocument } from '@/types/knowledge/document';
 
-export const getDocuments = (kbId: number) => get<KBDocument[]>(`/knowledge-bases/${kbId}/documents`);
+export const getDocuments = (kbId: number, config?: HttpRequestConfig) =>
+  get<KBDocument[]>(`/knowledge-bases/${kbId}/documents`, undefined, config);
 
 export const getDocumentDetail = (id: number) => get<KBDocument>(`/documents/${id}`);
 

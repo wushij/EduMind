@@ -269,29 +269,29 @@ const {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 16px;
+    overflow-x: auto;
 
     .toolbar-left {
       display: flex;
       align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-      flex: 1;
-      min-width: 320px;
+      gap: 10px;
+      flex-wrap: nowrap;
+      flex-shrink: 0;
 
       .filter-search-input {
-        width: 240px;
+        width: 190px;
         flex-shrink: 0;
       }
 
       .filter-chapter-select {
-        width: 200px;
+        width: 140px;
         flex-shrink: 0;
       }
 
       .filter-level-select {
-        width: 140px;
+        width: 120px;
         flex-shrink: 0;
       }
     }
@@ -299,7 +299,7 @@ const {
     .toolbar-right {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       flex-shrink: 0;
 
       .capsule-btn {

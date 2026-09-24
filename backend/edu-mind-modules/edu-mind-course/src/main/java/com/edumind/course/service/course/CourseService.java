@@ -24,6 +24,10 @@ public interface CourseService {
 
     void deleteCourse(Long id);
 
+    void archiveCourse(Long id);
+
+    void unarchiveCourse(Long id);
+
     List<KnowledgePointVO> listKnowledgePoints(Long courseId, Long chapterId);
 
     KnowledgePointVO getKnowledgePoint(Long courseId, Long kpId);

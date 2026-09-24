@@ -40,7 +40,9 @@ public class CourseAccessService {
     public void assertCanView(CourseEntity course) {
         Long currentUserId = LoginUserResolver.requireUserId();
         List<String> roles = userQueryApi.getRolesByUserId(currentUserId);
-        if (roles.contains(RoleCode.ADMIN.getCode())) {
+        if (roles.contains(RoleCode.ADMIN.getCode())
+                || roles.contains("PLATFORM_ADMIN")
+                || roles.contains(RoleCode.TENANT_ADMIN.getCode())) {
             return;
         }
         if (currentUserId.equals(course.getTeacherId())) {

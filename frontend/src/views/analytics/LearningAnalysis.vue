@@ -62,11 +62,12 @@
       </div>
       <StudentPortraitView
         v-else
-        :key="`portrait-${selectedStudentId || 'default'}`"
+        key="student-portrait"
         :portrait="portraitData"
         :student-options="portraitStudentOptions"
         :variant="isStudentViewer ? 'student' : 'teacher'"
         :advice-loading="adviceLoading"
+        :loading="loading"
         @switch-student="handleSwitchStudent"
         @back-overall="handleBackOverall"
         @generate-advice="handleGenerateAdvice"
@@ -86,6 +87,58 @@
       @dispatch-practice="handleDispatchPractice"
       @clear-advice="handleClearCurrentAdvice"
     />
+
+    <!-- 教师点击个人画像 Tab 未选学生时的选择弹窗 -->
+    <el-dialog
+      v-model="showStudentSelectModal"
+      title="选择诊断学员"
+      width="560px"
+      append-to-body
+      class="student-picker-dialog"
+      :before-close="handleCancelStudentPicker"
+    >
+      <div class="student-picker-header">
+        <p class="picker-tip">请选择当前班级中的一位学员，查看其个体能力雷达与薄弱诊断画像：</p>
+        <el-input
+          v-model="pickerSearchKeyword"
+          placeholder="搜索学员姓名、学号..."
+          clearable
+          :prefix-icon="Search"
+          class="picker-search-input"
+        />
+      </div>
+
+      <div class="picker-student-list">
+        <div
+          v-for="s in filteredPickerStudents"
+          :key="s.studentId"
+          class="picker-student-card"
+          @click="handleSelectStudentFromModal(Number(s.studentId))"
+        >
+          <el-avatar :size="42" :src="s.avatar" class="picker-avatar">
+            {{ s.realName?.slice(0, 1) || '学' }}
+          </el-avatar>
+          <div class="picker-student-meta">
+            <div class="picker-name-row">
+              <span class="picker-name">{{ s.realName }}</span>
+              <span class="picker-sno">{{ s.studentNo || s.username }}</span>
+            </div>
+            <div class="picker-score-row">
+              <span class="picker-stat">掌握度: {{ (s.masteryScore ?? 0).toFixed(1) }}%</span>
+              <span class="picker-divider">·</span>
+              <span class="picker-stat">在线时长: {{ s.studyMinutes ?? 0 }}分钟</span>
+            </div>
+          </div>
+          <button type="button" class="capsule-btn capsule-btn--primary picker-choose-btn">
+            查看画像
+          </button>
+        </div>
+
+        <div v-if="filteredPickerStudents.length === 0" class="picker-empty">
+          <p>暂无可选的班级学员</p>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -93,6 +146,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
+import { Search } from '@element-plus/icons-vue';
 import LearningAnalysisHero from '@/components/analytics/LearningAnalysisHero.vue';
 import OverallAnalyticsView from '@/components/analytics/OverallAnalyticsView.vue';
 import StudentPortraitView from '@/components/analytics/StudentPortraitView.vue';
@@ -117,7 +171,7 @@ const viewerId = computed(() => authStore.currentUser?.id ?? null);
 
 // 优先从路由 query 提取 courseId，未提供时默认课程 102
 const initialCourseId = Number(route.query.courseId) || 102;
-const { courseOptions, courseId } = useTeacherCourses(initialCourseId);
+const { courseOptions, courseId, courseIdCorrected } = useTeacherCourses(initialCourseId);
 
 const range = ref((route.query.range as string) || '7d');
 const aiDrawerVisible = ref(false);
@@ -171,26 +225,70 @@ const personalTabEnabled = computed(() =>
 /** 个体画像的可切换学员列表：学生视角不暴露班级名册，仅保留本人上下文 */
 const portraitStudentOptions = computed(() => (isStudentViewer.value ? [] : enrolledStudents.value));
 
+const showStudentSelectModal = ref(false);
+const pickerSearchKeyword = ref('');
+
+function isRealStudent(s: any): boolean {
+  const name = s.realName || '';
+  const u = s.username || '';
+  return !name.includes('管理员') && !name.toLowerCase().includes('admin') && u.toLowerCase() !== 'admin';
+}
+
+const filteredPickerStudents = computed(() => {
+  const kw = pickerSearchKeyword.value.trim().toLowerCase();
+  const list = enrolledStudents.value.filter(isRealStudent);
+  const candidates = list.length > 0 ? list : enrolledStudents.value;
+  if (!kw) return candidates;
+  return candidates.filter(
+    (s) =>
+      (s.realName && s.realName.toLowerCase().includes(kw)) ||
+      (s.studentNo && s.studentNo.toLowerCase().includes(kw)) ||
+      (s.username && s.username.toLowerCase().includes(kw))
+  );
+});
+
+function handleCancelStudentPicker() {
+  showStudentSelectModal.value = false;
+  activeTab.value = 'overall';
+  syncUrlQuery();
+}
+
+async function handleSelectStudentFromModal(studentId: number) {
+  showStudentSelectModal.value = false;
+  selectedStudentId.value = studentId;
+  activeTab.value = 'personal';
+  syncUrlQuery();
+  await fetchStudentPortrait(courseId.value, studentId, range.value);
+}
+
 function resolvePortraitStudentId(): number | null {
   const fromQuery = Number(route.query.studentId);
-  if (fromQuery && enrolledStudents.value.some((s) => s.studentId === fromQuery)) {
-    return fromQuery;
+  // URL 已明确指定学员时，绝不退化成「名册第一个」：
+  // 否则从成员页点「杨同学」的学情画像，一旦该生不在当前课程名册里就会静默显示
+  // 名册第一人（如超级管理员）的画像，让人误以为看的是杨同学的数据。
+  if (fromQuery) {
+    return enrolledStudents.value.some((s) => Number(s.studentId) === Number(fromQuery)) ? fromQuery : null;
   }
-  if (selectedStudentId.value && enrolledStudents.value.some((s) => s.studentId === selectedStudentId.value)) {
-    return selectedStudentId.value;
+  if (selectedStudentId.value && enrolledStudents.value.some((s) => Number(s.studentId) === Number(selectedStudentId.value))) {
+    return Number(selectedStudentId.value);
   }
-  return enrolledStudents.value[0]?.studentId ?? null;
+  const realStudent = enrolledStudents.value.find(isRealStudent);
+  if (realStudent?.studentId != null) {
+    return Number(realStudent.studentId);
+  }
+  return enrolledStudents.value[0]?.studentId != null ? Number(enrolledStudents.value[0].studentId) : null;
 }
 
 // 加载课程元数据
 async function loadCourseMeta(cid: number) {
   try {
     const res = await getCourseDetail(cid);
-    if (res?.data) {
-      courseDetailInfo.value = res.data;
-    }
+    courseDetailInfo.value = res?.data ?? null;
   } catch {
-    // 忽略元数据加载错误，使用默认与列表数据兜底
+    // 加载失败（无权访问该课程 / 课程已删除）必须清空，否则会继续沿用上一门课程的
+    // 标题、课程代号、教师与学期，页面就会变成「标题是 A 课、返回按钮跳 B 课」。
+    // 清空后由 courseOptions 兜底渲染，至少保证显示的是当前 courseId 对应的课程。
+    courseDetailInfo.value = null;
   }
 }
 
@@ -213,7 +311,7 @@ async function reload() {
 
   // 如果路由指定了 studentId 或当前处于 personal tab，加载该学员画像
   const queryStudentId = Number(route.query.studentId);
-  if (queryStudentId && personalTabEnabled.value && enrolledStudents.value.some((s) => s.studentId === queryStudentId)) {
+  if (queryStudentId && personalTabEnabled.value && enrolledStudents.value.some((s) => Number(s.studentId) === Number(queryStudentId))) {
     activeTab.value = 'personal';
     await fetchStudentPortrait(courseId.value, queryStudentId, range.value);
   } else if (activeTab.value === 'personal') {
@@ -226,6 +324,14 @@ async function reload() {
       const targetId = resolvePortraitStudentId();
       if (targetId) {
         await fetchStudentPortrait(courseId.value, targetId, range.value);
+      } else if (queryStudentId) {
+        // 路由明确指定了学员，但该学员不在本课名册：退回班级整体视图并说明原因，
+        // 不再静默展示名册里其他人的画像
+        activeTab.value = 'overall';
+        portraitData.value = null;
+        selectedStudentId.value = null;
+        ElMessage.warning('该学员不在当前课程名册中，已返回班级整体分析');
+        loadStoredAdvice(courseId.value, null);
       }
     }
   } else {
@@ -246,6 +352,22 @@ function syncUrlQuery() {
   }
   router.replace({ query });
 }
+
+/**
+ * 目标课程不可访问、被 useTeacherCourses 自动纠正为可用课程后必须重载。
+ * 否则页面会停留在「用无权课程请求失败」的旧状态：标题来自兜底数据、
+ * 而内部 courseId 已是另一门课，点「返回课程空间」就会跳回那门无权课程。
+ */
+watch(courseIdCorrected, (corrected) => {
+  if (!corrected) return;
+  const match = courseOptions.value.find((c) => Number(c.id) === Number(courseId.value));
+  const queryCourseId = Number(route.query.courseId);
+  if (queryCourseId && queryCourseId !== Number(courseId.value)) {
+    ElMessage.warning(`无权访问原课程，已切换到「${match?.name ?? '可用课程'}」`);
+  }
+  syncUrlQuery();
+  reload();
+});
 
 function handleCourseChange(newCourseId: number) {
   courseId.value = newCourseId;
@@ -269,27 +391,38 @@ function handleTabChange(tab: 'overall' | 'personal') {
     ElMessage.warning('当前课程暂无选课学员，无法查看个体学情画像');
     return;
   }
-  activeTab.value = tab;
   if (tab === 'personal') {
+    // 若当前没有已选定的学员，弹出学员选择窗口供老师明确点选
+    if (!selectedStudentId.value && !Number(route.query.studentId) && enrolledStudents.value.length > 0) {
+      showStudentSelectModal.value = true;
+      pickerSearchKeyword.value = '';
+      return;
+    }
+    activeTab.value = 'personal';
     const targetId = resolvePortraitStudentId();
     if (targetId) {
+      selectedStudentId.value = targetId;
+      syncUrlQuery();
       fetchStudentPortrait(courseId.value, targetId, range.value);
     }
   } else {
+    activeTab.value = 'overall';
     loadStoredAdvice(courseId.value, null);
+    syncUrlQuery();
   }
-  syncUrlQuery();
 }
 
 async function handleViewStudentPortrait(studentId: number) {
+  selectedStudentId.value = studentId;
   activeTab.value = 'personal';
-  await fetchStudentPortrait(courseId.value, studentId, range.value);
   syncUrlQuery();
+  await fetchStudentPortrait(courseId.value, studentId, range.value);
 }
 
 async function handleSwitchStudent(studentId: number) {
-  await fetchStudentPortrait(courseId.value, studentId, range.value);
+  selectedStudentId.value = studentId;
   syncUrlQuery();
+  await fetchStudentPortrait(courseId.value, studentId, range.value);
 }
 
 function handleBackOverall() {
@@ -419,9 +552,10 @@ watch(
     if (query.tab && (query.tab === 'overall' || query.tab === 'personal')) {
       activeTab.value = query.tab;
     }
-    if (query.studentId && Number(query.studentId) !== selectedStudentId.value) {
+    if (query.studentId && Number(query.studentId) !== Number(selectedStudentId.value)) {
       const sid = Number(query.studentId);
-      if (personalTabEnabled.value && enrolledStudents.value.some((s) => s.studentId === sid)) {
+      if (personalTabEnabled.value && enrolledStudents.value.some((s) => Number(s.studentId) === sid)) {
+        selectedStudentId.value = sid;
         activeTab.value = 'personal';
         fetchStudentPortrait(courseId.value, sid, range.value);
       } else {
@@ -514,5 +648,111 @@ onMounted(() => {
 .fade-slide-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+.student-picker-header {
+  margin-bottom: 16px;
+
+  .picker-tip {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: #64748B;
+    line-height: 1.5;
+  }
+
+  .picker-search-input {
+    width: 100%;
+  }
+}
+
+.picker-student-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.picker-student-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #EFF6FF;
+    border-color: #BFDBFE;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(22, 119, 255, 0.08);
+
+    .picker-choose-btn {
+      opacity: 1;
+    }
+  }
+
+  .picker-avatar {
+    flex-shrink: 0;
+    background: #1677FF;
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .picker-student-meta {
+    flex: 1;
+    min-width: 0;
+
+    .picker-name-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+
+      .picker-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: #0F172A;
+      }
+
+      .picker-sno {
+        font-size: 12px;
+        color: #64748B;
+        background: #E2E8F0;
+        padding: 1px 6px;
+        border-radius: 4px;
+      }
+    }
+
+    .picker-score-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #64748B;
+
+      .picker-divider {
+        color: #CBD5E1;
+      }
+    }
+  }
+
+  .picker-choose-btn {
+    flex-shrink: 0;
+    font-size: 12px;
+    padding: 6px 14px;
+    opacity: 0.85;
+  }
+}
+
+.picker-empty {
+  padding: 32px 0;
+  text-align: center;
+  color: #94A3B8;
+  font-size: 13px;
 }
 </style>

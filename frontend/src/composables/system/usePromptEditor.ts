@@ -3,6 +3,10 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { usePrompt } from '@/composables/system/usePrompt';
 import { resolveModels } from '@/composables/system/useAIModel';
+import {
+  applyPromptDemoVariables,
+  resolvePromptDemoFill
+} from '@/composables/system/usePromptDemoData';
 import { PromptTemplate } from '@/types/system/prompt';
 import type { PromptVersionItem } from '@/types/system/prompt';
 
@@ -39,10 +43,10 @@ export function createDefaultForm(): PromptTemplate {
     userPromptTemplate:
       '请基于当前课程知识库回答下面的问题。\n\n当前课程：{{course_name}}\n当前章节：{{chapter_name}}\n当前知识点：{{knowledge_point_name}}\n\n用户问题：\n{{question}}',
     variables: [
-      { name: 'course_name', label: '课程名称', defaultValue: 'Java程序设计' },
-      { name: 'chapter_name', label: '章节名称', defaultValue: '第三章 面向对象程序设计' },
-      { name: 'knowledge_point_name', label: '知识点', defaultValue: '多态与动态分派' },
-      { name: 'question', label: '用户提问', defaultValue: 'Java多态的具体实现原理是什么？' }
+      { name: 'course_name', label: '课程名称', defaultValue: 'Java面向对象程序设计' },
+      { name: 'chapter_name', label: '章节名称', defaultValue: '2.1 封装、继承与多态机制' },
+      { name: 'knowledge_point_name', label: '知识点', defaultValue: '面向对象三大特征与多态运行时绑定' },
+      { name: 'question', label: '用户提问', defaultValue: '多态的实现需要哪些必要条件？运行时又是如何确定实际调用的方法？' }
     ],
     version: 'v1.0.0',
     status: 'DRAFT',
@@ -223,128 +227,6 @@ export function extractVariableNamesFromPrompts(systemPrompt: string, userPrompt
   return Array.from(new Set(matches.map((m) => m.replace(/[\{\}]/g, '').trim())));
 }
 
-function buildFallbackTestOutput(
-  form: PromptTemplate,
-  testVariables: Record<string, string>
-): string {
-  if (form.category === 'grading' || form.code === 'GRADING_RAG_GENERAL') {
-    return `{
-  "status": "SUCCESS",
-  "questionId": "${testVariables.question_id || 'Q10001'}",
-  "questionType": "${testVariables.question_type || 'SHORT_ANSWER'}",
-  "maxScore": 6,
-  "totalScore": 5,
-  "scoreRate": 0.8333,
-  "gradingPoints": [
-    {
-      "scoringPointId": "SP1",
-      "description": "说明继承或父子类型关系",
-      "maxScore": 1,
-      "awardedScore": 1,
-      "status": "FULL",
-      "evidence": "父类变量可以保存子类对象",
-      "reason": "学生正确表达了父类引用可以指向子类对象的含义。"
-    }
-  ],
-  "overallFeedback": "你已经正确理解了多态中父类引用指向子类对象，以及方法重写后的运行时调用机制。",
-  "confidence": 0.94,
-  "requiresManualReview": false
-}`;
-  }
-
-  if (form.category === 'question' || form.code === 'EXAM_RAG_GENERAL') {
-    return `{
-  "status": "SUCCESS",
-  "courseId": "${testVariables.course_id || '10001'}",
-  "courseName": "${testVariables.course_name || 'Java程序设计'}",
-  "questions": [
-    {
-      "tempId": "Q1",
-      "type": "SINGLE_CHOICE",
-      "stem": "关于Java运行时多态，下列说法正确的是？",
-      "answer": ["B"]
-    }
-  ]
-}`;
-  }
-
-  if (form.category === 'teaching' || form.code === 'LESSON_PREP_RAG_GENERAL') {
-    return `{
-  "status": "SUCCESS",
-  "groundingStatus": "FULL",
-  "lessonPlan": {
-    "basicInfo": {
-      "courseName": "${testVariables.course_name || 'Java程序设计'}",
-      "lessonTitle": "${testVariables.lesson_title || 'Java运行时多态与动态绑定机制'}"
-    }
-  }
-}`;
-  }
-
-  return `### 多态的核心原理与实现机制
-
-Java 中的多态可以简单理解为：**同一个父类引用，在运行时可以指向不同的子类对象，并表现出不同的行为。** [S1]
-
-### 参考资料
-[S1] 《Java程序设计教材》· 第三章 面向对象 · 第86页`;
-}
-
-const UNIVERSITY_DEMO_DATA: Record<string, string> = {
-  course_id: '10001',
-  course_name: 'Java程序设计',
-  course_description: '面向软件技术专业核心基础课，主要讲解面向对象与核心类库。',
-  chapter_name: '第三章 面向对象程序设计',
-  knowledge_point_name: '多态与动态分派',
-  user_role: 'STUDENT',
-  answer_depth: 'NORMAL',
-  language: 'zh-CN',
-  allow_general_knowledge: 'true',
-  question: 'Java多态的具体实现原理是什么？它与方法重载有什么区别？',
-  conversation_history: '[User]: 什么是面向对象继承？\n[Assistant]: 继承是面向对象三大核心特征之一...',
-  retrieved_context: `<rag_context>
-<source id="S1" document="Java程序设计教材.pdf" chapter="第三章 面向对象" section="3.4 多态" page="86">
-Java中的多态是指同一个引用类型在不同运行状态下，可以指向不同类型的对象，并表现出不同的行为。
-</source>
-</rag_context>`,
-  context: `<rag_context>
-<source id="S1" document="Java程序设计教材.pdf" chapter="第三章 面向对象" section="3.4 多态" page="86">
-Java中的多态是指同一个引用类型在不同运行状态下，可以指向不同类型的对象，并表现出不同的行为。
-</source>
-</rag_context>`,
-  chapter_id: 'CH03',
-  knowledge_point_ids: 'KP003,KP004',
-  knowledge_point_names: '继承与重写,多态与动态分派',
-  question_types: 'SINGLE_CHOICE,MULTIPLE_CHOICE,SHORT_ANSWER',
-  difficulty: 'MEDIUM',
-  question_count: '3',
-  task_purpose: 'HOMEWORK',
-  student_level: '本科二年级',
-  score_per_question: '5',
-  generation_requirements: '注重考察代码执行结果分析与基本概念辨析',
-  existing_questions: '["什么是多态？","Java中单继承关键字是什么？"]',
-  question_id: 'Q10001',
-  question_stem: '请简述Java中运行时多态的实现条件。',
-  max_score: '6',
-  reference_answer: 'Java运行时多态通常需要继承、重写、父类引用指向子类对象。',
-  scoring_rubric: '按要点采分，语义等价即可得分。',
-  scoring_points: '[{"id":"SP1","description":"说明继承或父子类型关系","score":1}]',
-  student_answer: '多态就是父类变量可以保存子类对象。',
-  grading_mode: 'FULL_EXPLANATION',
-  teacher_requirements: '结合Animal/Dog/Cat案例设计课堂互动',
-  lesson_title: 'Java运行时多态与动态绑定机制',
-  lesson_duration: '90分钟',
-  lesson_count: '2',
-  class_profile: '已掌握Java类与对象、继承与重写',
-  teaching_mode: 'BOPPPS',
-  teaching_method: '问题驱动,案例教学,代码演示',
-  teaching_objectives: '理解运行时多态实现条件',
-  previous_learning: '类与对象,继承,方法重写',
-  next_learning: '抽象类,接口,面向接口编程',
-  available_resources: 'Java程序设计教材,课程PPT,IDE开发环境',
-  assessment_requirement: '设计课堂代码预测题作为形成性评价',
-  homework_requirement: '布置2道代码执行分析题',
-  output_depth: 'DETAILED'
-};
 
 export function usePromptEditor() {
   const route = useRoute();
@@ -379,6 +261,8 @@ export function usePromptEditor() {
   const form = ref<PromptTemplate>(createDefaultForm());
   const testVariables = ref<Record<string, string>>({});
   const testResultOutput = ref('');
+  /** 演示数据需要实时拉取课程 / 章节 / 知识点 / 知识库 / 题库，按钮需给出进行中反馈 */
+  const demoFilling = ref(false);
   const versionDetailVisible = ref(false);
   const selectedVersion = ref<PromptVersionItem | null>(null);
 
@@ -544,13 +428,31 @@ export function usePromptEditor() {
     }
   };
 
-  const fillUniversityDemoData = () => {
-    form.value.variables.forEach((v) => {
-      if (UNIVERSITY_DEMO_DATA[v.name]) {
-        testVariables.value[v.name] = UNIVERSITY_DEMO_DATA[v.name];
+  /**
+   * 一键填入高校课程真实 RAG 示例。
+   * 数据来自当前部署的真实课程 / 章节 / 知识点 / 知识库切片 / 题库题目，
+   * 接口不可用时由 `resolvePromptDemoFill` 静默回落到仓库种子快照。
+   */
+  const fillUniversityDemoData = async () => {
+    const slotNames = form.value.variables.map((v) => v.name);
+    if (!slotNames.length) {
+      ElMessage.warning('当前模板未声明任何参数插槽，无法注入演示数据');
+      return;
+    }
+    if (demoFilling.value) return;
+    demoFilling.value = true;
+    try {
+      const fill = await resolvePromptDemoFill();
+      const filled = applyPromptDemoVariables(testVariables.value, fill.variables, slotNames);
+      if (!filled) {
+        ElMessage.warning('当前模板插槽与演示数据不匹配，请先执行【同步插槽】再试');
+        return;
       }
-    });
-    ElMessage.success('已填入真实课程 RAG 演示数据');
+      const suffix = fill.source === 'remote' ? '' : '（后端数据不可用，已回落到种子快照）';
+      ElMessage.success(`已填入 ${filled} 个真实课程示例：${fill.label}${suffix}`);
+    } finally {
+      demoFilling.value = false;
+    }
   };
 
   const syncTestVariablesFromForm = () => {
@@ -569,7 +471,7 @@ export function usePromptEditor() {
     }
     testResultOutput.value = '';
 
-    await runTest(templateId, {
+    const ok = await runTest(templateId, {
       systemPrompt: form.value.systemPrompt,
       userPromptTemplate: form.value.userPromptTemplate,
       variables: testVariables.value,
@@ -578,10 +480,12 @@ export function usePromptEditor() {
       maxTokens: form.value.maxTokens
     });
 
+    if (!ok) {
+      // 失败已由全局拦截器提示，不再伪造兜底输出，避免被误读为测试通过
+      return;
+    }
     if (testResult.value?.output) {
       testResultOutput.value = testResult.value.output;
-    } else {
-      testResultOutput.value = buildFallbackTestOutput(form.value, testVariables.value);
     }
   };
 
@@ -707,6 +611,7 @@ export function usePromptEditor() {
     form,
     testVariables,
     testResultOutput,
+    demoFilling,
     versionDetailVisible,
     selectedVersion,
     selectedVersionVariables,

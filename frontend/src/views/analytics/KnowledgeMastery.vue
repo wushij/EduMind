@@ -61,20 +61,25 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import KnowledgeRadar from '@/components/analytics/KnowledgeRadar.vue';
 import KnowledgeHeatmap from '@/components/analytics/KnowledgeHeatmap.vue';
 import { useLearningAnalytics } from '@/composables/analytics/useLearningAnalytics';
 import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
 
-const { courseOptions, courseId } = useTeacherCourses(102);
+const { courseOptions, courseId } = useTeacherCourses();
 const studentId = ref<number | undefined>(undefined);
 
 const { loading, usedMockFallback, masteryData, fetchMastery } = useLearningAnalytics();
 
 async function reload() {
+  if (!courseId.value || courseId.value <= 0) return;
   await fetchMastery(courseId.value, studentId.value);
 }
+
+watch(courseId, () => {
+  reload();
+});
 
 onMounted(reload);
 </script>

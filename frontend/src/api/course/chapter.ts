@@ -1,7 +1,9 @@
 import { get, post, put, del } from '@/core/http/request';
+import type { HttpRequestConfig } from '@/core/http/types';
 import { Chapter } from '@/types/course/chapter';
 
-export const getChapters = (courseId: number) => get<Chapter[]>(`/courses/${courseId}/chapters`);
+export const getChapters = (courseId: number, config?: HttpRequestConfig) =>
+  get<Chapter[]>(`/courses/${courseId}/chapters`, undefined, config);
 
 export const createChapterApi = (
   courseId: number,

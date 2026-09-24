@@ -64,4 +64,12 @@ public class KnowledgePointDao {
         }
         return knowledgePointMapper.deleteById(id);
     }
+
+    public int deleteByCourseId(Long courseId) {
+        if (courseId == null) {
+            return 0;
+        }
+        return knowledgePointMapper.delete(new LambdaQueryWrapper<KnowledgePointEntity>()
+                .eq(KnowledgePointEntity::getCourseId, courseId));
+    }
 }

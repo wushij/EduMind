@@ -5,6 +5,10 @@ import { PromptTemplate } from '@/types/system/prompt';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { deletePromptTemplate } from '@/api/system/prompt';
 import { resolveModels } from '@/composables/system/useAIModel';
+import {
+  applyPromptDemoVariables,
+  resolvePromptDemoFill
+} from '@/composables/system/usePromptDemoData';
 import { AIModelConfigItem } from '@/types/system/model';
 
 export const categoryOptions = [
@@ -126,60 +130,51 @@ export function buildFallbackTestOutput(
   if (activeItem.category === 'grading' || activeItem.code === 'GRADING_RAG_GENERAL') {
     return `{
   "status": "SUCCESS",
-  "questionId": "${testVariables.question_id || 'Q10001'}",
-  "questionType": "${testVariables.question_type || 'SHORT_ANSWER'}",
-  "maxScore": 6,
-  "totalScore": 5,
-  "scoreRate": 0.8333,
+  "questionId": "${testVariables.question_id || '1007'}",
+  "questionType": "${testVariables.question_type || 'SINGLE_CHOICE'}",
+  "maxScore": ${Number(testVariables.max_score) || 5},
+  "totalScore": 0,
+  "scoreRate": 0,
   "gradingPoints": [
     {
       "scoringPointId": "SP1",
-      "description": "说明继承或父子类型关系",
-      "maxScore": 1,
-      "awardedScore": 1,
-      "status": "FULL",
-      "evidence": "父类变量可以保存子类对象",
-      "reason": "学生正确表达了父类引用可以指向子类对象的含义。"
+      "description": "指出 ArrayList 底层为动态数组，随机访问时间复杂度 O(1)",
+      "maxScore": 2,
+      "awardedScore": 0,
+      "status": "NONE",
+      "evidence": null,
+      "reason": "学生作答为 C，未命中该采分点。"
     },
     {
       "scoringPointId": "SP2",
-      "description": "说明方法重写",
+      "description": "指出 LinkedList 按下标访问需要遍历，时间复杂度 O(n)",
       "maxScore": 2,
-      "awardedScore": 2,
-      "status": "FULL",
-      "evidence": "如果子类重新实现父类的方法",
-      "reason": "学生正确说明了子类对父类方法进行重写。"
+      "awardedScore": 0,
+      "status": "NONE",
+      "evidence": null,
+      "reason": "作答未涉及链表下标访问的遍历代价。"
     },
     {
       "scoringPointId": "SP3",
-      "description": "说明运行时动态调用机制",
-      "maxScore": 2,
-      "awardedScore": 2,
-      "status": "FULL",
-      "evidence": "调用的时候会执行子类自己的实现",
-      "reason": "能够体现运行时根据实际对象执行重写方法的核心含义。"
-    },
-    {
-      "scoringPointId": "SP4",
-      "description": "完整描述多态实现机制",
+      "description": "指出 LinkedList 每个节点额外持有前后指针，内存开销更大",
       "maxScore": 1,
       "awardedScore": 0,
       "status": "NONE",
       "evidence": null,
-      "reason": "答案没有进一步明确说明动态绑定这一机制。"
+      "reason": "作答未涉及链表节点的额外指针开销。"
     }
   ],
   "knowledgeDiagnosis": [
     {
-      "knowledgePointId": "KP003",
-      "knowledgePointName": "多态",
-      "mastery": "PARTIAL",
-      "reason": "已经掌握父类引用、方法重写及运行时调用的核心关系，但概念表述不够完整。"
+      "knowledgePointId": "16",
+      "knowledgePointName": "ArrayList 与 LinkedList 源码剖析",
+      "mastery": "WEAK",
+      "reason": "把“动态数组扩容需要复制元素”误迁移成“ArrayList 插入永远不需要复制数组”，说明尚未把扩容机制与下标随机访问两套机制区分开。"
     }
   ],
-  "overallFeedback": "你已经正确理解了多态中父类引用指向子类对象，以及方法重写后的运行时调用机制。建议进一步补充“运行时动态绑定”这一概念，使答案更加完整。",
-  "sourceIds": ["S1", "S2"],
-  "confidence": 0.94,
+  "overallFeedback": "本题正确选项为 A。ArrayList 的 O(1) 随机访问来自连续内存 + 下标寻址，LinkedList 的 O(n) 查找与节点额外指针开销才是与 B、D 的分界；C 描述的是扩容代价，属于另一条考点，不能用来否定 A。",
+  "sourceIds": ["S1"],
+  "confidence": 0.93,
   "requiresManualReview": false,
   "manualReviewReason": null
 }`;
@@ -188,16 +183,16 @@ export function buildFallbackTestOutput(
   if (activeItem.category === 'question' || activeItem.code === 'EXAM_RAG_GENERAL') {
     return `{
   "status": "SUCCESS",
-  "courseId": "${testVariables.course_id || '10001'}",
-  "courseName": "${testVariables.course_name || 'Java程序设计'}",
-  "chapterId": "${testVariables.chapter_id || 'CH03'}",
-  "chapterName": "${testVariables.chapter_name || '第三章 面向对象程序设计'}",
+  "courseId": "${testVariables.course_id || '102'}",
+  "courseName": "${testVariables.course_name || 'Java面向对象程序设计'}",
+  "chapterId": "${testVariables.chapter_id || '10'}",
+  "chapterName": "${testVariables.chapter_name || '2.1 封装、继承与多态机制'}",
   "questions": [
     {
       "tempId": "Q1",
       "type": "SINGLE_CHOICE",
       "difficulty": "MEDIUM",
-      "stem": "关于Java运行时多态，下列说法正确的是？",
+      "stem": "关于 Java 运行时多态，下列说法正确的是？",
       "options": [
         { "key": "A", "content": "父类引用只能指向父类对象" },
         { "key": "B", "content": "父类引用可以指向子类对象，并根据实际对象调用重写的方法" },
@@ -206,9 +201,9 @@ export function buildFallbackTestOutput(
       ],
       "answer": ["B"],
       "acceptableAnswers": [],
-      "explanation": "Java运行时多态允许父类引用指向子类对象，当调用被重写的方法时，实际执行的方法由运行时对象类型决定。[S1]",
+      "explanation": "Java 运行时多态允许父类引用指向子类对象，当调用被重写的方法时，实际执行的方法由运行时对象类型决定。[S1]",
       "scoringPoints": [],
-      "knowledgePoints": [{ "id": "KP003", "name": "多态" }],
+      "knowledgePoints": [{ "id": "15", "name": "面向对象三大特征与多态运行时绑定" }],
       "sourceIds": ["S1"],
       "suggestedScore": 2
     },
@@ -216,19 +211,19 @@ export function buildFallbackTestOutput(
       "tempId": "Q2",
       "type": "MULTIPLE_CHOICE",
       "difficulty": "MEDIUM",
-      "stem": "下列关于Java方法重写的条件与约束，正确的有？",
+      "stem": "关于 ArrayList 与 LinkedList 的结构与复杂度，下列说法正确的有？",
       "options": [
-        { "key": "A", "content": "子类方法与父类方法的方法名和形参列表必须相同" },
-        { "key": "B", "content": "子类方法的访问修饰权限不能低于父类对应方法" },
-        { "key": "C", "content": "子类方法抛出的受检异常范围不能宽于父类对应方法" },
-        { "key": "D", "content": "私有方法（private）也可以在子类中被重写" }
+        { "key": "A", "content": "ArrayList 底层是 Object[] 数组，按下标访问为 O(1)" },
+        { "key": "B", "content": "LinkedList 底层是双向链表，按下标访问需要从头遍历" },
+        { "key": "C", "content": "ArrayList 扩容时会创建新数组并复制原有元素" },
+        { "key": "D", "content": "LinkedList 的每个节点额外持有前后指针，内存开销比 ArrayList 更大" }
       ],
-      "answer": ["A", "B", "C"],
+      "answer": ["A", "B", "C", "D"],
       "acceptableAnswers": [],
-      "explanation": "重写要求遵循'两同两小一大'原则：方法名和参数列表相同，返回值与抛出异常类型不大于父类，访问权限不小于父类。private方法对子类不可见，无法重写。[S2]",
+      "explanation": "四项描述均与源码结构一致：ArrayList 使用连续数组并按下标寻址，扩容时复制元素；LinkedList 使用双向链表，访问需遍历且节点额外持有 prev/next 指针。[S1]",
       "scoringPoints": [],
-      "knowledgePoints": [{ "id": "KP002", "name": "方法重写" }],
-      "sourceIds": ["S2"],
+      "knowledgePoints": [{ "id": "16", "name": "ArrayList 与 LinkedList 源码剖析" }],
+      "sourceIds": ["S1"],
       "suggestedScore": 3
     }
   ]
@@ -243,14 +238,14 @@ export function buildFallbackTestOutput(
   "reviewReason": null,
   "lessonPlan": {
     "basicInfo": {
-      "courseId": "${testVariables.course_id || '10001'}",
-      "courseName": "${testVariables.course_name || 'Java程序设计'}",
-      "chapterId": "${testVariables.chapter_id || 'CH03'}",
-      "chapterName": "${testVariables.chapter_name || '第三章 面向对象程序设计'}",
-      "lessonTitle": "${testVariables.lesson_title || 'Java运行时多态与动态绑定机制'}",
+      "courseId": "${testVariables.course_id || '102'}",
+      "courseName": "${testVariables.course_name || 'Java面向对象程序设计'}",
+      "chapterId": "${testVariables.chapter_id || '10'}",
+      "chapterName": "${testVariables.chapter_name || '2.1 封装、继承与多态机制'}",
+      "lessonTitle": "${testVariables.lesson_title || '面向对象三大特征与多态运行时绑定'}",
       "lessonCount": 2,
       "totalDurationMinutes": 90,
-      "studentLevel": "软件技术专业大二学生"
+      "studentLevel": "计算机专业大二学生"
     },
     "learningAnalysis": {
       "priorKnowledge": ["类与对象", "继承", "方法重写"],
@@ -293,7 +288,7 @@ export function buildFallbackTestOutput(
       }
     ],
     "teachingMethods": ["问题驱动", "案例教学", "代码演示", "任务驱动"],
-    "resources": ["Java程序设计教材", "课程PPT", "IDE开发环境", "课堂示例代码"],
+    "resources": ["Java面向对象编程实战教程", "课程PPT", "IDE开发环境", "课堂示例代码"],
     "stages": [
       {
         "stage": "LESSON_INTRODUCTION",
@@ -379,79 +374,9 @@ animal.speak(); // 运行时实际调用 Dog 类中重写的 speak() 方法
 多态与“方法重载”不同，重载发生在编译阶段（静态多分派），而多态属于运行阶段（动态单分派）。
 
 ### 参考资料
-[S1] 《Java程序设计教材》· 第三章 面向对象 · 第86页
-[S2] 《Java面向对象核心讲义》· 虚方法表 · 第24页`;
+[S1] 《Java面向对象编程实战教程》· 2.1 封装、继承与多态机制 · 多态三大必要条件
+[S2] 《Java面向对象程序设计知识库》· 面向对象三大特性剖析 · 方法重写`;
 }
-
-const DUMMY_VARIABLES: Record<string, string> = {
-  course_name: 'Java程序设计',
-  course_id: '10001',
-  course_description: '面向软件技术专业核心基础课，主要讲解面向对象与核心类库。',
-  chapter_name: '第三章 面向对象程序设计',
-  knowledge_point_name: '多态与动态分派',
-  user_role: 'STUDENT',
-  answer_depth: 'NORMAL',
-  language: 'zh-CN',
-  allow_general_knowledge: 'true',
-  question: 'Java中多态的具体实现原理是什么？',
-  conversation_history: '[User]: 什么是继承？\n[Assistant]: 继承是面向对象三大特性之一...',
-  retrieved_context: `<rag_context>
-<source id="S1" document="Java程序设计教材.pdf" chapter="第三章 面向对象" section="3.4 多态" page="86">
-Java中的多态是指同一个引用类型在不同运行状态下，可以指向不同类型的对象，并表现出不同的行为。实际调用的方法实现由运行时堆中真实对象类型决定。
-</source>
-<source id="S2" document="Java面向对象核心讲义.pptx" chapter="第三章 面向对象" section="虚方法表" page="24">
-JVM通过虚方法表（vtable）进行动态分派，实现父类引用调用子类重写方法。
-</source>
-<source id="S3" document="Java程序设计课堂案例.docx" chapter="第三章 面向对象" section="Animal-Dog-Cat多态示例" page="12">
-通过Animal、Dog、Cat三个类的示例，演示同一父类引用指向不同子类对象时产生不同输出的多态现象。
-</source>
-</rag_context>`,
-  context: `<rag_context>
-<source id="S1" document="Java程序设计教材.pdf" chapter="第三章 面向对象" section="3.4 多态" page="86">
-Java中的多态是指同一个引用类型在不同运行状态下，可以指向不同类型的对象，并表现出不同的行为。实际调用的方法实现由运行时堆中真实对象类型决定。
-</source>
-<source id="S2" document="Java面向对象核心讲义.pptx" chapter="第三章 面向对象" section="虚方法表" page="24">
-JVM通过虚方法表（vtable）进行动态分派，实现父类引用调用子类重写方法。
-</source>
-<source id="S3" document="Java程序设计课堂案例.docx" chapter="第三章 面向对象" section="Animal-Dog-Cat多态示例" page="12">
-通过Animal、Dog、Cat三个类的示例，演示同一父类引用指向不同子类对象时产生不同输出的多态现象。
-</source>
-</rag_context>`,
-  count: '3',
-  difficulty: 'MEDIUM',
-  question_type: '单选题',
-  chapter_id: 'CH03',
-  knowledge_point_ids: 'KP003,KP004',
-  knowledge_point_names: '继承与重写,多态与动态分派',
-  question_types: 'SINGLE_CHOICE,MULTIPLE_CHOICE,SHORT_ANSWER',
-  question_count: '3',
-  task_purpose: 'HOMEWORK',
-  student_level: '本科二年级',
-  score_per_question: '5',
-  generation_requirements:
-    'knowledgePointId 必须使用 KP003/KP004 等系统 ID，不得写中文名；chapterName 与输入完全一致；单选题干扰项需包含编译期/运行期或重载/重写混淆',
-  existing_questions: '["什么是多态？","Java中单继承关键字是什么？"]',
-  question_stem: '简述TCP与UDP的核心区别',
-  standard_answer: 'TCP面向连接、可靠交付；UDP无连接、最大努力交付。',
-  max_score: '10',
-  student_answer: 'TCP连接前要三次握手，可靠传输；UDP不建连接，速度快。',
-  teaching_hours: '2',
-  target_students: '计算机专业大二学生',
-  lesson_title: 'Java运行时多态与动态绑定机制',
-  lesson_duration: '90分钟',
-  lesson_count: '2',
-  class_profile: '已掌握Java类与对象、继承与重写，但对声明类型与运行时对象类型的关系理解较弱',
-  teaching_mode: 'BOPPPS',
-  teaching_method: '问题驱动,案例教学,代码演示,任务驱动',
-  teaching_objectives: '理解运行时多态实现条件，能分析并预测多态代码执行结果',
-  teacher_requirements: '结合Animal/Dog/Cat案例，设计课堂互动与代码预测环节，轻微口语化表述不扣分',
-  previous_learning: '类与对象,继承,方法重写',
-  next_learning: '抽象类,接口,面向接口编程',
-  available_resources: 'Java程序设计教材,课程PPT,IDE开发环境',
-  assessment_requirement: '设计课堂代码预测题作为形成性评价，检查学生是否能区分声明类型与运行时对象类型',
-  homework_requirement: '布置2道代码执行分析题，以及1道多态设计实践题',
-  output_depth: 'DETAILED'
-};
 
 export function usePromptList() {
   const router = useRouter();
@@ -470,6 +395,8 @@ export function usePromptList() {
   const testVariables = ref<Record<string, string>>({});
   const testResultOutput = ref('');
   const testDuration = ref(0);
+  /** 一键填入需要实时拉取真实课程数据，用于按钮态与重复点击保护 */
+  const demoFilling = ref(false);
 
   const loadAvailableModels = async () => {
     try {
@@ -546,15 +473,30 @@ export function usePromptList() {
     drawerVisible.value = true;
   };
 
-  const populateDummyVariables = () => {
-    if (!activeItem.value) return;
+  /** 一键填入真实课程示例：优先读取当前部署的真实课程 / 章节 / 知识点 / 知识库切片 */
+  const populateDummyVariables = async () => {
+    const item = activeItem.value;
+    if (!item || demoFilling.value) return;
 
-    activeItem.value.variables.forEach((v) => {
-      if (DUMMY_VARIABLES[v.name]) {
-        testVariables.value[v.name] = DUMMY_VARIABLES[v.name];
+    const slotNames = (item.variables || []).map((v) => v.name);
+    if (!slotNames.length) {
+      ElMessage.warning('当前模板未声明任何参数插槽，无法注入示例数据');
+      return;
+    }
+
+    demoFilling.value = true;
+    try {
+      const fill = await resolvePromptDemoFill();
+      const filled = applyPromptDemoVariables(testVariables.value, fill.variables, slotNames);
+      if (!filled) {
+        ElMessage.warning('当前模板插槽与示例数据不匹配，请检查插槽命名');
+        return;
       }
-    });
-    ElMessage.success('已自动载入课程真实测试变量');
+      const suffix = fill.source === 'remote' ? '' : '（后端数据不可用，已回落到种子快照）';
+      ElMessage.success(`已载入 ${filled} 个真实课程示例：${fill.label}${suffix}`);
+    } finally {
+      demoFilling.value = false;
+    }
   };
 
   const executePlaygroundTest = async () => {
@@ -562,20 +504,27 @@ export function usePromptList() {
     const startTime = Date.now();
     testResultOutput.value = '';
 
-    await runTest(activeItem.value.id, {
+    const ok = await runTest(activeItem.value.id, {
       systemPrompt: activeItem.value.systemPrompt,
       userPromptTemplate: activeItem.value.userPromptTemplate,
       variables: testVariables.value,
-      model: activeItem.value.boundModel || 'deepseek-chat',
+      // 空 boundModel 表示「跟随系统默认模型」，须交给后端自行路由：
+      // 传 'deepseek-chat' 这类占位串会被后端当成显式 model_key 去查模型配置，查不到就落到
+      // 全局默认配置，全局无 API Key 时直接抛错（表现为 500 系统繁忙），
+      // 且与界面上显示的「默认: xxx」完全不符。
+      model: activeItem.value.boundModel || defaultModelName.value || '',
       temperature: activeItem.value.temperature ?? 0.3,
       maxTokens: activeItem.value.maxTokens
     });
 
     testDuration.value = Date.now() - startTime;
+    if (!ok) {
+      // 失败已由全局拦截器提示，此处不再伪造兜底输出：
+      // 否则界面会渲染一段看似正常的样例文本，让人误以为测试通过。
+      return;
+    }
     if (testResult.value?.output) {
       testResultOutput.value = testResult.value.output;
-    } else if (activeItem.value) {
-      testResultOutput.value = buildFallbackTestOutput(activeItem.value, testVariables.value);
     }
   };
 
@@ -639,6 +588,7 @@ export function usePromptList() {
     testVariables,
     testResultOutput,
     testDuration,
+    demoFilling,
     categoryOptions,
     getCategoryCount: (catKey: string) => getCategoryCount(promptList.value, catKey),
     getCategoryLabel,

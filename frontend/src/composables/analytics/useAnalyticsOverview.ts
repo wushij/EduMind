@@ -13,10 +13,10 @@ export interface AnalyticsTabItem {
 
 const CHART_COLORS = ['#1677FF', '#06B6D4', '#10B981', '#722ED1', '#94A3B8', '#F59E0B'];
 
-export function useAnalyticsOverview(defaultCourseId = 102) {
+export function useAnalyticsOverview(defaultCourseId?: number) {
   const router = useRouter();
   const route = useRoute();
-  const { courseOptions, courseId } = useTeacherCourses(defaultCourseId);
+  const { courseOptions, courseId, loadCourses } = useTeacherCourses(defaultCourseId);
   const { fetchOverview } = useLearningAnalytics();
 
   const avgScore = ref('--');
@@ -333,6 +333,7 @@ export function useAnalyticsOverview(defaultCourseId = 102) {
   });
 
   async function loadOverviewData() {
+    if (!courseId.value || courseId.value <= 0) return;
     const range = resolveRange();
     const { learning, aiUsage, mastery } = await fetchOverview(courseId.value, range);
     if (learning) {
@@ -355,11 +356,10 @@ export function useAnalyticsOverview(defaultCourseId = 102) {
     refreshCharts();
   }
 
-  onMounted(() => {
-    nextTick(() => {
-      window.addEventListener('resize', handleResize);
-      loadOverviewData();
-    });
+  onMounted(async () => {
+    window.addEventListener('resize', handleResize);
+    await loadCourses();
+    await loadOverviewData();
   });
 
   onUnmounted(() => {

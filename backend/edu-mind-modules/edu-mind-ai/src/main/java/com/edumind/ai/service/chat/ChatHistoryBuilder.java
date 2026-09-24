@@ -32,6 +32,23 @@ public class ChatHistoryBuilder {
     };
 
     /**
+     * 纯口语应答词。
+     *
+     * <p>「愿意」「好的」这类消息本身不含任何指代信息，单独看毫无语义；
+     * 但只要会话里存在上一轮 AI 的提议（如「要不要我再换一道类似题目练一遍？」），
+     * 它必然是对该提议的确认。判为追问后追加追问纪律，可避免模型把它当成全新问题、
+     * 又重新输出一整段 RAG 导读。</p>
+     *
+     * <p>为避免「这道题可以这样做吗」之类正常提问被误判，仅当整条消息很短（≤ {@link #SHORT_ACK_MAX_LENGTH} 字）
+     * 且命中应答词时才生效——误判代价仅是追加一段多轮纪律提示，而漏判代价是用户看到复读。</p>
+     */
+    private static final String[] SHORT_ACK_KEYWORDS = {
+            "愿意", "好的", "好呀", "可以", "来吧", "继续", "是的", "麻烦你", "嗯"
+    };
+
+    private static final int SHORT_ACK_MAX_LENGTH = 10;
+
+    /**
      * 将数据库消息转为 LLM 多轮上下文（仅 content，不含 reasoning）。
      */
     public List<LlmChatMessage> build(List<MessageEntity> messages) {
@@ -125,6 +142,13 @@ public class ChatHistoryBuilder {
         for (String keyword : FOLLOW_UP_KEYWORDS) {
             if (trimmed.contains(keyword)) {
                 return true;
+            }
+        }
+        if (trimmed.length() <= SHORT_ACK_MAX_LENGTH) {
+            for (String ack : SHORT_ACK_KEYWORDS) {
+                if (trimmed.contains(ack)) {
+                    return true;
+                }
             }
         }
         return trimmed.length() <= 48 && (trimmed.contains("答案") || trimmed.contains("追问"));

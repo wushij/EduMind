@@ -247,7 +247,7 @@ function normalizeUnicodeIntervalNotation(text: string): string {
 /** 未加 $ 的 \\in\\left... 片段自动包裹 */
 function wrapRawLatexFragments(text: string): string {
   return text.replace(
-    /(?<!\$)(\\(?:in|notin|subset|cup|cap)[^$\n]*\\left[^$\n]+?\\right(?:[\]\).]|\\right)(?:\\cup[^$\n]+?)?)/g,
+    /(?<!\$)(\\(?:in|notin|subset|cup|cap)(?![a-zA-Z])[^$\n]*\\left[^$\n]+?\\right(?:[\]\).]|\\right)(?:\\cup[^$\n]+?)?)/g,
     (match) => `$${repairMalformedLeftRight(match.trim())}$`
   );
 }
@@ -265,24 +265,55 @@ function normalizeLatexDelimiters(text: string): string {
           `$${repairMalformedLeftRight(formula.replace(/\$/g, '').trim())}$`
         );
 
-      // 模型常输出 [ f'(x)=\frac{...}{...} ] 而非 $...$
-      s = s.replace(
-        /\[\s*([^[\n]*\\(?:frac|left|right|boxed|lim|ln|le|ge|Rightarrow|infty|varepsilon|delta)[^[\n]*)\s*\]/g,
-        (_m, formula: string) => `$${repairMalformedLeftRight(formula.trim())}$`
+      // 1. 保护已有合法 $$...$$ 独立块与 $...$ 行内公式，防止多行块内换行被后续单行正则拆碎打烂
+      const mathPlaceholders: string[] = [];
+      const maskMath = (raw: string): string => {
+        const key = `%%%PRE_MATH_TOKEN_${mathPlaceholders.length}%%%`;
+        mathPlaceholders.push(raw);
+        return key;
+      };
+
+      // 修复已有的 $$...$$ 与 $...$ 内部语法，并将其占位保护起来
+      s = s.replace(/\$\$([\s\S]+?)\$\$/g, (_m, formula: string) =>
+        maskMath(`$$${repairMalformedLeftRight(formula)}$$`)
+      );
+      s = s.replace(/(?<!\$)\$(?!\$)([^$\n]+?)(?<!\$)\$(?!\$)/g, (_m, formula: string) =>
+        maskMath(`$${repairMalformedLeftRight(formula)}$`)
       );
 
+      // 2. 裸多行环境识别（如未包裹 $$ 的 \begin{aligned}...\end{aligned}、\boxed{...}）自动包裹为 $$...$$
+      s = s.replace(
+        /(^|\n)[ \t]*(\\begin\{(?:aligned|cases|matrix|bmatrix|pmatrix|gathered)\}[\s\S]*?\\end\{(?:aligned|cases|matrix|bmatrix|pmatrix|gathered)\})(?=[ \t]*(?:\n|$))/g,
+        (_m, prefix: string, formula: string) => `${prefix}\n$$${formula.trim()}$$\n`
+      );
+      s = s.replace(
+        /(^|\n)[ \t]*(\\boxed\s*\{[\s\S]*?\n?[ \t]*\})(?=[ \t]*(?:\n|$))/g,
+        (_m, prefix: string, formula: string) => `${prefix}\n$$${formula.trim()}$$\n`
+      );
 
-      // 修复 $...$ 与 $$...$$ 内部的 \left/\right
-      s = s.replace(/\$\$([\s\S]+?)\$\$/g, (_m, formula: string) => `$$${repairMalformedLeftRight(formula)}$$`);
-      s = s.replace(/(?<!\$)\$(?!\$)([^$\n]+?)(?<!\$)\$(?!\$)/g, (_m, formula: string) =>
-        `$${repairMalformedLeftRight(formula)}$`
+      // 3. 独占一行的裸 LaTeX 独立数学公式（如模型直接输出未包裹的 \lim_{x\to\infty}...\right)^x=e）自动包裹为 $$...$$
+      s = s.replace(
+        /(^|\n)[ \t]*(\\(?:lim|frac|sqrt|sum|int|iint|iiint|oint|prod|left|displaystyle|aligned)(?![a-zA-Z])[^\$\n]+?)(?=[ \t]*(?:\n|$))/g,
+        (_m, prefix: string, formula: string) => `${prefix}\n$$${formula.trim()}$$\n`
+      );
+
+      // 4. 模型常输出 [ f'(x)=\frac{...}{...} ] 而非 $...$
+      // 注意：必须排除 LaTeX 语法本身的 \left[ ... \right]、\Big[ ... \Big] 等括号！
+      s = s.replace(
+        /(\\?(?:left|right|big|Big|bigg|Bigg)\s*)?\[\s*([^[\n]*\\(?:frac|left|right|boxed|lim|ln|le|ge|Rightarrow|infty|varepsilon|delta)[^[\n]*?)\s*(\\?(?:left|right|big|Big|bigg|Bigg)\s*)?\]/g,
+        (match, prefixCmd, formula, suffixCmd) => {
+          if (prefixCmd || suffixCmd || match.startsWith('\\[') || match.startsWith('\\[')) {
+            return match;
+          }
+          return `$${repairMalformedLeftRight(formula.trim())}$`;
+        }
       );
 
       s = normalizeUnicodeIntervalNotation(s);
       s = wrapRawLatexFragments(s);
       s = normalizePlainMathExpressions(s);
 
-      // 集合描述 {x | ...}、区间 [1,3] 等纯文本数学片段补 $ 包裹
+      // 5. 集合描述 {x | ...}、区间 [1,3] 等纯文本数学片段补 $ 包裹
       s = s.replace(
         /(?<!\$)([A-Z]\s*=\s*\{[^{}\n|]+\|\s*[^}\n]+\})(?!\$)/g,
         (_m, expr: string) => `$${normalizeUnicodeMathSymbols(expr.trim())}$`
@@ -291,6 +322,11 @@ function normalizeLatexDelimiters(text: string): string {
         /(?<!\$)(\d+\s*≤\s*[a-zA-Z]\s*≤\s*\d+)(?!\$)/g,
         (_m, expr: string) => `$${normalizeUnicodeMathSymbols(expr.trim())}$`
       );
+
+      // 6. 还原占位符（使用函数回调防止 $$ 被 replace 机制吞并为单个 $）
+      mathPlaceholders.forEach((mathStr, idx) => {
+        s = s.replaceAll(`%%%PRE_MATH_TOKEN_${idx}%%%`, () => mathStr);
+      });
 
       return s;
     })

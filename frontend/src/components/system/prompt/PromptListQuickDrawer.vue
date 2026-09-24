@@ -113,8 +113,13 @@
             <div class="test-inputs-panel">
               <div class="panel-head">
                 <span class="panel-title">1. 动态入参模拟填充</span>
-                <el-button size="small" link @click="$emit('populate-dummy')">
-                  一键填入高校课程示例数据
+                <el-button
+                  size="small"
+                  link
+                  :loading="demoFilling"
+                  @click="$emit('populate-dummy')"
+                >
+                  {{ demoFilling ? '正在读取真实课程数据…' : '一键填入高校课程示例数据' }}
                 </el-button>
               </div>
 
@@ -196,6 +201,8 @@ defineProps<{
   testResultOutput: string;
   testDuration: number;
   testing: boolean;
+  /** 演示数据实时读取中：课程 / 章节 / 知识点 / 知识库 / 题库 */
+  demoFilling?: boolean;
   getCategoryLabel: (category: string) => string;
 }>();
 

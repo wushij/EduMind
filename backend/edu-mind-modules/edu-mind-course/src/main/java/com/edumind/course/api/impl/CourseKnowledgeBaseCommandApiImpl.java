@@ -25,4 +25,9 @@ public class CourseKnowledgeBaseCommandApiImpl implements CourseKnowledgeBaseCom
         course.setKnowledgeBaseId(knowledgeBaseId);
         courseDao.updateById(course);
     }
+
+    @Override
+    public int unbindByKnowledgeBaseId(Long knowledgeBaseId) {
+        return courseDao.unbindKnowledgeBase(knowledgeBaseId);
+    }
 }

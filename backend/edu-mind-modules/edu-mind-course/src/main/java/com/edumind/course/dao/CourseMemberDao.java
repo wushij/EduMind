@@ -91,4 +91,12 @@ public class CourseMemberDao {
                 .eq(CourseMemberEntity::getCourseId, courseId)
                 .eq(CourseMemberEntity::getUserId, userId));
     }
+
+    public int deleteByCourseId(Long courseId) {
+        if (courseId == null) {
+            return 0;
+        }
+        return courseMemberMapper.delete(new LambdaQueryWrapper<CourseMemberEntity>()
+                .eq(CourseMemberEntity::getCourseId, courseId));
+    }
 }

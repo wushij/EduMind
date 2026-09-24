@@ -10,13 +10,9 @@
         <!-- 顶部彩色重点装饰条 -->
         <div class="card-accent-bar"></div>
 
-        <!-- 卡片顶栏：编码、版本与运行状态 -->
+        <!-- 卡片顶栏：分类、运行状态与版本 -->
         <div class="card-top-header">
-          <div class="code-and-category">
-            <span class="prompt-code" @click.stop="$emit('copy-text', item.code, '模板编码已复制')">
-              {{ item.code }}
-              <el-icon class="copy-icon"><CopyDocument /></el-icon>
-            </span>
+          <div class="category-box">
             <span class="category-tag" :class="item.category">
               {{ getCategoryLabel(item.category) }}
             </span>
@@ -142,7 +138,6 @@ import {
   Search,
   CollectionTag,
   Cpu,
-  CopyDocument,
   Link,
   Lock,
   Document,
@@ -227,40 +222,17 @@ defineEmits<{
       justify-content: space-between;
       align-items: center;
 
-      .code-and-category {
+      .category-box {
         display: flex;
         align-items: center;
-        gap: 8px;
-
-        .prompt-code {
-          font-family: ui-monospace, SFMono-Regular, monospace;
-          font-size: 11px;
-          font-weight: 700;
-          color: #1D4ED8;
-          background: #EFF6FF;
-          padding: 2px 8px;
-          border-radius: 999px;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          cursor: pointer;
-          transition: all 0.15s;
-
-          &:hover {
-            background: #DBEAFE;
-            color: #1E40AF;
-          }
-
-          .copy-icon {
-            font-size: 11px;
-          }
-        }
 
         .category-tag {
           font-size: 11px;
           font-weight: 600;
-          padding: 2px 8px;
+          padding: 3px 10px;
           border-radius: 999px;
+          white-space: nowrap;
+          letter-spacing: 0.2px;
 
           &.rag {
             background: #E0F2FE;
@@ -284,7 +256,9 @@ defineEmits<{
       .status-and-version {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
+        flex-shrink: 0;
+        white-space: nowrap;
 
         .status-pill {
           font-size: 11px;
@@ -293,7 +267,9 @@ defineEmits<{
           border-radius: 999px;
           display: flex;
           align-items: center;
-          gap: 4px;
+          gap: 5px;
+          white-space: nowrap;
+          flex-shrink: 0;
 
           &.status-online {
             background: #ECFDF5;

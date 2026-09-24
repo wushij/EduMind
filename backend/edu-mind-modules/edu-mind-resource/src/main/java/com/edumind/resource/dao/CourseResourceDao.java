@@ -63,4 +63,15 @@ public class CourseResourceDao {
         }
         return courseResourceMapper.deleteById(id);
     }
+
+    public int deleteByCourseId(Long courseId) {
+        if (courseId == null) {
+            return 0;
+        }
+        return courseResourceMapper.delete(
+                new LambdaQueryWrapper<CourseResourceEntity>()
+                        .eq(CourseResourceEntity::getCourseId, courseId)
+        );
+    }
 }
+

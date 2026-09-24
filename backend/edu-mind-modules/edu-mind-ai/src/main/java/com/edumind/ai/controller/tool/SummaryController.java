@@ -1,6 +1,7 @@
 package com.edumind.ai.controller.tool;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.annotation.SaMode;
 import com.edumind.ai.dto.tool.SummaryDTO;
 import com.edumind.ai.service.tool.SummaryService;
 import com.edumind.common.api.ApiResult;
@@ -19,7 +20,7 @@ public class SummaryController {
 
     private final SummaryService summaryService;
 
-    @SaCheckPermission("ai:tool")
+    @SaCheckPermission(value = {"ai:summary:view", "course:view", "course:ai:use"}, mode = SaMode.OR)
     @PostMapping
     public ApiResult<Map<String, String>> summarize(@RequestBody SummaryDTO dto) {
         return ApiResult.success(Map.of("content", summaryService.summarize(dto)));

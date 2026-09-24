@@ -63,6 +63,20 @@ public class CourseController {
     }
 
     @SaCheckPermission("course:edit")
+    @PutMapping("/{id}/archive")
+    public ApiResult<Void> archiveCourse(@PathVariable("id") Long id) {
+        courseService.archiveCourse(id);
+        return ApiResult.success();
+    }
+
+    @SaCheckPermission("course:edit")
+    @PutMapping("/{id}/unarchive")
+    public ApiResult<Void> unarchiveCourse(@PathVariable("id") Long id) {
+        courseService.unarchiveCourse(id);
+        return ApiResult.success();
+    }
+
+    @SaCheckPermission(value = {"course:delete", "course:edit"}, mode = cn.dev33.satoken.annotation.SaMode.OR)
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteCourse(@PathVariable("id") Long id) {

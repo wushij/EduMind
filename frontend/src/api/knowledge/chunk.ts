@@ -1,4 +1,5 @@
 import { get, post } from '@/core/http/request';
+import type { HttpRequestConfig } from '@/core/http/types';
 import { LONG_TASK_TIMEOUT } from '@/config';
 import { DocumentChunk, ChunkQueryRequest, ChunkStatsVO, ChunkOperationResult } from '@/types/knowledge/chunk';
 
@@ -51,17 +52,25 @@ function mapChunk(raw: Record<string, unknown>): DocumentChunk {
   };
 }
 
-export const getChunks = async (docId?: number, params?: ChunkQueryRequest): Promise<DocumentChunk[]> => {
+export const getChunks = async (
+  docId?: number,
+  params?: ChunkQueryRequest,
+  config?: HttpRequestConfig
+): Promise<DocumentChunk[]> => {
   if (!docId) {
     return [];
   }
 
-  const res = await get<PageResult<Record<string, unknown>>>(`/documents/${docId}/chunks`, {
-    page: params?.page || 1,
-    pageSize: params?.pageSize || 500,
-    keyword: params?.keyword,
-    status: params?.status
-  });
+  const res = await get<PageResult<Record<string, unknown>>>(
+    `/documents/${docId}/chunks`,
+    {
+      page: params?.page || 1,
+      pageSize: params?.pageSize || 500,
+      keyword: params?.keyword,
+      status: params?.status
+    },
+    config
+  );
 
   const list = res?.data?.list;
   if (list) {

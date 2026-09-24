@@ -3,6 +3,7 @@ package com.edumind.statistics.service.learning.impl;
 import com.edumind.common.model.UserContext;
 import com.edumind.course.api.CourseQueryApi;
 import com.edumind.course.vo.course.CourseVO;
+import com.edumind.course.vo.knowledge.KnowledgePointVO;
 import com.edumind.question.api.QuestionQueryApi;
 import com.edumind.question.vo.question.QuestionVO;
 import com.edumind.resource.api.ResourceQueryApi;
@@ -47,6 +48,10 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
         int size = limit != null && limit > 0 ? limit : 10;
         String courseName = resolveCourseName(courseId);
+        // 章节范围收敛：题目表只挂了 knowledge_point_id，没有 chapter_id，
+        // 因此「按章节出题」只能走「章节 → 知识点 → 题目」这条链路。
+        Set<Long> chapterKpIds = resolveChapterKnowledgePointIds(courseId, chapterId);
+        boolean chapterScoped = chapterKpIds != null && !chapterKpIds.isEmpty();
 
         List<QuestionVO> ordered = new ArrayList<>();
         Set<Long> seen = new HashSet<>();
@@ -59,28 +64,32 @@ public class RecommendationServiceImpl implements RecommendationService {
                 if (wp.getKnowledgePointId() == null) {
                     continue;
                 }
-                List<QuestionVO> kpQuestions = questionQueryApi.listQuestionsByKnowledgePointId(
-                        wp.getKnowledgePointId(), 3);
-                if (kpQuestions == null) {
+                if (chapterScoped && !chapterKpIds.contains(wp.getKnowledgePointId())) {
                     continue;
                 }
-                for (QuestionVO q : kpQuestions) {
-                    if (q.getId() != null && seen.add(q.getId())) {
-                        ordered.add(q);
-                    }
-                }
+                appendKnowledgePointQuestions(ordered, seen, wp.getKnowledgePointId());
             }
         }
 
         if (ordered.size() < size) {
-            List<QuestionVO> coursePool = questionQueryApi.listQuestionsByCourseId(courseId);
-            if (coursePool != null) {
-                for (QuestionVO q : coursePool) {
-                    if (q.getId() != null && seen.add(q.getId())) {
-                        ordered.add(q);
-                    }
+            if (chapterScoped) {
+                // 指定章节时只在该章节的知识点范围内补题，避免「第二章的计划推第一章的题」
+                for (Long kpId : chapterKpIds) {
                     if (ordered.size() >= size * 2) {
                         break;
+                    }
+                    appendKnowledgePointQuestions(ordered, seen, kpId);
+                }
+            } else {
+                List<QuestionVO> coursePool = questionQueryApi.listQuestionsByCourseId(courseId);
+                if (coursePool != null) {
+                    for (QuestionVO q : coursePool) {
+                        if (q.getId() != null && seen.add(q.getId())) {
+                            ordered.add(q);
+                        }
+                        if (ordered.size() >= size * 2) {
+                            break;
+                        }
                     }
                 }
             }
@@ -122,6 +131,41 @@ public class RecommendationServiceImpl implements RecommendationService {
             result.add(vo);
         }
         return result;
+    }
+
+    /**
+     * 解析章节对应的知识点 ID 集合。章节下没有录入知识点时返回 null，
+     * 由调用方回退到课程维度，避免「按章节推荐」退化为空结果。
+     */
+    private Set<Long> resolveChapterKnowledgePointIds(Long courseId, Long chapterId) {
+        if (chapterId == null) {
+            return null;
+        }
+        List<KnowledgePointVO> points = courseQueryApi.listKnowledgePointsByCourseId(courseId);
+        if (points.isEmpty()) {
+            return null;
+        }
+        Set<Long> ids = points.stream()
+                .filter(p -> chapterId.equals(p.getChapterId()))
+                .map(KnowledgePointVO::getId)
+                .filter(id -> id != null)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return ids.isEmpty() ? null : ids;
+    }
+
+    private void appendKnowledgePointQuestions(List<QuestionVO> ordered, Set<Long> seen, Long kpId) {
+        if (kpId == null) {
+            return;
+        }
+        List<QuestionVO> kpQuestions = questionQueryApi.listQuestionsByKnowledgePointId(kpId, 3);
+        if (kpQuestions == null) {
+            return;
+        }
+        for (QuestionVO q : kpQuestions) {
+            if (q.getId() != null && seen.add(q.getId())) {
+                ordered.add(q);
+            }
+        }
     }
 
     private Map<Long, Double> loadWeakMasteryMap(Long courseId, Long studentId) {

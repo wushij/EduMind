@@ -39,6 +39,7 @@
           :test-result-output="testResultOutput"
           :test-result="testResult"
           :testing="testing"
+          :demo-filling="demoFilling"
           :on-run-test="handleRunTest"
           :on-fill-demo="fillUniversityDemoData"
         />
@@ -80,6 +81,7 @@ const editor = usePromptEditor();
 const {
   promptId, systemExpanded, testing, publishing, rollingBack, versionHistory, testResult,
   modelOptions, modelsLoading, defaultModelLabel, form, testVariables, testResultOutput,
+  demoFilling,
   versionDetailVisible, selectedVersion, selectedVersionVariables, selectedVersionDiffInfo,
   getCategoryLabel, copyText, insertVar, addVariable, handleRemoveVariable,
   syncVariablesFromPrompts, fillUniversityDemoData, handleRunTest, saveForm, publishForm,

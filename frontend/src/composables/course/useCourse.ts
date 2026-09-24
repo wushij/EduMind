@@ -8,6 +8,8 @@ import {
   createCourse as createCourseApi,
   updateCourse,
   deleteCourse,
+  archiveCourse as archiveCourseApi,
+  unarchiveCourse as unarchiveCourseApi,
   joinCourseByCode
 } from '@/api/course/course';
 import {
@@ -218,7 +220,7 @@ export function useCourse() {
   }
 
   async function archiveCourse(id: number) {
-    await deleteCourse(id);
+    await archiveCourseApi(id);
     const archivedStatus = normalizeCourseStatus('ARCHIVED');
     const patchStatus = (c: Course) =>
       c.id === id ? { ...c, status: archivedStatus } : c;
@@ -231,12 +233,36 @@ export function useCourse() {
     }
   }
 
+  async function unarchiveCourse(id: number) {
+    await unarchiveCourseApi(id);
+    const activeStatus = normalizeCourseStatus('ACTIVE');
+    const patchStatus = (c: Course) =>
+      c.id === id ? { ...c, status: activeStatus } : c;
+    courses.value = courses.value.map(patchStatus);
+    if (currentCourse.value?.id === id) {
+      currentCourse.value = { ...currentCourse.value, status: activeStatus };
+      courseCache.set(id, currentCourse.value);
+    } else if (courseCache.has(id)) {
+      courseCache.set(id, { ...courseCache.get(id)!, status: activeStatus });
+    }
+  }
+
+  async function removeCourse(id: number) {
+    await deleteCourse(id);
+    courses.value = courses.value.filter((c) => c.id !== id);
+    courseCache.delete(id);
+    if (currentCourse.value?.id === id) {
+      currentCourse.value = null;
+    }
+    total.value = Math.max(0, total.value - 1);
+  }
+
   async function confirmArchiveCourse(course: { id: number; title?: string }, onSuccess?: () => void) {
     const title = course.title || '当前课程';
     try {
       await ElMessageBox.confirm(
-        `确定归档课程「${title}」吗？归档后学员将无法继续访问该课程空间，且不可恢复为进行中状态。`,
-        '归档课程确认',
+        `确定将课程「${title}」结课归档吗？归档后学员将转入结课修读，您可随时在「已结课」列表中管理或彻底清理。`,
+        '归档结课确认',
         {
           confirmButtonText: '确定归档',
           cancelButtonText: '取消',
@@ -244,11 +270,33 @@ export function useCourse() {
         }
       );
       await archiveCourse(course.id);
-      ElMessage.success('课程已归档，可在课程列表「已结课」中查看');
+      ElMessage.success('课程已结课归档，可在课程列表「已结课」中查看');
       onSuccess?.();
     } catch (err: unknown) {
       if (err === 'cancel' || err === 'close') return;
       ElMessage.error(err instanceof Error ? err.message : '归档课程失败');
+    }
+  }
+
+  async function confirmDeleteCourse(course: { id: number; title?: string }, onSuccess?: () => void) {
+    const title = course.title || '当前课程';
+    try {
+      await ElMessageBox.confirm(
+        `确定彻底删除课程「${title}」吗？\n该操作将同时清理课程空章节、知识点与资源。已有学生修读的课程将被系统安全拦截保护。此操作不可恢复！`,
+        '彻底删除课程确认',
+        {
+          confirmButtonText: '确定彻底删除',
+          cancelButtonText: '取消',
+          confirmButtonClass: 'el-button--danger',
+          type: 'error'
+        }
+      );
+      await removeCourse(course.id);
+      ElMessage.success(`课程「${title}」已彻底删除`);
+      onSuccess?.();
+    } catch (err: unknown) {
+      if (err === 'cancel' || err === 'close') return;
+      ElMessage.error(err instanceof Error ? err.message : '删除课程失败');
     }
   }
 
@@ -280,7 +328,9 @@ export function useCourse() {
     removeSection,
     createCourse,
     archiveCourse,
+    unarchiveCourse,
     confirmArchiveCourse,
+    confirmDeleteCourse,
     saveCourse,
     enrollCourseByCode,
     setCurrentCourse

@@ -1,7 +1,47 @@
 <template>
   <div class="student-portrait-view">
-    <!-- 学生基本信息卡片（带学员切换器） -->
-    <div class="student-hero-card">
+    <!-- 优雅加载骨架过渡：数据加载中或尚未获取 portrait 数据时展示，彻底杜绝 STU-undefined 假空壳与画面闪烁 -->
+    <div v-if="loading || !portrait" class="portrait-skeleton-container">
+      <div class="student-hero-card skeleton-hero">
+        <el-skeleton animated>
+          <template #template>
+            <div class="skeleton-hero-row">
+              <el-skeleton-item variant="circle" style="width: 64px; height: 64px; flex-shrink: 0;" />
+              <div class="skeleton-hero-text">
+                <el-skeleton-item variant="h3" style="width: 180px; height: 26px; border-radius: 6px; margin-bottom: 10px;" />
+                <el-skeleton-item variant="text" style="width: 320px; height: 16px; border-radius: 4px;" />
+              </div>
+            </div>
+          </template>
+        </el-skeleton>
+      </div>
+
+      <div class="portrait-kpi-grid">
+        <div v-for="i in 4" :key="i" class="portrait-kpi-card skeleton-kpi-box">
+          <el-skeleton animated>
+            <template #template>
+              <el-skeleton-item variant="text" style="width: 70px; height: 14px; margin-bottom: 12px;" />
+              <el-skeleton-item variant="h1" style="width: 100px; height: 32px; margin-bottom: 10px;" />
+              <el-skeleton-item variant="text" style="width: 140px; height: 14px;" />
+            </template>
+          </el-skeleton>
+        </div>
+      </div>
+
+      <div class="diagnostic-grid-row">
+        <div class="content-panel skeleton-panel">
+          <el-skeleton animated :rows="9" />
+        </div>
+        <div class="content-panel skeleton-panel">
+          <el-skeleton animated :rows="9" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 真实画像渲染 -->
+    <template v-else>
+      <!-- 学生基本信息卡片（带学员切换器） -->
+      <div class="student-hero-card">
       <div class="hero-left-profile">
         <el-avatar :size="64" :src="portrait?.studentInfo.avatar" class="large-student-avatar">
           {{ portrait?.studentInfo.realName?.slice(0, 1) || '学' }}
@@ -171,12 +211,12 @@
                 <span class="point-title">{{ wp.title }}</span>
                 <span class="score-pill-danger">掌握度：{{ wp.mastery }}%</span>
               </div>
-              <p class="suggestion-text">
+              <div class="suggestion-text">
                 <svg viewBox="0 0 24 24" class="suggest-svg" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"></path>
                 </svg>
-                <span>{{ wp.suggestion || '建议进行针对性变式巩固' }}</span>
-              </p>
+                <MathText :text="wp.suggestion || '建议进行针对性变式巩固'" />
+              </div>
             </div>
           </div>
 
@@ -216,7 +256,10 @@
           <tbody>
             <tr v-for="w in portrait.wrongQuestions" :key="w.recordId">
               <td class="col-stem">
-                <div class="stem-text">{{ w.questionStem || `题目 #${w.questionId}` }}</div>
+                <div class="stem-text">
+                  <MathText v-if="w.questionStem" :text="w.questionStem" />
+                  <span v-else>题目 #{{ w.questionId }}</span>
+                </div>
               </td>
               <td class="col-kp">
                 <span class="kp-pill" :title="w.knowledgePointTitle">{{ w.knowledgePointTitle }}</span>
@@ -233,7 +276,9 @@
                 </div>
               </td>
               <td class="col-diag">
-                <p class="diagnosis-text">{{ w.diagnosis || '概念细节理解存在轻微偏差' }}</p>
+                <div class="diagnosis-text">
+                  <MathText :text="w.diagnosis || '概念细节理解存在轻微偏差'" />
+                </div>
               </td>
               <td class="col-count">
                 <span class="wrong-count-tag">{{ w.wrongCount }} 次</span>
@@ -268,7 +313,9 @@
           <div class="week-tasks-list">
             <div v-for="(t, idx) in wk.tasks" :key="idx" class="task-item">
               <span class="task-dot" :class="{ 'task-dot--done': t.status === 'COMPLETED' }"></span>
-              <span class="task-title" :class="{ 'task-title--done': t.status === 'COMPLETED' }">{{ t.title }}</span>
+              <span class="task-title" :class="{ 'task-title--done': t.status === 'COMPLETED' }">
+                <MathText :text="t.title" />
+              </span>
               <span class="task-status-tag" :class="t.status === 'COMPLETED' ? 'tag--done' : 'tag--pending'">
                 {{ t.status === 'COMPLETED' ? '已完成' : '待完成' }}
               </span>
@@ -364,15 +411,23 @@
         v-loading="adviceLoading"
         :element-loading-text="`AI 深度学情诊断推演中… 已耗时 ${formattedAdviceSeconds}s`"
       >
-        <p>{{ portrait?.aiDiagnosis || '暂无该学员的 AI 诊断建议，点击上方「生成精准诊断建议」获取基于 DeepSeek 大模型的深度推演分析。' }}</p>
+        <MathText
+          v-if="portrait?.aiDiagnosis"
+          :text="portrait.aiDiagnosis"
+          tag="div"
+          custom-class="ai-diagnosis-rich"
+        />
+        <p v-else>暂无该学员的 AI 诊断建议，点击上方「生成精准诊断建议」获取基于 DeepSeek 大模型的深度推演分析。</p>
       </div>
     </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue';
 import { ElMessageBox } from 'element-plus';
+import MathText from '@/components/common/MathText.vue';
 import KnowledgeRadar from '@/components/analytics/KnowledgeRadar.vue';
 import LearningChart from '@/components/analytics/LearningChart.vue';
 import type { StudentPortraitVO, StudentLearningItemVO } from '@/types/analytics/learning';
@@ -384,6 +439,7 @@ const props = withDefaults(
     portrait: StudentPortraitVO | null;
     studentOptions?: StudentLearningItemVO[];
     adviceLoading?: boolean;
+    loading?: boolean;
     variant?: 'teacher' | 'student';
     personalTrends?: LearningReportTrendsVO | null;
     reportCode?: string;
@@ -391,6 +447,7 @@ const props = withDefaults(
   {
     studentOptions: () => [],
     adviceLoading: false,
+    loading: false,
     variant: 'teacher',
     personalTrends: null,
     reportCode: ''
@@ -786,13 +843,18 @@ function splitErrorTypes(types?: string): string[] {
           font-size: 12px;
           color: #B91C1C;
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           gap: 6px;
 
           .suggest-svg {
             width: 13px;
             height: 13px;
             flex-shrink: 0;
+            margin-top: 3px;
+          }
+
+          .math-text {
+            line-height: 1.5;
           }
         }
       }
@@ -943,10 +1005,14 @@ function splitErrorTypes(types?: string): string[] {
       }
 
       .stem-text {
-        font-weight: 600;
+        font-weight: 500;
         color: #0F172A;
-        line-height: 1.5;
+        line-height: 1.6;
         font-size: 13px;
+
+        .math-text {
+          line-height: 1.6;
+        }
       }
 
       .kp-pill {
@@ -1075,6 +1141,11 @@ function splitErrorTypes(types?: string): string[] {
           .task-title {
             flex: 1;
             color: #334155;
+            line-height: 1.5;
+
+            .math-text {
+              line-height: 1.5;
+            }
 
             &--done {
               color: #94A3B8;
@@ -1301,6 +1372,46 @@ function splitErrorTypes(types?: string): string[] {
 
   .adaptive-panel .adaptive-weeks-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* 骨架屏加载过渡样式 */
+.portrait-skeleton-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+
+  .skeleton-hero {
+    min-height: 106px;
+    display: flex;
+    align-items: center;
+  }
+
+  .skeleton-hero-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+  }
+
+  .skeleton-hero-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .skeleton-kpi-box {
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .skeleton-panel {
+    min-height: 380px;
+    box-sizing: border-box;
+    padding: 24px;
   }
 }
 

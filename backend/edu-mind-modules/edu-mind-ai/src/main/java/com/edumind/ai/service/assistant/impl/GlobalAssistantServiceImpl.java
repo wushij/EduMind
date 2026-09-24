@@ -1,7 +1,11 @@
 package com.edumind.ai.service.assistant.impl;
 
 import com.alibaba.fastjson2.JSON;
+import com.edumind.ai.dao.ConversationDao;
+import com.edumind.ai.dao.MessageDao;
 import com.edumind.ai.dto.assistant.GlobalAssistantRequestDTO;
+import com.edumind.ai.entity.ConversationEntity;
+import com.edumind.ai.entity.MessageEntity;
 import com.edumind.ai.gateway.AiGatewayFacade;
 import com.edumind.ai.gateway.AiUserModelPolicy;
 import com.edumind.ai.integration.llm.LlmChatMessage;
@@ -9,6 +13,7 @@ import com.edumind.ai.integration.llm.LlmClient;
 import com.edumind.ai.integration.llm.LlmStreamRelay;
 import com.edumind.ai.router.IntentRouter;
 import com.edumind.ai.service.assistant.GlobalAssistantService;
+import com.edumind.ai.service.chat.ChatHistoryBuilder;
 import com.edumind.ai.service.chat.ChatStreamRegistry;
 import com.edumind.ai.service.audit.AiCallAuditContext;
 import com.edumind.ai.service.routing.CopilotRagPolicy;
@@ -23,6 +28,7 @@ import com.edumind.course.vo.lesson.LessonCopilotContextVO;
 import com.edumind.knowledge.api.KnowledgeQueryApi;
 import com.edumind.knowledge.vo.knowledge.KnowledgeBaseVO;
 import com.edumind.common.context.TenantContext;
+import com.edumind.common.exception.BusinessException;
 import com.edumind.common.model.LoginUser;
 import com.edumind.common.model.UserContext;
 import com.edumind.security.context.LoginUserResolver;
@@ -33,6 +39,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +59,10 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
     private final LessonCopilotEnricher lessonCopilotEnricher;
     private final ChatStreamRegistry chatStreamRegistry;
     private final AiUserModelPolicy aiUserModelPolicy;
+    /** 会话消息持久化：多轮上下文依赖它按 conversationId 取回历史（原实现完全不带历史，导致「愿意」等追问丢失语境） */
+    private final MessageDao messageDao;
+    private final ConversationDao conversationDao;
+    private final ChatHistoryBuilder chatHistoryBuilder;
     private final java.util.concurrent.ExecutorService assistantExecutor = java.util.concurrent.Executors.newCachedThreadPool();
 
     @Override
@@ -75,6 +86,13 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                 .courseId(dto.getCourseId())
                 .conversationId(convId)
                 .build();
+
+        // 多轮上下文闭环：先确保会话主记录存在并落库本轮用户提问。
+        // 落库必须早于读历史，这样 listRecentByConversationId 取回的末条即本轮提问，
+        // 再交由 ChatHistoryBuilder.withCurrentUserPrompt 覆盖为携带课程/课节上下文的完整 prompt。
+        // 越权校验失败会直接抛出；其余持久化异常只降级为「本轮无历史」，不阻断对话。
+        ensureConversationQuietly(convId, userId, dto);
+        saveMessageQuietly(convId, "user", userQuestion, null, null);
 
         assistantExecutor.execute(() -> runWithContext(userId, tenantId, currentUser, () -> {
             String streamId = chatStreamRegistry.register();
@@ -116,8 +134,8 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                         "global_assistant",
                         // 与课程问答保持一致：接收并校验前端选择的模型，未通过治理校验时回落场景策略
                         aiUserModelPolicy.validateUserSelection(dto.getModelKey()),
-                        plan.getSystemPrompt(),
-                        List.of(LlmChatMessage.user(plan.getUserPrompt())),
+                        chatHistoryBuilder.appendFollowUpDiscipline(plan.getSystemPrompt(), userQuestion),
+                        buildChatHistory(convId, plan.getUserPrompt()),
                         auditContext,
                         () -> chatStreamRegistry.isCancelled(streamId),
                         new LlmClient.StreamCallback() {
@@ -145,10 +163,18 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                             @Override
                             public void onComplete() {
                                 if (chatStreamRegistry.isCancelled(streamId)) {
+                                    // 用户主动中止：本轮内容不完整，不写入历史，避免污染后续多轮上下文
                                     emitter.complete();
                                     chatStreamRegistry.remove(streamId);
                                     return;
                                 }
+                                // 落库本轮回答，供下一次提问时作为历史上下文取回
+                                List<CitationVO> citationsForSave = plan.getCitations() != null
+                                        ? plan.getCitations() : List.of();
+                                saveMessageQuietly(convId, "assistant", contentBuilder.toString(),
+                                        reasoningBuilder.toString(),
+                                        citationsForSave.isEmpty() ? null : JSON.toJSONString(citationsForSave));
+                                updateConversationStatsQuietly(convId);
                                 Map<String, Object> done = new HashMap<>();
                                 done.put("conversationId", convId);
                                 done.put("citations", plan.getCitations() != null ? plan.getCitations() : List.of());
@@ -192,15 +218,25 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                 routeByDirectQuestion ? userQuestion : dispatchMessage, dto.getCourseId());
         IntentDispatchPlan plan = intentDispatchService.prepare(buildDispatchRequest(dto, dispatchMessage, intent));
 
+        Long userId = LoginUserResolver.requireUserId();
+        ensureConversationQuietly(convId, userId, dto);
+        saveMessageQuietly(convId, "user", userQuestion, null, null);
+
         AiCallAuditContext auditContext = AiCallAuditContext.builder()
-                .userId(LoginUserResolver.requireUserId())
+                .userId(userId)
                 .tenantId(TenantContext.getTenantId())
                 .courseId(dto.getCourseId())
                 .conversationId(convId)
                 .build();
         String answer = aiGatewayFacade.chat("global_assistant",
                 aiUserModelPolicy.validateUserSelection(dto.getModelKey()),
-                plan.getSystemPrompt(), plan.getUserPrompt(), auditContext);
+                chatHistoryBuilder.appendFollowUpDiscipline(plan.getSystemPrompt(), userQuestion),
+                buildHistoryBlock(convId, plan.getUserPrompt()), auditContext);
+
+        List<CitationVO> citationsForSave = plan.getCitations() != null ? plan.getCitations() : List.of();
+        saveMessageQuietly(convId, "assistant", answer, null,
+                citationsForSave.isEmpty() ? null : JSON.toJSONString(citationsForSave));
+        updateConversationStatsQuietly(convId);
 
         String targetCode = resolveTargetCode(intent, plan);
 
@@ -215,6 +251,120 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
             result.put("navigate", plan.getNavigatePayload());
         }
         return result;
+    }
+
+    // ==================== 多轮上下文与会话持久化 ====================
+
+    /**
+     * 组装多轮上下文。
+     *
+     * <p>历史末条是本次刚落库的用户提问，{@link ChatHistoryBuilder#withCurrentUserPrompt}
+     * 会将其替换为携带课程 / 课节 / 题库上下文的完整 prompt，因此既保留前几轮语境，
+     * 又不会让模型看到两条重复的当前提问。</p>
+     */
+    private List<LlmChatMessage> buildChatHistory(String convId, String currentUserPrompt) {
+        try {
+            List<MessageEntity> recentMessages = messageDao.listRecentByConversationId(
+                    convId, ChatHistoryBuilder.MAX_HISTORY_MESSAGES);
+            return chatHistoryBuilder.withCurrentUserPrompt(
+                    chatHistoryBuilder.build(recentMessages), currentUserPrompt);
+        } catch (Exception ex) {
+            log.warn("Load assistant chat history failed convId={}: {}", convId, ex.getMessage());
+            return List.of(LlmChatMessage.user(currentUserPrompt));
+        }
+    }
+
+    /**
+     * 非流式回退接口的网关只提供「单串 userPrompt」重载（多轮 messages 重载仅流式链路具备），
+     * 因此把历史压缩为文本块前置到当前 prompt，保证 /ai/assistant/ask 同样具备多轮记忆。
+     */
+    private String buildHistoryBlock(String convId, String currentUserPrompt) {
+        try {
+            List<MessageEntity> recentMessages = messageDao.listRecentByConversationId(
+                    convId, ChatHistoryBuilder.MAX_HISTORY_MESSAGES);
+            if (!recentMessages.isEmpty()
+                    && "user".equalsIgnoreCase(recentMessages.get(recentMessages.size() - 1).getRole())) {
+                // 剔除刚落库的本轮提问，避免与下方「当前提问」重复
+                recentMessages = new ArrayList<>(recentMessages.subList(0, recentMessages.size() - 1));
+            }
+            String history = chatHistoryBuilder.formatConversationHistory(recentMessages);
+            if (!StringUtils.hasText(history)) {
+                return currentUserPrompt;
+            }
+            return "【历史对话】\n" + history + "\n\n【当前提问】\n" + currentUserPrompt;
+        } catch (Exception ex) {
+            log.warn("Load assistant chat history failed convId={}: {}", convId, ex.getMessage());
+            return currentUserPrompt;
+        }
+    }
+
+    /**
+     * 确保会话主记录存在：让消息有归属，历史亦可跨端恢复。
+     * 会话已属于他人时直接拒绝，防止按 conversationId 猜读他人对话。
+     */
+    private void ensureConversationQuietly(String convId, Long userId, GlobalAssistantRequestDTO dto) {
+        runQuietly(() -> {
+            ConversationEntity existing = conversationDao.findById(convId);
+            if (existing != null) {
+                if (!userId.equals(existing.getUserId())) {
+                    throw new BusinessException("会话不存在或无权访问");
+                }
+                return;
+            }
+            ConversationEntity entity = new ConversationEntity();
+            entity.setId(convId);
+            entity.setTenantId(TenantContext.getTenantId());
+            entity.setUserId(userId);
+            entity.setCourseId(dto.getCourseId());
+            entity.setTitle(truncate(dto.getMessage(), 30));
+            entity.setMessageCount(0);
+            entity.setTotalTokens(0);
+            conversationDao.insert(entity);
+        });
+    }
+
+    private void saveMessageQuietly(String convId, String role, String content,
+                                    String reasoningContent, String citationsJson) {
+        if (!StringUtils.hasText(content)) {
+            return;
+        }
+        runQuietly(() -> {
+            MessageEntity message = new MessageEntity();
+            message.setConversationId(convId);
+            message.setRole(role);
+            message.setContent(content);
+            if (StringUtils.hasText(reasoningContent)) {
+                message.setReasoningContent(reasoningContent);
+            }
+            message.setCitationsJson(citationsJson);
+            message.setTokenCount(content.length());
+            messageDao.insert(message);
+        });
+    }
+
+    private void updateConversationStatsQuietly(String convId) {
+        runQuietly(() -> {
+            ConversationEntity conversation = conversationDao.findById(convId);
+            if (conversation == null) {
+                return;
+            }
+            int count = conversation.getMessageCount() != null ? conversation.getMessageCount() : 0;
+            conversation.setMessageCount(count + 2);
+            conversationDao.updateById(conversation);
+        });
+    }
+
+    /**
+     * 持久化失败只降级为「本轮无历史」，绝不阻断对话；越权异常必须向上抛出。
+     */
+    private void runQuietly(Runnable action) {
+        try {
+            action.run();
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.warn("Assistant conversation persistence skipped: {}", ex.getMessage());
+        }
     }
 
     private void runWithContext(Long userId, Long tenantId, LoginUser currentUser, Runnable task) {

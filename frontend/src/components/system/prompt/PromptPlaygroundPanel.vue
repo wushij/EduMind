@@ -22,8 +22,13 @@
 
     <div class="preset-helper-bar">
       <span>需快速填充？</span>
-      <button class="helper-link" type="button" @click="onFillDemo">
-        一键填入高校课程真实 RAG 示例
+      <button
+        class="helper-link"
+        type="button"
+        :disabled="demoFilling"
+        @click="onFillDemo"
+      >
+        {{ demoFilling ? '正在读取真实课程数据…' : '一键填入高校课程真实 RAG 示例' }}
       </button>
     </div>
 
@@ -74,6 +79,8 @@ defineProps<{
   testResultOutput: string;
   testResult: PromptTestResponse | null;
   testing: boolean;
+  /** 演示数据实时读取中：课程 / 章节 / 知识点 / 知识库 / 题库 */
+  demoFilling?: boolean;
   onRunTest: () => void;
   onFillDemo: () => void;
 }>();
@@ -156,6 +163,12 @@ defineProps<{
 
       &:hover {
         color: #0369A1;
+      }
+
+      &:disabled {
+        color: #94A3B8;
+        cursor: not-allowed;
+        text-decoration: none;
       }
     }
   }

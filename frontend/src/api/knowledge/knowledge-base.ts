@@ -1,10 +1,12 @@
 import { get, post, put, del } from '@/core/http/request';
+import type { HttpRequestConfig } from '@/core/http/types';
 import { KnowledgeBase } from '@/types/knowledge/knowledge-base';
 
-export const getKnowledgeBases = (params?: Record<string, any>) =>
-  get<KnowledgeBase[]>('/knowledge-bases', params);
+export const getKnowledgeBases = (params?: Record<string, any>, config?: HttpRequestConfig) =>
+  get<KnowledgeBase[]>('/knowledge-bases', params, config);
 
-export const getKnowledgeBaseDetail = (id: number) => get<KnowledgeBase>(`/knowledge-bases/${id}`);
+export const getKnowledgeBaseDetail = (id: number, config?: HttpRequestConfig) =>
+  get<KnowledgeBase>(`/knowledge-bases/${id}`, undefined, config);
 
 export const createKnowledgeBase = (data: Record<string, any>) => post<number>('/knowledge-bases', data);
 

@@ -32,6 +32,7 @@ import com.edumind.system.vo.user.UserBriefVO;
 import com.edumind.common.context.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDateTime;
@@ -52,6 +53,7 @@ public class CourseServiceImpl implements CourseService {
     private final KnowledgePointDao knowledgePointDao;
     private final com.edumind.course.dao.ChapterDao chapterDao;
     private final com.edumind.resource.api.ResourceQueryApi resourceQueryApi;
+    private final com.edumind.resource.api.ResourceCommandApi resourceCommandApi;
     private final CourseConverter courseConverter;
     private final UserQueryApi userQueryApi;
     private final TenantDataScopeApi tenantDataScopeApi;
@@ -221,13 +223,57 @@ public class CourseServiceImpl implements CourseService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteCourse(Long id) {
         CourseEntity entity = courseDao.findById(id);
         if (entity == null) {
             throw new BusinessException("课程不存在");
         }
         assertCourseEditable(entity);
+
+        // 安全防线：检查是否已有学生选课修读（以学生身份加入）
+        long studentCount = courseMemberDao.countStudentsByCourseId(id);
+        if (studentCount > 0) {
+            throw new BusinessException("该课程已有学生选课修读，为保护学业档案严禁删除，仅支持结课归档");
+        }
+
+        // 1. 级联清理章节
+        chapterDao.deleteByCourseId(id);
+
+        // 2. 级联清理知识点
+        knowledgePointDao.deleteByCourseId(id);
+
+        // 3. 级联清理成员记录（如创建教师/助教自身关联）
+        courseMemberDao.deleteByCourseId(id);
+
+        // 4. 级联清理课程关联资源
+        if (resourceCommandApi != null) {
+            resourceCommandApi.deleteResourcesByCourseId(id);
+        }
+
+        // 5. 彻底删除课程实体
+        courseDao.deleteById(id);
+    }
+
+    @Override
+    public void archiveCourse(Long id) {
+        CourseEntity entity = courseDao.findById(id);
+        if (entity == null) {
+            throw new BusinessException("课程不存在");
+        }
+        assertCourseEditable(entity);
         entity.setStatus(0);
+        courseDao.updateById(entity);
+    }
+
+    @Override
+    public void unarchiveCourse(Long id) {
+        CourseEntity entity = courseDao.findById(id);
+        if (entity == null) {
+            throw new BusinessException("课程不存在");
+        }
+        assertCourseEditable(entity);
+        entity.setStatus(1);
         courseDao.updateById(entity);
     }
 
@@ -366,6 +412,6 @@ public class CourseServiceImpl implements CourseService {
         if (roles == null) {
             return false;
         }
-        return roles.contains(RoleCode.ORG_ADMIN.getCode()) || roles.contains(RoleCode.TEACHER.getCode());
+        return roles.contains(RoleCode.ORG_ADMIN.getCode());
     }
 }

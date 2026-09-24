@@ -80,10 +80,11 @@ export function useKnowledgeBase() {
   };
 }
 
+/** 兜底课程与 sql 种子数据保持一致，避免出现课程改名后兜底文案过期 */
 const FALLBACK_COURSES: Course[] = [
   { id: 101, title: '数据结构与算法' } as Course,
-  { id: 102, title: 'Java程序设计' } as Course,
-  { id: 103, title: '大学数学：高等数学（上）' } as Course
+  { id: 102, title: 'Java面向对象程序设计' } as Course,
+  { id: 103, title: '高等数学（上）' } as Course
 ];
 
 export function useKnowledgeBaseCreate() {

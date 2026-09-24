@@ -35,10 +35,20 @@
           </button>
 
           <button
-            v-if="courseEditable"
+            v-if="courseEditable && isArchived"
             type="button"
             class="table-action-pill table-action-pill--danger"
-            title="归档当前课程"
+            title="彻底删除课程（仅支持0人选课的空课程）"
+            @click="handleDeleteCourse"
+          >
+            删除课程
+          </button>
+
+          <button
+            v-else-if="courseEditable"
+            type="button"
+            class="table-action-pill table-action-pill--warning"
+            title="结课归档"
             @click="handleArchiveCourse"
           >
             归档课程
@@ -222,13 +232,30 @@ import {
 
 const route = useRoute();
 const router = useRouter();
-const { currentCourse, fetchCourseDetail, confirmArchiveCourse } = useCourse();
+const { currentCourse, fetchCourseDetail, confirmArchiveCourse, confirmDeleteCourse } = useCourse();
 provide(courseDetailInjectionKey, currentCourse);
 const courseEditable = useCourseEditable(currentCourse);
+
+const isArchived = computed(() => {
+  return (
+    currentCourse.value?.status === 'ARCHIVED'
+    || currentCourse.value?.status === 'INACTIVE'
+    || currentCourse.value?.status === 0
+    || currentCourse.value?.status === 2
+  );
+});
 
 async function handleArchiveCourse() {
   if (!currentCourse.value?.id) return;
   await confirmArchiveCourse(
+    { id: currentCourse.value.id, title: currentCourse.value.title },
+    () => router.push('/course')
+  );
+}
+
+async function handleDeleteCourse() {
+  if (!currentCourse.value?.id) return;
+  await confirmDeleteCourse(
     { id: currentCourse.value.id, title: currentCourse.value.title },
     () => router.push('/course')
   );
@@ -245,7 +272,9 @@ async function refreshKnowledgeMountSummary() {
     return;
   }
   try {
-    const res = await getKnowledgeBaseDetail(kbId);
+    // 这是课程页的附属统计，用静默请求：course.knowledge_base_id 是无外键约束的裸列，
+    // 知识库可能已被删除，此时只应把统计归零，不该弹「知识库不存在」打断用户浏览课程
+    const res = await getKnowledgeBaseDetail(kbId, { silent: true });
     const kb = res.data;
     kbMountDocCount.value = kb?.docCount ?? kb?.documentCount ?? 0;
     kbMountChunkCount.value = kb?.chunkCount ?? 0;

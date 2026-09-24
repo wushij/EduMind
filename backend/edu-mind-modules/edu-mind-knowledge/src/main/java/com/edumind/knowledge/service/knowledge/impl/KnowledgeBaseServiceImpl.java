@@ -3,21 +3,26 @@ package com.edumind.knowledge.service.knowledge.impl;
 import com.edumind.ai.api.embedding.EmbeddingApi;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
+import com.edumind.course.api.CourseKnowledgeBaseCommandApi;
 import com.edumind.course.api.CourseQueryApi;
 import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.course.vo.course.CourseVO;
 import com.edumind.knowledge.converter.KnowledgeBaseConverter;
 import com.edumind.knowledge.dao.KnowledgeBaseDao;
 import com.edumind.knowledge.dao.KnowledgeChunkIndexDao;
+import com.edumind.knowledge.dao.KnowledgeDocumentDao;
 import com.edumind.knowledge.dto.knowledge.KnowledgeBaseCreateDTO;
 import com.edumind.knowledge.dto.knowledge.KnowledgeBaseUpdateDTO;
 import com.edumind.knowledge.entity.KnowledgeBaseEntity;
+import com.edumind.knowledge.entity.KnowledgeDocumentEntity;
+import com.edumind.knowledge.service.knowledge.DocumentService;
 import com.edumind.knowledge.service.knowledge.KnowledgeAccessService;
 import com.edumind.knowledge.service.knowledge.KnowledgeBaseService;
 import com.edumind.knowledge.vo.knowledge.KnowledgeBaseVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -30,11 +35,16 @@ import java.util.stream.Collectors;
 public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private final KnowledgeBaseDao knowledgeBaseDao;
+    private final KnowledgeDocumentDao knowledgeDocumentDao;
     private final KnowledgeBaseConverter knowledgeBaseConverter;
     private final KnowledgeAccessService knowledgeAccessService;
     private final CourseQueryApi courseQueryApi;
     private final KnowledgeChunkIndexDao knowledgeChunkIndexDao;
     private final EmbeddingApi embeddingApi;
+    /** 删除知识库时需同步解除课程绑定，否则 course.knowledge_base_id 会留下悬空引用 */
+    private final CourseKnowledgeBaseCommandApi courseKnowledgeBaseCommandApi;
+    /** 级联清理文档：复用单文档删除逻辑，连带清理切片、向量索引与对象存储 */
+    private final DocumentService documentService;
 
     @Override
     public Long create(KnowledgeBaseCreateDTO dto) {
@@ -148,8 +158,25 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         knowledgeAccessService.assertAccessible(id);
+
+        // 1. 级联清理文档：此前只删 knowledge_base 一行，会留下大量孤儿数据
+        //    （实库已积累 17 条指向已删除知识库的文档、2 条切片）。
+        //    复用单文档删除逻辑，连带清掉切片、文本、向量索引与对象存储。
+        List<KnowledgeDocumentEntity> documents = knowledgeDocumentDao.findByKnowledgeBaseId(id);
+        for (KnowledgeDocumentEntity document : documents) {
+            documentService.delete(document.getId());
+        }
+
+        // 2. 删除知识库本体
         knowledgeBaseDao.deleteById(id);
+
+        // 3. 解除课程绑定：course.knowledge_base_id 是无外键约束的裸列，
+        //    留下悬空引用会让课程详情页持续请求已删除的知识库并报「知识库不存在」。
+        //    与删除同事务，避免删除成功但解绑失败而重新制造脏数据。
+        int unbound = courseKnowledgeBaseCommandApi.unbindByKnowledgeBaseId(id);
+        log.info("知识库 {} 已删除，级联清理 {} 个文档，解除 {} 门课程的绑定", id, documents.size(), unbound);
     }
 }

@@ -1,8 +1,17 @@
 import { get, post, put, del } from '@/core/http/request';
+import type { HttpRequestConfig } from '@/core/http/types';
 import type { KnowledgePoint, KnowledgePointSaveRequest } from '@/types/course/knowledge-point';
 
-export const getCourseKnowledgePoints = (courseId: number, chapterId?: number) =>
-  get<KnowledgePoint[]>(`/courses/${courseId}/knowledge-points`, chapterId ? { chapterId } : undefined);
+export const getCourseKnowledgePoints = (
+  courseId: number,
+  chapterId?: number,
+  config?: HttpRequestConfig
+) =>
+  get<KnowledgePoint[]>(
+    `/courses/${courseId}/knowledge-points`,
+    chapterId ? { chapterId } : undefined,
+    config
+  );
 
 export const getKnowledgePoints = (courseIdOrChapterId: number, chapterId?: number) =>
   getCourseKnowledgePoints(courseIdOrChapterId, chapterId);

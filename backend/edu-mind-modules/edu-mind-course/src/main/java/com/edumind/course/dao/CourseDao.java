@@ -1,6 +1,7 @@
 package com.edumind.course.dao;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.edumind.common.context.TenantContext;
 import com.edumind.course.dto.course.CourseQueryDTO;
@@ -89,6 +90,23 @@ public class CourseDao {
         return courseMapper.updateById(entity);
     }
 
+    /**
+     * 解除所有课程对指定知识库的绑定。
+     *
+     * <p>用于知识库删除后的引用清理：course.knowledge_base_id 是无外键约束的裸列，
+     * 不解绑会留下悬空引用，课程详情页会因此持续请求一个已不存在的知识库。</p>
+     *
+     * @return 受影响的课程数
+     */
+    public int unbindKnowledgeBase(Long knowledgeBaseId) {
+        if (knowledgeBaseId == null) {
+            return 0;
+        }
+        return courseMapper.update(null, new LambdaUpdateWrapper<CourseEntity>()
+                .eq(CourseEntity::getKnowledgeBaseId, knowledgeBaseId)
+                .set(CourseEntity::getKnowledgeBaseId, null));
+    }
+
     public long countAll() {
         return courseMapper.selectCount(null);
     }
@@ -98,5 +116,12 @@ public class CourseDao {
         return courseMapper.selectList(new LambdaQueryWrapper<CourseEntity>()
                 .orderByDesc(CourseEntity::getUpdateTime)
                 .last("LIMIT " + size));
+    }
+
+    public int deleteById(Long id) {
+        if (id == null) {
+            return 0;
+        }
+        return courseMapper.deleteById(id);
     }
 }

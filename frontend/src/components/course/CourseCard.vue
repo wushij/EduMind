@@ -87,9 +87,21 @@
 
         <div class="card-action-group" @click.stop>
           <button
+            v-if="isArchived"
             v-permission="'course:delete'"
             type="button"
             class="table-action-pill table-action-pill--danger"
+            title="彻底删除课程（仅支持0人选课的空课程）"
+            @click="handleDelete"
+          >
+            删除
+          </button>
+          <button
+            v-else
+            v-permission="'course:edit'"
+            type="button"
+            class="table-action-pill table-action-pill--warning"
+            title="结课归档"
             @click="handleArchive"
           >
             归档
@@ -122,7 +134,7 @@ const props = defineProps<{
 }>();
 
 const router = useRouter();
-const { setCurrentCourse, confirmArchiveCourse } = useCourse();
+const { setCurrentCourse, confirmArchiveCourse, confirmDeleteCourse } = useCourse();
 
 const avatarError = ref(false);
 const teacherAvatarSrc = computed(() => normalizeAvatarUrl(props.course.teacherAvatar));
@@ -135,10 +147,24 @@ watch(
   }
 );
 
+const isArchived = computed(() => {
+  return (
+    props.course.status === 'ARCHIVED'
+    || props.course.status === 'INACTIVE'
+    || props.course.status === 0
+    || props.course.status === 2
+  );
+});
+
 async function handleArchive() {
   await confirmArchiveCourse(
-    { id: props.course.id, title: props.course.title },
-    () => router.push('/course')
+    { id: props.course.id, title: props.course.title }
+  );
+}
+
+async function handleDelete() {
+  await confirmDeleteCourse(
+    { id: props.course.id, title: props.course.title }
   );
 }
 const imageError = ref(false);

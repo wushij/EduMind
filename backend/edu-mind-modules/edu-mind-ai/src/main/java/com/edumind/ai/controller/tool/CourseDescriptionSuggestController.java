@@ -1,6 +1,7 @@
 package com.edumind.ai.controller.tool;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.annotation.SaMode;
 import com.edumind.ai.dto.tool.CourseDescriptionSuggestDTO;
 import com.edumind.ai.dto.tool.CourseDescriptionSuggestResultVO;
 import com.edumind.ai.service.tool.CourseDescriptionSuggestService;
@@ -19,7 +20,7 @@ public class CourseDescriptionSuggestController {
 
     private final CourseDescriptionSuggestService descriptionSuggestService;
 
-    @SaCheckPermission("ai:tool")
+    @SaCheckPermission(value = {"course:edit", "course:create", "course:ai:use"}, mode = SaMode.OR)
     @PostMapping("/suggest-description")
     public ApiResult<CourseDescriptionSuggestResultVO> suggestDescription(
             @Valid @RequestBody CourseDescriptionSuggestDTO dto) {

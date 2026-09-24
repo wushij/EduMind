@@ -460,21 +460,29 @@ function splitProseFromCodeBlocks(text: string): string {
       const lines = body.split('\n');
       if (lines.length < 3) return full;
 
-      let endIdx = -1;
       const classStart = lines.findIndex((l) =>
         /^(?:public\s+)?(?:class|interface|enum)\s+\w+/.test(l.trim())
       );
-      if (classStart >= 0) {
-        endIdx = findJavaClassBlockEndLine(lines, classStart);
-      }
-      if (endIdx < 0) {
-        endIdx = findCodeEndLineBeforeProse(lines);
-      }
+      const classEnd = classStart >= 0 ? findJavaClassBlockEndLine(lines, classStart) : -1;
+      // 边界必须取「第一个类结束行」与「正文起始边界」中更靠后者。
+      // 教学示例常在同一代码块里连续写多个类（Animal → Dog → Test），只按第一个类裁剪，
+      // 会把后面的类当成正文甩出代码框，表现为「首个类在框内、其余类裸露」；
+      // 而后续代码里只要有一处中文注释（如 //输出 Dog），下方的中文判断即成立，误拆必然发生。
+      const proseBoundary = findCodeEndLineBeforeProse(lines);
+      const endIdx = Math.max(classEnd, proseBoundary);
 
       if (endIdx >= 0 && endIdx < lines.length - 1) {
         const remainingLines = lines.slice(endIdx + 1);
         const remainingText = remainingLines.join('\n').trim();
-        if (/[\u4e00-\u9fa5]/.test(remainingText) || /^#{1,6}\s/m.test(remainingText)) {
+        // 裁剪点之后若仍有类型声明，说明边界取得偏早：此时宁可不拆，也不能截断同一段代码
+        const stillCode =
+          /^(?:\s*(?:public|private|protected|static|final|abstract)\s+)*(?:class|interface|enum|record)\s+\w+/m.test(
+            remainingText
+          );
+        if (
+          !stillCode &&
+          (/[\u4e00-\u9fa5]/.test(remainingText) || /^#{1,6}\s/m.test(remainingText))
+        ) {
           const code = lines.slice(0, endIdx + 1).join('\n').trimEnd();
           const prose = remainingLines.join('\n').trimStart();
           return `${openFence}${code}\n\`\`\`\n\n${prose}\n\n`;

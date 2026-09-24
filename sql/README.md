@@ -48,6 +48,7 @@ sql/
 │   ├── V2_6_2__dedupe_memory_namespace.sql     # V2.6.2 记忆命名空间去重
 │   ├── V2_6_3__ai_call_log_model_key.sql       # V2.6.3 AI 调用日志模型密钥字段
 │   ├── V2_6_4__tenant_scoped_rbac.sql          # V2.6.4 租户内 RBAC 收敛（sys_user_role 增加 tenant_id，切换租户权限真实变化）
+│   ├── V2_6_5__restore_math_knowledge_points.sql # V2.6.5 补回高等数学丢失的知识点元数据（修复自适应周计划重复）
 │   ├── R__seed_data.sql                        # V0 增量路径演示种子（用户/课程/题库/AI 等，幂等）
 │   ├── R__seed_legacy.sql                      # 旧库升级补丁（租户角色/组织成员/权限乱码修复，幂等）
 │   └── R__gate_e2e_seeds.sql                   # Gate F/G/H 集成测试种子（幂等，init 不含 Gate F）
@@ -170,6 +171,7 @@ mysql -u root -p edumind < sql/migration/R__seed_legacy.sql
 | V2.5.7 错题本攻克与作答 | `V2_5_7__wrong_book_enrich.sql` | 错题本最近作答、攻克状态与检索索引 |
 | V2.5.8 课件资源关联 | `V2_5_8__knowledge_document_course_resource.sql` | 知识库文档关联 `course_resource_id` |
 | V2.6.4 租户内 RBAC | `V2_6_4__tenant_scoped_rbac.sql` | `sys_user_role` 增加 `tenant_id`（0=平台级全租户生效，>0=仅该租户内生效）；唯一键升级为 `(user_id, role_id, tenant_id)`；存量授权按用户真实加入的租户幂等展开。**修复「切换租户后权限不变」与「A 校租户管理员切到 B 校仍获全域数据范围」的跨租户越权。** |
+| V2.6.5 高数知识点补种 | `V2_6_5__restore_math_knowledge_points.sql` | 幂等补回课程 103 的 `course_knowledge_point`（17/18/19）与 `course_chapter_knowledge_point` 关联行。**修复「学员画像 → 自适应推荐学习与提分周计划」每周任务文案相同、重复推同一道练习题**（题目/错题/掌握度仍引用这些知识点，但知识点元数据在部分环境缺失）。 |
 
 > **V2.6.4 权限模型变更提示（重要）**
 >

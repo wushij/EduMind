@@ -1721,7 +1721,10 @@ UPDATE course_knowledge_point SET
 WHERE id = 14;
 
 INSERT IGNORE INTO course_chapter_knowledge_point (tenant_id, course_id, chapter_id, knowledge_point_id, sort_order)
-VALUES (1, 102, 8, 14, 1);
+VALUES (1, 102, 8, 14, 1),
+       (1, 103, 12, 17, 1),
+       (1, 103, 12, 18, 2),
+       (1, 103, 14, 19, 3);
 
 -- 9. 课程选课成员
 INSERT IGNORE INTO course_member (course_id, user_id, member_role) VALUES

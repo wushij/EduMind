@@ -1,6 +1,7 @@
 package com.edumind.statistics.service.learning;
 
 import com.edumind.course.api.CourseQueryApi;
+import com.edumind.course.vo.chapter.ChapterTreeVO;
 import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.course.vo.knowledge.KnowledgePointVO;
 import com.edumind.knowledge.api.KnowledgeGraphQueryApi;
@@ -22,7 +23,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -100,5 +103,60 @@ class AdaptivePathOrchestratorTest {
         LearningPathVO.LearningPathTaskVO firstTask = detail.getWeeks().get(0).getTasks().get(0);
         assertNotNull(firstTask.getTargetUrl());
         assertTrue(firstTask.getTargetUrl().contains("/course/" + courseId));
+    }
+
+    /**
+     * 课程尚未录入知识点元数据（kpById 为空）时的降级行为：
+     * 必须按章节维度给出互不相同的周主题与任务文案，且同一份计划内不重复推同一道练习题。
+     */
+    @Test
+    void buildDetail_degradesToChapterPlan_whenKnowledgePointsMissing() {
+        Long courseId = 103L;
+        Long studentId = 1L;
+
+        when(courseQueryApi.isCourseMember(courseId, studentId)).thenReturn(true);
+        when(courseQueryApi.listCoursesByIds(List.of(courseId)))
+                .thenReturn(List.of(com.edumind.course.vo.course.CourseVO.builder()
+                        .id(courseId).name("高等数学（上）").build()));
+
+        KnowledgeMasteryVO mastery = new KnowledgeMasteryVO();
+        mastery.setWeakPoints(List.of());
+        when(knowledgeMasteryService.getMastery(courseId, studentId)).thenReturn(mastery);
+        when(knowledgeMasteryQueryApi.getMasteryByStudentAndCourse(studentId, courseId)).thenReturn(Map.of());
+        when(courseQueryApi.listKnowledgePointsByCourseId(courseId)).thenReturn(List.of());
+        when(courseQueryApi.listChaptersByCourseId(courseId)).thenReturn(List.of(
+                ChapterTreeVO.builder().id(11L).parentId(0L).sort(1).title("第一章 函数与极限论")
+                        .children(List.of(ChapterTreeVO.builder().id(12L).parentId(11L).sort(1)
+                                .title("1.1 数列与函数极限计算").build()))
+                        .build(),
+                ChapterTreeVO.builder().id(13L).parentId(0L).sort(2).title("第二章 导数与微分").build()));
+
+        RecommendedQuestionVO q1 = new RecommendedQuestionVO();
+        q1.setId(1001L);
+        q1.setStem("极限练习一");
+        q1.setKnowledgePointId(17L);
+        RecommendedQuestionVO q2 = new RecommendedQuestionVO();
+        q2.setId(1002L);
+        q2.setStem("极限练习二");
+        q2.setKnowledgePointId(18L);
+        when(recommendationService.recommendQuestionsForStudent(eq(courseId), any(), anyInt(), eq(studentId)))
+                .thenReturn(List.of(q1, q2));
+
+        LearningPathDetailVO detail = orchestrator.buildDetail(courseId, studentId);
+
+        assertEquals(2, detail.getWeeks().size());
+        assertEquals("第一章 函数与极限论", detail.getWeeks().get(0).getTheme());
+        assertEquals("第二章 导数与微分", detail.getWeeks().get(1).getTheme());
+
+        LearningPathVO.LearningPathTaskVO read1 = detail.getWeeks().get(0).getTasks().get(0);
+        LearningPathVO.LearningPathTaskVO read2 = detail.getWeeks().get(1).getTasks().get(0);
+        assertEquals("学习章节：第一章 函数与极限论", read1.getTitle());
+        assertEquals("学习章节：第二章 导数与微分", read2.getTitle());
+        assertNotEquals(read1.getTitle(), read2.getTitle());
+
+        Long practiceId1 = detail.getWeeks().get(0).getTasks().get(1).getRefId();
+        Long practiceId2 = detail.getWeeks().get(1).getTasks().get(1).getRefId();
+        assertNotNull(practiceId1);
+        assertNotEquals(practiceId1, practiceId2, "同一份学习计划内不应重复推荐同一道练习题");
     }
 }

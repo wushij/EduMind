@@ -42,6 +42,7 @@
       :test-result-output="testResultOutput"
       :test-duration="testDuration"
       :testing="testing"
+      :demo-filling="demoFilling"
       :get-category-label="getCategoryLabel"
       @update-test-variable="updateTestVariable"
       @copy-text="copyText"
@@ -76,6 +77,7 @@ const {
   testVariables,
   testResultOutput,
   testDuration,
+  demoFilling,
   getCategoryCount,
   getCategoryLabel,
   changeCategory,

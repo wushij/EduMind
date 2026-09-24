@@ -1,6 +1,7 @@
 package com.edumind.ai.controller.tool;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.annotation.SaMode;
 import com.edumind.ai.dto.tool.LessonPlanDTO;
 import com.edumind.ai.service.tool.LessonPlanService;
 import com.edumind.common.api.ApiResult;
@@ -22,13 +23,13 @@ public class LessonPlanController {
 
     private final LessonPlanService lessonPlanService;
 
-    @SaCheckPermission("ai:tool")
+    @SaCheckPermission(value = {"ai:lesson:generate", "course:edit", "course:ai:use"}, mode = SaMode.OR)
     @PostMapping
     public ApiResult<Map<String, String>> generate(@Valid @RequestBody LessonPlanDTO dto) {
         return ApiResult.success(Map.of("content", lessonPlanService.generate(dto)));
     }
 
-    @SaCheckPermission("ai:tool")
+    @SaCheckPermission(value = {"ai:lesson:generate", "course:edit", "course:ai:use"}, mode = SaMode.OR)
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamGenerate(@Valid @RequestBody LessonPlanDTO dto) {
         return lessonPlanService.streamGenerate(dto);

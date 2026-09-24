@@ -31,7 +31,14 @@ public class ModelRouterImpl implements ModelRouter {
     @Override
     public String resolveModelKey(String scene, String explicitModelKey) {
         if (StringUtils.hasText(explicitModelKey)) {
-            return normalizeModelKey(explicitModelKey);
+            String normalized = normalizeModelKey(explicitModelKey);
+            if (normalized != null) {
+                return normalized;
+            }
+            // 显式 key 在「模型管理」里不存在（前端占位串、已删除或改名的模型）时不能原样下发：
+            // LlmClientRegistry 会拿它当模型键去查配置，查不到便落到全局 llm 配置，
+            // 全局没有 API Key 时抛 IllegalStateException，表现为与用户所选模型毫无关系的 500。
+            // 这里退回场景路由 → 平台默认模型，保证请求至少落在真实可用的模型上。
         }
 
         if (StringUtils.hasText(scene)) {
@@ -79,9 +86,13 @@ public class ModelRouterImpl implements ModelRouter {
         return "mock".equalsIgnoreCase(modelKey);
     }
 
+    /**
+     * @return 归一化后的配置查找键；模型管理里不存在对应配置时返回 {@code null}，
+     *         由调用方决定回退到场景路由还是平台默认模型
+     */
     private String normalizeModelKey(String modelKey) {
         AiModelConfigEntity config = findConfig(modelKey);
-        return config != null ? configLookupKey(config) : modelKey.trim();
+        return config != null ? configLookupKey(config) : null;
     }
 
     private AiModelConfigEntity findConfig(String modelKey) {

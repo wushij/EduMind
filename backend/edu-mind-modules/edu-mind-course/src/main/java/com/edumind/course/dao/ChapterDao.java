@@ -61,6 +61,14 @@ public class ChapterDao {
         return chapterMapper.deleteById(id);
     }
 
+    public int deleteByCourseId(Long courseId) {
+        if (courseId == null) {
+            return 0;
+        }
+        return chapterMapper.delete(new LambdaQueryWrapper<ChapterEntity>()
+                .eq(ChapterEntity::getCourseId, courseId));
+    }
+
     public List<ChapterEntity> findPublishedLessonChapters(Long courseId) {
         LambdaQueryWrapper<ChapterEntity> wrapper = new LambdaQueryWrapper<ChapterEntity>()
                 .isNotNull(ChapterEntity::getParentId)

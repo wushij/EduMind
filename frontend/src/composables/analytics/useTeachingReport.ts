@@ -22,7 +22,7 @@ const errorColorMap: Record<string, string> = {
   CALC: '#F59E0B'
 };
 
-export function useTeachingReport(defaultCourseId = 102) {
+export function useTeachingReport(defaultCourseId?: number) {
   const router = useRouter();
   const { courseId } = useTeacherCourses(defaultCourseId);
   const { fetchTeachingReport } = useLearningAnalytics();

@@ -252,13 +252,18 @@ export function usePrompt() {
     }
   };
 
-  const runTest = async (templateId: number, req: PromptTestRequest) => {
+  /** @return 是否执行成功，调用方据此决定是否展示输出（失败时不得伪造结果） */
+  const runTest = async (templateId: number, req: PromptTestRequest): Promise<boolean> => {
     testing.value = true;
     try {
       testResult.value = await testPromptTemplate(templateId, req);
       ElMessage.success('Prompt 在线测试执行完毕');
-    } catch (err: any) {
-      ElMessage.error(err.message || '测试执行异常');
+      return true;
+    } catch {
+      // 失败提示已由 axios 拦截器统一弹出，此处再弹一次会出现重复 toast；
+      // 同时清空上一次结果，避免调用方把旧输出当成本次结果。
+      testResult.value = null;
+      return false;
     } finally {
       testing.value = false;
     }

@@ -1,9 +1,10 @@
 import { get, post, put, del } from '@/core/http/request';
+import type { HttpRequestConfig } from '@/core/http/types';
 import { QuestionItem } from '@/types/question/question';
 import { PageResult } from '@/types/common/api';
 
-export const getQuestions = (params?: Record<string, any>) =>
-  get<PageResult<QuestionItem>>('/questions', params);
+export const getQuestions = (params?: Record<string, any>, config?: HttpRequestConfig) =>
+  get<PageResult<QuestionItem>>('/questions', params, config);
 
 export const getQuestionDetail = (id: number | string) => get<QuestionItem>(`/questions/${id}`);
 

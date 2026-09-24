@@ -2,6 +2,7 @@ package com.edumind.statistics.service.learning;
 
 import com.edumind.common.exception.BusinessException;
 import com.edumind.course.api.CourseQueryApi;
+import com.edumind.course.vo.chapter.ChapterTreeVO;
 import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.course.vo.knowledge.KnowledgePointVO;
 import com.edumind.knowledge.api.KnowledgeGraphQueryApi;
@@ -44,6 +45,12 @@ public class AdaptivePathOrchestrator {
 
     private static final double MASTERED_THRESHOLD = 0.7;
     private static final int MAX_WEEKS = 4;
+    /**
+     * 每周取题时的候选池大小。
+     * 取题需要「同一个知识点优先、跨周不重复」，候选池过小（例如 3）会导致多周只能拿到同一道题，
+     * 学员看到的就是一周接一周的相同练习，因此这里保留足够宽度供跨周轮换。
+     */
+    private static final int QUESTION_CANDIDATE_SIZE = 6;
     private static final DateTimeFormatter GENERATED_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private final KnowledgeMasteryService knowledgeMasteryService;
@@ -79,11 +86,16 @@ public class AdaptivePathOrchestrator {
         Map<Long, KnowledgePointVO> kpById = allKps.stream()
                 .filter(k -> k.getId() != null)
                 .collect(Collectors.toMap(KnowledgePointVO::getId, k -> k, (a, b) -> a));
+        // 章节标题映射 + 根章节列表：课程知识点尚未录入（kpById 为空）时，任务文案与排期必须退化为「章节维度」，
+        // 否则每周都会输出同一句通用占位文案并推同一道练习，学员会误以为系统在重复刷同一套假数据。
+        Map<Long, String> chapterTitleById = new HashMap<>();
+        List<ChapterTreeVO> rootChapters = loadRootChapters(courseId, chapterTitleById);
 
-        List<FocusWeekPlan> weekPlans = planWeeks(courseId, studentId, mastery, masteryByKp, kpById);
+        List<FocusWeekPlan> weekPlans =
+                planWeeks(courseId, studentId, mastery, masteryByKp, kpById, chapterTitleById, rootChapters);
         if (weekPlans.isEmpty()) {
             LearningPathVO baseline = learningPathService.buildPath(courseId);
-            weekPlans = fromBaselineWeeks(baseline, masteryByKp, kpById);
+            weekPlans = fromBaselineWeeks(baseline, masteryByKp, kpById, chapterTitleById);
         }
 
         LearningPathDetailVO detail = new LearningPathDetailVO();
@@ -99,6 +111,8 @@ public class AdaptivePathOrchestrator {
         int estimatedMinutes = 0;
         Set<Long> highlightKpIds = new LinkedHashSet<>();
         Map<Long, RecommendedQuestionVO> questionCache = new HashMap<>();
+        // 跨周已选题目：保证同一份学习计划内不会连续两周推同一道练习题
+        Set<Long> pickedQuestionIds = new HashSet<>();
 
         for (FocusWeekPlan plan : weekPlans) {
             if (weekNo > MAX_WEEKS) {
@@ -110,10 +124,13 @@ public class AdaptivePathOrchestrator {
             week.setKnowledgePointId(plan.knowledgePointId);
             week.setMasteryPercent(plan.masteryPercent);
             week.setFocusReason(plan.focusReason);
-            highlightKpIds.add(plan.knowledgePointId);
+            // 章节维度的降级计划没有知识点，null 进入高亮集合会让后续图切片构建做无意义的整图展开
+            if (plan.knowledgePointId != null) {
+                highlightKpIds.add(plan.knowledgePointId);
+            }
 
             List<LearningPathVO.LearningPathTaskVO> tasks = buildTasksForWeek(
-                    courseId, studentId, plan, masteryByKp, kpById, questionCache);
+                    courseId, studentId, plan, masteryByKp, kpById, questionCache, pickedQuestionIds);
             week.setTasks(tasks);
             detail.getWeeks().add(week);
 
@@ -167,7 +184,8 @@ public class AdaptivePathOrchestrator {
     }
 
     private List<FocusWeekPlan> planWeeks(Long courseId, Long studentId, KnowledgeMasteryVO mastery,
-                                          Map<Long, Double> masteryByKp, Map<Long, KnowledgePointVO> kpById) {
+                                          Map<Long, Double> masteryByKp, Map<Long, KnowledgePointVO> kpById,
+                                          Map<Long, String> chapterTitleById, List<ChapterTreeVO> rootChapters) {
         List<KnowledgeMasteryVO.WeakPointVO> weak = new ArrayList<>(mastery.getWeakPoints());
         weak.sort(Comparator.comparing(wp -> wp.getMastery() != null ? wp.getMastery() : 1.0));
 
@@ -190,8 +208,15 @@ public class AdaptivePathOrchestrator {
                     .forEach(focusIds::add);
         }
 
-        Map<Long, List<Long>> prereqMap = focusIds.isEmpty() ? Map.of()
-                : knowledgePointRelationCommandApi.listPrerequisiteTargetsBySourceIds(focusIds);
+        // 课程知识点表尚未录入（kpById 为空）时，题库与错题里残留的知识点 ID 无法反查标题，
+        // 若继续按知识点排期，只会产出「强化薄弱考点」这类占位主题 + 同一道练习题的重复计划。
+        // 因此显式降级为章节维度排期，让每周主题与章节一一对应、可回溯。
+        if (focusIds.isEmpty()) {
+            return planWeeksByChapter(rootChapters);
+        }
+
+        Map<Long, List<Long>> prereqMap =
+                knowledgePointRelationCommandApi.listPrerequisiteTargetsBySourceIds(focusIds);
 
         List<FocusWeekPlan> plans = new ArrayList<>();
         Set<Long> scheduled = new HashSet<>();
@@ -206,7 +231,8 @@ public class AdaptivePathOrchestrator {
                 if (m < MASTERED_THRESHOLD) {
                     KnowledgePointVO kp = kpById.get(prereqId);
                     String title = kp != null ? kp.getTitle() : "先修知识点";
-                    plans.add(new FocusWeekPlan(prereqId, "补先修：" + title, m * 100,
+                    plans.add(new FocusWeekPlan(prereqId, chapterIdOf(kp), chapterTitleOf(kp, chapterTitleById),
+                            "补先修：" + title, m * 100,
                             "先修掌握不足，建议先完成本周任务再进入后续考点。"));
                     scheduled.add(prereqId);
                 }
@@ -229,7 +255,8 @@ public class AdaptivePathOrchestrator {
                             .findFirst()
                             .orElse("根据测评与错题数据识别的薄弱项。");
                 }
-                plans.add(new FocusWeekPlan(focusId, theme, m * 100, reason));
+                plans.add(new FocusWeekPlan(focusId, chapterIdOf(kp), chapterTitleOf(kp, chapterTitleById),
+                        theme, m * 100, reason));
                 scheduled.add(focusId);
             }
             if (plans.size() >= MAX_WEEKS) {
@@ -239,40 +266,121 @@ public class AdaptivePathOrchestrator {
         return plans;
     }
 
+    /**
+     * 课程没有知识点元数据时的降级排期：按章节（根节点）顺序生成周计划。
+     * 每周的 chapterId/chapterTitle 都真实可回溯，任务文案与推荐范围因此收敛到该章节。
+     */
+    private List<FocusWeekPlan> planWeeksByChapter(List<ChapterTreeVO> rootChapters) {
+        List<FocusWeekPlan> plans = new ArrayList<>();
+        if (rootChapters == null || rootChapters.isEmpty()) {
+            return plans;
+        }
+        List<ChapterTreeVO> ordered = rootChapters.stream()
+                .filter(c -> c != null && c.getId() != null && StringUtils.hasText(c.getTitle()))
+                .sorted(Comparator.comparing(c -> c.getSort() != null ? c.getSort() : 0))
+                .limit(MAX_WEEKS)
+                .collect(Collectors.toList());
+        for (ChapterTreeVO chapter : ordered) {
+            plans.add(new FocusWeekPlan(null, chapter.getId(), chapter.getTitle(), chapter.getTitle(), null,
+                    "该课程尚未录入知识点元数据，已按章节维度编排；补齐知识点后将自动切换为按薄弱考点精准排期。"));
+        }
+        return plans;
+    }
+
+    /**
+     * 展开章节树，产出「章节ID → 章节标题」映射，并返回根章节列表（供章节维度降级排期使用）。
+     */
+    private List<ChapterTreeVO> loadRootChapters(Long courseId, Map<Long, String> chapterTitleById) {
+        List<ChapterTreeVO> roots = new ArrayList<>();
+        collectChapters(courseQueryApi.listChaptersByCourseId(courseId), chapterTitleById, roots);
+        return roots;
+    }
+
+    private void collectChapters(List<ChapterTreeVO> chapters, Map<Long, String> chapterTitleById,
+                                 List<ChapterTreeVO> roots) {
+        if (chapters == null) {
+            return;
+        }
+        for (ChapterTreeVO chapter : chapters) {
+            if (chapter == null) {
+                continue;
+            }
+            if (chapter.getId() != null && StringUtils.hasText(chapter.getTitle())) {
+                chapterTitleById.put(chapter.getId(), chapter.getTitle());
+            }
+            if (chapter.getParentId() == null || chapter.getParentId() == 0L) {
+                roots.add(chapter);
+            }
+            collectChapters(chapter.getChildren(), chapterTitleById, roots);
+        }
+    }
+
+    private static Long chapterIdOf(KnowledgePointVO kp) {
+        return kp != null ? kp.getChapterId() : null;
+    }
+
+    private static String chapterTitleOf(KnowledgePointVO kp, Map<Long, String> chapterTitleById) {
+        Long chapterId = chapterIdOf(kp);
+        return chapterId != null ? chapterTitleById.get(chapterId) : null;
+    }
+
     private List<FocusWeekPlan> fromBaselineWeeks(LearningPathVO baseline, Map<Long, Double> masteryByKp,
-                                                  Map<Long, KnowledgePointVO> kpById) {
+                                                  Map<Long, KnowledgePointVO> kpById,
+                                                  Map<Long, String> chapterTitleById) {
         List<FocusWeekPlan> plans = new ArrayList<>();
         if (baseline.getWeeks() == null) {
             return plans;
         }
         for (LearningPathVO.LearningPathWeekVO week : baseline.getWeeks()) {
-            Long kpId = week.getKnowledgePointId();
+            // 只接受能在课程知识点表反查到的 ID：基线任务里的 knowledgePointId 可能来自题库标签，
+            // 直接沿用会得到「知识点不存在」的周计划（文案退化、推荐题无法按考点收敛）。
+            Long kpId = kpById.containsKey(week.getKnowledgePointId()) ? week.getKnowledgePointId() : null;
             if (kpId == null && week.getTasks() != null) {
                 for (LearningPathVO.LearningPathTaskVO t : week.getTasks()) {
-                    if (t.getKnowledgePointId() != null) {
+                    if (t.getKnowledgePointId() != null && kpById.containsKey(t.getKnowledgePointId())) {
                         kpId = t.getKnowledgePointId();
                         break;
                     }
                 }
             }
-            if (kpId == null && !kpById.isEmpty()) {
-                kpId = kpById.values().iterator().next().getId();
-            }
+            Long chapterId = resolveBaselineChapterId(week);
+            String chapterTitle = chapterId != null ? chapterTitleById.get(chapterId) : week.getTheme();
             double m = kpId != null ? masteryByKp.getOrDefault(kpId, 0.0) : 0.0;
-            plans.add(new FocusWeekPlan(kpId, week.getTheme() != null ? week.getTheme() : "基础巩固",
+            plans.add(new FocusWeekPlan(kpId, chapterId, chapterTitle,
+                    week.getTheme() != null ? week.getTheme() : "基础巩固",
                     m * 100, "按章节进度推荐的学习计划。"));
         }
         return plans;
     }
 
+    /**
+     * 基线的「章节学习」任务 refId 即章节 ID，用它回填周计划的章节维度信息。
+     */
+    private static Long resolveBaselineChapterId(LearningPathVO.LearningPathWeekVO week) {
+        if (week.getTasks() == null) {
+            return null;
+        }
+        for (LearningPathVO.LearningPathTaskVO t : week.getTasks()) {
+            if ("READ".equalsIgnoreCase(t.getType()) && t.getRefId() != null) {
+                return t.getRefId();
+            }
+        }
+        return null;
+    }
+
     private List<LearningPathVO.LearningPathTaskVO> buildTasksForWeek(
             Long courseId, Long studentId, FocusWeekPlan plan, Map<Long, Double> masteryByKp,
-            Map<Long, KnowledgePointVO> kpById, Map<Long, RecommendedQuestionVO> questionCache) {
+            Map<Long, KnowledgePointVO> kpById, Map<Long, RecommendedQuestionVO> questionCache,
+            Set<Long> pickedQuestionIds) {
         List<LearningPathVO.LearningPathTaskVO> tasks = new ArrayList<>();
         Long kpId = plan.knowledgePointId;
         KnowledgePointVO kp = kpId != null ? kpById.get(kpId) : null;
         double mastery = kpId != null ? masteryByKp.getOrDefault(kpId, 0.0) : 0.0;
         boolean mastered = mastery >= MASTERED_THRESHOLD;
+        // 知识点缺失（课程尚未录入知识点元数据）时，章节标题是本周唯一可回溯的主题来源，
+        // 用它替代通用占位文案，保证「第 N 周」的任务描述各不相同。
+        String weekTopic = kp != null && StringUtils.hasText(kp.getTitle()) ? kp.getTitle()
+                : (StringUtils.hasText(plan.chapterTitle) ? plan.chapterTitle : null);
 
         LearningPathVO.LearningPathTaskVO read = new LearningPathVO.LearningPathTaskVO();
         read.setId(taskId(kpId, "read"));
@@ -280,15 +388,16 @@ public class AdaptivePathOrchestrator {
         read.setTypeLabel("章节学习");
         read.setKnowledgePointId(kpId);
         read.setEstimatedMinutes(20);
-        Long chapterId = kp != null ? kp.getChapterId() : null;
+        Long chapterId = kp != null ? kp.getChapterId() : plan.chapterId;
         read.setRefId(chapterId);
-        read.setTitle(kp != null ? "学习章节：" + kp.getTitle() : "学习课程章节内容");
+        read.setTitle(weekTopic != null ? "学习章节：" + weekTopic : "学习课程章节内容");
         read.setTargetUrl("/course/" + courseId + "/chapters");
         read.setActionLabel("去学习");
         read.setStatus(mastered ? "COMPLETED" : "PENDING");
         tasks.add(read);
 
-        RecommendedQuestionVO question = pickQuestion(courseId, studentId, kp, questionCache);
+        RecommendedQuestionVO question =
+                pickQuestion(courseId, studentId, kp, chapterId, questionCache, pickedQuestionIds);
         if (question != null) {
             LearningPathVO.LearningPathTaskVO practice = new LearningPathVO.LearningPathTaskVO();
             practice.setId(taskId(kpId, "practice"));
@@ -315,7 +424,7 @@ public class AdaptivePathOrchestrator {
             wb.setKnowledgePointId(kpId);
             wb.setRefId(wrong.getId());
             wb.setEstimatedMinutes(12);
-            wb.setTitle("错题变式攻坚");
+            wb.setTitle(weekTopic != null ? "错题变式攻坚：" + weekTopic : "错题变式攻坚");
             wb.setTargetUrl("/learning/wrong-questions?courseId=" + courseId
                     + (kpId != null ? "&knowledgePointId=" + kpId : ""));
             wb.setActionLabel("去错题本");
@@ -341,30 +450,53 @@ public class AdaptivePathOrchestrator {
         return tasks;
     }
 
-    private RecommendedQuestionVO pickQuestion(Long courseId, Long studentId, KnowledgePointVO kp,
-                                               Map<Long, RecommendedQuestionVO> questionCache) {
-        Long cacheKey = kp != null && kp.getId() != null ? kp.getId() : -1L;
-        if (questionCache.containsKey(cacheKey)) {
-            return questionCache.get(cacheKey);
+    private RecommendedQuestionVO pickQuestion(Long courseId, Long studentId, KnowledgePointVO kp, Long chapterId,
+                                               Map<Long, RecommendedQuestionVO> questionCache,
+                                               Set<Long> pickedQuestionIds) {
+        Long kpKey = kp != null && kp.getId() != null ? kp.getId() : null;
+        // 仅对「知识点确定」的周做缓存复用：知识点缺失时缓存 key 会退化到同一个分支，
+        // 整份计划就会反复取到同一道题，因此这类情况必须逐周重新挑选。
+        if (kpKey != null && questionCache.containsKey(kpKey)) {
+            return questionCache.get(kpKey);
         }
-        Long chapterId = kp != null ? kp.getChapterId() : null;
         List<RecommendedQuestionVO> list = recommendationService.recommendQuestionsForStudent(
-                courseId, chapterId, 3, studentId);
+                courseId, chapterId, QUESTION_CANDIDATE_SIZE, studentId);
         if (list == null || list.isEmpty()) {
-            questionCache.put(cacheKey, null);
+            if (kpKey != null) {
+                questionCache.put(kpKey, null);
+            }
             return null;
         }
-        RecommendedQuestionVO matched = list.get(0);
-        if (kp != null && kp.getId() != null) {
-            for (RecommendedQuestionVO q : list) {
-                if (Objects.equals(q.getKnowledgePointId(), kp.getId())) {
-                    matched = q;
-                    break;
-                }
+        RecommendedQuestionVO matched = pickUnusedQuestion(list, kpKey, pickedQuestionIds);
+        if (matched != null && matched.getId() != null) {
+            pickedQuestionIds.add(matched.getId());
+        }
+        if (kpKey != null) {
+            questionCache.put(kpKey, matched);
+        }
+        return matched;
+    }
+
+    /**
+     * 优先返回「同知识点 + 尚未被本周计划占用」的题目，其次退让为任意未占用题，最后才允许重复。
+     * 这是同一份学习计划内多周练习不重复的关键。
+     */
+    private static RecommendedQuestionVO pickUnusedQuestion(List<RecommendedQuestionVO> list, Long kpId,
+                                                            Set<Long> pickedQuestionIds) {
+        for (RecommendedQuestionVO q : list) {
+            if (kpId != null && !Objects.equals(q.getKnowledgePointId(), kpId)) {
+                continue;
+            }
+            if (q.getId() == null || !pickedQuestionIds.contains(q.getId())) {
+                return q;
             }
         }
-        questionCache.put(cacheKey, matched);
-        return matched;
+        for (RecommendedQuestionVO q : list) {
+            if (q.getId() != null && !pickedQuestionIds.contains(q.getId())) {
+                return q;
+            }
+        }
+        return list.get(0);
     }
 
     private LearningPathDetailVO.GraphSliceVO buildGraphSlice(
@@ -547,6 +679,7 @@ public class AdaptivePathOrchestrator {
         return "WEAK";
     }
 
-    private record FocusWeekPlan(Long knowledgePointId, String theme, Double masteryPercent, String focusReason) {
+    private record FocusWeekPlan(Long knowledgePointId, Long chapterId, String chapterTitle,
+                                 String theme, Double masteryPercent, String focusReason) {
     }
 }

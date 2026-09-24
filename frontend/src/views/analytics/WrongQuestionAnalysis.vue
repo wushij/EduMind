@@ -68,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { useLearningAnalytics } from '@/composables/analytics/useLearningAnalytics';
@@ -78,7 +78,7 @@ import AppPagination from '@/components/common/AppPagination.vue';
 
 const router = useRouter();
 
-const { courseOptions, courseId } = useTeacherCourses(102);
+const { courseOptions, courseId, loadCourses } = useTeacherCourses();
 const page = ref(1);
 const pageSize = ref(10);
 const diagnosingId = ref<number | null>(null);
@@ -86,8 +86,14 @@ const diagnosingId = ref<number | null>(null);
 const { loading, usedMockFallback, wrongQuestions, fetchWrongQuestions, diagnoseWrong } = useLearningAnalytics();
 
 async function reload() {
+  if (!courseId.value || courseId.value <= 0) return;
   await fetchWrongQuestions(courseId.value, page.value, pageSize.value);
 }
+
+watch(courseId, () => {
+  page.value = 1;
+  reload();
+});
 
 async function handleDiagnose(row: WrongQuestionItemVO) {
   if (!row.id) {

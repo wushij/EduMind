@@ -136,7 +136,7 @@
               @click="emit('update:courseCodeInput', 'CS101')"
             >
               <span class="chip-code">CS101</span>
-              <span class="chip-name">Java程序设计</span>
+              <span class="chip-name">Java面向对象程序设计</span>
             </button>
             <button
               type="button"
