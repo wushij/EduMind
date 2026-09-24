@@ -25,7 +25,8 @@ import {
 import { useStreamingMarkdown } from '@/composables/ai/useStreamingMarkdown';
 import { bindMarkdownCodeCopy } from '@/utils/ai/chat-markdown';
 import { formatCitationMatchLabel } from '@/utils/ai/citation-score';
-import { generateSmartFollowUps } from '@/services/ai/stream-service';
+import { requestFollowUps } from '@/services/ai/stream-service';
+import { pickTurnMessage } from '@/utils/ai/follow-up-message';
 import type {
   CitationItem,
   GlobalAssistantChatRequest,
@@ -560,7 +561,17 @@ export function useGlobalAssistant() {
       }
       const lastUserMsg = [...messages.value].reverse().find((m) => m.role === 'user');
       if (lastUserMsg?.content) {
-        const prompts = generateSmartFollowUps(lastUserMsg.content, lastMsg.content);
+        const targetId = lastMsg.id;
+        const prompts = requestFollowUps(lastUserMsg.content, lastMsg.content, {
+          onUpdate: (next) => {
+            // 按 id 判定「仍然是当轮消息」，并通过数组里的代理对象回写（引用比较在响应式代理下不可靠）
+            const current = pickTurnMessage(messages.value, targetId);
+            if (!current) return;
+            current.followUpPrompts = next;
+            followUpPrompts.value = next;
+            saveCurrentSessionToHistory();
+          }
+        });
         followUpPrompts.value = prompts;
         lastMsg.followUpPrompts = prompts;
       }
@@ -753,6 +764,8 @@ export function useGlobalAssistant() {
     };
   }
 
+  let currentTurnSettled = false;
+
   function stopStreaming() {
     if (!isStreaming.value) return;
     stopStreamTimer();
@@ -800,8 +813,9 @@ export function useGlobalAssistant() {
       streamingReasoning.value || streamingThinkingBody.value
     );
     const finalAnswer = streamingAnswerBody.value || streamingContent.value;
+    const lastUserPrompt = [...messages.value].reverse().find((m) => m.role === 'user')?.content || '';
 
-    messages.value.push({
+    const assistantMessage: GlobalAssistantMessage = {
       id: Date.now(),
       role: 'assistant',
       content: finalAnswer.trim(),
@@ -810,11 +824,29 @@ export function useGlobalAssistant() {
       intentDesc: streamingIntent.value.intentDesc,
       targetCode: streamingIntent.value.targetCode,
       citations: [...streamingCitations.value],
-      followUpPrompts: [...followUpPrompts.value],
-      createdAt: Date.now()
-    });
+      followUpPrompts: []
+    };
 
+    // 追问：模型结果异步到达后才回写（拿不到就静默回落到规则生成）
+    const finalFollowUps = requestFollowUps(lastUserPrompt, finalAnswer, {
+      onUpdate: (prompts) => {
+        // 用 pickTurnMessage 按 id 拿「数组里的代理对象」回写：
+        // 直接与原始对象做引用比较会恒为 false（响应式代理），表现就是「追问要刷新才出现」
+        const current = pickTurnMessage(messages.value, assistantMessage.id);
+        if (!current) return;
+        current.followUpPrompts = prompts;
+        followUpPrompts.value = prompts;
+        saveCurrentSessionToHistory();
+      }
+    });
+    assistantMessage.followUpPrompts = finalFollowUps;
+    followUpPrompts.value = finalFollowUps;
+    messages.value.push(assistantMessage);
+
+    currentTurnSettled = true;
     resetStreamingState();
+    // 关键修复：一旦回答结算入库，流式状态必须立即置为 false，消除正在进行的思考气泡
+    isStreaming.value = false;
     saveCurrentSessionToHistory();
     window.dispatchEvent(new CustomEvent('edumind:ai-usage-changed'));
     nextTick(() => bindMarkdownCodeCopy(messagesScrollRef.value));
@@ -868,7 +900,6 @@ export function useGlobalAssistant() {
           if (d.reasoningContent && !streamingReasoning.value) {
             streamingReasoning.value = String(d.reasoningContent);
           }
-          followUpPrompts.value = generateSmartFollowUps(query, streamingContent.value);
           finalizeAssistantMessage();
         },
         onFollowOutput: scheduleFollowStreamOutput
@@ -898,7 +929,6 @@ export function useGlobalAssistant() {
       streamingCitations.value = data.citations as CitationItem[];
     }
     streamingContent.value = data.content || '已处理您的教学助手请求。';
-    followUpPrompts.value = generateSmartFollowUps(query, streamingContent.value);
     finalizeAssistantMessage();
   }
 
@@ -920,6 +950,7 @@ export function useGlobalAssistant() {
     }
     inputContent.value = '';
     followUpPrompts.value = [];
+    currentTurnSettled = false;
     resetStreamingState();
     isStreaming.value = true;
     startStreamTimer();
@@ -927,7 +958,7 @@ export function useGlobalAssistant() {
 
     try {
       const streamed = await streamChat(query);
-      if (userStoppedGeneration.value) return;
+      if (userStoppedGeneration.value || currentTurnSettled) return;
       if (!streamed && !streamingContent.value) {
         if (isRegenerate) {
           throw new Error('重新生成未返回有效内容，请稍后重试');
@@ -935,7 +966,7 @@ export function useGlobalAssistant() {
         await fallbackAsk(query);
       }
     } catch {
-      if (userStoppedGeneration.value) return;
+      if (userStoppedGeneration.value || currentTurnSettled) return;
       if (isRegenerate) {
         const message = '重新生成失败，请检查模型 API Key 或网络后重试';
         messages.value.push({

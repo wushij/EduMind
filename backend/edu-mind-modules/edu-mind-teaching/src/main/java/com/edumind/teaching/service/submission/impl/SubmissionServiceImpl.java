@@ -5,6 +5,7 @@ import com.edumind.common.event.LearningActivityEvent;
 import com.edumind.common.api.ResultCode;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.common.model.UserContext;
+import com.edumind.course.api.CourseAccessApi;
 import com.edumind.infrastructure.redis.DistributedLockService;
 import com.edumind.infrastructure.redis.RedisKeyBuilder;
 import com.edumind.system.api.OrganizationQueryApi;
@@ -52,6 +53,7 @@ public class SubmissionServiceImpl implements SubmissionService {
     private final AssignmentConverter assignmentConverter;
     private final UserQueryApi userQueryApi;
     private final OrganizationQueryApi organizationQueryApi;
+    private final CourseAccessApi courseAccessApi;
 
     private static final long DEFAULT_TENANT_ID = 1L;
 
@@ -158,6 +160,11 @@ public class SubmissionServiceImpl implements SubmissionService {
 
     @Override
     public List<SubmissionVO> listByAssignmentId(Long assignmentId) {
+        if (assignmentId == null) {
+            return List.of();
+        }
+        // 批改场景读取全班作答：必须先确认作业所属课程在批改人可见范围内
+        assertCanGradeAssignment(assignmentId);
         return submissionDao.listByAssignmentId(assignmentId).stream()
                 .map(item -> getById(item.getId()))
                 .collect(Collectors.toList());
@@ -173,6 +180,8 @@ public class SubmissionServiceImpl implements SubmissionService {
         if (entity == null) {
             return;
         }
+        // 删除答卷是不可逆操作，同样受课程可见范围约束
+        assertCanGradeAssignment(entity.getAssignmentId());
         gradingResultDao.deleteBySubmissionId(id);
         submissionAnswerDao.deleteBySubmissionId(id);
         submissionDao.deleteById(id);
@@ -195,9 +204,29 @@ public class SubmissionServiceImpl implements SubmissionService {
         boolean canGrade = StpUtil.isLogin()
                 && (StpUtil.hasPermission("assignment:grade") || StpUtil.hasPermission("ai:grading"));
         if (canGrade) {
+            // 仅"有批改权限"并不足够：还必须确认作业所属课程在可见范围内，
+            // 否则任意教师都能通过遍历答卷 ID 读取他人课程学生的作答与 AI 评语。
+            assertCanGradeAssignment(entity.getAssignmentId());
             return;
         }
         throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权查看他人答卷");
+    }
+
+    /**
+     * 批改场景的作业归属校验：答卷属于作业、作业属于课程，
+     * 因此批改人必须对该作业所属课程具备可见权限。
+     */
+    private void assertCanGradeAssignment(Long assignmentId) {
+        if (assignmentId == null) {
+            throw new BusinessException("答卷未关联作业");
+        }
+        AssignmentEntity assignment = assignmentDao.findById(assignmentId);
+        if (assignment == null) {
+            throw new BusinessException("作业不存在");
+        }
+        if (!courseAccessApi.isCourseVisible(assignment.getCourseId())) {
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权查看该作业的答卷");
+        }
     }
 
     private Long requireUserId() {

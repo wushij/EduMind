@@ -39,6 +39,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -174,7 +175,7 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                                 saveMessageQuietly(convId, "assistant", contentBuilder.toString(),
                                         reasoningBuilder.toString(),
                                         citationsForSave.isEmpty() ? null : JSON.toJSONString(citationsForSave));
-                                updateConversationStatsQuietly(convId);
+                                updateConversationStatsQuietly(convId, 2);
                                 Map<String, Object> done = new HashMap<>();
                                 done.put("conversationId", convId);
                                 done.put("citations", plan.getCitations() != null ? plan.getCitations() : List.of());
@@ -220,7 +221,9 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
 
         Long userId = LoginUserResolver.requireUserId();
         ensureConversationQuietly(convId, userId, dto);
-        saveMessageQuietly(convId, "user", userQuestion, null, null);
+        // 前端流式失败后会带着同一 conversationId 回退到本接口，此时本轮提问可能已由流式链路落库，
+        // 必须按内容去重，否则历史里会出现连续两条相同的 user，破坏多轮语境
+        boolean userTurnSaved = saveUserMessageIfAbsent(convId, userQuestion);
 
         AiCallAuditContext auditContext = AiCallAuditContext.builder()
                 .userId(userId)
@@ -236,7 +239,8 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
         List<CitationVO> citationsForSave = plan.getCitations() != null ? plan.getCitations() : List.of();
         saveMessageQuietly(convId, "assistant", answer, null,
                 citationsForSave.isEmpty() ? null : JSON.toJSONString(citationsForSave));
-        updateConversationStatsQuietly(convId);
+        // 去重命中时本轮只新增了一条 assistant 消息
+        updateConversationStatsQuietly(convId, userTurnSaved ? 2 : 1);
 
         String targetCode = resolveTargetCode(intent, plan);
 
@@ -338,18 +342,54 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
             }
             message.setCitationsJson(citationsJson);
             message.setTokenCount(content.length());
+            // 显式写入毫秒级时间戳：多轮历史排序完全依赖 create_time（见 V2_6_6 迁移）
+            message.setCreateTime(LocalDateTime.now());
             messageDao.insert(message);
         });
     }
 
-    private void updateConversationStatsQuietly(String convId) {
+    /**
+     * 落库本轮用户提问，若末条 user 消息内容相同则跳过。
+     *
+     * <p>回退场景：流式链路失败 / 超时后，前端会带着同一 conversationId 改调
+     * {@code /ai/assistant/ask}，此时提问已被流式链路写入，重复写入会让模型看到
+     * 「user, user, assistant」，因此按内容去重。</p>
+     *
+     * @return 是否真正新增了一条 user 消息
+     */
+    private boolean saveUserMessageIfAbsent(String convId, String content) {
+        if (!StringUtils.hasText(content)) {
+            return false;
+        }
+        try {
+            MessageEntity last = messageDao.findLastByConversationIdAndRole(convId, "user");
+            if (last != null && content.equals(last.getContent())) {
+                return false;
+            }
+            MessageEntity message = new MessageEntity();
+            message.setConversationId(convId);
+            message.setRole("user");
+            message.setContent(content);
+            message.setTokenCount(content.length());
+            message.setCreateTime(LocalDateTime.now());
+            messageDao.insert(message);
+            return true;
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.warn("Assistant conversation persistence skipped: {}", ex.getMessage());
+            return false;
+        }
+    }
+
+    private void updateConversationStatsQuietly(String convId, int delta) {
         runQuietly(() -> {
             ConversationEntity conversation = conversationDao.findById(convId);
             if (conversation == null) {
                 return;
             }
             int count = conversation.getMessageCount() != null ? conversation.getMessageCount() : 0;
-            conversation.setMessageCount(count + 2);
+            conversation.setMessageCount(count + delta);
             conversationDao.updateById(conversation);
         });
     }

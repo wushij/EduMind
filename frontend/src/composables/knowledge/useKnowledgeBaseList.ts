@@ -126,11 +126,9 @@ export function useKnowledgeBaseList() {
         title: c.title || c.name || `课程 #${c.id}`
       }));
     } catch {
-      courses.value = [
-        { id: 101, title: '数据结构与算法' },
-        { id: 102, title: 'Java面向对象程序设计' },
-        { id: 103, title: '大学数学：高等数学（上）' }
-      ];
+      // 课程接口不可用时不再伪造课程列表（原先写死 101/102/103），
+      // 避免用户误以为这些课程真实可选，把知识库绑到并不存在的课程上。
+      courses.value = [];
     }
   }
 

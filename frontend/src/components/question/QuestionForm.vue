@@ -296,20 +296,13 @@ const inputTagVisible = ref(false);
 const inputTagValue = ref('');
 const tagInputRef = ref();
 
-const staticCourseNameMap: Record<string, string> = {
-  '101': '数据结构与算法',
-  '102': 'Java面向对象程序设计',
-  '103': '高等数学（上）',
-  '250': '计算机操作系统',
-  '251': '计算机网络技术',
-  '258': 'Java面向对象程序设计'
-};
-
-// 解决数字ID回显问题：确保 courses 中必定有真实课程名，绝不出现纯数字
+// 课程名一律来自课程接口返回的真实数据；接口不可用时只做「课程 #id」占位，
+// 不再用写死的 id → 名称映射（会把 102 这类 id 错标成固定课程名，与真实课程不符）。
+// 解决数字ID回显问题：确保 courses 中必定有可读名称，绝不出现纯数字
 const displayCourses = computed<any[]>(() => {
   const list: any[] = courses.value.map(c => {
     const rawName = (c as any).name || c.title || (c as any).courseName;
-    const resolvedName = rawName || staticCourseNameMap[String(c.id)] || `专业核心课 #${c.id}`;
+    const resolvedName = rawName || `课程 #${c.id}`;
     return {
       ...c,
       id: Number(c.id),
@@ -321,7 +314,7 @@ const displayCourses = computed<any[]>(() => {
   if (form.courseId) {
     const exists = list.some(c => String(c.id) === String(form.courseId));
     if (!exists) {
-      const fallbackTitle = form.courseName || staticCourseNameMap[String(form.courseId)] || `专业课程 #${form.courseId}`;
+      const fallbackTitle = form.courseName || `课程 #${form.courseId}`;
       list.unshift({
         id: Number(form.courseId) as any,
         name: fallbackTitle,

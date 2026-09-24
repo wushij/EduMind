@@ -103,13 +103,16 @@ public class KnowledgeAccessService {
 
     private boolean isAdmin() {
         LoginUser user = UserContext.get();
-        if (user != null && user.getRoles() != null && user.getRoles().contains(SecurityConstant.ROLE_ADMIN)) {
+        if (user != null && user.getRoles() != null && 
+                (user.getRoles().contains(SecurityConstant.ROLE_ADMIN) || user.getRoles().contains(SecurityConstant.ROLE_TEACHER))) {
             return true;
         }
         if (cn.dev33.satoken.stp.StpUtil.isLogin()) {
             try {
                 Long loginId = cn.dev33.satoken.stp.StpUtil.getLoginIdAsLong();
-                return Long.valueOf(1L).equals(loginId) || cn.dev33.satoken.stp.StpUtil.hasRole(SecurityConstant.ROLE_ADMIN);
+                return Long.valueOf(1L).equals(loginId)
+                        || cn.dev33.satoken.stp.StpUtil.hasRole(SecurityConstant.ROLE_ADMIN)
+                        || cn.dev33.satoken.stp.StpUtil.hasRole(SecurityConstant.ROLE_TEACHER);
             } catch (Exception ignored) {
             }
         }

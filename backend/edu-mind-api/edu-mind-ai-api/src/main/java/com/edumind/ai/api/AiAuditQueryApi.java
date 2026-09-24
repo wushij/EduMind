@@ -49,4 +49,16 @@ public interface AiAuditQueryApi {
      * 按课程、用户及起始时间统计 AI 调用量
      */
     long countCallsByCourseAndUser(Long courseId, Long userId, LocalDateTime since);
+
+    /**
+     * 按调用场景（ai_call_log.scene）分组统计调用量。
+     *
+     * <p>返回的是场景码归一后（大写）的原始事实，场景码到展示口径的映射由调用方
+     * 按自身分析诉求处理，避免 AI 模块耦合具体报表口径。</p>
+     *
+     * @param courseId 课程 ID，为 null 表示全局统计
+     * @param since    起始时间，可为 null
+     * @return 场景码（大写） -> 调用次数
+     */
+    Map<String, Long> countCallsByScene(Long courseId, LocalDateTime since);
 }

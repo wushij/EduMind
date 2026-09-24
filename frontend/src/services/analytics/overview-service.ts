@@ -11,11 +11,13 @@ export interface OverviewAnalyticsBundle {
 
 export async function fetchOverviewAnalyticsBundle(
   courseId: number,
-  range = '30d'
+  range = '30d',
+  startDate?: string,
+  endDate?: string
 ): Promise<OverviewAnalyticsBundle> {
   try {
     const [learningRes, aiRes, masteryRes] = await Promise.all([
-      getLearningAnalytics({ courseId, range }),
+      getLearningAnalytics({ courseId, range, startDate, endDate }),
       getAiUsageAnalytics({ courseId, range }),
       getKnowledgeMastery({ courseId })
     ]);

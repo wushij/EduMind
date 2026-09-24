@@ -27,6 +27,8 @@ import com.edumind.ai.service.routing.IntentDispatchService;
 import com.edumind.ai.service.teaching.LessonCopilotEnricher;
 import com.edumind.ai.vo.rag.CitationVO;
 import com.edumind.knowledge.api.LessonContentIndexApi;
+import com.edumind.course.api.CourseQueryApi;
+import com.edumind.course.vo.chapter.ChapterTreeVO;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.event.LearningActivityEvent;
 import com.edumind.common.exception.BusinessException;
@@ -37,18 +39,21 @@ import com.edumind.knowledge.api.KnowledgeQueryApi;
 import com.edumind.knowledge.vo.knowledge.KnowledgeBaseVO;
 import com.edumind.security.context.LoginUserResolver;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChatServiceImpl implements ChatService {
@@ -60,6 +65,7 @@ public class ChatServiceImpl implements ChatService {
     private final AiSessionCacheService aiSessionCacheService;
     private final ChatStreamRegistry chatStreamRegistry;
     private final KnowledgeQueryApi knowledgeQueryApi;
+    private final CourseQueryApi courseQueryApi;
     private final ApplicationEventPublisher eventPublisher;
     private final IntentDispatchService intentDispatchService;
     private final MemoryRetrievalService memoryRetrievalService;
@@ -128,14 +134,15 @@ public class ChatServiceImpl implements ChatService {
     private ConversationEntity resolveConversation(ChatStreamDTO dto, Long userId) {
         if (StringUtils.hasText(dto.getConversationId())) {
             ConversationEntity existing = conversationDao.findById(dto.getConversationId());
-            if (existing == null || !userId.equals(existing.getUserId())) {
-                throw new BusinessException("会话不存在或无权访问");
+            if (existing != null && userId.equals(existing.getUserId())) {
+                if (isDefaultTitle(existing.getTitle()) && StringUtils.hasText(dto.getMessage())) {
+                    existing.setTitle(truncate(dto.getMessage(), 20));
+                    conversationDao.updateById(existing);
+                }
+                return existing;
             }
-            if (isDefaultTitle(existing.getTitle()) && StringUtils.hasText(dto.getMessage())) {
-                existing.setTitle(truncate(dto.getMessage(), 20));
-                conversationDao.updateById(existing);
-            }
-            return existing;
+            log.info("Conversation {} does not exist or belong to userId {}, creating new conversation",
+                    dto.getConversationId(), userId);
         }
         ConversationEntity entity = new ConversationEntity();
         Long currentTenantId = TenantContext.requireTenantId();
@@ -174,14 +181,25 @@ public class ChatServiceImpl implements ChatService {
 
             String userQuestion = dto.getMessage();
             Long targetLessonChapterId = dto.getLessonChapterId() != null ? dto.getLessonChapterId() : dto.getChapterId();
+            String sectionTitle = resolveSectionTitle(dto, targetLessonChapterId);
+
             boolean lessonIndexed = targetLessonChapterId != null
                     && dto.getCourseId() != null
                     && lessonContentIndexApi.findLessonDocumentId(dto.getCourseId(), targetLessonChapterId)
                     .isPresent();
+
             String dispatchMessage = userQuestion;
-            if (!lessonIndexed && targetLessonChapterId != null) {
-                dispatchMessage = "[当前微课节ID: " + targetLessonChapterId + "] " + dispatchMessage;
+            if (StringUtils.hasText(sectionTitle)) {
+                dispatchMessage = "[当前知识锚定章节: " + sectionTitle + "] " + userQuestion;
+            } else if (targetLessonChapterId != null) {
+                dispatchMessage = "[当前微课节ID: " + targetLessonChapterId + "] " + userQuestion;
             }
+
+            String retrievalQuery = userQuestion;
+            if (StringUtils.hasText(sectionTitle) && !userQuestion.contains(sectionTitle)) {
+                retrievalQuery = sectionTitle + " " + userQuestion;
+            }
+
             Optional<Long> lessonDocId = targetLessonChapterId != null && dto.getCourseId() != null
                     ? lessonContentIndexApi.findLessonDocumentId(dto.getCourseId(), targetLessonChapterId)
                     : Optional.empty();
@@ -193,8 +211,8 @@ public class ChatServiceImpl implements ChatService {
                 useRag = knowledgeBaseId != null && !CopilotRagPolicy.shouldSkipRag(userQuestion);
             }
             IntentDispatchRequest dispatchRequest = IntentDispatchRequest.builder()
-                    .message(lessonIndexed ? userQuestion : dispatchMessage)
-                    .retrievalQuery(userQuestion)
+                    .message(dispatchMessage)
+                    .retrievalQuery(retrievalQuery)
                     .courseId(dto.getCourseId())
                     .contextModule(lessonIndexed ? "lesson_learn" : (targetLessonChapterId != null ? "lesson_learn" : null))
                     .lessonChapterId(targetLessonChapterId)
@@ -308,6 +326,7 @@ public class ChatServiceImpl implements ChatService {
                 @Override
                 public void onComplete() {
                     if (chatStreamRegistry.isCancelled(streamId)) {
+                        settleInterruptedTurn(conversation, regenerateTurn, userMessageId, "用户已中止生成");
                         emitter.complete();
                         chatStreamRegistry.remove(streamId);
                         return;
@@ -345,12 +364,14 @@ public class ChatServiceImpl implements ChatService {
                 @Override
                 public void onError(String message) {
                     relay.onError(message);
+                    settleInterruptedTurn(conversation, regenerateTurn, userMessageId, "模型服务异常中断");
                     aiSessionCacheService.deleteSession(conversation.getId());
                     emitter.completeWithError(new BusinessException(message));
                     chatStreamRegistry.remove(streamId);
                 }
             });
         } catch (Exception ex) {
+            settleInterruptedTurn(conversation, regenerateTurn, userMessageId, "服务调用失败");
             aiSessionCacheService.deleteSession(conversation.getId());
             sendEvent(emitter, "error", Map.of("code", "AI_TIMEOUT", "message", ex.getMessage()));
             emitter.completeWithError(ex);
@@ -369,8 +390,40 @@ public class ChatServiceImpl implements ChatService {
         }
         message.setCitationsJson(citationsJson);
         message.setTokenCount(content != null ? content.length() : 0);
+        // 显式写入毫秒级时间戳：多轮历史排序完全依赖 create_time（见 V2_6_6 迁移）
+        message.setCreateTime(LocalDateTime.now());
         messageDao.insert(message);
         return message;
+    }
+
+    /**
+     * 失败 / 中止轮次的历史一致性收尾。
+     *
+     * <p>用户提问在流式开始前就已落库（{@link #streamChat} 第 88 行），而失败分支不会写 assistant 回复，
+     * 如果放着不管，下一轮 {@link ChatHistoryBuilder#build} 取回的历史里就会出现连续两条 user，
+     * 多轮角色交替被破坏，模型容易把两次提问揉在一起回答。</p>
+     *
+     * <ul>
+     *   <li><b>普通提问</b>：直接删除刚落库的 user 消息整轮回滚。前端此时通常会带着同一
+     *       conversationId 回退到 {@code /ai/assistant/ask}，由它重新写入完整的一问一答。</li>
+     *   <li><b>重新生成</b>：本轮没有新增 user 消息（复用上一轮提问），改为补一条占位 assistant
+     *       维持角色交替，否则同样会出现连续两条 user。</li>
+     * </ul>
+     */
+    private void settleInterruptedTurn(ConversationEntity conversation, boolean regenerateTurn,
+                                       String userMessageId, String reason) {
+        try {
+            if (!regenerateTurn && StringUtils.hasText(userMessageId)) {
+                // 本轮 user 消息尚未计入 message_count（成功时才累加），删除后无需调整统计
+                messageDao.deleteById(userMessageId);
+                return;
+            }
+            saveMessage(conversation.getId(), "assistant",
+                    "（本轮回答未完成：" + reason + "）", null, null);
+            updateConversationStats(conversation, true);
+        } catch (Exception ex) {
+            log.warn("Settle interrupted chat turn failed conv={}: {}", conversation.getId(), ex.getMessage());
+        }
     }
 
     private void removeLastAssistantMessage(ConversationEntity conversation) {
@@ -445,5 +498,35 @@ public class ChatServiceImpl implements ChatService {
                 "AI_CHAT",
                 1,
                 null));
+    }
+
+    private String resolveSectionTitle(ChatStreamDTO dto, Long targetLessonChapterId) {
+        if (StringUtils.hasText(dto.getSectionTitle())) {
+            return dto.getSectionTitle().trim();
+        }
+        if (targetLessonChapterId == null || dto.getCourseId() == null) {
+            return null;
+        }
+        try {
+            List<ChapterTreeVO> tree = courseQueryApi.listChaptersByCourseId(dto.getCourseId());
+            if (tree != null) {
+                for (ChapterTreeVO chap : tree) {
+                    if (targetLessonChapterId.equals(chap.getId())) {
+                        return chap.getTitle();
+                    }
+                    if (chap.getChildren() != null) {
+                        for (ChapterTreeVO sec : chap.getChildren()) {
+                            if (targetLessonChapterId.equals(sec.getId())) {
+                                return sec.getTitle();
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to resolve section title courseId={} chapterId={}: {}",
+                    dto.getCourseId(), targetLessonChapterId, ex.getMessage());
+        }
+        return null;
     }
 }

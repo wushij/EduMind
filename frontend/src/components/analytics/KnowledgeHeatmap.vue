@@ -200,13 +200,12 @@ const handleCellClick = (studentName: string, kpTitle: string, score: number, st
 const handleAssignPractice = () => {
   drilldownVisible.value = false;
   ElMessage.success(`已为【${activeCell.value?.studentName}】针对【${activeCell.value?.kpTitle}】推送定制自适应习题`);
-  router.push({
-    path: '/learning/practice',
-    query: {
-      courseId: props.courseId || 102,
-      mode: 'WEAK_POINT'
-    }
-  });
+  // 仅在确实有课程上下文时透传 courseId，不再用 `|| 102` 把请求误导到某门固定课程
+  const query: Record<string, string> = { mode: 'WEAK_POINT' };
+  if (props.courseId) {
+    query.courseId = String(props.courseId);
+  }
+  router.push({ path: '/learning/practice', query });
 };
 
 watch(

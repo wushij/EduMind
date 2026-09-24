@@ -2,6 +2,7 @@ package com.edumind.course.api.impl;
 
 import com.edumind.common.exception.BusinessException;
 import com.edumind.course.api.CourseAccessApi;
+import com.edumind.course.api.CourseDataScope;
 import com.edumind.course.dao.CourseDao;
 import com.edumind.course.entity.CourseEntity;
 import com.edumind.course.service.access.CourseAccessService;
@@ -25,6 +26,16 @@ public class CourseAccessApiImpl implements CourseAccessApi {
     public void assertCanEdit(Long courseId) {
         CourseEntity course = requireCourse(courseId);
         courseAccessService.assertCanEdit(course);
+    }
+
+    @Override
+    public CourseDataScope resolveCurrentDataScope() {
+        return courseAccessService.resolveCurrentDataScope();
+    }
+
+    @Override
+    public boolean isCourseVisible(Long courseId) {
+        return courseAccessService.isCourseVisible(courseId);
     }
 
     private CourseEntity requireCourse(Long courseId) {

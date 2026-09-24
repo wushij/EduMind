@@ -9,10 +9,13 @@ import com.edumind.teaching.vo.submission.SubmissionStatsVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -69,23 +72,84 @@ public class SubmissionStatsQueryServiceImpl implements SubmissionStatsQueryServ
     @Override
     public List<SubmissionStatsVO.StudentScoreVO> listStudentScoresByCourse(Long courseId) {
         Map<Long, SubmissionStatsVO.StudentScoreVO> map = new HashMap<>();
+        if (courseId == null) {
+            return new ArrayList<>(map.values());
+        }
         List<AssignmentEntity> assignments = assignmentDao.listByCourseId(courseId);
-        for (AssignmentEntity assignment : assignments) {
-            for (SubmissionEntity sub : submissionDao.listByAssignmentId(assignment.getId())) {
-                SubmissionStatsVO.StudentScoreVO vo = map.computeIfAbsent(sub.getStudentId(), id -> {
-                    SubmissionStatsVO.StudentScoreVO s = new SubmissionStatsVO.StudentScoreVO();
-                    s.setStudentId(id);
-                    s.setSubmissionCount(0);
-                    s.setAvgScore(0.0);
-                    return s;
-                });
-                vo.setSubmissionCount(vo.getSubmissionCount() + 1);
-                if (sub.getTotalScore() != null && sub.getMaxScore() != null && sub.getMaxScore() > 0) {
-                    double ratio = sub.getTotalScore() * 100.0 / sub.getMaxScore();
-                    vo.setAvgScore((vo.getAvgScore() + ratio) / 2);
-                }
+        List<Long> assignmentIds = assignments.stream().map(AssignmentEntity::getId).collect(Collectors.toList());
+
+        // 真实平均分：累加总分与样本数后一次性相除。
+        // 旧实现用 (prev + ratio) / 2 递推近似，答卷数一多会收敛到"最近两次的平均"，
+        // 与课程整体均分口径不一致。
+        Map<Long, double[]> scoreAgg = new HashMap<>();
+        for (SubmissionEntity sub : submissionDao.listByScope(assignmentIds, null, null, null, null, null)) {
+            SubmissionStatsVO.StudentScoreVO vo = map.computeIfAbsent(sub.getStudentId(), id -> {
+                SubmissionStatsVO.StudentScoreVO s = new SubmissionStatsVO.StudentScoreVO();
+                s.setStudentId(id);
+                s.setSubmissionCount(0);
+                s.setAvgScore(0.0);
+                return s;
+            });
+            vo.setSubmissionCount(vo.getSubmissionCount() + 1);
+            if (hasUsableScore(sub)) {
+                double[] cell = scoreAgg.computeIfAbsent(sub.getStudentId(), k -> new double[2]);
+                cell[0] += sub.getTotalScore() * 100.0 / sub.getMaxScore();
+                cell[1] += 1;
+            }
+        }
+        for (Map.Entry<Long, double[]> e : scoreAgg.entrySet()) {
+            SubmissionStatsVO.StudentScoreVO vo = map.get(e.getKey());
+            if (vo != null && e.getValue()[1] > 0) {
+                vo.setAvgScore(Math.round(e.getValue()[0] / e.getValue()[1] * 10.0) / 10.0);
             }
         }
         return new ArrayList<>(map.values());
+    }
+
+    @Override
+    public List<SubmissionStatsVO.DailyScoreVO> listDailyAvgScores(Long courseId, LocalDate startDate, LocalDate endDate) {
+        List<Long> assignmentIds = null;
+        if (courseId != null) {
+            assignmentIds = assignmentDao.listByCourseId(courseId).stream()
+                    .map(AssignmentEntity::getId)
+                    .collect(Collectors.toList());
+        }
+        // courseId 为 null 时聚合全平台提交，作为"全校对照"基准线；
+        // 传空集合会命中 DAO 的 -1 兜底，因此这里保持 null 语义而非空列表。
+        Map<LocalDate, double[]> dailyAgg = new LinkedHashMap<>();
+        for (SubmissionEntity sub : submissionDao.listByScope(assignmentIds, null, null, null, null, null)) {
+            if (sub.getSubmitTime() == null || !hasUsableScore(sub)) {
+                continue;
+            }
+            LocalDate day = sub.getSubmitTime().toLocalDate();
+            if (startDate != null && day.isBefore(startDate)) {
+                continue;
+            }
+            if (endDate != null && day.isAfter(endDate)) {
+                continue;
+            }
+            double[] cell = dailyAgg.computeIfAbsent(day, k -> new double[2]);
+            cell[0] += sub.getTotalScore() * 100.0 / sub.getMaxScore();
+            cell[1] += 1;
+        }
+
+        return dailyAgg.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> {
+                    SubmissionStatsVO.DailyScoreVO vo = new SubmissionStatsVO.DailyScoreVO();
+                    vo.setDate(e.getKey().toString());
+                    vo.setAvgScore(Math.round(e.getValue()[0] / e.getValue()[1] * 10.0) / 10.0);
+                    vo.setSampleCount((int) e.getValue()[1]);
+                    return vo;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /** 答卷是否具备可纳入均分计算的分数（已批改且满分有效） */
+    private static boolean hasUsableScore(SubmissionEntity sub) {
+        return isGraded(sub.getStatus())
+                && sub.getTotalScore() != null
+                && sub.getMaxScore() != null
+                && sub.getMaxScore() > 0;
     }
 }

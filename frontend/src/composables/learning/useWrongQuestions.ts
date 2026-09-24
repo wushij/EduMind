@@ -51,7 +51,7 @@ export function hasDiagnosis(item: WrongQuestionRecordItem | null | undefined): 
   return stripDiagnosisTypeMarker(item?.diagnosis).length >= 10;
 }
 
-export function useWrongQuestions(initialCourseId = 102) {
+export function useWrongQuestions(initialCourseId = 0) {
   const courseId = ref(initialCourseId);
   const loading = ref(false);
   const overviewLoading = ref(false);
@@ -69,6 +69,8 @@ export function useWrongQuestions(initialCourseId = 102) {
   });
 
   async function fetchOverview() {
+    // 无有效课程时不请求概览接口，避免用无效/写死的课程 id 拿到似是而非的数据
+    if (!courseId.value || courseId.value <= 0) return;
     overviewLoading.value = true;
     try {
       const res = await getWrongBookOverview(courseId.value);
@@ -88,6 +90,11 @@ export function useWrongQuestions(initialCourseId = 102) {
   }
 
   async function fetchList() {
+    if (!courseId.value || courseId.value <= 0) {
+      wrongList.value = [];
+      totalWrongQuestions.value = 0;
+      return;
+    }
     loading.value = true;
     loadError.value = null;
     try {

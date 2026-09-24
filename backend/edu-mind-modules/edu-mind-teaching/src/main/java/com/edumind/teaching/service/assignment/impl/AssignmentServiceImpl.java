@@ -1,9 +1,13 @@
 package com.edumind.teaching.service.assignment.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.edumind.common.api.PageResult;
+import com.edumind.common.api.ResultCode;
 import com.edumind.common.exception.BusinessException;
 import com.edumind.common.model.UserContext;
+import com.edumind.course.api.CourseAccessApi;
+import com.edumind.course.api.CourseDataScope;
 import com.edumind.course.api.CourseQueryApi;
 import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.notification.api.NotificationWriteApi;
@@ -54,13 +58,26 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final ExamService examService;
     private final QuestionQueryApi questionQueryApi;
     private final CourseQueryApi courseQueryApi;
+    private final CourseAccessApi courseAccessApi;
     private final NotificationWriteApi notificationWriteApi;
 
     @Override
     public PageResult<AssignmentVO> pageQuery(Long courseId, String status, String keyword, Long page, Long pageSize) {
         long pageNum = page != null && page > 0 ? page : 1L;
         long size = pageSize != null && pageSize > 0 ? pageSize : 10L;
-        Page<AssignmentEntity> result = assignmentDao.pageQuery(courseId, status, keyword, pageNum, size);
+
+        // 数据范围收敛：只能看到「当前用户可见课程」下的作业。
+        // 此前仅校验 assignment:view 权限码、未按课程过滤，导致教师能看到并删除他人课程的作业。
+        CourseDataScope dataScope = courseAccessApi.resolveCurrentDataScope();
+        if (dataScope.isEmpty()) {
+            return PageResult.empty(pageNum, size);
+        }
+        // 学生视角（无创建/批改权限）只能看到已发布作业，草稿与归档属于教学管理数据
+        String effectiveStatus = isManagementViewer() ? status : "PUBLISHED";
+        List<Long> visibleCourseIds = visibleCourseIdsOrNull(dataScope);
+
+        Page<AssignmentEntity> result = assignmentDao.pageQuery(
+                courseId, visibleCourseIds, effectiveStatus, keyword, pageNum, size);
         List<AssignmentVO> list = result.getRecords().stream()
                 .map(this::enrich)
                 .collect(Collectors.toList());
@@ -75,9 +92,16 @@ public class AssignmentServiceImpl implements AssignmentService {
     @Override
     public AssignmentStatsVO getStats(Long courseId) {
         AssignmentStatsVO stats = new AssignmentStatsVO();
-        List<AssignmentEntity> assignments = courseId != null
-                ? assignmentDao.listByCourseId(courseId)
-                : assignmentDao.pageQuery(null, null, null, 1, 1000).getRecords();
+
+        // 统计卡片与列表必须共用同一份可见范围，否则会出现"卡片统计全库、列表只剩自己的"的数据自相矛盾
+        CourseDataScope dataScope = courseAccessApi.resolveCurrentDataScope();
+        List<AssignmentEntity> assignments;
+        if (dataScope.isEmpty()) {
+            assignments = List.of();
+        } else {
+            assignments = assignmentDao.pageQuery(
+                    courseId, visibleCourseIdsOrNull(dataScope), null, null, 1, 1000).getRecords();
+        }
 
         long active = assignments.stream().filter(a -> "PUBLISHED".equals(a.getStatus())).count();
         stats.setActiveAssignmentCount(active);
@@ -108,16 +132,16 @@ public class AssignmentServiceImpl implements AssignmentService {
 
     @Override
     public AssignmentVO getById(Long id) {
-        AssignmentEntity entity = assignmentDao.findById(id);
-        if (entity == null) {
-            throw new BusinessException("作业不存在");
-        }
+        AssignmentEntity entity = requireAssignment(id);
+        assertAssignmentVisible(entity);
         return enrich(entity);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long create(AssignmentCreateDTO dto) {
+        // 只能在本人可维护的课程下布置作业，避免向他人课程投放作业
+        courseAccessApi.assertCanEdit(dto.getCourseId());
         Long examId = resolveExamId(dto);
 
         AssignmentEntity entity = new AssignmentEntity();
@@ -138,6 +162,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     @Transactional(rollbackFor = Exception.class)
     public void publish(Long id) {
         AssignmentEntity entity = requireAssignment(id);
+        assertAssignmentEditable(entity);
         if (!"DRAFT".equals(entity.getStatus())) {
             throw new BusinessException("仅草稿状态的作业可发布");
         }
@@ -150,6 +175,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     @Transactional(rollbackFor = Exception.class)
     public void close(Long id) {
         AssignmentEntity entity = requireAssignment(id);
+        assertAssignmentEditable(entity);
         if (!"PUBLISHED".equals(entity.getStatus())) {
             throw new BusinessException("仅进行中的作业可归档关闭");
         }
@@ -164,6 +190,8 @@ public class AssignmentServiceImpl implements AssignmentService {
             return;
         }
         AssignmentEntity entity = requireAssignment(id);
+        // 删除是不可逆的破坏性操作：必须确认作业所属课程在当前用户的可维护范围内
+        assertAssignmentEditable(entity);
         // 级联清理作业名下所有答卷、答案与评分记录
         List<SubmissionEntity> submissions = submissionDao.listByAssignmentId(id);
         if (submissions != null && !submissions.isEmpty()) {
@@ -243,6 +271,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     @Override
     public int remindUnsubmitted(Long id) {
         AssignmentEntity entity = requireAssignment(id);
+        assertAssignmentEditable(entity);
         List<Long> studentIds = courseQueryApi.listStudentUserIdsByCourseId(entity.getCourseId());
         if (studentIds.isEmpty()) {
             return 0;
@@ -343,6 +372,44 @@ public class AssignmentServiceImpl implements AssignmentService {
             }
         }
         return questions;
+    }
+
+    /**
+     * 是否为教学管理视角：具备作业创建或批改权限（教师 / 管理员）。
+     *
+     * <p>学生只持有 {@code assignment:view}，因此学生视角下不允许出现草稿、
+     * 已归档等尚未面向学生发布的教学管理数据。</p>
+     */
+    private boolean isManagementViewer() {
+        return StpUtil.isLogin()
+                && (StpUtil.hasPermission("assignment:create") || StpUtil.hasPermission("assignment:grade"));
+    }
+
+    /**
+     * 将数据范围折算成 DAO 过滤参数：返回 null 表示「不限」（平台/租户管理员），
+     * 返回集合表示必须以 {@code course_id IN (...)} 收敛。空集合由调用方提前短路。
+     */
+    private List<Long> visibleCourseIdsOrNull(CourseDataScope dataScope) {
+        return dataScope.isAll() ? null : new ArrayList<>(dataScope.getCourseIds());
+    }
+
+    /**
+     * 作业读取越权校验：作业所属课程必须在当前用户的可见范围内。
+     * 列表已按范围过滤，单条读取仍需复核，避免直接遍历 id 读取他人课程的作业详情。
+     */
+    private void assertAssignmentVisible(AssignmentEntity entity) {
+        if (!courseAccessApi.isCourseVisible(entity.getCourseId())) {
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权访问该课程的作业");
+        }
+    }
+
+    /**
+     * 作业维护越权校验：仅课程创建者或本课教师/助教可发布、归档、催交、删除。
+     * 与 {@link #assertAssignmentVisible} 区分：可见范围可以包含院系扩散课程（只读），
+     * 但写操作必须落在本人真正负责的课程上。
+     */
+    private void assertAssignmentEditable(AssignmentEntity entity) {
+        courseAccessApi.assertCanEdit(entity.getCourseId());
     }
 
     private AssignmentEntity requireAssignment(Long id) {

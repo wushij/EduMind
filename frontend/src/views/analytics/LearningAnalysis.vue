@@ -77,6 +77,27 @@
       />
     </transition>
 
+    <!-- AI 智教认知推演引擎弹窗 (与其他模块完全对齐：640px 弹窗 + 罗盘脉冲雷达 + 0.1s 秒表实时递增 + 流水线推进 + 随时中止) -->
+    <el-dialog
+      v-model="aiThinkingModalVisible"
+      :title="activeTab === 'personal' ? 'AI 个人学情精准诊断推演引擎' : 'AI 全班教学质效评估推演引擎'"
+      width="640px"
+      class="ai-teaching-engine-dialog"
+      destroy-on-close
+      :close-on-click-modal="false"
+      :show-close="true"
+      append-to-body
+      @close="handleStopAdvice"
+    >
+      <AiCognitiveThinkingPanel
+        :active="aiThinkingModalVisible"
+        v-bind="AI_COGNITIVE_THINKING_PRESETS.analyticsTeachingAdvice"
+        show-footer-actions
+        abort-label="中止推演"
+        @abort="handleStopAdvice"
+      />
+    </el-dialog>
+
     <!-- AI 学情诊断决策抽屉 (长圆药丸美学 + 靶向干预) -->
     <AiDiagnosisDrawer
       v-model="aiDrawerVisible"
@@ -151,6 +172,8 @@ import LearningAnalysisHero from '@/components/analytics/LearningAnalysisHero.vu
 import OverallAnalyticsView from '@/components/analytics/OverallAnalyticsView.vue';
 import StudentPortraitView from '@/components/analytics/StudentPortraitView.vue';
 import AiDiagnosisDrawer from '@/components/analytics/AiDiagnosisDrawer.vue';
+import AiCognitiveThinkingPanel from '@/components/ai/common/AiCognitiveThinkingPanel.vue';
+import { AI_COGNITIVE_THINKING_PRESETS } from '@/constants/ai/cognitive-thinking';
 import { useLearningAnalytics } from '@/composables/analytics/useLearningAnalytics';
 import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
 import { getCourseDetail } from '@/api/course/course';
@@ -169,8 +192,10 @@ const authStore = useAuthStore();
 const isStudentViewer = computed(() => !authStore.hasAnyRole([RoleEnum.ADMIN, RoleEnum.TEACHER]));
 const viewerId = computed(() => authStore.currentUser?.id ?? null);
 
-// 优先从路由 query 提取 courseId，未提供时默认课程 102
-const initialCourseId = Number(route.query.courseId) || 102;
+// 课程来源优先级：URL query 显式指定 → 上次访问的课程 → 可用课程列表首项。
+// 不再硬编码默认课程 id：写死某门课程会让任何教师从侧栏进入时都先看到同一门课，
+// 与「我当前在教哪门课」的实际上下文无关。
+const initialCourseId = Number(route.query.courseId) || undefined;
 const { courseOptions, courseId, courseIdCorrected } = useTeacherCourses(initialCourseId);
 
 const range = ref((route.query.range as string) || '7d');
@@ -203,17 +228,14 @@ const currentCourseName = computed(() => {
   return match ? match.name : '当前诊断课程';
 });
 
-const currentCourseCode = computed(() => {
-  return courseDetailInfo.value?.code || (courseId.value === 102 ? 'AI2026-CS88' : `CRS-${courseId.value}`);
-});
+// 课程代号 / 主讲教师 / 开课学期一律以课程详情接口为准。
+// 拿不到时返回空串让 Hero 自行隐藏或占位，不再用 'AI2026-CS88'、'张老师'、'2026年秋季学期'
+// 这类 mock 值冒充真实课程信息（会让人误以为诊断的是那门写死的课程）。
+const currentCourseCode = computed(() => courseDetailInfo.value?.code || '');
 
-const currentTeacherName = computed(() => {
-  return courseDetailInfo.value?.teacherName || '张老师';
-});
+const currentTeacherName = computed(() => courseDetailInfo.value?.teacherName || '');
 
-const currentSemester = computed(() => {
-  return courseDetailInfo.value?.semester || '2026年秋季学期';
-});
+const currentSemester = computed(() => courseDetailInfo.value?.semester || '');
 
 const enrolledStudents = computed(() => learningData.value?.students ?? []);
 
@@ -438,6 +460,9 @@ const activeWeakPoints = computed(() => {
   return [];
 });
 
+const aiThinkingModalVisible = ref(false);
+let isThinkingAborted = false;
+
 async function handleGenerateAdvice() {
   // AI 学情诊断建议属于教师的教学干预动作，学生端仅提供只读画像
   if (isStudentViewer.value) {
@@ -449,16 +474,24 @@ async function handleGenerateAdvice() {
     ? (selectedStudentId.value || portraitData.value?.studentInfo?.studentId)
     : undefined;
 
+  isThinkingAborted = false;
+  aiThinkingModalVisible.value = true;
   try {
-    const advice = await fetchTeachingAdvice({
+    const fetchPromise = fetchTeachingAdvice({
       courseId: courseId.value,
       studentId: targetStudentId
     });
+    // 保持至少 1.8 秒沉浸式推演流水线体验，确保秒表与罗盘波纹正常运转
+    const [advice] = await Promise.all([
+      fetchPromise,
+      new Promise((resolve) => setTimeout(resolve, 1800))
+    ]);
 
-    if (!advice) {
-      // 手动中止/暂停
+    if (isThinkingAborted || !advice) {
       return;
     }
+
+    aiThinkingModalVisible.value = false;
 
     if (isPersonal && advice.summary && portraitData.value) {
       portraitData.value.aiDiagnosis = advice.summary;
@@ -473,13 +506,18 @@ async function handleGenerateAdvice() {
 
     aiDrawerVisible.value = true;
   } catch {
-    ElMessage.error('生成学情诊断建议失败，请稍后重试');
+    if (!isThinkingAborted) {
+      aiThinkingModalVisible.value = false;
+      ElMessage.error('生成学情诊断建议失败，请稍后重试');
+    }
   }
 }
 
 function handleStopAdvice() {
+  isThinkingAborted = true;
   stopTeachingAdvice();
-  ElMessage.info('已手动停止本次 AI 推演');
+  aiThinkingModalVisible.value = false;
+  ElMessage.info('已中止本次 AI 教学推演');
 }
 
 function handleClearAdvice() {

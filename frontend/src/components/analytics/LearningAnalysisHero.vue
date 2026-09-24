@@ -101,7 +101,7 @@
               <circle cx="12" cy="7" r="4"></circle>
             </svg>
             <span class="meta-label">主讲教师：</span>
-            <strong class="meta-value">{{ teacherName || '张老师' }}</strong>
+            <strong class="meta-value">{{ teacherName || '—' }}</strong>
           </div>
 
           <div class="meta-badge-item">
@@ -112,7 +112,7 @@
               <line x1="3" y1="10" x2="21" y2="10"></line>
             </svg>
             <span class="meta-label">开课学期：</span>
-            <strong class="meta-value">{{ semester || '2026年秋季学期' }}</strong>
+            <strong class="meta-value">{{ semester || '—' }}</strong>
           </div>
 
           <div v-if="showOverall" class="meta-badge-item">

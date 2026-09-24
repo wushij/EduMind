@@ -88,7 +88,9 @@ import { useAIPractice } from '@/composables/learning/useAIPractice';
 
 const router = useRouter();
 const route = useRoute();
-const initialCourseId = Number(route.query.courseId) || 102;
+// 课程上下文优先级：路由 query → 上次访问的课程 → 可用课程列表首项（由 useLearningCourseOptions 解析）。
+// 原先写死 `|| 102`，导致不带 courseId 进入时总是打开同一门固定课程。
+const initialCourseId = Number(route.query.courseId) || undefined;
 
 const { courseOptions, courseId: teacherCourseId } = useLearningCourseOptions(initialCourseId);
 

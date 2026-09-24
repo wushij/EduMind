@@ -17,6 +17,8 @@ public class ChatStreamDTO {
     private Boolean useRag;
     private Long chapterId;
     private Long lessonChapterId;
+    /** 当前知识锚定章节/微课节标题（如「1.1 数列与函数极限计算」） */
+    private String sectionTitle;
     private Long documentId;
 
     /** 临时上传的附件ID列表（用于文档解析与上下文理解） */

@@ -133,6 +133,14 @@ public class WrongQuestionRecordDao {
         );
     }
 
+    public long countByKpAndCourse(Long knowledgePointId, Long courseId) {
+        return wrongQuestionRecordMapper.selectCount(
+                new LambdaQueryWrapper<WrongQuestionRecordEntity>()
+                        .eq(WrongQuestionRecordEntity::getKnowledgePointId, knowledgePointId)
+                        .eq(WrongQuestionRecordEntity::getCourseId, courseId)
+        );
+    }
+
     public java.util.List<WrongQuestionRecordEntity> listByStudentAndCourse(Long studentId, Long courseId, int limit) {
         return wrongQuestionRecordMapper.selectList(
                 new LambdaQueryWrapper<WrongQuestionRecordEntity>()

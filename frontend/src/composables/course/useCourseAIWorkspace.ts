@@ -376,15 +376,35 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     historyDrawerVisible.value = false;
   }
 
-  function handleCreateNewSession() {
+  async function handleCreateNewSession() {
     const courseId = resolveCourseId();
     if (!courseId) {
       ElMessage.warning('课程信息加载中，请稍后再试');
       return;
     }
-    startNewChat(courseId);
-    historyDrawerVisible.value = false;
-    ElMessage.success('已开启新问答会话');
+    if (streaming.value) {
+      ElMessage.warning('当前正在生成中，请先停止生成');
+      return;
+    }
+
+    const previousSessionId = currentSessionId.value;
+    try {
+      const result = await startNewChat(courseId);
+      historyDrawerVisible.value = false;
+      if (!result) {
+        ElMessage.info('当前已是空白会话，直接提问即可');
+      } else if (result.reused) {
+        ElMessage.info(
+          result.sessionId === previousSessionId
+            ? '当前已是空白会话，直接提问即可'
+            : '已切换到空白会话，直接提问即可'
+        );
+      } else {
+        ElMessage.success('已开启新问答会话');
+      }
+    } catch {
+      // createNewSession 内部已给出失败提示，此处仅避免未处理的 Promise 拒绝
+    }
   }
 
   function getPersonaPromptPrefix(persona?: string) {
@@ -412,6 +432,7 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     sendMessage(cleanPrompt, courseId, {
       chapterId: activeChapterId.value,
       lessonChapterId: resolvedLessonId,
+      sectionTitle: activeSectionTitle.value || undefined,
       // 不传 modelKey：由后端按「场景路由 → 平台默认对话模型(is_default)」自动选择
       useRag: Boolean(course.value?.knowledgeBaseId),
       webSearch,
@@ -427,7 +448,8 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     const courseId = resolveCourseId();
     if (!courseId) return;
     regenerateStreamMessage(idx, courseId, {
-      chapterId: activeChapterId.value
+      chapterId: activeChapterId.value,
+      sectionTitle: activeSectionTitle.value || undefined
     });
   }
 

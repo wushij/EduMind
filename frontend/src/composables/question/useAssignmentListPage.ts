@@ -1,5 +1,5 @@
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { getAssignmentStats } from '@/api/question/assignment';
 import { useAssignment } from '@/composables/question/useAssignment';
@@ -8,6 +8,7 @@ import type { Course } from '@/types/course/course';
 import { formatSubmissionRate } from '@/constants/question/assignment';
 
 export function useAssignmentListPage() {
+  const route = useRoute();
   const router = useRouter();
   const {
     assignments,
@@ -164,6 +165,11 @@ export function useAssignmentListPage() {
   }
 
   onMounted(async () => {
+    // 支持从课程详情「发布与管理作业」携带 courseId 进入，直接按该课程过滤
+    const queryCourseId = Number(route.query.courseId);
+    if (Number.isFinite(queryCourseId) && queryCourseId > 0) {
+      selectedCourseId.value = queryCourseId;
+    }
     await Promise.all([loadCourseOptions(), refresh()]);
   });
 

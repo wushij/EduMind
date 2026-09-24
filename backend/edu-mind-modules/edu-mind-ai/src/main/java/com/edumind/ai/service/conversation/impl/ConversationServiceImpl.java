@@ -18,14 +18,17 @@ import com.edumind.common.exception.BusinessException;
 import com.edumind.infrastructure.redis.cache.AiSessionCacheService;
 import com.edumind.security.context.LoginUserResolver;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ConversationServiceImpl implements ConversationService {
@@ -140,23 +143,36 @@ public class ConversationServiceImpl implements ConversationService {
                 .filter(msg -> "user".equals(msg.getRole()))
                 .map(MessageEntity::getContent)
                 .findFirst()
-                .orElse("新会话");
-        String modelKey = modelRouter.resolveModelKey("CHAT", null);
-        AiCallAuditContext auditContext = AiCallAuditContext.builder()
-                .userId(LoginUserResolver.resolveUserId())
-                .tenantId(TenantContext.getTenantId())
-                .courseId(entity.getCourseId())
-                .conversationId(conversationId)
-                .build();
-        String title = aiGatewayFacade.chat(
-                "CHAT_TITLE",
-                modelKey,
-                "你是会话标题生成器，请用不超过12个字概括用户问题。",
-                firstUser,
-                auditContext
-        );
-        if (StringUtils.hasText(title)) {
-            entity.setTitle(title.trim().replace("\"", ""));
+                .orElse("新问答会话");
+        String cleanPrompt = firstUser.replaceAll("^\\[[^\\]]+\\]\\s*", "").trim();
+        String rawFallback = StringUtils.hasText(cleanPrompt) ? cleanPrompt : "新问答会话";
+        String fallbackTitle = rawFallback.length() <= 15 ? rawFallback : rawFallback.substring(0, 15);
+        try {
+            String modelKey = modelRouter.resolveModelKey("CHAT", null);
+            AiCallAuditContext auditContext = AiCallAuditContext.builder()
+                    .userId(LoginUserResolver.resolveUserId())
+                    .tenantId(TenantContext.getTenantId())
+                    .courseId(entity.getCourseId())
+                    .conversationId(conversationId)
+                    .build();
+            CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> aiGatewayFacade.chat(
+                    "CHAT_TITLE",
+                    modelKey,
+                    "你是会话标题生成器，请用不超过12个字概括用户问题，不要输出标点符号和引号。",
+                    cleanPrompt,
+                    auditContext
+            ));
+            String title = future.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            if (StringUtils.hasText(title)) {
+                entity.setTitle(title.trim().replace("\"", "").replace("'", ""));
+                conversationDao.updateById(entity);
+                return entity.getTitle();
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to generate title via LLM for conversation {}, fallback to user prompt: {}", conversationId, ex.getMessage());
+        }
+        if (StringUtils.hasText(fallbackTitle)) {
+            entity.setTitle(fallbackTitle);
             conversationDao.updateById(entity);
         }
         return entity.getTitle();

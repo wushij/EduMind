@@ -96,19 +96,21 @@ const targetCourseId = computed(() => {
   return val ? Number(val) : undefined;
 });
 
-function inferCourseName(courseId?: number, bankName?: string): string {
-  if (courseId === 102 || courseId === 258) return 'Java面向对象程序设计';
-  if (courseId === 101) return '数据结构与算法';
-  if (courseId === 103) return '高等数学（上）';
-  if (bankName && bankName.includes('Java')) return 'Java面向对象程序设计';
-  if (bankName && bankName.includes('数据结构')) return '数据结构与算法';
-  if (bankName && bankName.includes('数学')) return '高等数学（上）';
-  return 'Java面向对象程序设计';
+/**
+ * 课程名只接受路由显式携带的真实课程名。
+ * 原先按「courseId === 102 / 题库名包含 Java」等规则猜课程名，既无法覆盖新建课程，
+ * 又会把课程名张冠李戴；课程名最终以课程列表中的真实数据回显为准。
+ */
+function resolveCourseNameFromRoute(courseName?: unknown): string {
+  if (typeof courseName === 'string' && courseName.trim()) {
+    return decodeURIComponent(courseName).trim();
+  }
+  return '';
 }
 
 const initialForm = computed<Partial<Question>>(() => ({
   courseId: targetCourseId.value,
-  courseName: inferCourseName(targetCourseId.value, targetBankName.value),
+  courseName: resolveCourseNameFromRoute(route.query.courseName),
   type: 'SINGLE_CHOICE',
   difficulty: 'MEDIUM',
   score: 5,

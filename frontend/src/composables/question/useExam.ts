@@ -384,22 +384,11 @@ export function useExamCreate() {
         id: Number(c.id),
         title: c.title || c.name || '未命名课程'
       }));
-      const seedDefaults = [
-        { id: 101, title: '数据结构与算法' },
-        { id: 102, title: 'Java面向对象程序设计' },
-        { id: 103, title: '高等数学（上）' }
-      ];
-      seedDefaults.forEach(def => {
-        if (!courses.value.some(c => Number(c.id) === def.id)) {
-          courses.value.push({ id: def.id, title: def.title } as any);
-        }
-      });
     } catch {
-      courses.value = [
-        { id: 101, title: '数据结构与算法' },
-        { id: 102, title: 'Java面向对象程序设计' },
-        { id: 103, title: '高等数学（上）' }
-      ] as any;
+      // 课程接口不可用时不再注入写死的种子课程（101/102/103），
+      // 否则教师可能把试卷挂到并不存在、或自己无权访问的课程上。
+      courses.value = [];
+      ElMessage.error('课程列表加载失败，请稍后重试');
     }
   }
 
@@ -416,30 +405,15 @@ export function useExamCreate() {
   function handleCourseChange(val?: number) {
     const numId = Number(val);
     const c = courses.value.find(item => Number(item.id) === numId);
-    if (c) {
-      examForm.courseName = c.title || (c as any).name;
-    } else {
-      const staticNames: Record<string, string> = {
-        '101': '数据结构与算法',
-        '102': 'Java面向对象程序设计',
-        '103': '高等数学（上）'
-      };
-      if (staticNames[String(val)]) {
-        examForm.courseName = staticNames[String(val)];
-      }
-    }
+    // 课程名只取自课程列表的真实数据，不再用写死的 id → 名称映射兜底
+    examForm.courseName = c ? c.title || (c as any).name : '';
   }
 
   function getCourseName(courseId?: number) {
     const numId = Number(courseId);
     const c = courses.value.find(item => Number(item.id) === numId);
     if (c) return c.title || (c as any).name || '未指定课程';
-    const staticNames: Record<string, string> = {
-      '101': '数据结构与算法',
-      '102': 'Java面向对象程序设计',
-      '103': '高等数学（上）'
-    };
-    return staticNames[String(courseId)] || examForm.courseName || '未指定课程';
+    return examForm.courseName || '未指定课程';
   }
 
   function updateSectionDefaultScore(sec: ExamSection) {

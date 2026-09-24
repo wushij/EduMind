@@ -120,4 +120,9 @@ public class AiAuditQueryServiceImpl implements AiAuditQueryService {
         }
         return result;
     }
+
+    @Override
+    public Map<String, Long> countCallsByScene(Long courseId, LocalDateTime since) {
+        return aiCallLogDao.countGroupByScene(courseId, since);
+    }
 }

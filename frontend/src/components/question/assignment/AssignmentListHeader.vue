@@ -7,6 +7,7 @@
   >
     <template #actions>
       <button
+        v-permission="'assignment:create'"
         type="button"
         class="module-capsule-btn module-capsule-btn--primary"
         @click="router.push('/question/assignments/create')"

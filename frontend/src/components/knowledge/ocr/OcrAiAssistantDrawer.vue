@@ -128,6 +128,8 @@ import {
 } from '@element-plus/icons-vue';
 import AiCognitiveThinkingPanel from '@/components/ai/common/AiCognitiveThinkingPanel.vue';
 import MathText from '@/components/common/MathText.vue';
+import { SSEClient } from '@/core/sse/client';
+import { API_BASE_URL } from '@/config';
 import { OCR_AI_PROMPTS } from '@/constants/ai/ocr-ai-prompts';
 
 const props = defineProps<{
@@ -180,7 +182,9 @@ const streamResponseText = ref('');
 const aiResultText = ref('');
 const resultTab = ref<'rendered' | 'raw'>('rendered');
 const lastElapsedSeconds = ref(0);
-let abortController: AbortController | null = null;
+const sseClient = new SSEClient();
+/** 用户中止标记：SSEClient 会把 AbortError 吞掉并回调 onComplete，因此需自行记录 */
+let aborted = false;
 let timerStartTime = 0;
 
 const activePromptConfig = computed(() => {
@@ -204,10 +208,8 @@ function handleBeforeClose(done: () => void) {
 }
 
 function handleAbort() {
-  if (abortController) {
-    abortController.abort();
-    abortController = null;
-  }
+  aborted = true;
+  sseClient.stop();
   isProcessing.value = false;
   ElMessage.info('已安全中止本次 AI 辅助推演计算');
 }
@@ -221,78 +223,53 @@ async function startAiProcessing() {
   isProcessing.value = true;
   streamResponseText.value = '';
   aiResultText.value = '';
+  aborted = false;
   timerStartTime = Date.now();
-  abortController = new AbortController();
 
   const promptConfig = activePromptConfig.value;
-  const systemPrompt = promptConfig.systemPrompt;
-  const userPrompt = promptConfig.userPromptTemplate(props.currentPageText);
+  // 后端 /ai/chat/stream 的入参只有 message（ChatStreamDTO 未提供 systemPrompt 字段），
+  // 因此把 OCR 专属角色指令与任务模板合并为一条 message 下发；
+  // useRag=false，避免课程知识库检索结果干扰纯文本校对任务。
+  const composedMessage = `${promptConfig.systemPrompt}\n\n${promptConfig.userPromptTemplate(props.currentPageText)}`;
 
+  let streamError: string | null = null;
   try {
-    // 优先尝试通过系统真实后端 SSE 流式网关发起请求
-    const response = await fetch('/api/ai/chat/stream', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : ''
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        stream: true
-      }),
-      signal: abortController.signal
-    });
-
-    if (response.ok && response.body) {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let done = false;
-
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          const chunk = decoder.decode(value, { stream: true });
-          // 解析 SSE data 行
-          const lines = chunk.split('\n');
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('data:')) {
-              const dataContent = trimmed.substring(5).trim();
-              if (dataContent && dataContent !== '[DONE]') {
-                try {
-                  const parsed = JSON.parse(dataContent);
-                  const token = parsed.content || parsed.text || parsed.delta || '';
-                  streamResponseText.value += token;
-                } catch {
-                  streamResponseText.value += dataContent;
-                }
-              }
-            }
-          }
+    await sseClient.streamEvents(
+      `${API_BASE_URL}/ai/chat/stream`,
+      { message: composedMessage, useRag: false },
+      (event, data) => {
+        if (event === 'delta') {
+          const chunk = String((data as { content?: string }).content ?? '');
+          if (chunk) streamResponseText.value += chunk;
+        } else if (event === 'error') {
+          streamError = String((data as { message?: string }).message ?? 'AI 服务异常');
         }
+      },
+      undefined,
+      (err) => {
+        streamError = err instanceof Error ? err.message : String(err);
       }
+    );
+
+    if (aborted) return;
+
+    if (streamResponseText.value.trim()) {
       aiResultText.value = streamResponseText.value;
     } else {
-      // 若后端未配置该流式端点或鉴权拦截，智能回退为高质量规则与认知模型处理引擎
+      // 后端未配置可用模型或返回空内容时，回退到本地认知引擎推演
+      console.warn('[OcrAiAssistantDrawer] 流式链路未返回有效内容，回退本地认知引擎：', streamError);
       await fallbackCognitiveEngine(currentPromptKey.value, props.currentPageText);
     }
 
     lastElapsedSeconds.value = Math.max(1, Math.round((Date.now() - timerStartTime) / 1000));
     ElMessage.success(`${promptConfig.name} 完成`);
   } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      return;
-    }
-    // 遇网络或环境异常，优雅回退到专业高阶认知引擎推演
+    if (aborted) return;
+    console.warn('[OcrAiAssistantDrawer] 流式请求异常，回退本地认知引擎：', err);
     await fallbackCognitiveEngine(currentPromptKey.value, props.currentPageText);
     lastElapsedSeconds.value = Math.max(1, Math.round((Date.now() - timerStartTime) / 1000));
   } finally {
     isProcessing.value = false;
-    abortController = null;
   }
 }
 
@@ -303,7 +280,7 @@ async function fallbackCognitiveEngine(key: string, rawText: string) {
   // 模拟深度思考与逐段流式演进
   const steps = [800, 700, 600];
   for (const delay of steps) {
-    if (abortController?.signal.aborted) return;
+    if (aborted) return;
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
 

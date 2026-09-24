@@ -248,8 +248,13 @@ export function useLearningAnalytics() {
     }
   }
 
-  async function fetchOverview(courseId: number, range = '30d'): Promise<OverviewAnalyticsData> {
-    return fetchOverviewAnalyticsBundle(courseId, range);
+  async function fetchOverview(
+    courseId: number,
+    range = '30d',
+    startDate?: string,
+    endDate?: string
+  ): Promise<OverviewAnalyticsData> {
+    return fetchOverviewAnalyticsBundle(courseId, range, startDate, endDate);
   }
 
   async function diagnoseWrong(recordId: number): Promise<WrongQuestionDiagnoseResult | null> {

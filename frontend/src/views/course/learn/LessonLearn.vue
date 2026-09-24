@@ -21,7 +21,6 @@
         :duration-minutes="lesson.durationMinutes"
         :lesson-type="lesson.lessonType"
         :content-status="lesson.contentStatus"
-        @back="goChapters"
       />
 
       <div class="lesson-layout">
@@ -182,12 +181,8 @@ function goEditLesson() {
   gap: 20px;
 }
 
-/**
- * 顶部介绍与正文左列同宽（1200 - 300 目录列 - 20 间距 = 880）。
- * 否则 hero 通栏 1200px、正文卡片只有 880px，会出现"顶部边框长、内容边框短"的错位。
- */
 .lesson-hero-block {
-  width: calc(100% - 320px);
+  width: 100%;
 }
 
 .lesson-main {

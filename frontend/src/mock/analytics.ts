@@ -28,15 +28,36 @@ export const MOCK_LEARNING_ANALYTICS: LearningAnalyticsVO = {
       { date: '周日', activeUsers: 38 }
     ],
     score: [
-      { date: '周一', avgScore: 76.2 },
-      { date: '周二', avgScore: 78.5 },
-      { date: '周三', avgScore: 79.1 },
-      { date: '周四', avgScore: 81.3 },
-      { date: '周五', avgScore: 82.4 },
-      { date: '周六', avgScore: 80.8 },
-      { date: '周日', avgScore: 79.6 }
+      { date: '周一', avgScore: 76.2, schoolAvgScore: 73.5 },
+      { date: '周二', avgScore: 78.5, schoolAvgScore: 74.2 },
+      { date: '周三', avgScore: 79.1, schoolAvgScore: 74.8 },
+      { date: '周四', avgScore: 81.3, schoolAvgScore: 75.1 },
+      { date: '周五', avgScore: 82.4, schoolAvgScore: 76.0 },
+      { date: '周六', avgScore: 80.8, schoolAvgScore: 75.6 },
+      { date: '周日', avgScore: 79.6, schoolAvgScore: 75.2 }
     ]
   },
+  chapterProgressList: [
+    { chapterId: 101, chapterTitle: '第 1 章：Java 基础语法与面向对象初探', sort: 1, completionRate: 96.5, avgScore: 89.2, studentCount: 86, avgStudyMinutes: 120 },
+    { chapterId: 102, chapterTitle: '第 2 章：类与对象、封装继承多态实战', sort: 2, completionRate: 91.0, avgScore: 86.4, studentCount: 84, avgStudyMinutes: 145 },
+    { chapterId: 103, chapterTitle: '第 3 章：集合框架 ArrayList 与 LinkedList 源码剖析', sort: 3, completionRate: 84.5, avgScore: 78.2, studentCount: 79, avgStudyMinutes: 160 },
+    { chapterId: 104, chapterTitle: '第 4 章：泛型、异常处理与反射机制', sort: 4, completionRate: 77.0, avgScore: 74.5, studentCount: 72, avgStudyMinutes: 180 },
+    { chapterId: 105, chapterTitle: '第 5 章：并发编程与 JVM 内存模型基础', sort: 5, completionRate: 68.5, avgScore: 71.0, studentCount: 65, avgStudyMinutes: 210 }
+  ],
+  courseHealth: {
+    overallScore: 88.5,
+    syllabusCoverage: 92,
+    assignmentCompletion: 85,
+    studentInteraction: 78,
+    passRate: 92,
+    aiAssistanceRate: 82,
+    healthLevel: 'EXCELLENT'
+  },
+  courseWeakPoints: [
+    { knowledgePointId: 16, title: 'ArrayList 与 LinkedList 源码剖析', mastery: 67.5, wrongCount: 14, affectedStudents: 28, urgency: 'HIGH' },
+    { knowledgePointId: 10, title: '面向对象三大特征与多态运行时绑定', mastery: 72.0, wrongCount: 9, affectedStudents: 18, urgency: 'MEDIUM' },
+    { knowledgePointId: 12, title: '基本数据类型与包装类自动拆装箱', mastery: 78.5, wrongCount: 5, affectedStudents: 11, urgency: 'MEDIUM' }
+  ],
   students: [
     {
       studentId: 3,
@@ -258,6 +279,12 @@ export const MOCK_AI_USAGE: AiUsageAnalyticsVO = {
     { provider: 'DeepSeek', calls: 1820, tokens: 1024000 },
     { provider: 'OpenAI', calls: 980, tokens: 568000 },
     { provider: 'Qwen', calls: 448, tokens: 250000 }
+  ],
+  byScene: [
+    { scene: '智能答疑解惑', calls: 1820, ratio: 56.0, sourceScenes: ['CHAT', 'CHAT_RAG', 'GLOBAL_ASSISTANT'] },
+    { scene: '试题精准批阅', calls: 620, ratio: 19.1, sourceScenes: ['GRADING', 'SUBJECTIVE_GRADING'] },
+    { scene: '靶向变式推演', calls: 496, ratio: 15.3, sourceScenes: ['QUESTION_GENERATE'] },
+    { scene: '学情诊断评估', calls: 312, ratio: 9.6, sourceScenes: ['TEACHING_ADVICE', 'LEARNING'] }
   ]
 };
 

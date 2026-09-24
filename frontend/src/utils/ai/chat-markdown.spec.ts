@@ -117,5 +117,14 @@ $$\\boxed{
     const html7 = renderChatMarkdown(input7);
     expect(html7).toContain('katex');
     expect(html7).not.toContain('katex-error');
+
+    // 修复大模型误输出的非法数字宏（如 \0 \cdot \infty、\1^\infty、\0^0）
+    const input8 = `• **未定式**：进入变换层。七种基本型：
+$$\\frac{0}{0}, \\frac{\\infty}{\\infty}, \\infty - \\infty, \\0 \\cdot \\infty, \\1^\\infty, \\0^0, \\infty^0.$$`;
+    const html8 = renderChatMarkdown(input8);
+    expect(html8).toContain('katex');
+    expect(html8).not.toContain('katex-error');
+    expect(html8).not.toContain('\\0');
+    expect(html8).not.toContain('\\1');
   });
 });

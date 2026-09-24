@@ -116,12 +116,6 @@ export function getDifficultyTagType(diff: Difficulty | string) {
   return (map[diff] as string) || '';
 }
 
-const FALLBACK_BANKS = [
-  { id: 1, name: '数据结构核心真题库', courseId: 101, questionCount: 5, description: '涵盖408与期末高频真题', updateTime: '2026-09-10' },
-  { id: 2, name: 'Java面向对象精选题集', courseId: 102, questionCount: 3, description: 'Java核心典型题型', updateTime: '2026-09-09' },
-  { id: 3, name: '高等数学期末测试真题库', courseId: 103, questionCount: 3, description: '微积分计算经典测试题', updateTime: '2026-09-08' }
-];
-
 export function downloadMarkdownFile(title: string, questions: QuestionItem[], courseName: string) {
   const totalScore = calculateBankTotalScore(questions);
   const lines: string[] = [];
@@ -161,12 +155,8 @@ export function resolveCourseName(courses: Course[], courseId: number | string |
   if (!courseId) return '专业核心课';
   const c = courses.find((item) => String(item.id) === String(courseId));
   if (c) return c.title || (c as any).name || '专业核心课';
-  const staticNames: Record<string, string> = {
-    '101': '数据结构与算法',
-    '102': 'Java面向对象程序设计',
-    '103': '高等数学（上）'
-  };
-  return staticNames[String(courseId)] || '专业核心课';
+  // 找不到课程时不再用写死的 id → 名称映射冒充，统一回落到中性文案
+  return '专业核心课';
 }
 
 export function useBankList() {
@@ -284,9 +274,12 @@ export function useBankList() {
       });
       banks.value = res.data?.list || [];
       total.value = res.data?.total ?? banks.value.length;
-    } catch {
-      banks.value = FALLBACK_BANKS;
-      total.value = banks.value.length;
+    } catch (err) {
+      // 题库接口不可用时不再展示伪造的兜底题库（原 FALLBACK_BANKS 是演示数据），
+      // 否则用户会以为库里真有这些题集，点进去却查不到任何题目。
+      console.error('加载题库失败', err);
+      banks.value = [];
+      total.value = 0;
     } finally {
       loading.value = false;
     }

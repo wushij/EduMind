@@ -77,4 +77,40 @@ public class AiCallLogDao {
         }
         return result;
     }
+
+    /**
+     * 按调用场景分组统计次数（单次 GROUP BY 聚合）。
+     *
+     * <p>scene 在历史写入方存在大小写混用（CHAT / chat / QUESTION_GEN / question_generate），
+     * 因此统一用 {@code UPPER(TRIM(scene))} 归一后再分组；scene 为空的历史日志归入 UNKNOWN，
+     * 保证 SUM(结果) == 该课程时间窗内的真实调用总数。</p>
+     *
+     * @param courseId 课程 ID，为 null 表示不限定课程（全局统计）
+     * @param since    起始时间，可为 null
+     * @return scene（已大写归一） -> 调用次数
+     */
+    public Map<String, Long> countGroupByScene(Long courseId, LocalDateTime since) {
+        QueryWrapper<AiCallLogEntity> wrapper = new QueryWrapper<AiCallLogEntity>()
+                .select("COALESCE(UPPER(TRIM(scene)), 'UNKNOWN') AS scene", "COUNT(*) AS cnt")
+                .groupBy("COALESCE(UPPER(TRIM(scene)), 'UNKNOWN')");
+        if (courseId != null) {
+            wrapper.eq("course_id", courseId);
+        }
+        if (since != null) {
+            wrapper.ge("create_time", since);
+        }
+        List<Map<String, Object>> rows = aiCallLogMapper.selectMaps(wrapper);
+        if (rows == null || rows.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, Long> result = new HashMap<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            Object scene = row.get("scene");
+            Object count = row.get("cnt");
+            if (scene != null && count instanceof Number countValue) {
+                result.merge(scene.toString().toUpperCase(), countValue.longValue(), Long::sum);
+            }
+        }
+        return result;
+    }
 }

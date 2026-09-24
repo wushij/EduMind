@@ -17,6 +17,7 @@ import { createAIStreamSessionActions } from '@/composables/ai/useAIStreamSessio
 import { createAIStreamOperations } from '@/composables/ai/useAIStreamOperations';
 
 export type { ChatMessage, ChatSession, StreamOptions, LoadSessionsOptions };
+export type { NewSessionResult } from '@/composables/ai/useAIStreamSessions';
 
 export function useAIStream() {
   const sseClient = new SSEClient();

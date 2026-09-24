@@ -1,5 +1,6 @@
 import { ElMessage } from 'element-plus';
 import type { Ref } from 'vue';
+import { pickTurnMessage } from '@/utils/ai/follow-up-message';
 import {
   type ChatMessage,
   type ChatSession,
@@ -13,7 +14,7 @@ import {
   storeSessionId,
   clearStoredSessionId,
   buildSessionTitleFromPrompt,
-  generateSmartFollowUps,
+  requestFollowUps,
   fetchConversationList,
   fetchMessageList,
   createRemoteSession,
@@ -31,6 +32,12 @@ export type AIStreamSessionsDeps = {
   resetStreamingState: () => void;
   scrollToBottomInstant: () => void;
 };
+
+/** 新建会话的结果：reused 为 true 表示复用了已存在的空白会话，并未真正新建 */
+export interface NewSessionResult {
+  sessionId: string;
+  reused: boolean;
+}
 
 export function createAIStreamSessionActions(deps: AIStreamSessionsDeps) {
   const {
@@ -100,7 +107,16 @@ export function createAIStreamSessionActions(deps: AIStreamSessionsDeps) {
       }
       const lastUserMsg = [...messages.value].reverse().find((m) => m.role === 'user');
       if (lastUserMsg?.content) {
-        const prompts = generateSmartFollowUps(lastUserMsg.content, lastMsg.content);
+        const targetId = lastMsg.id;
+        const prompts = requestFollowUps(lastUserMsg.content, lastMsg.content, {
+          onUpdate: (next) => {
+            // 按 id 判定「仍然是当轮消息」，并通过数组里的代理对象回写（引用比较在响应式代理下不可靠）
+            const current = pickTurnMessage(messages.value, targetId);
+            if (!current) return;
+            current.followUpPrompts = next;
+            followUpPrompts.value = next;
+          }
+        });
         followUpPrompts.value = prompts;
         lastMsg.followUpPrompts = prompts;
       }
@@ -144,6 +160,9 @@ export function createAIStreamSessionActions(deps: AIStreamSessionsDeps) {
         return mapped;
       });
 
+      // 静默收敛历史里重复的空白会话（不阻塞首屏渲染）
+      void pruneDuplicateEmptySessions(courseId);
+
       if (!restoreLastSession) {
         currentSessionId.value = '';
         messages.value = [];
@@ -179,10 +198,62 @@ export function createAIStreamSessionActions(deps: AIStreamSessionsDeps) {
     }
   }
 
-  async function createNewSession(courseId?: number, force = false) {
-    if (!force && messages.value.length === 0 && !streaming.value) {
-      return;
+  /** 把目标空白会话置为当前会话（仅本地切换，不重复拉取消息） */
+  function activateSession(session: ChatSession, courseId?: number) {
+    sessions.value = [session, ...sessions.value.filter((s) => s.id !== session.id)];
+    currentSessionId.value = session.id;
+    storeSessionId(courseId, session.id);
+    messages.value = [];
+    followUpPrompts.value = [];
+    resetStreamingState();
+  }
+
+  /**
+   * 查找可复用的空白会话：
+   * 1. 当前会话本身就没有任何问答记录时，直接复用当前会话；
+   * 2. 否则回溯历史列表，找出「默认标题 + 服务端确认零消息」的空白会话。
+   * 目的：用户反复点击「新建问答会话」时不再无限生成空会话。
+   */
+  async function findReusableEmptySession(courseId?: number): Promise<ChatSession | null> {
+    const current = sessions.value.find((s) => s.id === currentSessionId.value);
+    if (current && messages.value.length === 0) {
+      return current;
     }
+
+    const candidates = sessions.value.filter(
+      (s) => s.id !== currentSessionId.value && isDefaultSessionTitle(s.title)
+    );
+
+    for (const candidate of candidates) {
+      // 本地草稿非空说明该会话已有未落库内容（如手动停止生成），不可复用
+      if (readMessageCache(courseId, candidate.id).length > 0) continue;
+      try {
+        const serverMsgs = await fetchMessageList(candidate.id);
+        if (serverMsgs.length === 0) return candidate;
+      } catch {
+        // 单个会话校验失败（网络抖动 / 权限）时跳过，不影响其余候选
+      }
+    }
+    return null;
+  }
+
+  async function createNewSession(
+    courseId?: number,
+    force = false
+  ): Promise<NewSessionResult | null> {
+    if (!force && messages.value.length === 0 && !streaming.value) {
+      return currentSessionId.value
+        ? { sessionId: currentSessionId.value, reused: true }
+        : null;
+    }
+
+    // 关键防线：已存在空白会话时不再新建，直接复用，避免历史列表被空会话刷屏
+    const reusable = await findReusableEmptySession(courseId);
+    if (reusable) {
+      activateSession(reusable, courseId);
+      return { sessionId: reusable.id, reused: true };
+    }
+
     try {
       const session = await createRemoteSession(courseId);
       sessions.value.unshift(session);
@@ -190,14 +261,54 @@ export function createAIStreamSessionActions(deps: AIStreamSessionsDeps) {
       storeSessionId(courseId, session.id);
       messages.value = [];
       followUpPrompts.value = [];
+      return { sessionId: session.id, reused: false };
     } catch {
       ElMessage.error('创建会话失败，请确认已登录且网络正常');
       throw new Error('create conversation failed');
     }
   }
 
-  async function startNewChat(courseId?: number) {
-    await createNewSession(courseId, true);
+  async function startNewChat(courseId?: number): Promise<NewSessionResult | null> {
+    return createNewSession(courseId, true);
+  }
+
+  /**
+   * 收敛历史里重复的空白会话：仅保留一条，其余「服务端确认零消息」的空白会话静默删除。
+   * 早期版本反复点「新建」会残留多条「新问答会话」，此处在列表加载后异步清理。
+   */
+  async function pruneDuplicateEmptySessions(courseId?: number) {
+    const candidates = sessions.value.filter((s) => isDefaultSessionTitle(s.title));
+    if (candidates.length <= 1) return;
+
+    const confirmedEmptyIds: string[] = [];
+    for (const candidate of candidates) {
+      if (readMessageCache(courseId, candidate.id).length > 0) continue;
+      try {
+        const serverMsgs = await fetchMessageList(candidate.id);
+        if (serverMsgs.length === 0) confirmedEmptyIds.push(candidate.id);
+      } catch {
+        // 校验失败时保留该会话，宁可留一条也不误删
+      }
+    }
+    if (confirmedEmptyIds.length <= 1) return;
+
+    const keepId = confirmedEmptyIds.includes(currentSessionId.value)
+      ? currentSessionId.value
+      : confirmedEmptyIds[0];
+    const removeIds = confirmedEmptyIds.filter((id) => id !== keepId);
+
+    await Promise.all(removeIds.map((id) => deleteRemoteSession(id).catch(() => undefined)));
+    removeIds.forEach((id) => {
+      clearMessageCache(courseId, id);
+      clearStoredSessionId(courseId, id);
+    });
+    sessions.value = sessions.value.filter((s) => !removeIds.includes(s.id));
+
+    // 极端情况下当前会话恰好是被清理的重复空白会话，回落到保留下来的那一条
+    if (removeIds.includes(currentSessionId.value)) {
+      currentSessionId.value = keepId;
+      storeSessionId(courseId, keepId);
+    }
   }
 
   async function switchSession(id: string, courseId?: number) {

@@ -4,7 +4,7 @@ import {
   filterInterventions,
   getInterventionTriggerLabel,
   getInterventionStatusLabel,
-  resolveCourseNameById
+  resolveCourseNameFromOptions
 } from './useIntervention';
 
 const sample: TeachingInterventionVO[] = [
@@ -57,7 +57,14 @@ describe('intervention label helpers', () => {
     expect(getInterventionStatusLabel('DISPATCHED')).toBe('已分发');
   });
 
-  it('resolves known course names', () => {
-    expect(resolveCourseNameById(101)).toBe('数据结构与算法');
+  it('resolves course names from the real course options', () => {
+    const options = [
+      { id: 101, name: '数据结构与算法' },
+      { id: 258, name: 'Java面向对象程序设计' }
+    ];
+    expect(resolveCourseNameFromOptions(options, 101)).toBe('数据结构与算法');
+    expect(resolveCourseNameFromOptions(options, 258)).toBe('Java面向对象程序设计');
+    expect(resolveCourseNameFromOptions(options, 999)).toBeUndefined();
+    expect(resolveCourseNameFromOptions(options, undefined)).toBeUndefined();
   });
 });

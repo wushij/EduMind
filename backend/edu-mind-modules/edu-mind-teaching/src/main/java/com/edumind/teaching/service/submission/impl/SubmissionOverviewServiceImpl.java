@@ -2,7 +2,10 @@ package com.edumind.teaching.service.submission.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.edumind.common.api.PageResult;
+import com.edumind.common.api.ResultCode;
 import com.edumind.common.exception.BusinessException;
+import com.edumind.course.api.CourseAccessApi;
+import com.edumind.course.api.CourseDataScope;
 import com.edumind.course.api.CourseQueryApi;
 import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.system.api.OrganizationQueryApi;
@@ -27,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,6 +44,7 @@ public class SubmissionOverviewServiceImpl implements SubmissionOverviewService 
     private final UserQueryApi userQueryApi;
     private final OrganizationQueryApi organizationQueryApi;
     private final CourseQueryApi courseQueryApi;
+    private final CourseAccessApi courseAccessApi;
     private final GradingService gradingService;
 
     @Override
@@ -47,7 +52,17 @@ public class SubmissionOverviewServiceImpl implements SubmissionOverviewService 
                                                       Long page, Long pageSize) {
         long pageNum = page != null && page > 0 ? page : 1L;
         long size = pageSize != null && pageSize > 0 ? pageSize : 10L;
-        QueryScope scope = resolveScope(courseId, assignmentId, keyword);
+
+        // 数据范围收敛：答卷列表必须限定在「当前用户可见课程」的作业范围内，
+        // 否则不传 courseId 时会返回全库学生答卷（含成绩），属严重越权读取。
+        CourseDataScope dataScope = courseAccessApi.resolveCurrentDataScope();
+        if (dataScope.isEmpty()) {
+            return PageResult.empty(pageNum, size);
+        }
+        assertCourseAccessible(dataScope, courseId);
+        assertAssignmentAccessible(dataScope, assignmentId);
+
+        QueryScope scope = resolveScope(visibleCourseIdsOrNull(dataScope), courseId, assignmentId, keyword);
 
         Page<SubmissionEntity> result = submissionDao.pageQuery(
                 scope.assignmentIds(), assignmentId, status, null,
@@ -73,8 +88,15 @@ public class SubmissionOverviewServiceImpl implements SubmissionOverviewService 
 
     @Override
     public SubmissionOverviewStatsVO getStats(Long courseId, Long assignmentId) {
-        QueryScope scope = resolveScope(courseId, assignmentId, null);
         SubmissionOverviewStatsVO stats = new SubmissionOverviewStatsVO();
+        // 统计口径必须与列表一致，否则会出现"卡片统计全库、列表只剩自己的"矛盾数据
+        CourseDataScope dataScope = courseAccessApi.resolveCurrentDataScope();
+        if (dataScope.isEmpty()) {
+            return stats;
+        }
+        assertCourseAccessible(dataScope, courseId);
+        assertAssignmentAccessible(dataScope, assignmentId);
+        QueryScope scope = resolveScope(visibleCourseIdsOrNull(dataScope), courseId, assignmentId, null);
         stats.setTotal(submissionDao.countByScope(scope.assignmentIds(), assignmentId, null, null,
                 scope.keywordAssignmentIds(), scope.keywordStudentIds()));
         stats.setSubmittedCount(submissionDao.countByScope(scope.assignmentIds(), assignmentId, "SUBMITTED", null,
@@ -92,14 +114,27 @@ public class SubmissionOverviewServiceImpl implements SubmissionOverviewService 
             throw new BusinessException("请求参数不能为空");
         }
         boolean force = Boolean.TRUE.equals(dto.getForceRegrade());
+
+        CourseDataScope dataScope = courseAccessApi.resolveCurrentDataScope();
+        if (dataScope.isEmpty()) {
+            return 0;
+        }
+        assertCourseAccessible(dataScope, dto.getCourseId());
+        assertAssignmentAccessible(dataScope, dto.getAssignmentId());
+
         List<SubmissionEntity> targets;
         if (!CollectionUtils.isEmpty(dto.getSubmissionIds())) {
+            // 按显式提交 ID 批量批改：逐条剔除不在可见范围内的答卷，
+            // 防止通过遍历 ID 越权调用 AI 批改并覆盖他人课程的成绩
+            Set<Long> allowedAssignmentIds = visibleAssignmentIds(dataScope);
             targets = dto.getSubmissionIds().stream()
                     .map(submissionDao::findById)
                     .filter(e -> e != null && (force || "SUBMITTED".equals(e.getStatus())))
+                    .filter(e -> allowedAssignmentIds == null || allowedAssignmentIds.contains(e.getAssignmentId()))
                     .toList();
         } else {
-            QueryScope scope = resolveScope(dto.getCourseId(), dto.getAssignmentId(), null);
+            QueryScope scope = resolveScope(visibleCourseIdsOrNull(dataScope), dto.getCourseId(),
+                    dto.getAssignmentId(), null);
             String targetStatus = force ? null : "SUBMITTED";
             targets = submissionDao.listByScope(scope.assignmentIds(), dto.getAssignmentId(), targetStatus, null,
                     scope.keywordAssignmentIds(), scope.keywordStudentIds());
@@ -122,20 +157,34 @@ public class SubmissionOverviewServiceImpl implements SubmissionOverviewService 
         return success;
     }
 
-    private QueryScope resolveScope(Long courseId, Long assignmentId, String keyword) {
+    /**
+     * 解析答卷查询范围。
+     *
+     * @param visibleCourseIds 当前用户可见课程集合；null 表示不限（平台/租户管理员）。
+     *                         未指定具体作业时用它收敛到「可见课程下的作业」，避免全库答卷泄露
+     */
+    private QueryScope resolveScope(List<Long> visibleCourseIds, Long courseId, Long assignmentId, String keyword) {
         List<Long> assignmentIds = null;
         List<Long> keywordAssignmentIds = null;
         List<Long> keywordStudentIds = null;
 
-        if (assignmentId == null && courseId != null) {
-            assignmentIds = assignmentDao.listByCourseId(courseId).stream()
-                    .map(AssignmentEntity::getId)
-                    .collect(Collectors.toList());
+        if (assignmentId == null) {
+            if (courseId != null) {
+                assignmentIds = assignmentDao.listByCourseId(courseId).stream()
+                        .map(AssignmentEntity::getId)
+                        .collect(Collectors.toList());
+            } else if (visibleCourseIds != null) {
+                assignmentIds = assignmentDao.listByCourseIds(visibleCourseIds).stream()
+                        .map(AssignmentEntity::getId)
+                        .collect(Collectors.toList());
+            }
         }
 
         if (StringUtils.hasText(keyword)) {
             String kw = keyword.trim();
-            keywordAssignmentIds = assignmentDao.pageQuery(courseId, null, kw, 1, 500).getRecords().stream()
+            // 关键字检索只按可见课程/课程收敛，不限作业状态（status 传 null），取前 500 条命中作业即可
+            keywordAssignmentIds = assignmentDao.pageQuery(courseId, visibleCourseIds, null, kw, 1, 500)
+                    .getRecords().stream()
                     .map(AssignmentEntity::getId)
                     .toList();
             keywordStudentIds = userQueryApi.findUserIdsByKeyword(kw);
@@ -244,6 +293,42 @@ public class SubmissionOverviewServiceImpl implements SubmissionOverviewService 
             vo.setStudentNo(org.getMemberNo());
         } else if (user != null) {
             vo.setStudentNo(user.getUsername());
+        }
+    }
+
+    /** 数据范围折算成 DAO 过滤参数：null 表示不限（平台/租户管理员） */
+    private List<Long> visibleCourseIdsOrNull(CourseDataScope dataScope) {
+        return dataScope.isAll() ? null : new ArrayList<>(dataScope.getCourseIds());
+    }
+
+    /** 当前可见课程下的作业 ID 集合；null 表示不限（平台/租户管理员） */
+    private Set<Long> visibleAssignmentIds(CourseDataScope dataScope) {
+        if (dataScope.isAll()) {
+            return null;
+        }
+        return assignmentDao.listByCourseIds(dataScope.getCourseIds()).stream()
+                .map(AssignmentEntity::getId)
+                .collect(Collectors.toSet());
+    }
+
+    /** 显式指定的 courseId 必须落在可见范围内，否则视为越权读取 */
+    private void assertCourseAccessible(CourseDataScope dataScope, Long courseId) {
+        if (courseId != null && !dataScope.contains(courseId)) {
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权访问该课程的答卷数据");
+        }
+    }
+
+    /** 显式指定的作业必须落在可见范围内，否则视为越权读取 */
+    private void assertAssignmentAccessible(CourseDataScope dataScope, Long assignmentId) {
+        if (assignmentId == null) {
+            return;
+        }
+        AssignmentEntity entity = assignmentDao.findById(assignmentId);
+        if (entity == null) {
+            throw new BusinessException("作业不存在");
+        }
+        if (!dataScope.contains(entity.getCourseId())) {
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权访问该作业的答卷数据");
         }
     }
 

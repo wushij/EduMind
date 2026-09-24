@@ -66,12 +66,13 @@ export const questionRoutes: RouteRecordRaw[] = [
     meta: { title: '试卷导出中心', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
   },
 
-  // 作业管理
+  // 作业管理（教师/管理员专属：页面承载全班提交进度、批改与删除等教学管理能力；
+  // 学生侧作业入口是 /learning/tasks 与 /learning/assignments/:id/take）
   {
     path: '/question/assignments',
     name: 'AssignmentList',
     component: () => import('@/views/question/assignments/AssignmentList.vue'),
-    meta: { title: '平时作业', requiresAuth: true }
+    meta: { title: '平时作业', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
   },
   {
     path: '/question/assignments/create',
@@ -83,20 +84,20 @@ export const questionRoutes: RouteRecordRaw[] = [
     path: '/question/assignments/:id',
     name: 'AssignmentDetail',
     component: () => import('@/views/question/assignments/AssignmentDetail.vue'),
-    meta: { title: '作业详情', requiresAuth: true }
+    meta: { title: '作业详情', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
   },
 
-  // 作业批阅与提交
+  // 作业批阅与提交（全班答卷含成绩，属教师/管理员批改场景，后端接口同样要求 assignment:grade）
   {
     path: '/question/submissions',
     name: 'SubmissionList',
     component: () => import('@/views/question/submissions/SubmissionList.vue'),
-    meta: { title: '提交记录与批阅', requiresAuth: true }
+    meta: { title: '提交记录与批阅', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
   },
   {
     path: '/question/submissions/:id',
     name: 'SubmissionDetail',
     component: () => import('@/views/question/submissions/SubmissionDetail.vue'),
-    meta: { title: '作答批阅详情', requiresAuth: true }
+    meta: { title: '作答批阅详情', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
   }
 ];

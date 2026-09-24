@@ -35,12 +35,14 @@ public class LearningAnalyticsController {
     @GetMapping
     public ApiResult<LearningAnalyticsVO> getLearningAnalytics(
             @RequestParam Long courseId,
-            @RequestParam(defaultValue = "7d") String range,
-            @RequestParam(required = false) Long classId) {
+            @RequestParam(defaultValue = "30d") String range,
+            @RequestParam(required = false) Long classId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate endDate) {
         if (!isTeacherOrAdmin()) {
             throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "仅教师或管理员可以查看班级整体学情分析");
         }
-        return ApiResult.success(learningAnalyticsService.getLearningAnalytics(courseId, range, classId));
+        return ApiResult.success(learningAnalyticsService.getLearningAnalytics(courseId, range, classId, startDate, endDate));
     }
 
     /**

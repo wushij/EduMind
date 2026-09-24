@@ -13,12 +13,13 @@ import {
 import { useWrongQuestions } from '@/composables/learning/useWrongQuestions';
 import type { WrongBookDetailVO, WrongQuestionRecordItem } from '@/types/learning/wrong-question';
 
-export function useWrongQuestionsPage(defaultCourseId = 102) {
+export function useWrongQuestionsPage(defaultCourseId?: number) {
   const router = useRouter();
   const route = useRoute();
 
   const courseOptions = ref<Array<{ id: number; name: string }>>([]);
-  const teacherCourseId = ref<number>(defaultCourseId);
+  // 0 表示「课程上下文尚未就绪」：此时不请求错题接口，也不伪造课程，页面转为空态提示。
+  const teacherCourseId = ref<number>(defaultCourseId ?? 0);
   const hasEnrolledCourses = ref(true);
   const coursesLoading = ref(false);
 
@@ -77,12 +78,16 @@ export function useWrongQuestionsPage(defaultCourseId = 102) {
       } else {
         hasEnrolledCourses.value = false;
         courseOptions.value = [];
+        teacherCourseId.value = 0;
+        courseId.value = 0;
       }
     } catch {
-      hasEnrolledCourses.value = true;
-      courseOptions.value = [{ id: defaultCourseId, name: `课程 #${defaultCourseId}` }];
-      teacherCourseId.value = defaultCourseId;
-      courseId.value = defaultCourseId;
+      // 课程接口不可用时不再伪造「课程 #102」这类兜底项：
+      // 否则会拿着写死的课程 id 去查错题，页面看起来有数据但其实是别的课程。
+      hasEnrolledCourses.value = false;
+      courseOptions.value = [];
+      teacherCourseId.value = 0;
+      courseId.value = 0;
     } finally {
       coursesLoading.value = false;
     }
@@ -312,7 +317,8 @@ export function useWrongQuestionsPage(defaultCourseId = 102) {
 
   onMounted(async () => {
     await loadCourseOptions();
-    if (hasEnrolledCourses.value) {
+    // 课程上下文就绪后才拉取错题；无课程时页面走空态提示，而不是拿写死的课程 id 请求
+    if (hasEnrolledCourses.value && courseId.value > 0) {
       await fetchList();
     }
   });

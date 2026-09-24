@@ -13,6 +13,7 @@ import {
 import { bindMarkdownCodeCopy, renderMermaidInElement } from '@/utils/ai/chat-markdown';
 import type { CitationItem } from '@/types/ai/assistant';
 import { getDefaultReasoningFolded } from '@/utils/ai/thinking-display';
+import { pickTurnMessage } from '@/utils/ai/follow-up-message';
 import {
   type ChatMessage,
   type ChatSession,
@@ -21,7 +22,7 @@ import {
   persistMessageCache,
   storeSessionId,
   buildSessionTitleFromPrompt,
-  generateSmartFollowUps,
+  requestFollowUps,
   deleteRemoteMessage,
   renameRemoteSession,
   streamAssistantChat,
@@ -60,13 +61,17 @@ export type AIStreamOperationsDeps = {
   ) => Promise<void>;
   refreshSessionsMeta: (courseId?: number) => Promise<void>;
   loadSessions: (courseId?: number, options?: import('@/services/ai/stream-service').LoadSessionsOptions) => Promise<void>;
-  createNewSession: (courseId?: number, force?: boolean) => Promise<void>;
+  createNewSession: (
+    courseId?: number,
+    force?: boolean
+  ) => Promise<import('@/composables/ai/useAIStreamSessions').NewSessionResult | null>;
 };
 
 export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
   const getInitialReasoningFolded = getDefaultReasoningFolded;
   const currentStreamingMemories = ref<Array<{ id: number; summary: string; memoryType?: string }>>([]);
   let activeChatStreamId = '';
+  let currentTurnSettled = false;
 
   function clearActiveChatStreamId() {
     activeChatStreamId = '';
@@ -102,8 +107,7 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
       }
     }
 
-    const followUps = generateSmartFollowUps(promptText, finalAnswer);
-    deps.messages.value.push({
+    const assistantMessage: ChatMessage = {
       id: serverIds?.messageId || `ai_${Date.now()}`,
       role: 'assistant',
       content: finalAnswer.trim() || '已处理你的课程学习咨询。',
@@ -111,12 +115,34 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
       createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       citations: [...deps.streamingCitations.value],
       recalledMemories: [...currentStreamingMemories.value],
-      followUpPrompts: followUps
+      followUpPrompts: []
+    };
+
+    // 追问：模型结果异步到达后才回写（拿不到就静默回落到规则生成）
+    const followUps = requestFollowUps(promptText, finalAnswer, {
+      onUpdate: (prompts) => {
+        // 用 pickTurnMessage 按 id 拿「数组里的代理对象」回写：
+        // 直接与原始对象做引用比较会恒为 false（响应式代理），表现就是「追问要刷新才出现」
+        const current = pickTurnMessage(deps.messages.value, assistantMessage.id);
+        if (!current) return;
+        current.followUpPrompts = prompts;
+        deps.followUpPrompts.value = prompts;
+        persistMessageCache(
+          deps.activeStreamCourseId.value,
+          deps.currentSessionId.value,
+          deps.messages.value
+        );
+      }
     });
+    assistantMessage.followUpPrompts = followUps;
+    deps.messages.value.push(assistantMessage);
     currentStreamingMemories.value = [];
 
+    currentTurnSettled = true;
     deps.followUpPrompts.value = followUps;
     deps.resetStreamingState();
+    // 关键修复：一旦回答结算入库，流式状态必须立即置为 false，消除正在进行的思考气泡
+    deps.streaming.value = false;
     persistMessageCache(
       deps.activeStreamCourseId.value,
       deps.currentSessionId.value,
@@ -224,6 +250,7 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
     if (!text || deps.streaming.value) return;
 
     deps.activeStreamCourseId.value = courseId;
+    currentTurnSettled = false;
 
     if (!deps.currentSessionId.value) {
       await deps.createNewSession(courseId, true);
@@ -262,7 +289,7 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
 
     try {
       const streamed = await streamAssistantChatLocal(text, courseId, options);
-      if (deps.userStoppedGeneration.value) return;
+      if (deps.userStoppedGeneration.value || currentTurnSettled) return;
       if (!streamed && !deps.streamingContent.value) {
         try {
           await fallbackAsk(text, courseId);
@@ -273,7 +300,7 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
         }
       }
     } catch (err: unknown) {
-      if (deps.userStoppedGeneration.value) return;
+      if (deps.userStoppedGeneration.value || currentTurnSettled) return;
       if (options?.isRegenerate) {
         const errorMsg = err instanceof Error ? err.message : '服务繁忙，请稍后重试';
         deps.messages.value.push({
@@ -311,12 +338,18 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
         storeSessionId(courseId, deps.currentSessionId.value);
         if (wasStopped) {
           persistMessageCache(courseId, deps.currentSessionId.value, deps.messages.value);
-          await deps.refreshSessionsMeta(courseId);
+          try {
+            await deps.refreshSessionsMeta(courseId);
+          } catch {}
         } else {
-          await deps.syncSessionTitleIfDefaultLocal(deps.currentSessionId.value, text, {
-            tryLlmTitle: true
-          });
-          await deps.refreshSessionsMeta(courseId);
+          try {
+            await deps.syncSessionTitleIfDefaultLocal(deps.currentSessionId.value, text, {
+              tryLlmTitle: true
+            });
+          } catch {}
+          try {
+            await deps.refreshSessionsMeta(courseId);
+          } catch {}
           persistMessageCache(courseId, deps.currentSessionId.value, deps.messages.value);
         }
       }

@@ -31,11 +31,9 @@
       <!-- 过滤与工具控制栏 -->
       <div class="filter-card">
         <div class="filter-left">
-          <el-select v-model="courseFilter" placeholder="关联课程" clearable style="width: 200px;">
+          <el-select v-model="courseFilter" placeholder="关联课程" clearable filterable style="width: 220px;">
             <el-option label="全部课程" :value="undefined" />
-            <el-option label="高等数学（上）" :value="102" />
-            <el-option label="数据结构与算法" :value="101" />
-            <el-option label="高中物理必修第一册" :value="103" />
+            <el-option v-for="c in courseOptions" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
 
           <el-select v-model="triggerFilter" placeholder="预警触发动因" clearable style="width: 180px;">
@@ -181,10 +179,8 @@
     <el-dialog v-model="createDialogVisible" title="新建教学干预提案" width="560px" destroy-on-close>
       <el-form ref="createFormRef" :model="createForm" label-position="top">
         <el-form-item label="关联课程">
-          <el-select v-model="createForm.courseId" placeholder="选择关联课程" style="width: 100%" @change="onCourseChange">
-            <el-option label="高等数学（上）" :value="102" />
-            <el-option label="数据结构与算法" :value="101" />
-            <el-option label="高中物理必修第一册" :value="103" />
+          <el-select v-model="createForm.courseId" placeholder="选择关联课程" filterable style="width: 100%" @change="onCourseChange">
+            <el-option v-for="c in courseOptions" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-form-item>
 
@@ -231,6 +227,7 @@ import { useIntervention } from '@/composables/analytics/useIntervention';
 
 const {
   loading,
+  courseOptions,
   courseFilter,
   triggerFilter,
   statusFilter,

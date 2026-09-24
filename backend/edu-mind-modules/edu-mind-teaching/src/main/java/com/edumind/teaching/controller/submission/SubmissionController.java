@@ -29,7 +29,8 @@ public class SubmissionController {
     private final GradingService gradingService;
     private final SubmissionOverviewService submissionOverviewService;
 
-    @SaCheckPermission("assignment:view")
+    /** 全班答卷总览（含成绩与学号）属批改场景，仅教师/管理员可读；学生读取自己的答卷走 GET /{id} */
+    @SaCheckPermission("assignment:grade")
     @GetMapping
     public ApiResult<PageResult<SubmissionListItemVO>> pageQuery(
             @RequestParam(value = "courseId", required = false) Long courseId,
@@ -42,7 +43,8 @@ public class SubmissionController {
                 courseId, assignmentId, status, keyword, page, pageSize));
     }
 
-    @SaCheckPermission("assignment:view")
+    /** 批改看板统计（待批改 / 已批改 / 已终审），同样仅教师/管理员可读 */
+    @SaCheckPermission("assignment:grade")
     @GetMapping("/stats")
     public ApiResult<SubmissionOverviewStatsVO> stats(
             @RequestParam(value = "courseId", required = false) Long courseId,

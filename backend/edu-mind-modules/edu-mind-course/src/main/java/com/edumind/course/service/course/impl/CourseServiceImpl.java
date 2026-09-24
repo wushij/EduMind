@@ -3,8 +3,8 @@ package com.edumind.course.service.course.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.edumind.common.api.PageResult;
-import com.edumind.common.enums.RoleCode;
 import com.edumind.common.exception.BusinessException;
+import com.edumind.course.api.CourseDataScope;
 import com.edumind.course.converter.CourseConverter;
 import com.edumind.course.dao.CourseDao;
 import com.edumind.course.dao.CourseMemberDao;
@@ -24,24 +24,18 @@ import com.edumind.course.service.course.CourseService;
 import com.edumind.course.vo.course.CourseDetailVO;
 import com.edumind.course.vo.course.CourseVO;
 import com.edumind.course.vo.knowledge.KnowledgePointVO;
-import com.edumind.system.api.OrganizationQueryApi;
-import com.edumind.system.api.TenantDataScope;
-import com.edumind.system.api.TenantDataScopeApi;
 import com.edumind.system.api.UserQueryApi;
 import com.edumind.system.vo.user.UserBriefVO;
 import com.edumind.common.context.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -56,61 +50,23 @@ public class CourseServiceImpl implements CourseService {
     private final com.edumind.resource.api.ResourceCommandApi resourceCommandApi;
     private final CourseConverter courseConverter;
     private final UserQueryApi userQueryApi;
-    private final TenantDataScopeApi tenantDataScopeApi;
-    private final OrganizationQueryApi organizationQueryApi;
     private final CourseAccessService courseAccessService;
     private final KnowledgePointService knowledgePointService;
 
     @Override
     public PageResult<CourseVO> listCourses(CourseQueryDTO query) {
-        Long currentUserId = StpUtil.getLoginIdAsLong();
-        Long tenantId = TenantContext.getTenantId();
-        TenantDataScope scope = tenantDataScopeApi.resolve(currentUserId, tenantId);
+        // 可见课程范围统一由 CourseAccessService 解析：作业/答卷/学情等模块共用同一口径，
+        // 禁止在此处另写一套过滤条件（曾经课程中心过滤、作业列表全量返回，导致越权可见）。
+        CourseDataScope dataScope = courseAccessService.resolveCurrentDataScope();
 
         Page<CourseEntity> page;
-        if (scope.isAllTenant()) {
+        if (dataScope.isAll()) {
             page = courseDao.pageQueryAll(query);
         } else {
-            List<String> roles = userQueryApi.getRolesByUserId(currentUserId);
-            // 纯学生：课程中心仅展示已加入（选课）的课程，不按院系扩散教师开课
-            if (isStudentOnlyRole(roles)) {
-                List<Long> enrolledIds = courseMemberDao.findCourseIdsByUserId(currentUserId);
-                if (CollectionUtils.isEmpty(enrolledIds)) {
-                    return PageResult.empty(defaultPage(query), defaultPageSize(query));
-                }
-                page = courseDao.pageQuery(query, enrolledIds);
-            } else {
-                Set<Long> allowedCourseIds = new HashSet<>(scope.getCourseIds());
-                if (roles != null && roles.contains(RoleCode.TEACHER.getCode())) {
-                    List<Long> teacherCourseIds = courseDao.findByTeacherId(currentUserId).stream()
-                            .map(CourseEntity::getId)
-                            .collect(Collectors.toList());
-                    allowedCourseIds.addAll(teacherCourseIds);
-                }
-                if (roles != null && roles.contains(RoleCode.STUDENT.getCode())) {
-                    allowedCourseIds.addAll(courseMemberDao.findCourseIdsByUserId(currentUserId));
-                }
-                // 院系管理员 / 教研负责人：包含所属组织及子树下成员所授课程（学生身份不进入此分支）
-                if (canExpandOrgTeacherCourses(roles)
-                        && scope.getOrgIds() != null
-                        && !scope.getOrgIds().isEmpty()) {
-                    for (Long orgId : scope.getOrgIds()) {
-                        List<Long> userIds = organizationQueryApi.listUserIdsByOrgId(tenantId, orgId);
-                        if (!CollectionUtils.isEmpty(userIds)) {
-                            for (Long uid : userIds) {
-                                allowedCourseIds.addAll(courseDao.findByTeacherId(uid).stream()
-                                        .map(CourseEntity::getId)
-                                        .collect(Collectors.toList()));
-                            }
-                        }
-                    }
-                }
-
-                if (allowedCourseIds.isEmpty()) {
-                    return PageResult.empty(defaultPage(query), defaultPageSize(query));
-                }
-                page = courseDao.pageQuery(query, new ArrayList<>(allowedCourseIds));
+            if (dataScope.isEmpty()) {
+                return PageResult.empty(defaultPage(query), defaultPageSize(query));
             }
+            page = courseDao.pageQuery(query, new ArrayList<>(dataScope.getCourseIds()));
         }
 
         Map<Long, UserBriefVO> teacherCache = new HashMap<>();
@@ -391,27 +347,5 @@ public class CourseServiceImpl implements CourseService {
 
     private long defaultPageSize(CourseQueryDTO query) {
         return query.getPageSize() != null && query.getPageSize() > 0 ? query.getPageSize() : 10L;
-    }
-
-    /** 仅学生身份（无管理/教师全局角色） */
-    private boolean isStudentOnlyRole(List<String> roles) {
-        if (roles == null || roles.isEmpty()) {
-            return false;
-        }
-        if (roles.contains(RoleCode.ADMIN.getCode())
-                || roles.contains("PLATFORM_ADMIN")
-                || roles.contains(RoleCode.TENANT_ADMIN.getCode())
-                || roles.contains(RoleCode.ORG_ADMIN.getCode())
-                || roles.contains(RoleCode.TEACHER.getCode())) {
-            return false;
-        }
-        return roles.contains(RoleCode.STUDENT.getCode());
-    }
-
-    private boolean canExpandOrgTeacherCourses(List<String> roles) {
-        if (roles == null) {
-            return false;
-        }
-        return roles.contains(RoleCode.ORG_ADMIN.getCode());
     }
 }

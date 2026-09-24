@@ -61,11 +61,27 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
 
     @Override
     public LearningAnalyticsVO getLearningAnalytics(Long courseId, String range, Long classId) {
+        return getLearningAnalytics(courseId, range, classId, null, null);
+    }
+
+    @Override
+    public LearningAnalyticsVO getLearningAnalytics(Long courseId, String range, Long classId, LocalDate customStartDate, LocalDate customEndDate) {
         LearningAnalyticsVO vo = new LearningAnalyticsVO();
         vo.setCourseId(courseId);
-        LocalDateTime since = resolveSince(range);
-        LocalDate startDate = since != null ? since.toLocalDate() : LocalDate.now().minusDays(7);
-        LocalDate endDate = LocalDate.now();
+
+        LocalDate startDate;
+        LocalDate endDate;
+        LocalDateTime since;
+
+        if (customStartDate != null && customEndDate != null) {
+            startDate = customStartDate;
+            endDate = customEndDate;
+            since = customStartDate.atStartOfDay();
+        } else {
+            since = resolveSince(range);
+            startDate = since != null ? since.toLocalDate() : LocalDate.now().minusDays(30);
+            endDate = LocalDate.now();
+        }
 
         // 1. 优先读取 course_statistics 预聚合表 (PRD §34 高性能报表查询)
         List<com.edumind.statistics.entity.CourseStatisticsEntity> preAggStats = courseId != null
@@ -124,13 +140,23 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
             }
         }
 
-        buildTrends(vo, records, statByDate, since);
+        buildTrends(vo, records, statByDate, startDate, endDate);
         if (vo.getAggregated() == null) {
             vo.setAggregated(false);
         }
 
         // 组装班级选课学生学情明细列表 (供班级整体分析学生榜单)
         vo.setStudents(buildStudentRoster(courseId, submissionStats, since));
+
+        // 组装课程深入分析专用维度（章节进度、健康度雷达、薄弱考点）
+        buildCourseDeepInsights(vo, courseId, enrolledStudentIds, submissionStats, records);
+
+        // 数据更新时间：取统计范围内最近一次真实学习行为，避免用前端本地时间冒充
+        records.stream()
+                .map(LearningRecordEntity::getCreateTime)
+                .filter(Objects::nonNull)
+                .max(LocalDateTime::compareTo)
+                .ifPresent(t -> vo.setDataUpdatedAt(t.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))));
 
         return vo;
     }
@@ -488,44 +514,290 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         radar.setClassAvgScores(newClass);
     }
 
+    /**
+     * 构建学习活跃度与成绩演进趋势。
+     *
+     * <p>全部指标来自真实数据聚合，某天没有数据就如实留空，不再用正弦波拟合或
+     * "选课人数 × 系数"模拟：</p>
+     * <ul>
+     *   <li>活跃人数：course_statistics 日快照 -> learning_record 去重学生数 -> 0</li>
+     *   <li>班级均分：课程作业提交按提交日真实聚合（与"班级平均分"KPI 同源同口径）</li>
+     *   <li>全校对照：全平台作业提交按提交日真实聚合</li>
+     * </ul>
+     */
     private void buildTrends(LearningAnalyticsVO vo,
                             List<LearningRecordEntity> records,
                             Map<LocalDate, com.edumind.statistics.entity.CourseStatisticsEntity> statByDate,
-                            LocalDateTime since) {
+                            LocalDate startDate,
+                            LocalDate endDate) {
         Map<LocalDate, Set<Long>> dailyUsers = records.stream()
+                .filter(r -> r.getCreateTime() != null && r.getStudentId() != null)
                 .collect(Collectors.groupingBy(
                         r -> r.getCreateTime().toLocalDate(),
                         Collectors.mapping(LearningRecordEntity::getStudentId, Collectors.toSet())));
+
+        Map<LocalDate, Double> classDailyScore = toDailyScoreMap(
+                submissionQueryApi.listDailyAvgScores(vo.getCourseId(), startDate, endDate));
+        Map<LocalDate, Double> schoolDailyScore = toDailyScoreMap(
+                submissionQueryApi.listDailyAvgScores(null, startDate, endDate));
+
         DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE;
-        LocalDate start = since != null ? since.toLocalDate() : LocalDate.now().minusDays(7);
-        for (LocalDate d = start; !d.isAfter(LocalDate.now()); d = d.plusDays(1)) {
+        for (LocalDate d = startDate; !d.isAfter(endDate); d = d.plusDays(1)) {
             LearningAnalyticsVO.TrendPoint tp = new LearningAnalyticsVO.TrendPoint();
             tp.setDate(d.format(fmt));
+            com.edumind.statistics.entity.CourseStatisticsEntity stat = statByDate.get(d);
+            if (stat != null && stat.getStudentCount() != null && stat.getStudentCount() > 0) {
+                tp.setActiveUsers(stat.getStudentCount());
+            } else {
+                tp.setActiveUsers(dailyUsers.getOrDefault(d, Collections.emptySet()).size());
+            }
 
             LearningAnalyticsVO.ScoreTrendPoint sp = new LearningAnalyticsVO.ScoreTrendPoint();
             sp.setDate(d.format(fmt));
-
-            // 优先读取日聚合表数据
-            if (statByDate.containsKey(d)) {
-                com.edumind.statistics.entity.CourseStatisticsEntity stat = statByDate.get(d);
-                tp.setActiveUsers(stat.getStudentCount() != null ? stat.getStudentCount() : 0);
-                sp.setAvgScore(stat.getAvgScore() != null ? stat.getAvgScore().doubleValue() : vo.getAvgScore());
-            } else {
-                tp.setActiveUsers(dailyUsers.getOrDefault(d, Set.of()).size());
-                sp.setAvgScore(vo.getAvgScore());
-            }
+            sp.setAvgScore(classDailyScore.get(d));
+            sp.setSchoolAvgScore(schoolDailyScore.get(d));
             vo.getTrends().getLearning().add(tp);
             vo.getTrends().getScore().add(sp);
         }
     }
 
+    /** 把按日聚合结果转换为 date -> 均分映射，便于趋势逐日取值 */
+    private Map<LocalDate, Double> toDailyScoreMap(List<SubmissionStatsVO.DailyScoreVO> dailyScores) {
+        Map<LocalDate, Double> map = new HashMap<>();
+        if (dailyScores == null) {
+            return map;
+        }
+        for (SubmissionStatsVO.DailyScoreVO item : dailyScores) {
+            if (item == null || item.getDate() == null || item.getAvgScore() == null) {
+                continue;
+            }
+            try {
+                map.put(LocalDate.parse(item.getDate()), item.getAvgScore());
+            } catch (Exception e) {
+                log.warn("Skip malformed daily score date: {}", item.getDate());
+            }
+        }
+        return map;
+    }
+
+    /**
+     * 组装课程深入分析维度（章节学习覆盖、课程质效 5 维、薄弱考点）。
+     *
+     * <p>所有分项均来自真实数据：章节维度把 learning_record.chapter_id 按顶层章上卷；
+     * 质效指数取真实的章节覆盖、提交率、活跃学生、及格率与 AI 渗透率；
+     * 薄弱考点只保留有真实掌握度记录的知识点。历史实现这里是按章节序号递减的公式、
+     * 硬编码 92 分大纲覆盖与编造的错题数，属于伪数据。</p>
+     */
+    private void buildCourseDeepInsights(LearningAnalyticsVO vo,
+                                         Long courseId,
+                                         List<Long> enrolledStudentIds,
+                                         SubmissionStatsVO submissionStats,
+                                         List<LearningRecordEntity> records) {
+        if (courseId == null) {
+            return;
+        }
+        int totalStudents = Math.max(1, enrolledStudentIds.size());
+        Set<Long> enrolledSet = new HashSet<>(enrolledStudentIds);
+
+        // 1. 章节维度：learning_record 可能挂在顶层章或微课节，统一上卷到顶层章
+        List<com.edumind.course.vo.chapter.ChapterTreeVO> chapters = Collections.emptyList();
+        try {
+            List<com.edumind.course.vo.chapter.ChapterTreeVO> loaded = courseQueryApi.listChaptersByCourseId(courseId);
+            if (loaded != null) {
+                chapters = loaded;
+            }
+        } catch (Exception e) {
+            log.warn("Failed to load chapters for course {}: {}", courseId, e.getMessage());
+        }
+
+        Map<Long, Set<Long>> chapterScope = new LinkedHashMap<>();
+        for (com.edumind.course.vo.chapter.ChapterTreeVO top : chapters) {
+            Set<Long> scope = new LinkedHashSet<>();
+            scope.add(top.getId());
+            if (top.getChildren() != null) {
+                for (com.edumind.course.vo.chapter.ChapterTreeVO child : top.getChildren()) {
+                    scope.add(child.getId());
+                }
+            }
+            chapterScope.put(top.getId(), scope);
+        }
+
+        Map<Long, Set<Long>> studentsByChapter = new HashMap<>();
+        Map<Long, Integer> minutesByChapter = new HashMap<>();
+        for (LearningRecordEntity r : records) {
+            if (r.getChapterId() == null || r.getStudentId() == null || !enrolledSet.contains(r.getStudentId())) {
+                continue;
+            }
+            studentsByChapter.computeIfAbsent(r.getChapterId(), k -> new HashSet<>()).add(r.getStudentId());
+            minutesByChapter.merge(r.getChapterId(),
+                    r.getDurationMinutes() != null ? r.getDurationMinutes() : 0, Integer::sum);
+        }
+
+        Map<Long, Double> chapterMastery = buildChapterMastery(courseId);
+
+        int sortIndex = 0;
+        for (com.edumind.course.vo.chapter.ChapterTreeVO top : chapters) {
+            sortIndex++;
+            Set<Long> scope = chapterScope.getOrDefault(top.getId(), Collections.singleton(top.getId()));
+            Set<Long> chapterStudents = new HashSet<>();
+            int chapterMinutes = 0;
+            for (Long chapterId : scope) {
+                chapterStudents.addAll(studentsByChapter.getOrDefault(chapterId, Collections.emptySet()));
+                chapterMinutes += minutesByChapter.getOrDefault(chapterId, 0);
+            }
+            LearningAnalyticsVO.ChapterProgressVO cp = new LearningAnalyticsVO.ChapterProgressVO();
+            cp.setChapterId(top.getId());
+            cp.setChapterTitle(top.getTitle());
+            cp.setSort(top.getSort() != null ? top.getSort() : sortIndex);
+            cp.setCompletionRate(Math.round(chapterStudents.size() * 1000.0 / totalStudents) / 10.0);
+            cp.setStudentCount(chapterStudents.size());
+            cp.setAvgStudyMinutes(chapterStudents.isEmpty() ? 0 : chapterMinutes / chapterStudents.size());
+            cp.setAvgScore(chapterMastery.get(top.getId()));
+            vo.getChapterProgressList().add(cp);
+        }
+
+        // 2. 课程 5 维质效：每一项都由真实数据推导，无数据记 0
+        LearningAnalyticsVO.CourseHealthVO health = new LearningAnalyticsVO.CourseHealthVO();
+        long touchedChapters = chapterScope.values().stream()
+                .filter(scope -> scope.stream()
+                        .anyMatch(id -> !studentsByChapter.getOrDefault(id, Collections.emptySet()).isEmpty()))
+                .count();
+        int syllabusCov = chapterScope.isEmpty() ? 0 : (int) Math.round(touchedChapters * 100.0 / chapterScope.size());
+        int assignComp = (int) Math.round((vo.getCompletionRate() != null ? vo.getCompletionRate() : 0) * 100);
+        Set<Long> activeStudents = records.stream()
+                .map(LearningRecordEntity::getStudentId)
+                .filter(Objects::nonNull)
+                .filter(enrolledSet::contains)
+                .collect(Collectors.toSet());
+        int interaction = (int) Math.round(activeStudents.size() * 100.0 / totalStudents);
+        int passRate = computePassRate(submissionStats);
+        int aiRate = computeAiPenetration(records, enrolledSet, totalStudents);
+
+        health.setSyllabusCoverage(syllabusCov);
+        health.setAssignmentCompletion(assignComp);
+        health.setStudentInteraction(interaction);
+        health.setPassRate(passRate);
+        health.setAiAssistanceRate(aiRate);
+
+        double overall = (syllabusCov * 0.2) + (assignComp * 0.25) + (interaction * 0.15) + (passRate * 0.25) + (aiRate * 0.15);
+        health.setOverallScore(Math.round(overall * 10.0) / 10.0);
+        health.setHealthLevel(overall >= 85 ? "EXCELLENT" : (overall >= 70 ? "GOOD" : "WARNING"));
+        vo.setCourseHealth(health);
+
+        // 3. 高频预警薄弱考点
+        buildWeakPoints(vo, courseId);
+    }
+
+    /** 章节掌握度：该章关联知识点的真实平均掌握度 × 100，无数据的章节不返回 */
+    private Map<Long, Double> buildChapterMastery(Long courseId) {
+        Map<Long, Double> result = new HashMap<>();
+        try {
+            List<KnowledgePointVO> points = courseQueryApi.listKnowledgePointsByCourseId(courseId);
+            if (points == null || points.isEmpty()) {
+                return result;
+            }
+            Map<Long, Double> masteryByKp = knowledgeMasteryDao.listByCourse(courseId).stream()
+                    .collect(Collectors.groupingBy(KnowledgeMasteryEntity::getKnowledgePointId,
+                            Collectors.averagingDouble(m -> m.getMasteryScore().doubleValue())));
+            Map<Long, List<Double>> byChapter = new HashMap<>();
+            for (KnowledgePointVO pt : points) {
+                Double mastery = masteryByKp.get(pt.getId());
+                if (pt.getChapterId() == null || mastery == null) {
+                    continue;
+                }
+                byChapter.computeIfAbsent(pt.getChapterId(), k -> new ArrayList<>()).add(mastery * 100.0);
+            }
+            byChapter.forEach((chapterId, values) -> {
+                double avg = values.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+                result.put(chapterId, Math.round(avg * 10.0) / 10.0);
+            });
+        } catch (Exception e) {
+            log.warn("Failed to build chapter mastery for course {}: {}", courseId, e.getMessage());
+        }
+        return result;
+    }
+
+    /** 测验及格率：已批改学生中均分达到 60 分的占比（真实值，无样本记 0） */
+    private int computePassRate(SubmissionStatsVO submissionStats) {
+        List<SubmissionStatsVO.StudentScoreVO> scores = submissionStats != null ? submissionStats.getStudentScores() : null;
+        if (scores == null || scores.isEmpty()) {
+            return 0;
+        }
+        long pass = scores.stream()
+                .filter(s -> s.getAvgScore() != null && s.getAvgScore() >= 60)
+                .count();
+        return (int) Math.round(pass * 100.0 / scores.size());
+    }
+
+    /** AI 助学渗透率：产生过 AI 学习行为的学生数占选课学生的比例（真实值，无数据记 0） */
+    private int computeAiPenetration(List<LearningRecordEntity> records, Set<Long> enrolledSet, int totalStudents) {
+        Set<Long> aiStudents = records.stream()
+                .filter(r -> r.getActionType() != null && r.getActionType().toUpperCase().contains("AI"))
+                .map(LearningRecordEntity::getStudentId)
+                .filter(Objects::nonNull)
+                .filter(enrolledSet::contains)
+                .collect(Collectors.toSet());
+        return (int) Math.round(aiStudents.size() * 100.0 / Math.max(1, totalStudents));
+    }
+
+    /**
+     * 课程薄弱考点：只统计有真实掌握度记录的知识点，错题数与受影响人数同样取真实值。
+     * 历史实现对无掌握度数据的知识点默认按 0.68 掌握度，并按公式编造错题数与受影响人数。
+     */
+    private void buildWeakPoints(LearningAnalyticsVO vo, Long courseId) {
+        try {
+            List<KnowledgePointVO> points = courseQueryApi.listKnowledgePointsByCourseId(courseId);
+            if (points == null || points.isEmpty()) {
+                return;
+            }
+            List<KnowledgeMasteryEntity> masteries = knowledgeMasteryDao.listByCourse(courseId);
+            if (masteries.isEmpty()) {
+                return;
+            }
+            Map<Long, List<KnowledgeMasteryEntity>> masteryByKp = masteries.stream()
+                    .collect(Collectors.groupingBy(KnowledgeMasteryEntity::getKnowledgePointId));
+
+            for (KnowledgePointVO pt : points) {
+                List<KnowledgeMasteryEntity> kpMasteries = masteryByKp.get(pt.getId());
+                if (kpMasteries == null || kpMasteries.isEmpty()) {
+                    continue;
+                }
+                double avgMastery = kpMasteries.stream()
+                        .mapToDouble(m -> m.getMasteryScore().doubleValue())
+                        .average().orElse(0);
+                double mastery = Math.round(avgMastery * 1000.0) / 10.0;
+                if (mastery >= 80.0) {
+                    continue;
+                }
+                LearningAnalyticsVO.CourseWeakPointVO wp = new LearningAnalyticsVO.CourseWeakPointVO();
+                wp.setKnowledgePointId(pt.getId());
+                wp.setTitle(pt.getTitle());
+                wp.setMastery(mastery);
+                wp.setWrongCount((int) wrongQuestionRecordDao.countByKpAndCourse(pt.getId(), courseId));
+                wp.setAffectedStudents((int) kpMasteries.stream()
+                        .filter(m -> m.getMasteryScore() != null && m.getMasteryScore().doubleValue() < 0.70)
+                        .map(KnowledgeMasteryEntity::getStudentId)
+                        .distinct()
+                        .count());
+                wp.setUrgency(mastery < 65.0 ? "HIGH" : "MEDIUM");
+                vo.getCourseWeakPoints().add(wp);
+            }
+            vo.getCourseWeakPoints().sort(Comparator.comparing(LearningAnalyticsVO.CourseWeakPointVO::getMastery));
+        } catch (Exception e) {
+            log.warn("Failed to build course weak points for course {}: {}", courseId, e.getMessage());
+        }
+    }
+
     private LocalDateTime resolveSince(String range) {
+        if ("7d".equals(range)) {
+            return LocalDateTime.now().minusDays(7);
+        }
         if ("30d".equals(range)) {
             return LocalDateTime.now().minusDays(30);
         }
-        if ("semester".equals(range) || "term".equals(range)) {
+        if ("semester".equals(range) || "term".equals(range) || "90d".equals(range)) {
             return LocalDateTime.now().minusDays(90);
         }
-        return LocalDateTime.now().minusDays(7);
+        return LocalDateTime.now().minusDays(30);
     }
 }

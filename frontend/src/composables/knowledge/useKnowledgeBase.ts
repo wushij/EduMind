@@ -80,13 +80,6 @@ export function useKnowledgeBase() {
   };
 }
 
-/** 兜底课程与 sql 种子数据保持一致，避免出现课程改名后兜底文案过期 */
-const FALLBACK_COURSES: Course[] = [
-  { id: 101, title: '数据结构与算法' } as Course,
-  { id: 102, title: 'Java面向对象程序设计' } as Course,
-  { id: 103, title: '高等数学（上）' } as Course
-];
-
 export function useKnowledgeBaseCreate() {
   const router = useRouter();
   const formRef = ref<FormInstance>();
@@ -96,7 +89,8 @@ export function useKnowledgeBaseCreate() {
 
   const formData = reactive({
     name: '',
-    courseId: 101 as number | undefined,
+    // 课程由「第一门真实课程」回填（见 loadCourses），不再写死某个课程 id
+    courseId: undefined as number | undefined,
     description: '',
     embeddingModel: 'bge-large-zh-v1.5',
     chunkStrategy: 'PARAGRAPH',
@@ -113,17 +107,19 @@ export function useKnowledgeBaseCreate() {
     try {
       const res = await getCourseList({ page: 1, pageSize: 50 });
       const rawList = res.data?.list || [];
-      if (rawList.length > 0) {
-        courses.value = rawList.map((c: any) => ({
-          ...c,
-          title: c.name || c.title || `课程 #${c.id}`,
-          name: c.name || c.title || `课程 #${c.id}`
-        }));
-      } else {
-        courses.value = FALLBACK_COURSES;
+      courses.value = rawList.map((c: any) => ({
+        ...c,
+        title: c.name || c.title || `课程 #${c.id}`,
+        name: c.name || c.title || `课程 #${c.id}`
+      }));
+      // 默认选中第一门真实课程，避免表单停留在写死的课程 id 上
+      if (!formData.courseId && courses.value.length > 0) {
+        formData.courseId = Number(courses.value[0].id);
       }
     } catch {
-      courses.value = FALLBACK_COURSES;
+      // 课程接口不可用时不再兜底到写死的课程（原 FALLBACK_COURSES 含 101/102/103），
+      // 避免把知识库误绑到并不存在的课程上。
+      courses.value = [];
     }
   }
 

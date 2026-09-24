@@ -147,5 +147,13 @@ export const AI_COGNITIVE_THINKING_PRESETS = {
       '同构改造题干情境、数据与典型干扰项',
       '执行 LaTeX 公式排版校验并写入题库待自测'
     ]
+  },
+  analyticsTeachingAdvice: {
+    title: 'AI 教学质效引擎正在全链路推演中...',
+    steps: [
+      '全链路整合课程考情、作业与章节学情数据',
+      '深度识别知识点认知断层与群体薄弱点',
+      '调用智教大模型推演生成精准教学干预清单'
+    ]
   }
 } as const satisfies Record<string, AiCognitiveThinkingPreset>;

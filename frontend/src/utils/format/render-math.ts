@@ -11,11 +11,15 @@ function escapeHtml(text: string): string {
 
 /**
  * 修复因 JSON/SQL/大模型多重转义导致的 LaTeX 命令双斜杠问题（如 \\frac, \\cos, \\sin, \\ln, \\sim, \\to 等）
- * 在 LaTeX 中，单个斜杠加字母是命令；双斜杠 \\ 紧跟字母会被 KaTeX 误当作“强制换行 + 普通英文字母”
+ * 以及大模型常误输出的非法数字转义宏（如 \0 \cdot \infty、\1^\infty、\0^0 等）
+ * 在 LaTeX 中，单个斜杠加字母是命令；双斜杠 \\ 紧跟字母会被 KaTeX 误当作“强制换行 + 普通英文字母”；
+ * 而反斜杠后直接跟数字（如 \0, \1）在 LaTeX 中是非法未定义指令，会导致 KaTeX 抛出 Undefined control sequence 并渲染为红色报错字符。
  */
 export function repairLatexDoubleEscapes(text: string): string {
   if (!text) return '';
-  return text.replace(/\\{2,}([a-zA-Z]+)/g, '\\$1');
+  return text
+    .replace(/\\{2,}([a-zA-Z]+)/g, '\\$1')
+    .replace(/\\+([0-9])/g, '$1');
 }
 
 function renderKatex(formula: string, displayMode: boolean): string {

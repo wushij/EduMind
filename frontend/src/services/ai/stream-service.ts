@@ -1,7 +1,7 @@
 import { SSEClient } from '@/core/sse/client';
 import { API_BASE_URL } from '@/config';
 import { storage } from '@/core/storage/local';
-import { askGlobalAssistant } from '@/api/ai/assistant';
+import { askGlobalAssistant, suggestFollowUps } from '@/api/ai/assistant';
 import {
   getConversations,
   getMessages,
@@ -43,6 +43,7 @@ export interface StreamOptions {
   model?: string;
   useRag?: boolean;
   enableThinking?: boolean;
+  sectionTitle?: string;
   activeSectionTitle?: string;
   isRegenerate?: boolean;
   webSearch?: boolean;
@@ -200,27 +201,42 @@ export function mergeServerWithLocalDrafts(server: ChatMessage[], local: ChatMes
   return result;
 }
 
+function getSessionStorageKey(courseId?: number): string {
+  if (!courseId) return '';
+  const currentUserId = storage.get('edumind_user_id') || '';
+  return currentUserId ? `${SESSION_STORAGE_PREFIX}${currentUserId}:${courseId}` : `${SESSION_STORAGE_PREFIX}${courseId}`;
+}
+
 export function getStoredSessionId(courseId?: number): string {
   if (!courseId) return '';
-  const stored = storage.get(`${SESSION_STORAGE_PREFIX}${courseId}`);
-  return typeof stored === 'string' ? stored : '';
+  const key = getSessionStorageKey(courseId);
+  const stored = storage.get(key);
+  if (typeof stored === 'string' && stored) return stored;
+  const legacyStored = storage.get(`${SESSION_STORAGE_PREFIX}${courseId}`);
+  return typeof legacyStored === 'string' ? legacyStored : '';
 }
 
 export function storeSessionId(courseId: number | undefined, sessionId: string) {
   if (!courseId || !sessionId) return;
-  storage.set(`${SESSION_STORAGE_PREFIX}${courseId}`, sessionId);
+  storage.set(getSessionStorageKey(courseId), sessionId);
 }
 
 export function clearStoredSessionId(courseId: number | undefined, sessionId: string) {
   if (!courseId || !sessionId) return;
-  if (getStoredSessionId(courseId) === sessionId) {
+  const key = getSessionStorageKey(courseId);
+  if (storage.get(key) === sessionId) {
+    storage.remove(key);
+  }
+  if (storage.get(`${SESSION_STORAGE_PREFIX}${courseId}`) === sessionId) {
     storage.remove(`${SESSION_STORAGE_PREFIX}${courseId}`);
   }
 }
 
 export function buildSessionTitleFromPrompt(text: string): string {
   const cleaned = text
+    .replace(/^\[当前知识锚定章节:[^\]]+\]\s*/i, '')
     .replace(/^\[当前章节:[^\]]+\]\s*/i, '')
+    .replace(/^\[当前微课节ID:[^\]]+\]\s*/i, '')
     .replace(/\s+/g, ' ')
     .trim();
   return cleaned.slice(0, 20) || '新问答会话';
@@ -255,30 +271,65 @@ export interface FollowUpOptions {
   courseTitle?: string;
 }
 
+/** 章节结构词：本身不承载知识点，不能拿来当追问锚点 */
+const TOPIC_NOISE_PATTERN =
+  /^(总结|小结|概述|摘要|引言|前言|目录|思考|思考题|自测|建议|注意|提示|说明|例如|举例|关键|结论|分析|核心要点|总体|底层原理|运行原理|运行机制|方法选择|统一解题流程|最核心的底层逻辑|易错点|延伸|拓展|背景|目标|学习目标|重点|难点|作业|练习|随堂|本节|本章|上文|下文|含义|定义|性质|分类|流程|步骤|为什么|是什么|怎么做|有什么区别|怎么用)$/;
+
+/** 以代词 / 连接词开头的片段是叙述句，不是知识点（如「它有没有一个稳定目标」） */
+const TOPIC_SENTENCE_HEAD_PATTERN =
+  /^(它|他|她|这|那|该|此|其|我|你|我们|你们|这些|那些|上述|以上|以下|下面|其中|同时|首先|其次|再次|最后|因此|所以|但是|如果|只要|只有|由于|因为|例如|比如|假设|可见|总之|综上|那么|若|则)/;
+
+/** 疑问结尾的片段是问题描述，套进任何句式都会变成驴唇不对马嘴的追问 */
+const TOPIC_QUESTION_TAIL_PATTERN = /[？?]$|吗$|呢$|吧$/;
+
+function splitTopicCandidates(raw: string): string[] {
+  return raw
+    .replace(/[*#`~[\]()（）“”"'「」『』《》【】]/g, '')
+    .split(/[：:，。；;！!]+/)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+}
+
+function normalizeTopic(segment: string): string {
+  return segment
+    .replace(/^[0-9一二三四五六七八九十]+[.、:：\s\-—]*/, '')
+    .replace(/(详细解析|深入分析|核心原理|总体架构|全景概述|主要内容|基本概念|简介)$/, '')
+    .replace(/[，。；、]+$/, '')
+    .trim();
+}
+
+function isUsableTopic(text: string): boolean {
+  if (text.length < 2 || text.length > 20) return false;
+  if (TOPIC_NOISE_PATTERN.test(text)) return false;
+  if (TOPIC_SENTENCE_HEAD_PATTERN.test(text)) return false;
+  if (TOPIC_QUESTION_TAIL_PATTERN.test(text)) return false;
+  if (/[，。；？?]/.test(text)) return false;
+  return true;
+}
+
 /**
- * 从用户提问及 AI 回答正文中动态提取核心知识主题与专有技术实体
+ * 从用户提问与助手回答中提取「可复用的知识锚点」。
+ *
+ * <p>锚点必须像一个能在下一轮被指代的名词：优先取小标题里冒号前的知识点名
+ * （「数列极限：ε-N 是一场误差合同」→「数列极限」），其次取加粗术语。
+ * 叙述句（代词开头、问号结尾、带逗号从句）一律丢弃——否则会出现
+ * 「深入剖析『它有没有一个稳定目标？』的底层工作原理」这类荒唐追问。</p>
  */
 export function extractKeyTopicsFromContent(query: string, answer?: string): string[] {
   const topics: string[] = [];
   const seen = new Set<string>();
 
-  const sanitizeTopic = (raw: string): string => {
-    return raw
-      .replace(/^[0-9一二三四五六七八九十]+[\.\、\:\s\-—]*/, '')
-      .replace(/[*#`_~[\]()（）]/g, '')
-      .replace(/(详细解析|深入分析|核心原理|总体架构|全景概述|主要内容|基本概念|简介)$/, '')
-      .trim();
-  };
-
-  const addTopic = (t: string) => {
-    const cleaned = sanitizeTopic(t);
-    if (cleaned.length >= 2 && cleaned.length <= 24) {
+  const addTopic = (raw: string) => {
+    // 一个标题 / 加粗片段只产出一个锚点：取第一段能当知识点的片段
+    for (const candidate of splitTopicCandidates(raw)) {
+      const cleaned = normalizeTopic(candidate);
+      if (!isUsableTopic(cleaned)) continue;
       const lower = cleaned.toLowerCase();
-      const isNoise = /^(总结|注意|提示|说明|例如|举例|关键|结论|分析|概述|引言|目录|思考|自测|小结|思考题|建议|核心要点|总体)$/.test(lower);
-      if (!isNoise && !seen.has(lower)) {
+      if (!seen.has(lower)) {
         seen.add(lower);
         topics.push(cleaned);
       }
+      return;
     }
   };
 
@@ -325,94 +376,302 @@ export function extractKeyTopicsFromContent(query: string, answer?: string): str
   return topics;
 }
 
+type FollowUpDomain = 'math' | 'code' | 'generic';
+
+/** 学科信号词：用于挑选「符合本学科语境」的提问句式（数学课不该出现「工业级代码示例」） */
+const MATH_SIGNALS =
+  /极限|数列|收敛|有界|导数|微分|积分|定理|推论|证明|推导|公式|方程|不等式|矩阵|向量|行列式|概率|统计|洛必达|夹逼|无穷小|无穷大|未定式|单调|保号|左右极限|函数极限|三角函数|多项式|对数|指数|求导|解析几何|复数|级数|ε/g;
+const CODE_SIGNALS =
+  /```|代码|编译|报错|异常|堆栈|接口|数据库|SQL|索引|并发|线程|锁|缓存|部署|重构|单元测试|日志|前端|后端|框架|依赖|类名|算法|递归|动态规划|数组|链表|二叉树|哈希|时间复杂度|空间复杂度|Java|Python|TypeScript|Vue|React|Spring|MyBatis|Redis|Linux|Git|API/g;
+
+function detectFollowUpDomain(query: string, answer: string): FollowUpDomain {
+  const sample = `${query}\n${answer}`.slice(0, 3000);
+  const mathHits = (sample.match(MATH_SIGNALS) || []).length;
+  const codeHits = (sample.match(CODE_SIGNALS) || []).length;
+  // 有代码块时按代码处理；否则谁命中多信谁，「函数」这类两栖词不计入任何一方
+  if (answer.includes('```') && codeHits >= mathHits) return 'code';
+  if (mathHits >= 2 && mathHits > codeHits) return 'math';
+  if (codeHits >= 2 && codeHits > mathHits) return 'code';
+  return 'generic';
+}
+
+/** 有真实锚点时：三条追问分别指向推导、易错 / 反例、用法自测，且句句带具体内容 */
+function buildAnchoredFollowUps(domain: FollowUpDomain, anchors: [string, string, string]): string[] {
+  const [t1, t2, t3] = anchors;
+  // 刻意不加「」这类括号：追问胶囊里读起来像机器模板，直接写术语本身更像学生提问
+  if (domain === 'math') {
+    return [
+      `${t1}是怎么推导出来的，能补上关键一步吗？`,
+      `${t2}最容易错在哪里，有反例吗？`,
+      `用${t3}做题时，第一步该判断什么？`
+    ];
+  }
+  if (domain === 'code') {
+    return [
+      `${t1}在真实项目里最容易踩的坑是什么？`,
+      `${t2}和${t1}有什么区别，该怎么选？`,
+      `能用一个最小可运行示例演示${t3}吗？`
+    ];
+  }
+  return [
+    `${t1}能再举一个更直观的例子吗？`,
+    `${t2}最容易混淆的地方是什么？`,
+    `围绕${t3}给我出 2 道自测题`
+  ];
+}
+
+/** 提不出锚点时：仍按学科给出可用的追问方向，但不再硬塞「企业级 / 代码示例」这类错位说法 */
+function buildContextFollowUps(domain: FollowUpDomain, sectionTitle?: string): string[] {
+  const spot = sectionTitle ? `「${sectionTitle}」` : '这一节';
+  if (domain === 'math') {
+    return [
+      `${spot}里最容易混淆的两个定义是什么？`,
+      '这类题的完整步骤能按「先判断什么、再做什么」再梳理一遍吗？',
+      '给我 2 道同等难度的变式题练手'
+    ];
+  }
+  if (domain === 'code') {
+    return [
+      `${spot}里最容易踩的坑是什么？`,
+      '这段逻辑的健壮性与边界情况还能怎么补强？',
+      '结合一个真实项目场景说明它该怎么落地'
+    ];
+  }
+  return [
+    `${spot}的重点内容能再完整梳理一遍吗？`,
+    '这里最容易混淆的概念是什么？',
+    '围绕这一节内容给我出 2 道自测题'
+  ];
+}
+
+/**
+ * 规则兜底追问。
+ *
+ * <p>仅在「模型没返回可用结果」时使用（见 {@link requestFollowUps}），因此这里的目标
+ * 不是替代模型，而是保证降级时也不会出现与学科语境的错位提问。</p>
+ */
 export function generateSmartFollowUps(
   query: string,
   answer?: string,
   options?: FollowUpOptions
 ): string[] {
   const cleanQuery = query.replace(/^\[[^\]]+\]\s*/g, '').trim();
-  const q = cleanQuery.toLowerCase() || query.toLowerCase();
+  const body = (answer || '').trim();
+  const topics = extractKeyTopicsFromContent(cleanQuery, body);
+  const domain = detectFollowUpDomain(cleanQuery, body);
 
-  // 1. 动态提取回答和提问中的真实技术实体与核心主题
-  const topics = extractKeyTopicsFromContent(cleanQuery, answer);
-
-  // 若成功提取到了具体的技术知识点，则生成具象化、直击核心的深度追问
   if (topics.length >= 2) {
-    const t1 = topics[0];
-    const t2 = topics[1];
-    const t3 = topics[2] || topics[0];
-
-    const results: string[] = [];
-
-    // 追问 1：针对核心知识点 1 的底层运行机制与原理深入
-    results.push(`深入剖析「${t1}」的底层工作原理与运行时机制`);
-
-    // 追问 2：针对核心知识点 1 与 2 的横向对比或工程落地踩坑
-    if (/区别|对比|不同|差异|辨析|选型/.test(q) || /与|和|vs/.test(t1) || /与|和|vs/.test(t2)) {
-      results.push(`请用对比表格详细梳理「${t1}」与「${t2}」的核心差异与适用场景`);
-    } else {
-      results.push(`在企业级实际业务中，使用「${t2}」有哪些高频避坑指南或最佳实践？`);
-    }
-
-    // 追问 3：针对知识点 3 的代码示例演练或考查自测
-    if (/代码|实现|函数|工程|实战|bug|异常/.test(q) || (answer && answer.includes('```'))) {
-      results.push(`请提供一个关于「${t3}」的典型工业级可运行代码示例并逐行剖析`);
-    } else {
-      results.push(`围绕「${t3}」出一道考查深度理解的典型思考自测题并附解析`);
-    }
-
-    return results;
+    return buildAnchoredFollowUps(domain, [topics[0], topics[1], topics[2] || topics[0]]);
   }
-
   if (topics.length === 1) {
-    const t = topics[0];
-    return [
-      `深入剖析「${t}」的底层实现原理与运行机制`,
-      `在实际工程业务落地中，针对「${t}」有哪些高频踩坑点与优化策略？`,
-      `围绕「${t}」给出一个典型的应用场景与可运行实操代码示例`
-    ];
+    return buildAnchoredFollowUps(domain, [topics[0], topics[0], topics[0]]);
   }
 
-  // 2. 兜底方案：结合章节上下文或意图模型生成更有针对性的追问
-  const sectionHint = options?.sectionTitle?.trim() ? `「${options.sectionTitle.trim()}」` : '';
-
-  if (/出题|题目|试题|试卷|考题|做题|作业|考点|数列|函数解析|数学|难题|随堂|真题|选择题|填空题|大题|解答题|难度系数/.test(q)) {
+  // 提不出锚点时，题目 / 考点类对话最能受益于固定方向的提问
+  const sectionTitle = options?.sectionTitle?.trim();
+  if (/出题|题目|试题|试卷|考题|做题|作业|考点|随堂|真题|选择题|填空题|大题|解答题|变式|难度/.test(cleanQuery)) {
+    const spot = sectionTitle ? `「${sectionTitle}」` : '';
     return [
-      `根据上述考点${sectionHint}，衍生 3 道同等难度的变式训练题`,
-      '导出上述解题的评分采分点与核心评分细则标准',
-      '深入剖析这道题在真实考试中学生最容易踩的失分陷阱'
+      `这道题考查的核心考点${spot}能再归纳一下吗？`,
+      '给我 2 道同等难度的变式题练手',
+      '这类题在考试里最容易在哪儿失分？'
     ];
   }
+  return buildContextFollowUps(domain, sectionTitle);
+}
 
-  if (/写代码|代码实现|写一个函数|写个类|报错|bug|debug|堆栈|异常处理|spring boot|vue|typescript|sql查询/.test(q) || (/代码|编程/.test(q) && /写|看|改|实现|重构/.test(q))) {
-    return [
-      '给出此逻辑更具健壮性的工业级优化版代码实现',
-      '分析这段代码在极端并发或大数据量下的边界隐患与异常处理',
-      '结合主流设计模式对该段代码进行结构重构与解耦'
-    ];
+const FOLLOW_UP_CACHE_STORAGE_KEY = 'edumind:ai:follow-up-cache';
+const FOLLOW_UP_CACHE_LIMIT = 80;
+const FOLLOW_UP_REQUEST_TIMEOUT_MS = 12000;
+/** 回答短于该长度（报错占位、寒暄）不足以支撑内容化追问，直接不展示胶囊 */
+const FOLLOW_UP_MIN_ANSWER_CHARS = 80;
+const FOLLOW_UP_PROMPT_COUNT = 3;
+const FOLLOW_UP_MAX_PROMPT_CHARS = 40;
+
+/** 与后端 FollowUpSuggestServiceImpl 的套话黑名单保持一致：模型偷懒时不暴露到 UI */
+const FOLLOW_UP_GENERIC_PATTERN =
+  /还有什么(想|需要)|需要我(进一步|继续|再|展开)|希望(这些|以上|对你有帮助)|如需(更多|进一步)|欢迎(继续|随时)|还有(什么)?(疑问|问题吗)|你想(了解|深入|先看)哪|想(先|深入)?了解哪|上述(回答|内容|讲解)|上文|本文|以上(内容|回答)|^好的[，,。]|^当然|以下(是|为)|如下[：:]|建议(的)?(追问|问题)|希望对你/;
+
+/**
+ * 追问请求序号：模型响应是异步到达的，用户很可能已经进入下一轮或切换会话。
+ * 只允许「最后一次发起」的响应回写 UI，避免旧轮次的追问顶掉当前轮次。
+ */
+let followUpRequestSeq = 0;
+
+function followUpCacheKey(question: string, answer: string): string {
+  const raw = `${question.trim()}::${answer.trim()}`;
+  let hash = 5381;
+  for (let i = 0; i < raw.length; i += 1) {
+    hash = ((hash << 5) + hash + raw.charCodeAt(i)) | 0;
+  }
+  return `q${(hash >>> 0).toString(36)}_${raw.length}`;
+}
+
+function readFollowUpCache(): Record<string, string[]> {
+  try {
+    const cached = storage.get(FOLLOW_UP_CACHE_STORAGE_KEY);
+    return cached && typeof cached === 'object' ? (cached as Record<string, string[]>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeFollowUpCache(key: string, prompts: string[]): void {
+  try {
+    const cache = readFollowUpCache();
+    cache[key] = prompts;
+    const keys = Object.keys(cache);
+    if (keys.length > FOLLOW_UP_CACHE_LIMIT) {
+      keys.slice(0, keys.length - FOLLOW_UP_CACHE_LIMIT).forEach((stale) => delete cache[stale]);
+    }
+    storage.set(FOLLOW_UP_CACHE_STORAGE_KEY, cache);
+  } catch {
+    // 本地缓存写入失败不影响追问展示
+  }
+}
+
+/** 读取「同一轮问答」已生成过的追问：命中后切会话/刷新页面都不再重复调用模型 */
+export function readCachedFollowUps(question: string, answer: string): string[] | null {
+  if (!question.trim() || !answer.trim()) return null;
+  const cached = readFollowUpCache()[followUpCacheKey(question, answer)];
+  return Array.isArray(cached) && cached.length > 0 ? [...cached] : null;
+}
+
+/**
+ * 把被挤在同一行的多条追问拆开（模型偶尔会把「1. 甲？2. 乙？3. 丙？」写成一行）。
+ *
+ * <p>后端已做同样处理，这里再兜一层：万一接口返回的是旧版实现（整串一行），
+ * 前端也不会因为「单条超长」把整批追问丢干净。刻意不用正则后行断言，避免老浏览器解析期报错。</p>
+ */
+function splitMergedFollowUpLines(text: string): string[] {
+  const marked = text.replace(/([？?。！!\s])(\d{1,2}\s*[.、)）:：])/g, '$1\u0000$2');
+  const segments: string[] = [];
+  for (const line of marked.split(/\r?\n/)) {
+    for (const part of line.split('\u0000')) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      const marks = trimmed.match(/[？?]/g);
+      if (trimmed.length > FOLLOW_UP_MAX_PROMPT_CHARS && marks && marks.length >= 2) {
+        let current = '';
+        for (const ch of trimmed) {
+          current += ch;
+          if (ch === '？' || ch === '?') {
+            segments.push(current.trim());
+            current = '';
+          }
+        }
+        if (current.trim()) segments.push(current.trim());
+      } else {
+        segments.push(trimmed);
+      }
+    }
+  }
+  return segments;
+}
+
+/** 净化模型输出：剥离编号 / Markdown 残留，剔除套话、超长与重复条目 */
+export function normalizeFollowUpPrompts(raw: unknown, max = FOLLOW_UP_PROMPT_COUNT): string[] {
+  if (!Array.isArray(raw)) return [];
+  const flattened: string[] = [];
+  for (const item of raw) {
+    if (typeof item === 'string') flattened.push(...splitMergedFollowUpLines(item));
   }
 
-  if (/概念|原理|是什么|区别|体系|架构|为什么/.test(q)) {
-    return [
-      `用通俗生动的比喻进一步剖析${sectionHint || '该技术'}的底层原理`,
-      `用对比表格清晰列出${sectionHint || '它'}与关联技术模块的关键异同`,
-      '结合当前课程教学大纲，梳理其前驱知识依赖与后继拓展方向'
-    ];
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const item of flattened) {
+    const text = item
+      .replace(/^\s*(?:[-*•·]+|\d{1,2}\s*[.、)）:：]|[（(]\d{1,2}[)）])\s*/, '')
+      .replace(/[*`_#>]/g, '')
+      .replace(/^["'“”‘’「」《》【】]+|["'“”‘’「」《》【】]+$/g, '')
+      .trim();
+    if (text.length < 4 || text.length > FOLLOW_UP_MAX_PROMPT_CHARS) continue;
+    if (FOLLOW_UP_GENERIC_PATTERN.test(text)) continue;
+    const key = text.replace(/[\s，。！？、；：（）【】「」《》“”‘’]/g, '').toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(text);
+    if (result.length >= max) break;
+  }
+  return result;
+}
+
+/** 长回答保留头尾：开头是结论主线，结尾是易错点与总结，掐掉结尾会明显拉低追问质量 */
+function clipAnswerForFollowUp(answer: string): string {
+  const trimmed = answer.trim();
+  if (trimmed.length <= 6000) return trimmed;
+  return `${trimmed.slice(0, 4000)}\n…（中间内容已省略）…\n${trimmed.slice(-2000)}`;
+}
+
+function warnFollowUpDegrade(error: unknown): void {
+  if (import.meta.env.DEV) {
+    console.warn(
+      '[follow-ups] 模型追问生成失败，已回落到本地规则；若长期出现请检查后端是否已重启、POST /api/ai/assistant/follow-ups 是否 200',
+      error
+    );
+  }
+}
+
+/**
+ * 追问主入口（全局助手 / 课程 AI / 题目辅导共用）。
+ *
+ * <p>模型没返回之前一律不展示规则模板：规则模板句式固定、且难以贴合学科语境
+ * （高数课会出现「企业级业务避坑」「工业级代码示例」），先闪出来既误导用户也掩盖了
+ * 模型链路故障。因此这里的策略是「模型优先、失败才降级」：</p>
+ * <ul>
+ *   <li>命中本地缓存 → 直接返回（同一轮问答不重复调模型）；</li>
+ *   <li>调用方没有 onUpdate（纯同步场景）→ 返回规则结果；</li>
+ *   <li>否则发起模型请求，成功回写模型追问，失败 / 超时 / 输出不合法时回写规则结果。</li>
+ * </ul>
+ */
+export function requestFollowUps(
+  question: string,
+  answer: string,
+  options?: FollowUpOptions & { onUpdate?: (prompts: string[]) => void }
+): string[] {
+  const cleanQuestion = (question || '').trim();
+  const cleanAnswer = (answer || '').trim();
+  if (!cleanQuestion || cleanAnswer.length < FOLLOW_UP_MIN_ANSWER_CHARS) {
+    return [];
   }
 
-  if (/算法|数据结构|复杂度|时间复杂度|空间复杂度|渐进表示|递归|动态规划|贪心/.test(q)) {
-    return [
-      '分析该算法在最好、最坏与平均情况下的具体时空复杂度',
-      '用简明步骤图解该算法的内存变化与执行推演过程',
-      '对比该算法与其他常见替代算法的性能优缺点与适用边界'
-    ];
+  const cached = readCachedFollowUps(cleanQuestion, cleanAnswer);
+  if (cached) return cached;
+
+  const fallback = () => generateSmartFollowUps(cleanQuestion, cleanAnswer, options);
+  if (!options?.onUpdate) {
+    return fallback();
   }
 
-  return [
-    `结合${sectionHint || '当前考点'}给出一个通俗生动的教学应用案例`,
-    `针对上述讲解内容，设计 2 道课堂即兴互动自测提问`,
-    `该知识点在企业级实际生产项目中有哪些典型的落地应用场景？`
-  ];
+  const cacheKey = followUpCacheKey(cleanQuestion, cleanAnswer);
+  const seq = (followUpRequestSeq += 1);
+  const context = [options.courseTitle, options.sectionTitle].filter(Boolean).join(' · ');
+  void suggestFollowUps(
+    {
+      question: cleanQuestion.slice(0, 1000),
+      answer: clipAnswerForFollowUp(cleanAnswer),
+      ...(context ? { context } : {}),
+      count: FOLLOW_UP_PROMPT_COUNT
+    },
+    { silent: true, timeout: FOLLOW_UP_REQUEST_TIMEOUT_MS }
+  )
+    .then((res) => {
+      if (seq !== followUpRequestSeq) return;
+      const prompts = res?.data?.aiGenerated ? normalizeFollowUpPrompts(res.data.prompts) : [];
+      if (prompts.length === 0) {
+        options.onUpdate?.(fallback());
+        return;
+      }
+      writeFollowUpCache(cacheKey, prompts);
+      options.onUpdate?.(prompts);
+    })
+    .catch((error: unknown) => {
+      if (seq !== followUpRequestSeq) return;
+      warnFollowUpDegrade(error);
+      options.onUpdate?.(fallback());
+    });
+
+  return [];
 }
 
 export function mapSession(raw: Record<string, unknown>): ChatSession {
@@ -529,6 +788,7 @@ export async function streamAssistantChat(
       courseId,
       chapterId: options?.chapterId,
       lessonChapterId: options?.lessonChapterId,
+      sectionTitle: options?.sectionTitle || options?.activeSectionTitle,
       conversationId: conversationId || undefined,
       modelKey: resolveStreamModelKey(options),
       useRag: options?.useRag ?? true,
@@ -579,6 +839,9 @@ export const aiStreamService = {
   clearStoredSessionId,
   buildSessionTitleFromPrompt,
   generateSmartFollowUps,
+  requestFollowUps,
+  readCachedFollowUps,
+  normalizeFollowUpPrompts,
   mapSession,
   mapMessage,
   fetchConversationList,

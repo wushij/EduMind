@@ -71,12 +71,19 @@ export function useKnowledgeHeatmap(getCourseId: () => number | undefined) {
   const classAvgScores = ref<Record<number, number>>({});
 
   async function fetchHeatmap() {
-    const courseId = getCourseId() || 102;
-    loading.value = true;
-    loadError.value = false;
+    const courseId = getCourseId();
     kpList.value = [];
     studentRows.value = [];
     classAvgScores.value = {};
+    // 没有有效课程上下文时不再兜底成固定课程（原实现为 `getCourseId() || 102`），
+    // 否则会去拉取一门与当前上下文无关的课程热力图，看起来「有数据」实则张冠李戴。
+    if (!courseId || courseId <= 0) {
+      loadError.value = false;
+      loading.value = false;
+      return;
+    }
+    loading.value = true;
+    loadError.value = false;
 
     try {
       const res = await getKnowledgeHeatmap(courseId);

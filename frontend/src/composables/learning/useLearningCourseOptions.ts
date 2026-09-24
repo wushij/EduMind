@@ -1,32 +1,15 @@
-import { onMounted, ref } from 'vue';
-import { getCourseList } from '@/api/course/course';
-import type { Course } from '@/types/course/course';
+import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
 import { courseLabel } from '@/utils/learning/course-label';
 
-export function useLearningCourseOptions(defaultCourseId = 102) {
-  const courseOptions = ref<Array<{ id: number; name: string }>>([]);
-  const courseId = ref(defaultCourseId);
-  const loading = ref(false);
-
-  async function loadCourses() {
-    loading.value = true;
-    try {
-      const res = await getCourseList({ page: 1, pageSize: 50 });
-      const list = (res.data?.list ?? []) as Course[];
-      // ⚠️ 后端 Long 以字符串返回（c.id 运行时是 "103"），必须转数字后再比较，
-      // 否则 some() 恒为 false，会把路由/调用方指定的课程悄悄换成列表第一门课
-      courseOptions.value = list.map((c) => ({ id: Number(c.id), name: courseLabel(c) }));
-      if (courseOptions.value.length > 0 && !courseOptions.value.some((c) => c.id === courseId.value)) {
-        courseId.value = courseOptions.value[0].id;
-      }
-    } catch {
-      courseOptions.value = [];
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  onMounted(loadCourses);
-
+/**
+ * 学习中心通用「课程下拉选项」。
+ *
+ * 课程解析顺序统一收敛到 useTeacherCourses：显式指定 → 上次访问的课程 → 可用课程列表首项。
+ * 不再像历史实现那样默认兜底到写死的课程 id（`defaultCourseId = 102`），
+ * 否则任何用户一进页面都会落到同一门固定课程，与真实教学上下文无关。
+ * 解析不到课程时 courseId 为 0，调用方应据此跳过请求并展示空态。
+ */
+export function useLearningCourseOptions(defaultCourseId?: number) {
+  const { courseOptions, courseId, loading, loadCourses } = useTeacherCourses(defaultCourseId);
   return { courseOptions, courseId, loading, loadCourses, courseLabel };
 }

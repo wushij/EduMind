@@ -1,4 +1,5 @@
 import { ref, computed, watch, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   listInterventions,
@@ -7,6 +8,7 @@ import {
   rejectIntervention,
   dispatchIntervention
 } from '@/api/analytics/intervention';
+import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
 import type { TeachingInterventionVO, InterventionCreateRequest } from '@/types/analytics/intervention';
 
 export function getInterventionTriggerLabel(type: string) {
@@ -77,16 +79,28 @@ export function filterInterventions(
   });
 }
 
-export function resolveCourseNameById(courseId?: number): string | undefined {
-  if (courseId === 102) return '高等数学（上）';
-  if (courseId === 101) return '数据结构与算法';
-  if (courseId === 103) return '高中物理必修第一册';
-  return undefined;
+/**
+ * 依据「教师真实可选课程列表」解析课程名。
+ * 原实现是 `if (courseId === 102) return '高等数学（上）'` 式写死映射，既无法覆盖新增课程，
+ * 又会把课程名张冠李戴（种子数据中 102 实为《Java面向对象程序设计》）。
+ */
+export function resolveCourseNameFromOptions(
+  options: Array<{ id: number; name: string }>,
+  courseId?: number
+): string | undefined {
+  if (!courseId) return undefined;
+  return options.find((c) => Number(c.id) === Number(courseId))?.name;
 }
 
 export function useIntervention() {
+  const route = useRoute();
+  // 支持从学情分析页携带 courseId 跳转进来：既作为列表筛选条件，也作为新建提案的默认课程。
+  const routeCourseId = Number(route.query.courseId) || undefined;
+  // 可选课程来自教师真实课程列表，替换原先写死的 101/102/103 三项。
+  const { courseOptions, courseId: activeCourseId } = useTeacherCourses(routeCourseId);
+
   const loading = ref(false);
-  const courseFilter = ref<number | undefined>(undefined);
+  const courseFilter = ref<number | undefined>(routeCourseId);
   const triggerFilter = ref<string | undefined>(undefined);
   const statusFilter = ref<string | undefined>(undefined);
   const interventions = ref<TeachingInterventionVO[]>([]);
@@ -96,14 +110,21 @@ export function useIntervention() {
 
   const createDialogVisible = ref(false);
   const createSubmitting = ref(false);
-  const createForm = ref<InterventionCreateRequest>({
-    courseId: 102,
-    courseName: '高等数学（上）',
-    triggerType: 'EXAM_WEAK',
-    title: '',
-    proposalText: '',
-    affectedStudentCount: 5
-  });
+
+  /** 新建提案默认值：优先当前课程，其次可用课程首项；解析不到课程名时留空而不伪造 */
+  function buildCreateForm(): InterventionCreateRequest {
+    const fallbackId = activeCourseId.value > 0 ? activeCourseId.value : courseOptions.value[0]?.id;
+    return {
+      courseId: fallbackId,
+      courseName: resolveCourseNameFromOptions(courseOptions.value, fallbackId),
+      triggerType: 'EXAM_WEAK',
+      title: '',
+      proposalText: '',
+      affectedStudentCount: 5
+    };
+  }
+
+  const createForm = ref<InterventionCreateRequest>(buildCreateForm());
 
   const pendingCount = computed(() => interventions.value.filter((i) => i.status === 'PENDING').length);
   const totalAffectedStudents = computed(() =>
@@ -137,19 +158,12 @@ export function useIntervention() {
   });
 
   function openCreateDialog() {
-    createForm.value = {
-      courseId: 102,
-      courseName: '高等数学（上）',
-      triggerType: 'EXAM_WEAK',
-      title: '',
-      proposalText: '',
-      affectedStudentCount: 5
-    };
+    createForm.value = buildCreateForm();
     createDialogVisible.value = true;
   }
 
   function onCourseChange(val?: number) {
-    createForm.value.courseName = resolveCourseNameById(val);
+    createForm.value.courseName = resolveCourseNameFromOptions(courseOptions.value, val);
   }
 
   async function submitCreateIntervention() {
@@ -230,6 +244,7 @@ export function useIntervention() {
 
   return {
     loading,
+    courseOptions,
     courseFilter,
     triggerFilter,
     statusFilter,

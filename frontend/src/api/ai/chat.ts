@@ -29,7 +29,7 @@ export const deleteMessage = (messageId: string) =>
   del<{ deletedIds: string[] }>(`/ai/conversations/messages/${messageId}`);
 
 export const generateConversationTitle = (id: string) =>
-  post<string>(`/ai/conversations/${id}/generate-title`);
+  post<string>(`/ai/conversations/${id}/generate-title`, undefined, { silent: true, timeout: 6000 });
 
 export const cancelChatStream = (streamId: string) => del<void>(`/ai/chat/stream/${streamId}`);
 

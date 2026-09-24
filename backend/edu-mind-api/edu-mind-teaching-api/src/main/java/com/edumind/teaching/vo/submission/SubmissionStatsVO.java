@@ -21,4 +21,15 @@ public class SubmissionStatsVO {
         private Double avgScore;
         private Integer submissionCount;
     }
+
+    /** 按提交日期聚合的真实均分（百分制归一），用于成绩演进趋势 */
+    @Data
+    public static class DailyScoreVO {
+        /** 统计日期 yyyy-MM-dd */
+        private String date;
+        /** 当日已批改答卷的归一平均分（0~100） */
+        private Double avgScore;
+        /** 当日纳入统计的答卷份数，用于前端判断样本是否充足 */
+        private Integer sampleCount;
+    }
 }

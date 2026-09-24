@@ -111,7 +111,8 @@ const STUDENT_FUNCTIONS: CommonFunctionItem[] = [
   { title: '课程 AI 助教', icon: ChatDotRound, theme: 'purple', route: '/course/ai-assistant', desc: '不懂就问，名师级AI点拨' },
   { title: '智能错题本', icon: Notebook, theme: 'rose', route: '/learning/wrong-book', desc: '智能归因与举一反三巩固' },
   { title: '个人学情报告', icon: TrendCharts, theme: 'amber', route: '/learning/report', desc: '知识图谱掌握度实时画像' },
-  { title: '课程作业提交', icon: CircleCheck, theme: 'emerald', route: '/question/assignments', desc: '在线作答与即时智能测评' }
+  // 学生作业入口必须指向学习中心待办任务页：/question/assignments 是教师作业管理页（ADMIN/TEACHER）
+  { title: '课程作业提交', icon: CircleCheck, theme: 'emerald', route: '/learning/tasks', desc: '在线作答与即时智能测评' }
 ];
 
 export function buildLineChartOption(daily?: Array<{ date: string; calls?: number }>): echarts.EChartsOption {
@@ -293,7 +294,7 @@ export function useDashboard(options?: { enableCharts?: boolean }) {
           sublabel: `已提交作业 ${(assignments - pendingAssignments) > 0 ? (assignments - pendingAssignments) : 0} 份`,
           trend: pendingAssignments > 0 ? '建议今日优先完成' : '全部已按期提交',
           trendUp: pendingAssignments === 0,
-          route: '/question/assignments',
+          route: '/learning/tasks',
           icon: CircleCheck,
           theme: 'amber'
         }
@@ -364,7 +365,7 @@ export function useDashboard(options?: { enableCharts?: boolean }) {
           title: '待完成随堂与课后作业',
           count: `${pendingAss} 份待提交`,
           dotColor: '#EF4444',
-          route: '/question/assignments',
+          route: '/learning/tasks',
           urgent: true
         });
       }

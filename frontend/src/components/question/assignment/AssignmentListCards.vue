@@ -34,10 +34,23 @@
           <el-progress :percentage="progressPercent(a)" :color="progressColor(a)" />
         </div>
         <div class="row-right-actions">
-          <el-button type="primary" size="small" @click="router.push(`/question/assignments/${a.id}`)">
+          <!-- 批改与 AI 批改属教学管理能力，按批改权限渲染，避免学生侧出现越权操作入口 -->
+          <el-button
+            v-permission="'assignment:grade'"
+            type="primary"
+            size="small"
+            @click="router.push(`/question/assignments/${a.id}`)"
+          >
             批改与答卷管理
           </el-button>
-          <el-button type="success" plain size="small" :icon="Cpu" @click="emit('ai-grade', a.id)">
+          <el-button
+            v-permission="'assignment:grade'"
+            type="success"
+            plain
+            size="small"
+            :icon="Cpu"
+            @click="emit('ai-grade', a.id)"
+          >
             一键 AI 批改
           </el-button>
           <button
@@ -56,7 +69,11 @@
       <el-icon class="empty-icon"><FolderOpened /></el-icon>
       <h3>暂无匹配的作业任务</h3>
       <p>您可以点击右上角「发布新作业」，为学生选拔试题并设定考核时间。</p>
-      <el-button type="primary" @click="router.push('/question/assignments/create')">
+      <el-button
+        v-permission="'assignment:create'"
+        type="primary"
+        @click="router.push('/question/assignments/create')"
+      >
         立即发布新作业
       </el-button>
     </div>

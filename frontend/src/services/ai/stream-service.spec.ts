@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { mergeServerWithLocalDrafts, generateSmartFollowUps, type ChatMessage } from './stream-service';
+import {
+  mergeServerWithLocalDrafts,
+  generateSmartFollowUps,
+  extractKeyTopicsFromContent,
+  normalizeFollowUpPrompts,
+  requestFollowUps,
+  type ChatMessage
+} from './stream-service';
 
 describe('mergeServerWithLocalDrafts', () => {
   it('does not duplicate user prompts when local has persona/chapter prefixes and server does not', () => {
@@ -54,10 +61,88 @@ Java源码通过 javac 编译成 .class 字节码。
     expect(prompts[1]).toContain('字节码跨平台机制与WORA');
   });
 
-  it('falls back gracefully to intent-based prompts if answer has no headings', () => {
-    const query = '请为我讲解这个算法的时间复杂度';
-    const prompts = generateSmartFollowUps(query);
+  it('falls back to subject-appropriate prompts when no anchor can be extracted', () => {
+    const prompts = generateSmartFollowUps('请为我讲解这个算法的时间复杂度');
+
     expect(prompts).toHaveLength(3);
-    expect(prompts[0]).toContain('时空复杂度');
+    expect(prompts.join('')).not.toMatch(/企业级|工业级/);
+  });
+
+  it('never anchors follow-ups on narrative sentences (regression: 「它有没有一个稳定目标？」)', () => {
+    const answer = [
+      '## 一、底层原理：极限是“误差可控的稳定趋势”',
+      '**它有没有一个稳定目标？**',
+      '**极限唯一**：趋势只能稳定到一个目标。'
+    ].join('\n');
+
+    const topics = extractKeyTopicsFromContent('请结合 1.1 节讲透极限', answer);
+    const prompts = generateSmartFollowUps('请结合 1.1 节讲透极限', answer);
+
+    expect(topics).not.toContain('它有没有一个稳定目标');
+    expect(prompts).toHaveLength(3);
+    expect(prompts.join('')).not.toMatch(/它有没有一个稳定目标/);
+  });
+
+  it('keeps math follow-ups free of engineering / code wording', () => {
+    const prompts = generateSmartFollowUps(
+      '极限到底怎么理解',
+      '极限、收敛、导数与数列的性质讲解。'.repeat(4)
+    );
+
+    expect(prompts).toHaveLength(3);
+    expect(prompts.join('')).not.toMatch(/企业级|工业级|代码|落地|避坑/);
+  });
+});
+
+describe('normalizeFollowUpPrompts', () => {
+  it('strips numbering and markdown, drops generic and duplicated prompts', () => {
+    const prompts = normalizeFollowUpPrompts([
+      '1. worktree 和主分支共享对象库吗？',
+      'worktree 和主分支共享对象库吗',
+      '- 还有什么想了解的？',
+      '**worktree 与 clone 在磁盘占用上有差别吗**',
+      '这条追问会因为超过四十个字而被丢弃因为它实在是太长了根本不像学生会问出来的问题（真的）'
+    ]);
+
+    expect(prompts).toEqual([
+      'worktree 和主分支共享对象库吗？',
+      'worktree 与 clone 在磁盘占用上有差别吗'
+    ]);
+  });
+
+  it('splits prompts that the model merged into one single line', () => {
+    const prompts = normalizeFollowUpPrompts([
+      '1. 极限唯一是怎么推导出来的？ 2. 收敛必有界有反例吗？ 3. 保号性做题第一步判断什么？'
+    ]);
+
+    expect(prompts).toEqual([
+      '极限唯一是怎么推导出来的？',
+      '收敛必有界有反例吗？',
+      '保号性做题第一步判断什么？'
+    ]);
+  });
+
+  it('caps prompts at the configured max count', () => {
+    const prompts = normalizeFollowUpPrompts(
+      ['A 方案在哪里会失败？', 'B 方案的边界在哪？', 'C 方案和 D 有什么差别？', 'E 方案怎么自测？'],
+      3
+    );
+
+    expect(prompts).toHaveLength(3);
+  });
+});
+
+describe('requestFollowUps', () => {
+  it('returns nothing for degenerate answers that cannot anchor follow-ups', () => {
+    expect(requestFollowUps('讲讲 JVM', '好的')).toEqual([]);
+    expect(requestFollowUps('', 'JVM 由类加载器、运行时数据区与执行引擎组成。'.repeat(4))).toEqual([]);
+  });
+
+  it('returns rule-based prompts synchronously when no model upgrade is wired', () => {
+    const answer = `## 1. JDK、JRE与JVM的包含关系\n${'JDK 包含开发工具与 JRE，JRE 包含 JVM 与核心类库。'.repeat(4)}`;
+
+    const prompts = requestFollowUps('请梳理 Java 体系结构', answer);
+
+    expect(prompts.length).toBeGreaterThan(0);
   });
 });

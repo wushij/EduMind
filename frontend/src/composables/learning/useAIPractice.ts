@@ -72,7 +72,7 @@ function mapQuestionVo(q: PracticeQuestionVO): PracticeQuestion {
   };
 }
 
-export function useAIPractice(initialCourseId = 102) {
+export function useAIPractice(initialCourseId = 0) {
   const courseId = ref(initialCourseId);
   const practiceMode = ref('WEAK_POINT');
   const selectedKpId = ref(0);
@@ -209,6 +209,12 @@ export function useAIPractice(initialCourseId = 102) {
   }
 
   async function loadSetupSnapshot() {
+    // 课程上下文尚未就绪（课程列表未回填）时不发请求，
+    // 否则会拿 0 / 写作死的课程 id 去查考点，拿到与当前课程无关的数据。
+    if (!courseId.value || courseId.value <= 0) {
+      snapshotLoading.value = false;
+      return;
+    }
     snapshotLoading.value = true;
     try {
       const [kpRes, portraitRes, wrongRes] = await Promise.all([

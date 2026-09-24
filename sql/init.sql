@@ -742,7 +742,7 @@ CREATE TABLE IF NOT EXISTS ai_message (
     reasoning_content TEXT      DEFAULT NULL COMMENT 'DeepSeek 思考链原文',
     citations_json  TEXT        DEFAULT NULL COMMENT '引用 JSON（RAG 溯源）',
     token_count     INT         DEFAULT 0 COMMENT '本次Token消耗',
-    create_time     DATETIME    DEFAULT CURRENT_TIMESTAMP COMMENT '发送时间',
+    create_time     DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) COMMENT '发送时间（毫秒精度，保证多轮消息排序稳定）',
     KEY idx_tenant_id (tenant_id),
     PRIMARY KEY (id),
     KEY idx_conversation_id (conversation_id)

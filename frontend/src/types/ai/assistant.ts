@@ -72,6 +72,24 @@ export interface GlobalAssistantIntentEvent {
   slots?: Record<string, unknown>;
 }
 
+/** 追问建议生成入参：以本轮真实问答内容为依据，由模型现生成「下一步追问」 */
+export interface FollowUpSuggestRequest {
+  question: string;
+  answer: string;
+  /** 可选场景上下文（课程名 / 课节标题 / 题目考点） */
+  context?: string;
+  /** 生成条数，默认 3，上限 5 */
+  count?: number;
+  modelKey?: string;
+}
+
+export interface FollowUpSuggestResponse {
+  prompts: string[];
+  /** false 表示模型未返回可用追问（网关抖动 / 输出不合法），前端应回落规则生成 */
+  aiGenerated: boolean;
+  sourceLabel?: string;
+}
+
 export interface GlobalAssistantSession {
   id: string;
   title: string;
