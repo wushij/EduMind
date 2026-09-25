@@ -24,6 +24,13 @@ public class LearningAnalyticsVO {
     private List<ChapterProgressVO> chapterProgressList = new ArrayList<>();
     private CourseHealthVO courseHealth;
     private List<CourseWeakPointVO> courseWeakPoints = new ArrayList<>();
+    /**
+     * 课程全量考点真实掌握度（含尚未测评的考点，其 mastery 为 null）。
+     *
+     * <p>供「课程核心考点掌握情况」等图表使用。绝不能用"先验基准补算"的班级均分代替真实掌握度：
+     * 那会把实测 0% 的考点渲染成 36%，与同页「重点薄弱考点」卡片的真实值自相矛盾。</p>
+     */
+    private List<KnowledgePointMasteryVO> courseKnowledgePoints = new ArrayList<>();
 
     @Data
     public static class TrendData {
@@ -76,5 +83,15 @@ public class LearningAnalyticsVO {
         private Integer wrongCount; // 错题次数
         private Integer affectedStudents; // 需关注学生数
         private String urgency; // HIGH, MEDIUM, LOW
+    }
+
+    @Data
+    public static class KnowledgePointMasteryVO {
+        private Long knowledgePointId;
+        private String title;
+        /** 真实平均掌握度百分比 (0~100)；该考点尚无任何实测记录时为 null（前端展示"未测评"） */
+        private Double mastery;
+        /** 有实测掌握度记录的学生数（未测评时为 0） */
+        private Integer assessedStudentCount;
     }
 }

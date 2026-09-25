@@ -97,25 +97,36 @@
         </div>
         <div class="status-pill status-pill--time">
           <el-icon class="pill-icon"><Clock /></el-icon>
-          <span>数据更新: {{ lastUpdatedTime }}</span>
+          <span v-if="lastUpdatedTime">数据更新: {{ lastUpdatedTime }}</span>
+          <span v-else>周期内暂无学习行为</span>
         </div>
       </div>
 
       <div class="hero-metric-progress">
-        <span class="progress-title">知识大纲推进完成度</span>
-        <div class="progress-track">
-          <div
-            class="progress-fill"
-            :style="{ width: `${syllabusProgress}%` }"
-          />
-        </div>
-        <span class="progress-value">{{ syllabusProgress }}%</span>
+        <span class="progress-title">教学大纲推进进度</span>
+        <template v-if="hasRealData">
+          <div class="progress-track">
+            <div
+              class="progress-fill"
+              :style="{ width: `${syllabusProgress}%` }"
+            />
+          </div>
+          <span class="progress-value">
+            {{ syllabusProgress }}%
+            <em v-if="totalChapters > 0" class="progress-detail">已推进 {{ advancedChapterCount }}/{{ totalChapters }} 章</em>
+          </span>
+        </template>
+        <template v-else>
+          <div class="progress-track progress-track--empty" />
+          <span class="progress-value progress-value--muted">暂无学习行为数据</span>
+        </template>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { Refresh, Download, Clock, User } from '@element-plus/icons-vue';
 import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
@@ -124,7 +135,7 @@ interface CourseOption {
   name: string;
 }
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     courseId: number;
     courseOptions: CourseOption[];
@@ -132,11 +143,16 @@ withDefaults(
     courseCode?: string;
     teacherName?: string;
     studentCount?: number;
+    /** 教学大纲推进度 (0~100)：周期内有学习行为的章节数 / 总章节数 */
     syllabusProgress?: number;
+    totalChapters?: number;
+    /** 是否存在可用于分析的真实数据；false 时进度条展示空态而非 0% */
+    hasRealData?: boolean;
     range?: '7d' | '30d' | 'semester';
     loading?: boolean;
     coursesLoading?: boolean;
     adviceLoading?: boolean;
+    /** 后端返回的真实数据更新时间；空字符串表示周期内无学习行为 */
     lastUpdatedTime?: string;
   }>(),
   {
@@ -144,14 +160,22 @@ withDefaults(
     courseCode: '',
     teacherName: '任课教师',
     studentCount: 0,
-    syllabusProgress: 68,
+    syllabusProgress: 0,
+    totalChapters: 0,
+    hasRealData: false,
     range: '7d',
     loading: false,
     coursesLoading: false,
     adviceLoading: false,
-    lastUpdatedTime: '刚刚'
+    lastUpdatedTime: ''
   }
 );
+
+/** 由推进百分比折算已推进章节数，仅用于展示，不参与任何统计计算 */
+const advancedChapterCount = computed(() => {
+  if (props.totalChapters <= 0) return 0;
+  return Math.round((props.syllabusProgress / 100) * props.totalChapters);
+});
 
 const emit = defineEmits<{
   (e: 'change-course', id: number): void;
@@ -464,11 +488,34 @@ const rangeOptions = [
           background: linear-gradient(90deg, #10b981 0%, #3b82f6 100%);
           transition: width 0.5s ease-in-out;
         }
+
+        &--empty {
+          background: repeating-linear-gradient(
+            90deg,
+            #e2e8f0 0 6px,
+            #f1f5f9 6px 12px
+          );
+        }
       }
 
       .progress-value {
         font-weight: 700;
         color: #0f172a;
+        display: inline-flex;
+        align-items: baseline;
+        gap: 6px;
+
+        &--muted {
+          font-weight: 500;
+          color: #94a3b8;
+        }
+
+        .progress-detail {
+          font-style: normal;
+          font-weight: 500;
+          font-size: 11.5px;
+          color: #64748b;
+        }
       }
     }
   }

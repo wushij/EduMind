@@ -14,6 +14,7 @@ import com.edumind.statistics.dto.learning.AiPracticeGradeDTO;
 import com.edumind.statistics.dto.learning.AiPracticeStartDTO;
 import com.edumind.statistics.dto.learning.AiPracticeSubmitDTO;
 import com.edumind.statistics.entity.WrongQuestionRecordEntity;
+import com.edumind.statistics.enums.WrongErrorType;
 import com.edumind.statistics.service.analytics.WrongQuestionDiagnosisService;
 import com.edumind.statistics.service.learning.AIPracticeService;
 import com.edumind.statistics.service.learning.support.AiPracticeAnswerGrader;
@@ -61,7 +62,9 @@ public class AIPracticeServiceImpl implements AIPracticeService {
             item.setQuestionId(entity.getQuestionId());
             item.setKnowledgePointId(entity.getKnowledgePointId());
             item.setWrongCount(entity.getWrongCount());
-            item.setDiagnosis(entity.getDiagnosis());
+            // 展示层统一清洗机器标记，避免「主要失分诱因代码：[ ]」透给学生
+            String cleanDiagnosis = WrongErrorType.stripTypeMarker(entity.getDiagnosis());
+            item.setDiagnosis(StringUtils.hasText(cleanDiagnosis) ? cleanDiagnosis : null);
             if (StringUtils.hasText(entity.getErrorTypes())) {
                 item.setErrorTypes(Arrays.stream(entity.getErrorTypes().split(","))
                         .map(String::trim)
@@ -200,7 +203,7 @@ public class AIPracticeServiceImpl implements AIPracticeService {
         vo.setWrongQuestionIds(new ArrayList<>(wrongIds));
         vo.setWeakKnowledgePointIds(new ArrayList<>(weakKpIds));
         vo.setQuestionResults(results);
-        vo.setAiSummary(buildAiSummary(correct, total, weakKpIds.size()));
+        vo.setAiSummary(buildAiSummary(correct, total, weakKpIds.size(), courseId));
 
         sessionStore.remove(dto.getSessionId());
 
@@ -217,7 +220,7 @@ public class AIPracticeServiceImpl implements AIPracticeService {
         return Math.min(clientSeconds, max);
     }
 
-    private String buildAiSummary(int correct, int total, int weakKpCount) {
+    private String buildAiSummary(int correct, int total, int weakKpCount, Long courseId) {
         if (total <= 0) {
             return "本次练习已结束，建议继续巩固薄弱考点。";
         }
@@ -227,7 +230,8 @@ public class AIPracticeServiceImpl implements AIPracticeService {
         try {
             String prompt = base + " 涉及薄弱考点约 " + weakKpCount
                     + " 个。请用 2 句话给出学习建议，语气专业简洁。";
-            return aiChatApi.chat("LEARNING", "你是学习导师。", prompt);
+            // 自适应练习属于某门课的学习行为，带上 courseId 才能计入该课程的 AI 消耗
+            return aiChatApi.chat("LEARNING", courseId, "你是学习导师。", prompt);
         } catch (Exception ex) {
             if (rate >= 80) {
                 return base + " 掌握情况良好，可适度挑战更高认知层级题目。";

@@ -43,7 +43,7 @@ public class CourseDescriptionSuggestServiceImpl implements CourseDescriptionSug
 
         try {
             log.info("[AI Course Description] 调用网关生成课程简介 courseId={}", dto.getCourseId());
-            String raw = aiChatApi.chat(SCENE, systemPrompt, userPrompt);
+            String raw = aiChatApi.chat(SCENE, dto.getCourseId(), systemPrompt, userPrompt);
             String text = normalizeText(raw);
             if (StringUtils.hasText(text)) {
                 return CourseDescriptionSuggestResultVO.builder()

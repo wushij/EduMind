@@ -6,6 +6,7 @@ import com.edumind.question.api.QuestionQueryApi;
 import com.edumind.question.vo.question.QuestionVO;
 import com.edumind.statistics.dao.WrongQuestionRecordDao;
 import com.edumind.statistics.entity.WrongQuestionRecordEntity;
+import com.edumind.statistics.enums.WrongErrorType;
 import com.edumind.statistics.service.analytics.WrongQuestionAnalyticsService;
 import com.edumind.statistics.vo.analytics.WrongQuestionAnalyticsVO;
 import com.edumind.system.api.UserQueryApi;
@@ -161,10 +162,8 @@ public class WrongQuestionAnalyticsServiceImpl implements WrongQuestionAnalytics
                     globalErrorTypeCount.put(t, globalErrorTypeCount.getOrDefault(t, 0) + 1);
                 }
             }
-            if (distinctErrorTypes.isEmpty()) {
-                distinctErrorTypes.add("CONCEPT");
-                globalErrorTypeCount.put("CONCEPT", globalErrorTypeCount.getOrDefault("CONCEPT", 0) + 1);
-            }
+            // 无归因记录时不再强行补 CONCEPT：兜底会让「失分诱因：概念偏差」在根本没有归因的题目上出现，
+            // 并把概念类错因的全局占比抬虚。保持为空，由前端展示「待归因」。
             item.setErrorTypes(new ArrayList<>(distinctErrorTypes));
             item.setErrorTypeLabels(distinctErrorTypes.stream()
                     .map(this::formatErrorTypeLabel)
@@ -177,7 +176,9 @@ public class WrongQuestionAnalyticsServiceImpl implements WrongQuestionAnalytics
                     .findFirst()
                     .orElse(null);
             if (StringUtils.hasText(diagnosis)) {
-                item.setDiagnosis(diagnosis);
+                // 展示层统一清洗机器标记；来源判定仍基于库中原文，避免清洗后判定失效
+                String cleanDiagnosis = WrongErrorType.stripTypeMarker(diagnosis);
+                item.setDiagnosis(StringUtils.hasText(cleanDiagnosis) ? cleanDiagnosis : null);
                 item.setDiagnosisSource(diagnosis.contains("根本原因") ? "AI" : "LEGACY");
             } else {
                 item.setDiagnosis("全班共有 " + item.getWrongStudentCount() + " 人在该考点出现偏差，建议开展靶向变式巩固。");

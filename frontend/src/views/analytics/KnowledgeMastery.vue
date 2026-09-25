@@ -9,11 +9,13 @@
       :range="range"
       :loading="loading"
       :advice-loading="adviceLoading"
-      :total-points="masteryData?.totalKnowledgePoints || masteryData?.dimensions?.length || 0"
-      :class-avg-score="masteryData?.classAvgMastery || computeAvgClassScore()"
-      :mastered-count="masteryData?.masteredCount || countMastered()"
-      :warning-count="masteryData?.warningCount || (masteryData?.weakPoints?.length || 0)"
-      :student-count="masteryData?.studentCount || (masteryData?.students?.length || 0)"
+      :scope="masteryData?.scope || 'CLASS'"
+      :total-points="heroMetrics.totalPoints"
+      :class-avg-score="heroMetrics.classAvgScore"
+      :mastered-count="heroMetrics.masteredCount"
+      :warning-count="heroMetrics.warningCount"
+      :student-count="heroMetrics.studentCount"
+      :class-student-count="heroMetrics.classStudentCount"
       @change-course="handleCourseChange"
       @change-student="handleStudentChange"
       @change-range="handleRangeChange"
@@ -64,10 +66,12 @@
               <span class="card-title-indicator indicator--danger" />
               <span class="card-title">待攻坚薄弱考点排行</span>
               <el-tag size="small" type="danger" effect="plain" class="weak-count-tag">
-                {{ masteryData?.weakPoints?.length || 0 }} 处预警
+                {{ masteryData?.weakPoints?.length ?? 0 }} 处预警
               </el-tag>
             </div>
-            <span class="card-subtitle">掌握度低于 70% 考点集</span>
+            <span class="card-subtitle">
+              {{ masteryData?.scope === 'STUDENT' ? '该学员掌握度低于 70% 的考点集' : '全班掌握度低于 70% 的考点集' }}
+            </span>
           </div>
         </template>
 
@@ -115,6 +119,13 @@
                 <span v-if="item.affectedStudentCount" class="stat-badge">
                   受影响: <strong>{{ item.affectedStudentCount }}</strong> 人
                 </span>
+                <span
+                  class="stat-badge stat-badge--source"
+                  :class="`source--${(item.dataConfidence || 'ESTIMATED').toLowerCase()}`"
+                  :title="confidenceTitle(item)"
+                >
+                  {{ confidenceText(item) }}
+                </span>
               </div>
               <button
                 type="button"
@@ -149,10 +160,21 @@
         :active="aiThinkingModalVisible"
         v-bind="AI_COGNITIVE_THINKING_PRESETS.analyticsTeachingAdvice"
         show-footer-actions
-        abort-label="完成推演"
+        abort-label="中止推演"
         @abort="handleCloseAiAdvice"
       />
     </el-dialog>
+
+    <!-- AI 学情诊断决策抽屉 (长圆药丸美学 + 靶向干预) -->
+    <AiDiagnosisDrawer
+      v-model="aiDrawerVisible"
+      :advice="teachingAdvice"
+      :mode="studentId ? 'personal' : 'overall'"
+      :target-student-name="selectedStudentName"
+      :weak-points="weakPointTitles"
+      @dispatch-practice="handleDispatchPracticeFromAi"
+      @clear-advice="handleClearAdvice"
+    />
   </div>
 </template>
 
@@ -164,6 +186,7 @@ import KnowledgeMasteryHero from '@/components/analytics/KnowledgeMasteryHero.vu
 import KnowledgeRadar from '@/components/analytics/KnowledgeRadar.vue';
 import KnowledgeHeatmap from '@/components/analytics/KnowledgeHeatmap.vue';
 import AiCognitiveThinkingPanel from '@/components/ai/common/AiCognitiveThinkingPanel.vue';
+import AiDiagnosisDrawer from '@/components/analytics/AiDiagnosisDrawer.vue';
 import { AI_COGNITIVE_THINKING_PRESETS } from '@/constants/ai/cognitive-thinking';
 import { useLearningAnalytics } from '@/composables/analytics/useLearningAnalytics';
 import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
@@ -174,9 +197,31 @@ const { courseOptions, courseId } = useTeacherCourses();
 const studentId = ref<number | undefined>(undefined);
 const range = ref<string>('30d');
 const aiThinkingModalVisible = ref(false);
-const adviceLoading = ref(false);
+const aiDrawerVisible = ref(false);
+let isThinkingAborted = false;
+let isThinkingInProgress = false;
 
-const { loading, usedMockFallback, masteryData, fetchMastery } = useLearningAnalytics();
+const {
+  loading,
+  adviceLoading,
+  usedMockFallback,
+  masteryData,
+  teachingAdvice,
+  fetchMastery,
+  fetchTeachingAdvice,
+  stopTeachingAdvice,
+  clearTeachingAdvice
+} = useLearningAnalytics();
+
+const selectedStudentName = computed(() => {
+  if (!studentId.value) return '';
+  const stu = masteryData.value?.students?.find((s) => s.id === studentId.value);
+  return stu?.name || '';
+});
+
+const weakPointTitles = computed(() => {
+  return masteryData.value?.weakPoints?.map((w) => w.title) || [];
+});
 
 const radarTitle = computed(() => {
   if (!studentId.value) {
@@ -186,8 +231,9 @@ const radarTitle = computed(() => {
   return curStu ? `【${curStu.name}】掌握度对比 (个人表现 vs 班级平均)` : '学员多维掌握度对比画像';
 });
 
+/** 后端字段缺失时的降级算法（正常情况下以后端返回为准） */
 function computeAvgClassScore(): number {
-  if (!masteryData.value?.classAvg?.length) return 75;
+  if (!masteryData.value?.classAvg?.length) return 0;
   const sum = masteryData.value.classAvg.reduce((a, b) => a + b, 0);
   return Math.round((sum / masteryData.value.classAvg.length) * 10) / 10;
 }
@@ -196,6 +242,50 @@ function countMastered(): number {
   if (!masteryData.value?.classAvg?.length) return 0;
   return masteryData.value.classAvg.filter((v) => v >= 85).length;
 }
+
+/** 薄弱考点结论的可信度短标签：让教师一眼看出该结论有没有实测支撑 */
+function confidenceText(item: WeakPointVO): string {
+  const measured = item.measuredStudentCount ?? 0;
+  const total = item.classStudentCount ?? 0;
+  if (item.dataConfidence === 'MEASURED') return `实测可信 ${measured}/${total}`;
+  if (item.dataConfidence === 'MIXED') return `部分实测 ${measured}/${total}`;
+  return '暂无实测';
+}
+
+function confidenceTitle(item: WeakPointVO): string {
+  const measured = item.measuredStudentCount ?? 0;
+  const total = item.classStudentCount ?? 0;
+  if (item.dataConfidence === 'MEASURED') {
+    return `该考点已有 ${measured}/${total} 名学员产生真实测评记录，结论可信度高`;
+  }
+  if (item.dataConfidence === 'MIXED') {
+    return `该考点仅 ${measured}/${total} 名学员有真实测评记录，其余分值由作业均分与错题记录推算`;
+  }
+  return '该考点尚无任何学员产生独立测评记录，当前掌握率完全由作业均分与错题记录推算，建议安排一次课内小测';
+}
+
+/**
+ * 指标条口径。
+ *
+ * 修复要点：
+ * 1. 不再用 `||` 兜底，`0` 是合法统计结果（例如「精熟考点 0 个」），
+ *    历史实现会把 0 误判为「无数据」而切换到本地重算，导致指标条与榜单互相打架；
+ * 2. 聚焦学员时切换为个人口径，与后端 weakPoints 榜单同源，
+ *    避免出现「指标条说 3 个薄弱考点、右侧榜单却说 0 处预警」。
+ */
+const heroMetrics = computed(() => {
+  const data = masteryData.value;
+  const isStudentScope = data?.scope === 'STUDENT';
+  const scopeAvg = isStudentScope ? data?.focusAvgMastery : data?.classAvgMastery;
+  return {
+    totalPoints: data?.totalKnowledgePoints ?? data?.dimensions?.length ?? 0,
+    classAvgScore: scopeAvg || computeAvgClassScore(),
+    masteredCount: data?.masteredCount ?? countMastered(),
+    warningCount: data?.warningCount ?? data?.weakPoints?.length ?? 0,
+    studentCount: data?.studentCount ?? data?.students?.length ?? 0,
+    classStudentCount: data?.classStudentCount ?? data?.students?.length ?? 0
+  };
+});
 
 async function reload() {
   if (!courseId.value || courseId.value <= 0) return;
@@ -218,40 +308,117 @@ function handleRangeChange(newRange: string) {
   reload();
 }
 
-function handleOpenAiAdvice() {
+async function handleOpenAiAdvice() {
+  if (!courseId.value || courseId.value <= 0) {
+    ElMessage.warning('请先选择需要诊断评估的课程');
+    return;
+  }
+  isThinkingAborted = false;
+  isThinkingInProgress = true;
   aiThinkingModalVisible.value = true;
-  adviceLoading.value = true;
-  setTimeout(() => {
-    adviceLoading.value = false;
-  }, 3500);
+
+  try {
+    const focusKpIds = masteryData.value?.weakPoints?.map((w) => w.knowledgePointId) || [];
+    const fetchPromise = fetchTeachingAdvice({
+      courseId: courseId.value,
+      studentId: studentId.value,
+      focusKnowledgePointIds: focusKpIds.length ? focusKpIds : undefined
+    });
+
+    // 保持沉浸式推演流水线动画体验 (至少 1.8 秒)
+    const [advice] = await Promise.all([
+      fetchPromise,
+      new Promise((resolve) => setTimeout(resolve, 1800))
+    ]);
+
+    if (isThinkingAborted || !advice) {
+      isThinkingInProgress = false;
+      return;
+    }
+
+    // 标记正常推演完成，避免 el-dialog 的 @close 事件触发误报
+    isThinkingInProgress = false;
+    aiThinkingModalVisible.value = false;
+
+    ElMessage.success({
+      message: studentId.value
+        ? `已成功生成针对学员「${selectedStudentName.value || '个体'}」的精准考点诊断建议！`
+        : '已成功生成全班知识考点教学质效评估决策报告！',
+      duration: 3000
+    });
+    aiDrawerVisible.value = true;
+  } catch {
+    isThinkingInProgress = false;
+    if (!isThinkingAborted) {
+      aiThinkingModalVisible.value = false;
+      ElMessage.error('生成考点教学质效诊断建议失败，请稍后重试');
+    }
+  }
 }
 
 function handleCloseAiAdvice() {
-  aiThinkingModalVisible.value = false;
-  adviceLoading.value = false;
+  if (isThinkingInProgress) {
+    isThinkingInProgress = false;
+    isThinkingAborted = true;
+    stopTeachingAdvice();
+    aiThinkingModalVisible.value = false;
+    ElMessage.info('已中止本次 AI 教学质效推演');
+  }
+}
+
+function handleClearAdvice() {
+  if (courseId.value) {
+    clearTeachingAdvice(courseId.value, studentId.value || null);
+    ElMessage.success('已清空当前 AI 诊断策略缓存');
+  }
+}
+
+function handleDispatchPracticeFromAi(topic?: string) {
+  aiDrawerVisible.value = false;
+  ElMessage.success(`已为知识考点【${topic || '薄弱项'}】启动自适应定向变式训练计划`);
+  const query: Record<string, string> = {
+    mode: 'WEAK_POINT',
+    courseId: String(courseId.value || '')
+  };
+  // 聚焦某位学员时同步带上学生 ID，练习页才能按人下发
+  if (studentId.value) {
+    query.studentId = String(studentId.value);
+  }
+  router.push({ path: '/learning/practice', query });
 }
 
 function handleDispatchPractice(item: WeakPointVO) {
   ElMessage.success(`已为考点【${item.title}】启动自适应定向变式题训练计划`);
-  router.push({
-    path: '/learning/practice',
-    query: {
-      mode: 'WEAK_POINT',
-      courseId: String(courseId.value || ''),
-      knowledgePointId: String(item.knowledgePointId)
-    }
-  });
+  const query: Record<string, string> = {
+    mode: 'WEAK_POINT',
+    courseId: String(courseId.value || ''),
+    knowledgePointId: String(item.knowledgePointId)
+  };
+  if (studentId.value) {
+    query.studentId = String(studentId.value);
+  }
+  router.push({ path: '/learning/practice', query });
 }
 
 function handleExportMatrix() {
-  if (!masteryData.value?.dimensions?.length) {
+  const data = masteryData.value;
+  if (!data?.dimensions?.length) {
     ElMessage.warning('暂无考点掌握度数据可导出');
     return;
   }
-  const headers = ['知识考点', '班级平均掌握率(%)'];
-  const rows = masteryData.value.dimensions.map((dim, i) => {
-    const avg = masteryData.value?.classAvg[i] ?? 0;
-    return `"${dim}",${avg}`;
+
+  // 导出内容与页面口径保持一致，并显式标注每个考点的实测支撑度，
+  // 避免教师把推算出的 72% 当成真实测评成绩
+  const weakByTitle = new Map((data.weakPoints || []).map((w) => [w.title, w]));
+  const scopeLabel = data.scope === 'STUDENT' ? '聚焦学员掌握率(%)' : '班级平均掌握率(%)';
+  const headers = ['知识考点', scopeLabel, '数据可信度', '实测支撑(人/总)'];
+  const rows = data.dimensions.map((dim, i) => {
+    const avg = data.classAvg?.[i] ?? 0;
+    const weak = weakByTitle.get(dim);
+    const confidence = weak ? confidenceText(weak) : '掌握良好';
+    const measured = weak?.measuredStudentCount ?? 0;
+    const total = weak?.classStudentCount ?? data.studentCount ?? 0;
+    return `"${dim}",${avg},"${confidence}","${measured}/${total}"`;
   });
   const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -467,7 +634,9 @@ onMounted(() => {
 
       .weak-stat-tags {
         display: flex;
+        align-items: center;
         gap: 8px;
+        flex-wrap: wrap;
 
         .stat-badge {
           font-size: 11px;
@@ -475,6 +644,30 @@ onMounted(() => {
 
           strong {
             color: #0F172A;
+          }
+
+          &--source {
+            padding: 1px 6px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+
+            &.source--measured {
+              color: #047857;
+              background: #ECFDF5;
+              border-color: #A7F3D0;
+            }
+
+            &.source--mixed {
+              color: #B45309;
+              background: #FFFBEB;
+              border-color: #FDE68A;
+            }
+
+            &.source--estimated {
+              color: #64748B;
+              background: #F1F5F9;
+              border-color: #CBD5E1;
+            }
           }
         }
       }

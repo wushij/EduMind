@@ -78,6 +78,13 @@ export interface FollowUpSuggestRequest {
   answer: string;
   /** 可选场景上下文（课程名 / 课节标题 / 题目考点） */
   context?: string;
+  /**
+   * 本轮问答所属课程 ID。
+   *
+   * <p>追问属于该课程的 AI 消耗：不带课程号时这条调用不归属任何课程，
+   * 会被课程维度的调用明细过滤掉（表现为「课程里用了 AI 追问，消耗明细查不到」）。</p>
+   */
+  courseId?: number;
   /** 生成条数，默认 3，上限 5 */
   count?: number;
   modelKey?: string;

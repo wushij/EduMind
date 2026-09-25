@@ -12,8 +12,8 @@ import type { WrongQuestionDiagnoseVO } from '@/types/analytics/knowledge';
 export const getKnowledgeMastery = (params: KnowledgeMasteryQuery) =>
   get<KnowledgeMasteryVO>('/analytics/knowledge-mastery', params);
 
-export const getKnowledgeHeatmap = (courseId: number) =>
-  get<KnowledgeHeatmapVO>('/analytics/knowledge-mastery/heatmap', { courseId });
+export const getKnowledgeHeatmap = (courseId: number, includeTesting = false) =>
+  get<KnowledgeHeatmapVO>('/analytics/knowledge-mastery/heatmap', { courseId, includeTesting });
 
 export const getWrongQuestions = (params: WrongQuestionQuery) =>
   get<WrongQuestionAnalyticsVO>('/analytics/wrong-questions', params);

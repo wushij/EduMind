@@ -33,7 +33,7 @@ public class AiUsageAnalyticsServiceImpl implements AiUsageAnalyticsService {
      * ai_call_log.scene 场景码（大写归一）-> 教育业务场景展示口径。
      */
     private static final Map<String, String> SCENE_BUCKETS = Map.ofEntries(
-            // 智能答疑解惑：对话式问答 / RAG 检索增强问答 / 智能体
+            // 智能答疑解惑：对话式问答 / RAG 检索增强问答 / 智能体 / 会话追问建议
             Map.entry("CHAT", "智能答疑解惑"),
             Map.entry("CHAT_STREAM", "智能答疑解惑"),
             Map.entry("CHAT_RAG", "智能答疑解惑"),
@@ -42,6 +42,7 @@ public class AiUsageAnalyticsServiceImpl implements AiUsageAnalyticsService {
             Map.entry("KB_RETRIEVAL", "智能答疑解惑"),
             Map.entry("GLOBAL_ASSISTANT", "智能答疑解惑"),
             Map.entry("AGENT", "智能答疑解惑"),
+            Map.entry("CHAT_FOLLOW_UP", "智能答疑解惑"),
             // 试题精准批阅：主观题 / 作业智能批改
             Map.entry("GRADING", "试题精准批阅"),
             Map.entry("SUBJECTIVE_GRADING", "试题精准批阅"),
@@ -52,19 +53,33 @@ public class AiUsageAnalyticsServiceImpl implements AiUsageAnalyticsService {
             Map.entry("EXAM_SWAP_QUESTION", "靶向变式推演"),
             Map.entry("PAPER_COMPOSE", "靶向变式推演"),
             Map.entry("EXAM", "靶向变式推演"),
-            // 学情诊断评估：学情分析 / 教学建议 / 记忆抽取
+            // 学情诊断评估：学情分析 / 教学建议 / 记忆抽取 / 教学干预推演
             Map.entry("LEARNING", "学情诊断评估"),
             Map.entry("EVALUATION", "学情诊断评估"),
             Map.entry("TEACHING_ADVICE", "学情诊断评估"),
             Map.entry("MEMORY_EXTRACT", "学情诊断评估"),
+            Map.entry("MEMORY", "学情诊断评估"),
             Map.entry("SUMMARY", "学情诊断评估"),
-            // 教学备课辅助：教案大纲生成
+            Map.entry("TEACHING_INTERVENTION", "学情诊断评估"),
+            Map.entry("ANALYTICS", "学情诊断评估"),
+            // 教学备课辅助：教案大纲 / 课程内容与知识点生成 / 知识图谱关系推荐
             Map.entry("LESSON_PLAN", "教学备课辅助"),
-            Map.entry("PREP", "教学备课辅助")
+            Map.entry("PREP", "教学备课辅助"),
+            Map.entry("COURSE_DESCRIPTION", "教学备课辅助"),
+            Map.entry("COURSE_OBJECTIVE", "教学备课辅助"),
+            Map.entry("COURSE_KNOWLEDGE_POINT", "教学备课辅助"),
+            Map.entry("GRAPH_SUGGEST", "教学备课辅助")
     );
 
-    /** 未收录场景码的兜底口径 */
-    private static final String SCENE_FALLBACK = "教学备课辅助";
+    /**
+     * 未收录场景码的兜底口径。
+     *
+     * <p>历史实现兜底成"教学备课辅助"，把 {@code CHAT_TITLE}（会话标题生成）这类系统内部调用
+     * 也算进了教学业务场景，于是出现"教学备课辅助 18 次"实际全是标题生成的误报。
+     * 现统一兜底为「其他」：未收录场景既不会被伪装成业务场景，也不会被隐藏，
+     * 场景占比之和仍等于总调用量，可在调用明细里按 sourceScenes 核对。</p>
+     */
+    private static final String SCENE_FALLBACK = "其他";
 
     @Override
     public AiUsageAnalyticsVO getUsage(Long courseId, String range) {

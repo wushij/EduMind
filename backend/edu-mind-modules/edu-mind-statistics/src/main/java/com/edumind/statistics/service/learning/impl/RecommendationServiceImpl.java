@@ -43,6 +43,12 @@ public class RecommendationServiceImpl implements RecommendationService {
     @Override
     public List<RecommendedQuestionVO> recommendQuestionsForStudent(
             Long courseId, Long chapterId, Integer limit, Long studentId) {
+        return recommendQuestionsForStudent(courseId, chapterId, limit, studentId, null);
+    }
+
+    @Override
+    public List<RecommendedQuestionVO> recommendQuestionsForStudent(
+            Long courseId, Long chapterId, Integer limit, Long studentId, KnowledgeMasteryVO presetMastery) {
         if (courseId == null) {
             return Collections.emptyList();
         }
@@ -53,11 +59,20 @@ public class RecommendationServiceImpl implements RecommendationService {
         Set<Long> chapterKpIds = resolveChapterKnowledgePointIds(courseId, chapterId);
         boolean chapterScoped = chapterKpIds != null && !chapterKpIds.isEmpty();
 
+        // 掌握度只加载一次：「筛薄弱考点」与「计算匹配度」共用同一份数据。
+        // 历史实现分别调用两次 getMastery，而该方法内部要跑「全班 × 全考点」矩阵计算，
+        // 在学习路径这种逐周取题的场景里会被放大成十几次重复计算。
+        // presetMastery 允许调用方复用已算好的掌握度，彻底消除同一请求内的重复计算。
+        KnowledgeMasteryVO mastery = null;
+        if (studentId != null) {
+            mastery = presetMastery != null ? presetMastery
+                    : knowledgeMasteryService.getMastery(courseId, studentId);
+        }
+
         List<QuestionVO> ordered = new ArrayList<>();
         Set<Long> seen = new HashSet<>();
 
-        if (studentId != null) {
-            KnowledgeMasteryVO mastery = knowledgeMasteryService.getMastery(courseId, studentId);
+        if (mastery != null && mastery.getWeakPoints() != null) {
             List<KnowledgeMasteryVO.WeakPointVO> weak = new ArrayList<>(mastery.getWeakPoints());
             weak.sort(Comparator.comparing(KnowledgeMasteryVO.WeakPointVO::getMastery));
             for (KnowledgeMasteryVO.WeakPointVO wp : weak) {
@@ -95,7 +110,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             }
         }
 
-        Map<Long, Double> weakMastery = loadWeakMasteryMap(courseId, studentId);
+        Map<Long, Double> weakMastery = buildWeakMasteryMap(mastery);
         return ordered.stream()
                 .limit(size)
                 .map(q -> toQuestionRecommendation(q, courseName, weakMastery))
@@ -168,11 +183,14 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
     }
 
-    private Map<Long, Double> loadWeakMasteryMap(Long courseId, Long studentId) {
-        if (studentId == null) {
+    /**
+     * 由已加载的掌握度构建「知识点 → 掌握度」映射，用于计算题目匹配度。
+     * 直接复用调用方传入的掌握度，不再重复调用 KnowledgeMasteryService.getMastery。
+     */
+    private Map<Long, Double> buildWeakMasteryMap(KnowledgeMasteryVO mastery) {
+        if (mastery == null || mastery.getWeakPoints() == null) {
             return Map.of();
         }
-        KnowledgeMasteryVO mastery = knowledgeMasteryService.getMastery(courseId, studentId);
         return mastery.getWeakPoints().stream()
                 .filter(wp -> wp.getKnowledgePointId() != null)
                 .collect(Collectors.toMap(

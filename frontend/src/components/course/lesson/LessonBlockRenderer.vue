@@ -6,14 +6,17 @@
       class="lesson-block"
       :class="`lesson-block--${block.type}`"
     >
-      <h2 v-if="block.type === 'heading'" class="block-heading" :class="`level-${block.level}`">
-        {{ block.text }}
-      </h2>
+      <h2
+        v-if="block.type === 'heading'"
+        class="block-heading"
+        :class="`level-${block.level}`"
+        v-html="renderMathText(block.text)"
+      />
 
       <div
         v-else-if="block.type === 'markdown'"
         class="markdown-body assistant-markdown-surface chat-md-content"
-        v-html="renderLessonMarkdown(block.body)"
+        v-html="renderLessonMarkdown(block.body, lessonTitle)"
       />
 
       <div
@@ -62,6 +65,7 @@ import type { LessonBlock } from '@/types/course/lesson-content';
 import type { KnowledgePoint } from '@/types/course/knowledge-point';
 import type { LessonResourceSummary } from '@/api/course/lesson';
 import { renderLessonMarkdown, bindLessonMarkdownEnhancements } from '@/utils/format/lesson-markdown';
+import { renderMathText } from '@/utils/format/render-math';
 import { applyLessonTocFromDom, type LessonTocItem } from '@/utils/course/lesson-toc';
 import { onMounted, watch, nextTick, ref } from 'vue';
 import LessonResourceEmbed from '@/components/course/lesson/LessonResourceEmbed.vue';
@@ -70,6 +74,8 @@ const props = defineProps<{
   blocks: LessonBlock[];
   knowledgePoints?: KnowledgePoint[];
   resources?: LessonResourceSummary[];
+  /** 课节标题：页面标题已展示，正文开头若重复它会被识别为回声并剥离 */
+  lessonTitle?: string;
 }>();
 
 const emit = defineEmits<{

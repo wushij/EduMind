@@ -8,8 +8,13 @@
         class="toc-item"
         :class="[`toc-item--level-${item.level}`, { 'is-active': activeId === item.id }]"
       >
-        <button type="button" class="toc-link" :title="item.title" @click="scrollTo(item.id)">
-          {{ item.title }}
+        <button
+          type="button"
+          class="toc-link"
+          :title="getPlainTitle(item.title)"
+          @click="scrollTo(item.id)"
+        >
+          <span class="toc-text" v-html="renderMathText(item.title)" />
         </button>
       </li>
     </ul>
@@ -21,6 +26,17 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import type { LessonTocItem } from '@/utils/course/lesson-toc';
 import { getScrollParent, scrollElementIntoView } from '@/utils/dom/scroll-into-view';
+import { renderMathText } from '@/utils/format/render-math';
+
+function getPlainTitle(raw: string): string {
+  if (!raw) return '';
+  return raw
+    .replace(/\$\$?[^$]+?\$\$?/g, match => match.replace(/\$/g, '').trim())
+    .replace(/\\[a-zA-Z]+/g, '')
+    .replace(/[{}]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 const props = defineProps<{
   items: LessonTocItem[];
@@ -139,6 +155,10 @@ onUnmounted(() => {
     color: #2563eb;
     background: #eff6ff;
     font-weight: 600;
+
+    .toc-text :deep(.katex) {
+      color: #2563eb;
+    }
   }
 }
 
@@ -165,6 +185,31 @@ onUnmounted(() => {
   &:hover {
     background: #f8fafc;
     color: #1d4ed8;
+  }
+}
+
+.toc-text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+
+  :deep(.katex) {
+    font-size: 0.95em;
+    font-weight: 500;
+    line-height: normal;
+    white-space: nowrap;
+  }
+
+  :deep(.katex-html) {
+    white-space: nowrap;
+  }
+
+  :deep(.katex-display) {
+    display: inline;
+    margin: 0;
   }
 }
 

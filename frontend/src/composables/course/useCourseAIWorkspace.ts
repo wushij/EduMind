@@ -569,6 +569,7 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     const prompts = requestFollowUps(asking, material, {
       courseTitle,
       sectionTitle: secTitle || undefined,
+      courseId: resolveCourseId(),
       minMaterialChars: 0,
       count: 5,
       onUpdate: (list) => {

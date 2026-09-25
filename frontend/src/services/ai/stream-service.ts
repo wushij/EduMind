@@ -271,6 +271,8 @@ export function mapCitation(raw: Record<string, unknown>): CitationItem {
 export interface FollowUpOptions {
   sectionTitle?: string;
   courseTitle?: string;
+  /** 本轮问答所属课程 ID：透传给后端写入 AI 审计，使追问计入该课程的消耗 */
+  courseId?: number;
 }
 
 /** 追问请求的可选参数：onUpdate 用于异步回写，其余用于放宽 / 收紧生成门槛 */
@@ -683,6 +685,7 @@ export function requestFollowUps(
       question: cleanQuestion.slice(0, 1000),
       answer: clipAnswerForFollowUp(cleanAnswer),
       ...(context ? { context } : {}),
+      ...(options?.courseId ? { courseId: options.courseId } : {}),
       count: wanted
     },
     { silent: true, timeout: FOLLOW_UP_REQUEST_TIMEOUT_MS }
@@ -857,6 +860,21 @@ export async function fallbackAskAssistant(query: string, courseId: number, conv
     reasoningContent: data.reasoningContent as string | undefined,
     citations: (data.citations as CitationItem[] | undefined) || []
   };
+}
+
+/**
+ * 一次性 AI 问答：不进入会话流，用于「AI 大纲拆解」这类只需要一段结构化结果的场景。
+ * 组件层禁止直接 import `@/api`，统一从这里走。
+ */
+export async function askAssistantOnce(
+  query: string,
+  options?: { courseId?: number; signal?: AbortSignal }
+): Promise<string> {
+  const res = await askGlobalAssistant(
+    { message: query, courseId: options?.courseId },
+    { signal: options?.signal }
+  );
+  return res?.data?.content || '';
 }
 
 export const aiStreamService = {

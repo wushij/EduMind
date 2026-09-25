@@ -58,7 +58,7 @@ export function normalizeMathTextNewlines(text: string): string {
 }
 
 const COMMON_MATH_COMMANDS =
-  'ln|sin|cos|tan|cot|sec|csc|arcsin|arccos|arctan|frac|sqrt|lim|sum|int|iint|iiint|oint|prod|partial|nabla|sim|approx|ne|neq|le|leq|ge|geq|in|notin|subset|subseteq|cup|cap|to|leftarrow|rightarrow|Rightarrow|Leftarrow|Leftrightarrow|forall|exists|infty|pm|times|div|cdot|alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|phi|chi|psi|omega';
+  'ln|sin|cos|tan|cot|sec|csc|arcsin|arccos|arctan|frac|dfrac|tfrac|sqrt|lim|sum|int|iint|iiint|oint|prod|partial|nabla|sim|approx|ne|neq|le|leq|ge|geq|in|notin|subset|subseteq|cup|cap|to|leftarrow|rightarrow|Rightarrow|Leftarrow|Leftrightarrow|forall|exists|infty|pm|times|div|cdot|alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|phi|chi|psi|omega';
 
 const BARE_LATEX_RE = new RegExp(
   `(?<![\\\\$a-zA-Z0-9])\\\\(?:${COMMON_MATH_COMMANDS})(?:\\\\[a-zA-Z]+|\\{[^{}]*\\}|\\[[^\\]]*\\]|\\([^()]*\\)|[0-9a-zA-Z+\\-*/=^_(),.:~\\s])*(?=[，；。！？、\\n]|$)`,

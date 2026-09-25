@@ -226,6 +226,10 @@ function getSceneTagClass(scene?: string): string {
 function getSceneFallbackName(scene?: string): string {
   if (!scene) return 'AI 智能交互';
   const s = scene.toUpperCase();
+  // 会话标题/追问建议属于对话流程内的辅助调用，不能因为包含 CHAT 就冒充"智能答疑解惑"；
+  // 场景分布图把它们归入「其他」，明细表如实展示具体场景，避免同一批调用两处口径打架。
+  if (s === 'CHAT_TITLE') return '会话标题生成';
+  if (s === 'CHAT_FOLLOW_UP') return '追问建议生成';
   if (s.includes('CHAT')) return '智能答疑解惑';
   if (s.includes('GRADING')) return '试题精准批阅';
   if (s.includes('QUESTION')) return '靶向变式推演';

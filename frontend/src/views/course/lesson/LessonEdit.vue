@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import LessonStudioNavbar from '@/components/course/lesson/studio/LessonStudioNavbar.vue';
@@ -95,6 +95,8 @@ import {
   shouldOfferLessonEditBackupRestore,
   type LessonEditBackupPayload
 } from '@/utils/course/lesson-edit-local-backup';
+import { LESSON_AI_PREP_QUERY } from '@/services/course/lesson-studio-entry';
+import { takeLessonPrepDiagnosis } from '@/utils/course/lesson-prep-diagnosis';
 
 const route = useRoute();
 const router = useRouter();
@@ -133,6 +135,8 @@ const markdownEditorRef = ref<LessonMarkdownEditorExpose | null>(null);
 const teachingCopilotStore = useTeachingCopilotStore();
 /** 服务端数据灌入完成前，不把初始化变更当作「用户编辑」 */
 const hydrationComplete = ref(false);
+/** 教情报告带来的学情诊断（薄弱考点 + 错因），只用于强化 AI 备课的针对性 */
+const prepDiagnosis = ref('');
 
 const wordCount = computed(() => (studio.mainMarkdown || '').replace(/\s+/g, '').length);
 const readMinutes = computed(() => Math.max(1, Math.ceil(wordCount.value / 350)));
@@ -143,8 +147,9 @@ useLessonStudioCopilotBridge({
   studio,
   knowledgePoints,
   editorRef: markdownEditorRef,
+  // 助教「应用到表单」写入后同样按内容快照判定，写入与基线相同的值不算未保存
   onDirty: () => {
-    isDirty.value = true;
+    syncDirtyBySnapshot();
   }
 });
 
@@ -167,6 +172,7 @@ const lessonSidebarCopilot = useLessonSidebarCopilotActions({
   knowledgePoints,
   contentStatus,
   wordCount,
+  diagnosis: prepDiagnosis,
   onPatchDescription: value => {
     meta.description = value;
   }
@@ -179,11 +185,47 @@ const { saveStatusText, runSave, readLocalBackup, clearLocalBackup, writeLocalBa
   save: persist
 });
 
+/** 最近一次与服务端一致的编辑态快照，作为「是否有未保存改动」的判定基线 */
+let savedSnapshot = '';
+
+/**
+ * 采集当前编辑态快照。
+ *
+ * <p>把脏判定从「是否触发过响应式变更」升级为「内容是否真的偏离基线」，
+ * 服务端回填、AI 回填同值、用户改回原样都不应再被判为未保存。
+ */
+function currentSnapshot() {
+  return JSON.stringify({
+    meta: { ...meta },
+    mainMarkdown: studio.mainMarkdown,
+    objectiveCallout: { ...studio.objectiveCallout },
+    extraBlocks: [...studio.extraBlocks],
+    knowledgePointIds: [...studio.knowledgePointIds]
+  });
+}
+
+/** 按内容与基线比对刷新脏标记，返回是否真的存在未保存改动 */
+function syncDirtyBySnapshot() {
+  const dirty = currentSnapshot() !== savedSnapshot;
+  isDirty.value = dirty;
+  return dirty;
+}
+
+/** 保存成功后重置基线，避免「已保存却仍提示未保存」 */
+function markSaved() {
+  savedSnapshot = currentSnapshot();
+  isDirty.value = false;
+}
+
 watch(
   () => [meta, studio.mainMarkdown, studio.objectiveCallout, studio.extraBlocks, studio.knowledgePointIds],
   () => {
     if (!hydrationComplete.value) return;
-    isDirty.value = true;
+    if (!syncDirtyBySnapshot()) {
+      // 内容已改回与基线一致：撤销脏标记并丢弃本地备份，避免留下过期草稿
+      clearLocalBackup();
+      return;
+    }
     writeLocalBackup({
       meta: { ...meta },
       studio: {
@@ -205,6 +247,9 @@ onMounted(async () => {
     meta.durationMinutes = lesson.value.durationMinutes || 30;
     meta.lessonType = lesson.value.lessonType || 'LECTURE';
   }
+  // 服务端内容基线：即使随后恢复了本地草稿，脏判定仍以「是否偏离服务端」为准
+  const serverSnapshot = currentSnapshot();
+
   const backup = readLocalBackup();
   const backupPayload = backup?.payload as LessonEditBackupPayload | undefined;
   if (
@@ -228,15 +273,22 @@ onMounted(async () => {
           ? [...p.studio.knowledgePointIds]
           : studio.knowledgePointIds;
       }
-      isDirty.value = true;
+      // 恢复的草稿与服务器内容存在差异，脏标记由下方基线比对统一得出
     } catch {
       clearLocalBackup();
     }
   } else if (backupPayload) {
     clearLocalBackup();
   }
-  isDirty.value = false;
+
+  // watch 的 pre flush 回调排在微任务里：必须等初始化回填触发的回调跑完再建立基线，
+  // 否则「刚打开课节、什么都没改」也会被判为有未保存修改
+  await nextTick();
+  savedSnapshot = serverSnapshot;
+  syncDirtyBySnapshot();
   hydrationComplete.value = true;
+
+  await maybeAutoPrepare();
 
   try {
     const kpRes = await getCourseKnowledgePoints(courseId);
@@ -251,6 +303,38 @@ onMounted(async () => {
     resources.value = [];
   }
 });
+
+/**
+ * 由教情报告「新建备课课节」入口跳转而来时（当前路由带 aiPrep=1），
+ * 落地即按课节标题与导读（已写入薄弱考点）发起 AI 备课，
+ * 省去教师再点一次「AI 辅助 → 一键生成课节正文」。
+ */
+async function maybeAutoPrepare() {
+  if (String(route.query[LESSON_AI_PREP_QUERY] ?? '') !== '1') return;
+
+  // 先摘掉标记，避免刷新、返回或二次跳转时重复触发
+  const restQuery = { ...route.query };
+  delete restQuery[LESSON_AI_PREP_QUERY];
+  void router.replace({ path: route.path, query: restQuery });
+
+  if (!meta.title?.trim()) {
+    ElMessage.warning('课节标题为空，无法自动发起备课，请在「AI 辅助」中手动生成');
+    return;
+  }
+
+  // 取出教情报告带来的学情诊断（读取即销毁），供随后发起的 AI 备课使用
+  prepDiagnosis.value = takeLessonPrepDiagnosis(courseId, lessonId);
+
+  // 全局助手的 open 事件监听在 AppLayout 中晚于本页 mounted 注册，
+  // 直接刷新该路由时需等一帧，否则事件会被丢弃、备课无法自动发起
+  await nextTick();
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  // 新建备课课节属于全新备课场景：显式开启新会话，
+  // 否则侧栏会沿用上一节课（或上一个入口）遗留的旧对话
+  void handleAiAction('generate', { startNewSession: true });
+  ElMessage.info('已按薄弱考点发起 AI 备课：正文请在右侧助教确认后插入，导读可用「AI 提炼」生成更具体的版本');
+}
 
 function patchMeta(patch: Partial<LessonMetaForm>) {
   Object.assign(meta, patch);
@@ -275,7 +359,7 @@ async function persist(showToast = false) {
     },
     { showToast }
   );
-  if (ok) isDirty.value = false;
+  if (ok) markSaved();
   return ok;
 }
 
@@ -286,19 +370,13 @@ async function handlePublish() {
     durationMinutes: meta.durationMinutes,
     lessonType: meta.lessonType
   });
-  isDirty.value = false;
+  markSaved();
 }
 
 function handleBack() {
-  if (!isDirty.value) {
-    router.push(`/course/${courseId}/chapters`);
-    return;
-  }
-  ElMessageBox.confirm('有未保存修改，确定返回大纲吗？', '提示', {
-    type: 'warning'
-  })
-    .then(() => router.push(`/course/${courseId}/chapters`))
-    .catch(() => {});
+  // 未保存确认统一交给 useLessonAutosave 的路由离开守卫，
+  // 此处不再自行弹一次，避免一次返回要点两次「确定」
+  router.push(`/course/${courseId}/chapters`);
 }
 
 function openLessonCopilot(prompt: string, selectedText = '', lessonInsertIntent = 'editor' as const) {
@@ -322,7 +400,7 @@ function openLessonCopilot(prompt: string, selectedText = '', lessonInsertIntent
   );
 }
 
-async function handleAiAction(command: string) {
+async function handleAiAction(command: string, options?: { startNewSession?: boolean }) {
   if (command === 'description') {
     lessonSidebarCopilot.aiExtractDescription();
     return;
@@ -337,7 +415,7 @@ async function handleAiAction(command: string) {
   }
 
   if (command === 'generate') {
-    lessonSidebarCopilot.aiGenerateLessonBody();
+    lessonSidebarCopilot.aiGenerateLessonBody(options);
     return;
   }
 

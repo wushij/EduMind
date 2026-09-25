@@ -1,8 +1,9 @@
 import { ref, onMounted, onUnmounted, nextTick, shallowRef, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import * as echarts from 'echarts';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { useLearningAnalytics } from '@/composables/analytics/useLearningAnalytics';
+import { generateAiInterventionProposal } from '@/api/analytics/intervention';
 import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
 import { downloadBlob } from '@/utils/download';
 import type {
@@ -40,6 +41,8 @@ export function useAnalyticsOverview(defaultCourseId?: number) {
   const { fetchOverview, fetchTeachingAdvice, stopTeachingAdvice, adviceLoading, teachingAdvice } = useLearningAnalytics();
 
   const loading = ref(false);
+  // 靶向干预预案生成中（真实调用干预中心 AI 推演接口）
+  const interventionProposalLoading = ref(false);
   const avgScore = ref('--');
   const masteryRate = ref('--');
   const participationRate = ref('--');
@@ -55,9 +58,13 @@ export function useAnalyticsOverview(defaultCourseId?: number) {
   const scoreTrendValues = ref<Array<number | null>>([]);
   const schoolTrendValues = ref<Array<number | null>>([]);
 
-  // 知识点掌握数据
+  // 知识点掌握数据（逐考点横向柱图）
   const masteryCategories = ref<string[]>([]);
-  const masteryValues = ref<number[]>([]);
+  // 柱图数据项：value 永远是真实掌握度；unassessed=true 表示该考点尚无实测记录，
+  // 渲染为灰色"未测评"，绝不用 0.72 之类的先验值补算成"看得过去"的数字
+  const masteryBarData = ref<
+    Array<{ value: number; name: string; unassessed: boolean; assessedStudentCount: number }>
+  >([]);
 
   // 活跃度与 AI 统计
   const activityDates = ref<string[]>([]);
@@ -292,7 +299,18 @@ export function useAnalyticsOverview(defaultCourseId?: number) {
       },
       tooltip: {
         trigger: 'axis',
-        formatter: '{b}: <strong>{c}%</strong> 掌握度'
+        formatter: (params: any) => {
+          const p = Array.isArray(params) ? params[0] : params;
+          const item = p?.data;
+          if (!item) return '';
+          if (item.unassessed) {
+            return `${item.name}：<strong>未测评</strong><br/><span style="color:#94A3B8;font-size:12px">暂无实测掌握度记录</span>`;
+          }
+          const base = `${item.name}：<strong>${item.value}%</strong> 掌握度`;
+          return item.assessedStudentCount > 0
+            ? `${base}<br/><span style="color:#94A3B8;font-size:12px">已测评 ${item.assessedStudentCount} 人</span>`
+            : base;
+        }
       },
       xAxis: {
         type: 'value',
@@ -316,7 +334,7 @@ export function useAnalyticsOverview(defaultCourseId?: number) {
       series: [
         {
           type: 'bar',
-          data: masteryValues.value,
+          data: masteryBarData.value,
           barWidth: 10,
           showBackground: true,
           backgroundStyle: {
@@ -325,6 +343,10 @@ export function useAnalyticsOverview(defaultCourseId?: number) {
           },
           itemStyle: {
             color: (params: any) => {
+              // 未测评考点不画柱：只保留灰色轨道 + "未测评"标签，避免被误读成"掌握度 0%"
+              if (params?.data?.unassessed) {
+                return 'transparent';
+              }
               const val = Number(params.value) || 0;
               if (val >= 80) {
                 return new echarts.graphic.LinearGradient(0, 0, 1, 0, [
@@ -348,7 +370,8 @@ export function useAnalyticsOverview(defaultCourseId?: number) {
           label: {
             show: true,
             position: 'right',
-            formatter: '{c}%',
+            formatter: (params: any) =>
+              params?.data?.unassessed ? '未测评' : `${params.value}%`,
             color: '#64748B',
             fontSize: 11,
             fontWeight: 600
@@ -706,7 +729,9 @@ export function useAnalyticsOverview(defaultCourseId?: number) {
     const endDate = dateRange.value?.[1];
 
     try {
-      const { learning, aiUsage, mastery } = await fetchOverview(
+      // 注意：不再消费 bundle 里的 mastery（KnowledgeMastery 接口的 classAvg 含先验补算），
+      // 逐考点掌握度统一走 learning.courseKnowledgePoints 的真实值
+      const { learning, aiUsage } = await fetchOverview(
         courseId.value,
         range,
         startDate,
@@ -716,7 +741,13 @@ export function useAnalyticsOverview(defaultCourseId?: number) {
       if (learning) {
         avgScore.value = learning.avgScore != null ? learning.avgScore.toFixed(1) : '--';
         masteryRate.value = `${Math.round((learning.knowledgeMasteryAvg ?? 0) * 100)}%`;
-        participationRate.value = `${Math.round((learning.completionRate ?? 0) * 100)}%`;
+        // 学生参与度 = 周期内产生过学习/作业/AI 行为的学生占选课学生比例（courseHealth.studentInteraction）。
+        // 历史实现借用"作业提交率"（completionRate）：一是口径与卡片文案不符，
+        // 二是把非选课账号的提交也算了进来，出现"2 名学生只有 1 人交作业却显示 100%"。
+        participationRate.value =
+          learning.courseHealth?.studentInteraction != null
+            ? `${Math.round(learning.courseHealth.studentInteraction)}%`
+            : '--';
         studentCount.value = learning.studentCount ?? 0;
         avgStudyMinutes.value = learning.avgStudyMinutes ?? 0;
 
@@ -743,12 +774,37 @@ export function useAnalyticsOverview(defaultCourseId?: number) {
           : '--';
       }
 
-      if (mastery && mastery.dimensions && mastery.dimensions.length > 0) {
-        masteryCategories.value = mastery.dimensions;
-        masteryValues.value = mastery.classAvg ?? [];
+      // 逐考点掌握度：优先使用后端真实口径 courseKnowledgePoints（未测评考点的 mastery 为 null）。
+      // 不再使用 KnowledgeMastery 接口的 classAvg——它会给"没有实测记录的学生"按 0.72 先验值补算，
+      // 把实测 0% 的考点渲染成 36%，与同页「重点薄弱考点」卡片的真实值自相矛盾。
+      const realKps = learning?.courseKnowledgePoints;
+      if (realKps) {
+        // 按掌握度升序（薄弱在前），未测评考点排在最后
+        const sorted = [...realKps].sort((a, b) => {
+          if (a.mastery == null && b.mastery == null) return 0;
+          if (a.mastery == null) return 1;
+          if (b.mastery == null) return -1;
+          return a.mastery - b.mastery;
+        });
+        masteryCategories.value = sorted.map((k) => k.title);
+        masteryBarData.value = sorted.map((k) => ({
+          name: k.title,
+          value: k.mastery == null ? 0 : Math.round(k.mastery),
+          unassessed: k.mastery == null,
+          assessedStudentCount: k.assessedStudentCount ?? 0
+        }));
       } else if (courseWeakPoints.value.length > 0) {
-        masteryCategories.value = courseWeakPoints.value.map(w => w.title);
-        masteryValues.value = courseWeakPoints.value.map(w => Math.round(w.mastery));
+        // 兼容旧后端：只有薄弱考点（真实值，但仅覆盖掌握度低于 80 的考点）
+        masteryCategories.value = courseWeakPoints.value.map((w) => w.title);
+        masteryBarData.value = courseWeakPoints.value.map((w) => ({
+          name: w.title,
+          value: Math.round(w.mastery),
+          unassessed: false,
+          assessedStudentCount: 0
+        }));
+      } else {
+        masteryCategories.value = [];
+        masteryBarData.value = [];
       }
 
       if (aiUsage) {
@@ -849,6 +905,59 @@ export function useAnalyticsOverview(defaultCourseId?: number) {
     // BOM 前缀确保 Excel 正确识别 UTF-8 中文
     downloadBlob(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' }), filename);
     ElMessage.success(`周报已导出：${filename}`);
+  }
+
+  /**
+   * 一键生成靶向干预预案。
+   *
+   * 直接调用教学干预中心真实接口 POST /api/analytics/interventions/ai-propose：
+   * 后端会取该课程真实薄弱考点、真实预警学生、真实课程资源与考点关联变式题，
+   * 再由真实大模型（scene=TEACHING_INTERVENTION）推演出循证提案并落库为待审核预案，
+   * 生成后跳转干预中心继续审核/下发。
+   *
+   * 历史实现（handleDispatchGroupPractice）只弹了一句"已生成 5 题靶向变式题组"的提示，
+   * 既不发请求也不落库，属于假动作，已整体移除。
+   * 注意：该接口没有去重，重复点击会新增多条待审核记录，故此处先让教师确认。
+   */
+  async function handleGenerateInterventionProposal() {
+    if (!courseId.value || courseId.value <= 0) {
+      ElMessage.warning('请先选择需要生成干预预案的课程');
+      return;
+    }
+    // courseWeakPoints 后端已按掌握度升序返回，第 1 条即最薄弱考点
+    const weakest = courseWeakPoints.value[0];
+    const kpTitle = weakest?.title ?? '班级整体薄弱考点';
+
+    try {
+      await ElMessageBox.confirm(
+        `将基于「${kpTitle}」生成一份 AI 靶向干预预案（含预警学生名单与考点变式题清单），` +
+          `生成后需在「教学干预中心」审核通过才能下发。重复生成会产生多条待审核记录。`,
+        '生成靶向干预预案',
+        {
+          confirmButtonText: '立即生成',
+          cancelButtonText: '取消',
+          type: 'info'
+        }
+      );
+    } catch {
+      return; // 教师取消
+    }
+
+    interventionProposalLoading.value = true;
+    try {
+      const res = await generateAiInterventionProposal({
+        courseId: courseId.value,
+        knowledgePointId: weakest?.knowledgePointId,
+        triggerType: 'EXAM_WEAK'
+      });
+      const proposalTitle = res?.data?.title || `针对「${kpTitle}」的干预预案`;
+      ElMessage.success(`已生成${proposalTitle}，请前往教学干预中心审核下发`);
+      router.push('/analytics/interventions');
+    } catch {
+      // 失败提示由全局响应拦截器统一弹出（同文案 2.5s 内自动去重），此处不重复弹窗
+    } finally {
+      interventionProposalLoading.value = false;
+    }
   }
 
   // 启动推演秒表计时
@@ -968,6 +1077,7 @@ export function useAnalyticsOverview(defaultCourseId?: number) {
     aiCurrentStep,
     aiThinkingSteps,
     aiExecutionDurationText,
+    interventionProposalLoading,
     scoreTrendChartRef,
     knowledgeMasteryChartRef,
     gradeDistributionChartRef,
@@ -977,6 +1087,7 @@ export function useAnalyticsOverview(defaultCourseId?: number) {
     handleQuickRangeChange,
     handleDateRangePickerChange,
     handleExportReport,
+    handleGenerateInterventionProposal,
     handleOpenAiAdvice,
     handleStopAiAdvice,
     handleHighlightLegend,

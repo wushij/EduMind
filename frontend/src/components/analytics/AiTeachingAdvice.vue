@@ -53,13 +53,14 @@
           <div class="bot-avatar">
             <el-icon><Cpu /></el-icon>
           </div>
-          <p class="summary-text">{{ advice.summary }}</p>
+          <!-- 建议正文含数学公式，必须走 KaTeX 渲染，纯文本插值会退化成「lim(...)」这类裸写法 -->
+          <p class="summary-text math-rendered-body" v-html="renderMathText(advice.summary)" />
         </div>
 
         <ul v-if="advice.actions.length" class="action-list">
           <li v-for="(action, index) in advice.actions" :key="index">
             <span class="action-index">{{ index + 1 }}</span>
-            <span>{{ action }}</span>
+            <span class="math-rendered-body" v-html="renderMathText(action)" />
           </li>
         </ul>
       </div>
@@ -73,6 +74,7 @@
 import { Opportunity, Cpu, Loading } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import type { TeachingAdviceVO } from '@/types/analytics/mastery';
+import { renderMathText } from '@/utils/format/render-math';
 
 withDefaults(
   defineProps<{
@@ -300,6 +302,17 @@ function handleClear() {
       justify-content: center;
       flex-shrink: 0;
     }
+  }
+}
+
+/* 公式排版：与学情榜单的诊断卡片保持一致的 KaTeX 字号与配色 */
+.math-rendered-body {
+  :deep(.katex) {
+    font-size: 1.05em;
+  }
+
+  :deep(.katex-html) {
+    color: #0f172a;
   }
 }
 </style>

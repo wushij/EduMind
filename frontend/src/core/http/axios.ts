@@ -104,9 +104,17 @@ function handleUnauthorized(message = '登录状态已失效，请重新登录')
  */
 function isAiHeavyRequest(url?: string): boolean {
   const target = url || '';
-  return ['/ai/', '/grade', '/diagnose', '/variants', '/submit', '/compose'].some((key) =>
-    target.includes(key)
-  );
+  return [
+    '/ai/',
+    '/grade',
+    '/diagnose',
+    '/variants',
+    '/submit',
+    '/compose',
+    // 学情诊断类接口同样在服务端同步调用大模型（教学诊断建议、教学干预推演）
+    '/teaching-advice',
+    '/interventions/generate'
+  ].some((key) => target.includes(key));
 }
 
 /**

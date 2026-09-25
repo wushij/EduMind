@@ -99,13 +99,13 @@ function normalizeInlineNumberedLists(text: string): string {
 
         // 2. 确保已在行首的加粗序号内部有标准空格（如「**1.知识体系**」->「**1. 知识体系**」），绝不拆开 ** 与数字
         s = s.replace(
-          /(^|\n)([ \t]*)\*\*(\d{1,2})\.[ \t]*(?=[\p{Extended_Pictographic}\u4e00-\u9fa5（(「『【A-Za-z])/gu,
+          /(^|\n)([ \t]*)\*\*(\d{1,2})\.[ \t]*(?=[\p{Extended_Pictographic}\u4e00-\u9fa5（(「『【A-Za-z$\\])/gu,
           '$1$2**$3. '
         );
 
-        // 3. 普通无加粗序号拆行：仅在标点符号、中文后粘连且不在未闭合括号内时拆行
+        // 3. 普通无加粗序号拆行：仅在标点符号、中文后粘连且不在未闭合括号内时拆行（支持公式 $ 与 \ 前缀）
         s = s.replace(
-          /([\p{Extended_Pictographic}\u4e00-\u9fa5。；;!?！？:：）)”"』」】])[ \t]*(\d{1,2})\.[ \t]*(?=[\p{Extended_Pictographic}\u4e00-\u9fa5（(「『【A-Za-z]|\*\*)/gu,
+          /([\p{Extended_Pictographic}\u4e00-\u9fa5。；;!?！？:：）)”"』」】])[ \t]*(\d{1,2})\.[ \t]*(?=[\p{Extended_Pictographic}\u4e00-\u9fa5（(「『【A-Za-z$\\]|\*\*)/gu,
           (match, char, num, offset, fullStr) => {
             const before = fullStr.slice(0, offset + char.length);
             if (hasUnclosedBrackets(before)) return match;
@@ -113,9 +113,9 @@ function normalizeInlineNumberedLists(text: string): string {
           }
         );
 
-        // 4. 行首普通序号后补齐标准空格
+        // 4. 行首普通序号后补齐标准空格（支持公式 $ 与 \ 前缀）
         s = s.replace(
-          /^([ \t]*)(\d{1,2})\.(?=[ \t]*[\p{Extended_Pictographic}\u4e00-\u9fa5（(「『【A-Za-z])/gmu,
+          /^([ \t]*)(\d{1,2})\.(?=[ \t]*[\p{Extended_Pictographic}\u4e00-\u9fa5（(「『【A-Za-z$\\])/gmu,
           '$1$2. '
         );
 

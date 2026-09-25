@@ -86,6 +86,17 @@ public enum WrongErrorType {
      * 属于内部中间产物，不应出现在面向学生展示的诊断文案里。
      */
     private static final List<Pattern> TYPE_MARKER_PATTERNS = List.of(
+            // 诱因代码整段：提示词要求模型在结论末尾输出「主要失分诱因代码：[类型: CONCEPT]」。
+            // 过去只剥离其中的 code，会残留「主要失分诱因代码：[ ]」这种空壳直接透给教师，
+            // 因此这里连同引导语、方括号、code 一起整体清除。
+            Pattern.compile("(?:主要)?失分(?:诱因|原因|类型)?代码\\s*[:：]?\\s*[\\[【]?\\s*"
+                    + "(?:(?:错因)?类型\\s*[:：]?\\s*)?(?:CONCEPT|LOGIC|CALC|READING)?\\s*[\\]】]?",
+                    Pattern.CASE_INSENSITIVE),
+            // 方括号包裹的类型标注：[类型: CONCEPT] / 【READING】
+            Pattern.compile("[\\[【]\\s*(?:(?:错因)?类型\\s*[:：]?\\s*)?(?:CONCEPT|LOGIC|CALC|READING)\\s*[\\]】]?",
+                    Pattern.CASE_INSENSITIVE),
+            // 剥离上述标记后可能只剩一对空方括号，一并清理
+            Pattern.compile("[\\[【]\\s*[\\]】]"),
             // 开头前缀：CONCEPT: / READING：xxx
             Pattern.compile("^\\s*(CONCEPT|LOGIC|CALC|READING)\\s*[:：]\\s*", Pattern.CASE_INSENSITIVE),
             // 括号包裹：（CONCEPT） / (READING)

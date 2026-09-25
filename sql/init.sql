@@ -1687,7 +1687,9 @@ INSERT IGNORE INTO course_chapter (id, course_id, parent_id, title, sort_order) 
 (11, 103, 0,  '第一章 函数与极限论',        1),
 (12, 103, 11, '1.1 数列与函数极限计算',      1),
 (13, 103, 0,  '第二章 导数与微分',          2),
-(14, 103, 13, '2.1 复合函数与隐函数求导',    1);
+(14, 103, 13, '2.1 复合函数与隐函数求导',    1),
+(109, 103, 11, '1.3 函数的连续性与零点定理',        3),
+(110, 103, 13, '2.2 导数的几何意义与函数性质研究',  2);
 
 -- 7.1 微课节演示内容（Java 课节 8，供学习页联调）
 UPDATE course_chapter SET
@@ -1710,7 +1712,12 @@ INSERT IGNORE INTO course_knowledge_point (id, course_id, chapter_id, title, sor
 (16, 102, 10, 'ArrayList 与 LinkedList 源码剖析', 3),
 (17, 103, 12, '等价无穷小代换及其应用条件',      1),
 (18, 103, 12, '洛必达法则求未定式极限',          2),
-(19, 103, 14, '复合函数链式求导法则',            3);
+(19, 103, 14, '复合函数链式求导法则',            3),
+(20, 103, 109, '函数的连续性与零点定理',          1),
+(21, 103, 12,  '两个重要极限及其应用',            3),
+(22, 103, 110, '导数的几何意义与切线方程',        1),
+(23, 103, 110, '导数应用：单调性、极值与最值',    2),
+(24, 103, 14,  '隐函数与参数方程求导',            4);
 
 UPDATE course_knowledge_point SET
     code = 'KP-014',
@@ -1723,7 +1730,12 @@ INSERT IGNORE INTO course_chapter_knowledge_point (tenant_id, course_id, chapter
 VALUES (1, 102, 8, 14, 1),
        (1, 103, 12, 17, 1),
        (1, 103, 12, 18, 2),
-       (1, 103, 14, 19, 3);
+       (1, 103, 14, 19, 3),
+       (1, 103, 109, 20, 1),
+       (1, 103, 12, 21, 3),
+       (1, 103, 110, 22, 1),
+       (1, 103, 110, 23, 2),
+       (1, 103, 14, 24, 4);
 
 -- 9. 课程选课成员
 INSERT IGNORE INTO course_member (course_id, user_id, member_role) VALUES
@@ -2077,6 +2089,21 @@ UPDATE edu_question
 SET answer = REPLACE(answer, 'O(n^2)', '$O(n^2)$')
 WHERE answer LIKE '%O(n^2)%'
   AND answer NOT LIKE '%$%';
+
+-- V2.7.0 按题目实际考查内容重挂考点与历史错题对齐（幂等）
+UPDATE edu_question q JOIN course_knowledge_point kp ON kp.id = 20 AND kp.course_id = 103 SET q.knowledge_point_id = 20 WHERE q.id IN (1101, 1103, 1110);
+UPDATE edu_question q JOIN course_knowledge_point kp ON kp.id = 21 AND kp.course_id = 103 SET q.knowledge_point_id = 21 WHERE q.id = 1107;
+UPDATE edu_question q JOIN course_knowledge_point kp ON kp.id = 22 AND kp.course_id = 103 SET q.knowledge_point_id = 22 WHERE q.id = 1105;
+UPDATE edu_question q JOIN course_knowledge_point kp ON kp.id = 23 AND kp.course_id = 103 SET q.knowledge_point_id = 23 WHERE q.id = 1111;
+UPDATE edu_question q JOIN course_knowledge_point kp ON kp.id = 24 AND kp.course_id = 103 SET q.knowledge_point_id = 24 WHERE q.id IN (1106, 1109);
+
+UPDATE wrong_question_record w
+JOIN edu_question q ON q.id = w.question_id
+JOIN course_knowledge_point kp ON kp.id = q.knowledge_point_id
+SET w.knowledge_point_id = q.knowledge_point_id
+WHERE q.course_id = 103
+  AND w.course_id = 103
+  AND (w.knowledge_point_id IS NULL OR w.knowledge_point_id <> q.knowledge_point_id);
 
 SELECT '=============================================================================' AS EDUMIND_INIT_NOTICE;
 SELECT ' EduMind init.sql 执行完毕（未 DROP 任何表，仅补表/补种）' AS EDUMIND_INIT_NOTICE;

@@ -58,6 +58,16 @@ export function getSceneLabel(scene?: string) {
     COURSE_OBJECTIVE: '教学目标生成',
     COURSE_DESCRIPTION: '课程简介生成',
     COURSE_KNOWLEDGE_POINT: '知识点推荐',
+    // 补齐 ai_call_log 中真实存在、但此前未收录的场景码：
+    // 未收录会原样展示 "CHAT_TITLE" 这类内部代号，教学场景占比也会被误归并
+    AI_CHAT: '课程智能助教',
+    CHAT_TITLE: '会话标题生成',
+    CHAT_FOLLOW_UP: '追问建议生成',
+    QUESTION_GEN: '智能出题',
+    PAPER_COMPOSE: '智能组卷',
+    GRAPH_SUGGEST: '知识图谱推荐',
+    ANALYTICS: '学情诊断推演',
+    TEACHING_INTERVENTION: '教学干预推演',
     STREAM: '流式对话',
     OCR: 'OCR 识别',
     EMBEDDING: '向量嵌入',

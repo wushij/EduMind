@@ -1,5 +1,5 @@
 import { onMounted, ref } from 'vue';
-import { getCourseList } from '@/api/course/course';
+import { getCourseDetail, getCourseList } from '@/api/course/course';
 import { getCourseDisplayName } from '@/utils/course/course-display';
 import type { Course } from '@/types/course/course';
 
@@ -46,7 +46,25 @@ export function useTeacherCourses(defaultCourseId?: number) {
     }
   }
 
+  /**
+   * 读取单个课程详情（主讲教师、选课人数等列表接口没有的字段）。
+   *
+   * <p>页面必须经 composable 调用：无权访问或课程已删除时要返回 null，
+   * 让调用方清空上一门课的元数据，否则会继续沿用别的课程的主讲教师与班级人数。</p>
+   */
+  async function loadCourseDetail(id: number): Promise<Course | null> {
+    if (!id || id <= 0) {
+      return null;
+    }
+    try {
+      const res = await getCourseDetail(id);
+      return res?.data ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   onMounted(loadCourses);
 
-  return { courseOptions, courseId, loading, loadCourses, courseIdCorrected };
+  return { courseOptions, courseId, loading, loadCourses, loadCourseDetail, courseIdCorrected };
 }

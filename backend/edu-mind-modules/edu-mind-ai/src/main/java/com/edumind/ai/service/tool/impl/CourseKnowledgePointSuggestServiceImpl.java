@@ -58,7 +58,7 @@ public class CourseKnowledgePointSuggestServiceImpl implements CourseKnowledgePo
 
         try {
             log.info("[AI KP Suggest] courseId={}, chapterId={}, count={}", dto.getCourseId(), dto.getChapterId(), count);
-            String aiReply = aiChatApi.chat(SCENE, systemPrompt, userPrompt);
+            String aiReply = aiChatApi.chat(SCENE, dto.getCourseId(), systemPrompt, userPrompt);
             List<CourseKnowledgePointSuggestItemVO> parsed = parsePoints(aiReply, count);
             if (!parsed.isEmpty()) {
                 return CourseKnowledgePointSuggestResultVO.builder()
@@ -68,7 +68,7 @@ public class CourseKnowledgePointSuggestServiceImpl implements CourseKnowledgePo
                         .build();
             }
             String repair = userPrompt + "\n\n上次输出无法解析，请严格只输出合法 JSON 数组，字段与示例一致。";
-            String retryReply = aiChatApi.chat(SCENE, systemPrompt, repair);
+            String retryReply = aiChatApi.chat(SCENE, dto.getCourseId(), systemPrompt, repair);
             parsed = parsePoints(retryReply, count);
             if (!parsed.isEmpty()) {
                 return CourseKnowledgePointSuggestResultVO.builder()

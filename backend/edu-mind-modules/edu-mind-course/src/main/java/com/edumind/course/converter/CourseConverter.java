@@ -14,6 +14,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -154,20 +155,25 @@ public class CourseConverter {
         if (chapters == null || chapters.isEmpty()) {
             return Collections.emptyList();
         }
-        Map<Long, ChapterTreeVO> nodeMap = chapters.stream()
-                .collect(Collectors.toMap(ChapterEntity::getId, this::toChapterNode, (a, b) -> a));
+        // 入参由 ChapterDao 按 sortOrder ASC, id ASC 查回，必须沿用该顺序建树；
+        // 若直接用 HashMap 的迭代顺序，同一章下的课节会被打乱（例如 1.2 排到 1.1 之前）
+        List<ChapterTreeVO> nodes = chapters.stream()
+                .map(this::toChapterNode)
+                .collect(Collectors.toList());
+        Map<Long, ChapterTreeVO> nodeMap = new LinkedHashMap<>();
+        for (ChapterTreeVO node : nodes) {
+            nodeMap.put(node.getId(), node);
+        }
+
         List<ChapterTreeVO> roots = new ArrayList<>();
-        for (ChapterTreeVO node : nodeMap.values()) {
-            ChapterEntity source = chapters.stream()
-                    .filter(item -> item.getId().equals(node.getId()))
-                    .findFirst()
-                    .orElse(null);
-            Long parentId = source != null ? source.getParentId() : 0L;
-            if (parentId == null || parentId == 0L || !nodeMap.containsKey(parentId)) {
+        for (ChapterTreeVO node : nodes) {
+            Long parentId = node.getParentId();
+            ChapterTreeVO parent = parentId != null ? nodeMap.get(parentId) : null;
+            if (parent == null) {
                 roots.add(node);
                 continue;
             }
-            nodeMap.get(parentId).getChildren().add(node);
+            parent.getChildren().add(node);
         }
         return roots;
     }

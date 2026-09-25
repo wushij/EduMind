@@ -2,10 +2,12 @@ package com.edumind.ai.service.assistant.impl;
 
 import com.edumind.ai.dto.assistant.FollowUpSuggestDTO;
 import com.edumind.ai.gateway.AiGatewayFacade;
+import com.edumind.ai.service.audit.AiCallAuditContext;
 import com.edumind.ai.service.prompt.PromptService;
 import com.edumind.ai.vo.assistant.FollowUpSuggestVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -14,6 +16,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -39,7 +42,7 @@ class FollowUpSuggestServiceImplTest {
     @Test
     void suggest_shouldStripNumberingAndKeepContentAnchoredPrompts() {
         when(promptService.renderTemplate(eq("chat_follow_up"), anyMap())).thenReturn("渲染后的提示词");
-        when(aiGatewayFacade.chat(anyString(), any(), anyString(), anyString())).thenReturn("""
+        when(aiGatewayFacade.chat(anyString(), any(), anyString(), anyString(), any())).thenReturn("""
                 1. git worktree 和主分支共享对象库吗？
                 2. 删除 worktree 时未提交的改动会丢吗
                 3. CI 里同时跑多个 worktree 会冲突吗？
@@ -56,7 +59,7 @@ class FollowUpSuggestServiceImplTest {
     @Test
     void suggest_shouldFallbackSilentlyWhenModelUnavailable() {
         when(promptService.renderTemplate(eq("chat_follow_up"), anyMap())).thenReturn("渲染后的提示词");
-        when(aiGatewayFacade.chat(anyString(), any(), anyString(), anyString()))
+        when(aiGatewayFacade.chat(anyString(), any(), anyString(), anyString(), any()))
                 .thenThrow(new IllegalStateException("gateway down"));
 
         FollowUpSuggestVO vo = followUpSuggestService.suggest(request());
@@ -117,10 +120,33 @@ class FollowUpSuggestServiceImplTest {
         assertEquals("极限唯一怎么推导出来的呢？", prompts.get(0));
     }
 
+    /**
+     * 追问必须带上课程归属：不带 courseId 时审计记录 course_id 为空，
+     * 会被课程维度的调用明细过滤掉，用户看到的现象是「课程里用了追问，消耗明细里没有」。
+     */
+    @Test
+    void suggest_shouldCarryCourseIdIntoAuditContext() {
+        when(promptService.renderTemplate(eq("chat_follow_up"), anyMap())).thenReturn("渲染后的提示词");
+        ArgumentCaptor<AiCallAuditContext> contextCaptor = ArgumentCaptor.forClass(AiCallAuditContext.class);
+        when(aiGatewayFacade.chat(anyString(), any(), anyString(), anyString(), contextCaptor.capture()))
+                .thenReturn("""
+                        极限唯一为什么成立？
+                        收敛必有界做题时怎么用？
+                        保号性判定的前提是什么？
+                        """);
+
+        FollowUpSuggestDTO dto = request();
+        dto.setCourseId(103L);
+        followUpSuggestService.suggest(dto);
+
+        assertNotNull(contextCaptor.getValue(), "有课程上下文时必须传审计上下文");
+        assertEquals(103L, contextCaptor.getValue().getCourseId());
+    }
+
     @Test
     void suggest_shouldRepairWhenFirstReplyIsUnusable() {
         when(promptService.renderTemplate(eq("chat_follow_up"), anyMap())).thenReturn("渲染后的提示词");
-        when(aiGatewayFacade.chat(anyString(), any(), anyString(), anyString()))
+        when(aiGatewayFacade.chat(anyString(), any(), anyString(), anyString(), any()))
                 .thenReturn("好的，以下是一些建议追问。")
                 .thenReturn("""
                         极限唯一为什么成立？

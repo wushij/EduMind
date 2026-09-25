@@ -64,7 +64,8 @@
             <span class="source-tag">高阶语义归因</span>
           </div>
           <div class="summary-text-box">
-            <p>{{ advice?.summary }}</p>
+            <!-- 诊断结论含数学公式，必须走 KaTeX 渲染，否则教师只能看到纯文本写法 -->
+            <p class="math-rendered-body" v-html="adviceSummaryHtml"></p>
           </div>
         </div>
 
@@ -84,7 +85,7 @@
             >
               <div class="action-num-circle">{{ idx + 1 }}</div>
               <div class="action-text-content">
-                <span>{{ act }}</span>
+                <span class="math-rendered-body" v-html="renderMathText(act)" />
               </div>
             </div>
           </div>
@@ -163,6 +164,7 @@
 import { computed } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { TeachingAdviceVO } from '@/types/analytics/mastery';
+import { renderMathText } from '@/utils/format/render-math';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -202,6 +204,9 @@ const drawerTitle = computed(() => {
 
 /** 诊断行动项：只取后端真实返回，无数据时不再编造占位建议 */
 const actionList = computed(() => props.advice?.actions ?? []);
+
+/** 诊断结论的公式渲染结果：结论里常含极限/导数表达式，纯文本插值会退化成一行行「lim(...)」 */
+const adviceSummaryHtml = computed(() => renderMathText(props.advice?.summary ?? ''));
 
 /** 是否存在真实诊断数据（结论或行动项至少有一项），决定是否展示“结论”区域 */
 const hasAdvice = computed(() => {
@@ -443,6 +448,17 @@ function handleGoIntervention() {
       line-height: 1.65;
       color: #1E293B;
     }
+  }
+}
+
+/* 公式排版：与学情榜单的诊断卡片保持一致的 KaTeX 字号与配色 */
+.math-rendered-body {
+  :deep(.katex) {
+    font-size: 1.05em;
+  }
+
+  :deep(.katex-html) {
+    color: #0f172a;
   }
 }
 

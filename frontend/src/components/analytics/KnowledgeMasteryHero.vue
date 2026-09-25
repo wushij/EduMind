@@ -164,7 +164,10 @@
         </div>
         <div class="status-pill status-pill--info">
           <span class="status-dot status-dot--info" />
-          <span>班级掌握度均分: <strong>{{ classAvgScore }}%</strong></span>
+          <span>
+            {{ isStudentScope ? '学员掌握度均分' : '班级掌握度均分' }}:
+            <strong>{{ classAvgScore }}%</strong>
+          </span>
         </div>
         <div class="status-pill status-pill--success">
           <span class="status-dot status-dot--success" />
@@ -172,9 +175,12 @@
         </div>
         <div class="status-pill status-pill--warning">
           <span class="status-dot status-dot--warning" />
-          <span>薄弱待攻坚 (&lt;70%): <strong>{{ warningCount }}</strong> 个</span>
+          <span>
+            {{ isStudentScope ? '该学员待攻坚' : '薄弱待攻坚' }} (&lt;70%):
+            <strong>{{ warningCount }}</strong> 个
+          </span>
         </div>
-        <div class="status-pill status-pill--neutral">
+        <div class="status-pill status-pill--neutral" :title="studentCountTooltip">
           <span class="status-dot status-dot--neutral" />
           <span>选课建档学员: <strong>{{ studentCount }}</strong> 人</span>
         </div>
@@ -186,7 +192,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import type { KnowledgeMasteryStudentItem } from '@/types/analytics/mastery';
+import type { KnowledgeMasteryStudentItem, MasteryScope } from '@/types/analytics/mastery';
 
 interface CourseOption {
   id: number;
@@ -203,11 +209,13 @@ const props = withDefaults(
     range?: string;
     loading?: boolean;
     adviceLoading?: boolean;
+    scope?: MasteryScope;
     totalPoints?: number;
     classAvgScore?: number;
     masteredCount?: number;
     warningCount?: number;
     studentCount?: number;
+    classStudentCount?: number;
   }>(),
   {
     courseId: undefined,
@@ -216,11 +224,13 @@ const props = withDefaults(
     range: '30d',
     loading: false,
     adviceLoading: false,
+    scope: 'CLASS',
     totalPoints: 0,
     classAvgScore: 0,
     masteredCount: 0,
     warningCount: 0,
-    studentCount: 0
+    studentCount: 0,
+    classStudentCount: 0
   }
 );
 
@@ -272,6 +282,22 @@ const currentCourse = computed(() => {
 
 const currentCourseName = computed(() => currentCourse.value?.name || '');
 const currentCourseCode = computed(() => currentCourse.value?.code || '');
+
+/** 指标条口径：聚焦学员时展示个人维度，全班时展示班级维度 */
+const isStudentScope = computed(() => props.scope === 'STUDENT');
+
+/** 已被排除的管理员/测试账号数量，用于向教师解释人数口径 */
+const filteredTestingCount = computed(() =>
+  Math.max(0, (props.classStudentCount || 0) - (props.studentCount || 0))
+);
+
+const studentCountTooltip = computed(() => {
+  const total = props.classStudentCount || props.studentCount || 0;
+  if (filteredTestingCount.value > 0) {
+    return `课程共 ${total} 名选课成员，统计时已排除 ${filteredTestingCount.value} 个管理员/测试账号（与下方热力矩阵口径一致）`;
+  }
+  return `课程共 ${total} 名选课成员`;
+});
 
 const selectedStudentName = computed(() => {
   if (!currentStudentId.value) return '';

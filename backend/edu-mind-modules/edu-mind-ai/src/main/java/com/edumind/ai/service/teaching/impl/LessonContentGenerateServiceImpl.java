@@ -3,6 +3,7 @@ package com.edumind.ai.service.teaching.impl;
 import com.edumind.ai.dto.teaching.LessonContentGenerateDTO;
 import com.edumind.ai.integration.llm.LlmClient;
 import com.edumind.ai.service.prompt.PromptService;
+import com.edumind.ai.service.teaching.LessonContentBlockNormalizer;
 import com.edumind.ai.service.teaching.LessonContentGenerateService;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONException;
@@ -27,6 +28,7 @@ public class LessonContentGenerateServiceImpl implements LessonContentGenerateSe
     private final PromptService promptService;
     private final CourseQueryApi courseQueryApi;
     private final LessonContentCommandApi lessonContentCommandApi;
+    private final LessonContentBlockNormalizer lessonContentBlockNormalizer;
 
     @Override
     public String generateAndSaveDraft(LessonContentGenerateDTO dto) {
@@ -46,8 +48,10 @@ public class LessonContentGenerateServiceImpl implements LessonContentGenerateSe
         String systemPrompt = promptService.renderTemplate("lesson_content_blocks", vars);
         String raw = llmClient.chat(systemPrompt, "请输出课节 JSON 内容。");
         String contentJson = sanitizeJson(raw);
-        lessonContentCommandApi.saveLessonContentDraft(dto.getCourseId(), dto.getLessonChapterId(), contentJson);
-        return contentJson;
+        // 落库前剥离正文里重复的课节标题：页面标题已展示课节名，正文再写一遍会显示成两个「1.2 xxx」
+        String normalized = lessonContentBlockNormalizer.normalize(contentJson, lesson.getTitle());
+        lessonContentCommandApi.saveLessonContentDraft(dto.getCourseId(), dto.getLessonChapterId(), normalized);
+        return normalized;
     }
 
     private ChapterTreeVO findChapter(List<ChapterTreeVO> roots, Long id) {

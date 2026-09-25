@@ -239,7 +239,7 @@
         <div class="chart-header">
           <div class="chart-title-group">
             <h3 class="chart-title">成绩演进与年级对照</h3>
-            <span class="chart-sub-label">班级平均分与全校基准平滑对比曲线</span>
+            <span class="chart-sub-label">班级平均分与全校基准平滑对比曲线（纵轴按当期真实样本自适应，非 0-100 满分刻度）</span>
           </div>
           <div class="chart-actions">
             <div class="time-filter-pills">
@@ -478,9 +478,10 @@
               size="small"
               round
               :icon="Promotion"
-              @click="handleDispatchGroupPractice"
+              :loading="interventionProposalLoading"
+              @click="handleGenerateInterventionProposal"
             >
-              一键推送靶向变式题组
+              生成靶向干预预案
             </el-button>
           </div>
         </div>
@@ -642,7 +643,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
 import {
   Refresh,
   Download,
@@ -696,6 +696,7 @@ const {
   aiCurrentStep,
   aiThinkingSteps,
   aiExecutionDurationText,
+  interventionProposalLoading,
   scoreTrendChartRef,
   knowledgeMasteryChartRef,
   gradeDistributionChartRef,
@@ -705,6 +706,7 @@ const {
   handleQuickRangeChange,
   handleDateRangePickerChange,
   handleExportReport,
+  handleGenerateInterventionProposal,
   handleOpenAiAdvice,
   handleStopAiAdvice,
   handleHighlightLegend,
@@ -727,9 +729,9 @@ const healthLevelText = computed(() => {
   return '良好 · 正常推进';
 });
 
-function handleDispatchGroupPractice() {
-  ElMessage.success('已依据薄弱考点生成 5 题靶向变式题组，已加入「教学干预中心」待发布清单！');
-}
+// 说明：此处原有 handleDispatchGroupPractice() 只弹一句"已生成 5 题靶向变式题组"的提示，
+// 既不调用任何接口也不落库，属于假动作，已替换为 useAnalyticsOverview 中的真实实现
+// handleGenerateInterventionProposal()（调用干预中心 AI 推演接口 + 跳转审核）。
 </script>
 
 <style scoped lang="scss">

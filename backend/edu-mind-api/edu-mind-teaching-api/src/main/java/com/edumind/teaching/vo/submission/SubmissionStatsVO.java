@@ -11,8 +11,17 @@ public class SubmissionStatsVO {
     private Integer totalAssignments;
     private Integer submittedCount;
     private Integer gradedCount;
+    /**
+     * 应提交答卷槽位数 = Σ(每份已发布/已关闭作业的选课学生数)。
+     * 由本 VO 直接给出，调用方无需为了还原分母再查一次选课名单。
+     */
+    private Integer expectedSubmissionCount;
     private Double avgSubmissionRate;
     private Double avgScore;
+    /**
+     * 学生维度成绩明细（均分 / 答卷数）。
+     * 与课程级汇总在同一次答卷扫描中产出，调用方不要再单独发起全量扫描。
+     */
     private List<StudentScoreVO> studentScores = new ArrayList<>();
 
     @Data

@@ -201,7 +201,7 @@ public class TeachingInterventionServiceImpl implements TeachingInterventionServ
 
         // 4. 调用真实 AI 模型与提示词进行循证推演
         String resTitle = !resourceList.isEmpty() ? resourceList.get(0).getTitle() : "考点精讲攻坚微课";
-        JSONObject aiResult = invokeAiInterventionThinking(courseName, weakPointTitle, "EXAM_WEAK", targetStudents.size(), resTitle, questionList.size());
+        JSONObject aiResult = invokeAiInterventionThinking(courseId, courseName, weakPointTitle, "EXAM_WEAK", targetStudents.size(), resTitle, questionList.size());
 
         // 5. 组装实体
         TeachingInterventionEntity entity = new TeachingInterventionEntity();
@@ -286,7 +286,7 @@ public class TeachingInterventionServiceImpl implements TeachingInterventionServ
 
         // 3. 真实大模型 AI 推演
         String resTitle = !resourceList.isEmpty() ? resourceList.get(0).getTitle() : "考点精讲攻坚微课";
-        JSONObject aiResult = invokeAiInterventionThinking(courseName, weakPointTitle, triggerType, targetStudents.size(), resTitle, questionList.size());
+        JSONObject aiResult = invokeAiInterventionThinking(courseId, courseName, weakPointTitle, triggerType, targetStudents.size(), resTitle, questionList.size());
 
         // 4. 返回前端预览与回填 VO
         TeachingInterventionVO vo = new TeachingInterventionVO();
@@ -308,6 +308,7 @@ public class TeachingInterventionServiceImpl implements TeachingInterventionServ
     }
 
     private JSONObject invokeAiInterventionThinking(
+            Long courseId,
             String courseName,
             String weakPointTitle,
             String triggerType,
@@ -348,7 +349,8 @@ public class TeachingInterventionServiceImpl implements TeachingInterventionServ
 
         try {
             log.info("[AI Intervention] 正在调用真实 AI 模型推演干预提案，course={}, kp={}, trigger={}", courseName, weakPointTitle, triggerType);
-            String aiReply = aiChatApi.chat("TEACHING_INTERVENTION", systemPrompt, userPrompt.toString());
+            // 干预提案针对具体课程生成，带上 courseId 才会计入该课程的 AI 消耗
+            String aiReply = aiChatApi.chat("TEACHING_INTERVENTION", courseId, systemPrompt, userPrompt.toString());
             log.info("[AI Intervention] 真实 AI 模型返回结果: {}", aiReply);
             JSONObject parsed = parseAiJson(aiReply);
             if (parsed != null) {

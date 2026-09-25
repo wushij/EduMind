@@ -53,6 +53,7 @@ sql/
 │   ├── V2_6_7__remove_ai_lesson_plan.sql       # V2.6.7 下线独立 AI 教案页：清理工具入口与 ai:lesson:generate 权限（幂等）
 │   ├── V2_6_8__widen_wrong_question_diagnosis.sql # V2.6.8 错题 AI 归因结论列加宽为 TEXT（修复 AI 诊断落库 400）
 │   ├── V2_6_9__widen_ai_memory_summary.sql     # V2.6.9 AI 长期记忆摘要列加宽为 TEXT（同类超长隐患预防）
+│   ├── V2_7_0__fix_math_knowledge_point_tagging.sql # V2.7.0 修正高数（课程103）考题知识点归属与章节挂载（消除评估榜单矛盾）
 │   ├── R__seed_data.sql                        # V0 增量路径演示种子（用户/课程/题库/AI 等，幂等）
 │   ├── R__seed_legacy.sql                      # 旧库升级补丁（租户角色/组织成员/权限乱码修复，幂等）
 │   └── R__gate_e2e_seeds.sql                   # Gate F/G/H 集成测试种子（幂等，init 不含 Gate F）
@@ -76,7 +77,7 @@ mysql -u root -p < sql/init.sql
 
 > 已有业务数据的库 **禁止** 执行 `init.sql`；补表、改结构、版本升级请走 `sql/migration/V*.sql`（执行前 `mysqldump` 备份）。
 
-`init.sql` 已包含 **V0.1 ~ V2.6.8** 所有迁移最终状态（含多租户 Wave1/2、权限补全、课程 AI 字段、课程概览门户表、`sys_menu`、微课节正文/进度、课节讲义 AI 索引、Chunk 向量持久化、深度思考提示词纪律、考查重点、导出进度、作业高级配置、错题本状态、错题归因结论长文本列、试题 LaTeX 规范化转义等），**全新空库跑 init 后无需再跑任何 `V*.sql` migration**（Gate E2E 可选种子除外）。
+`init.sql` 已包含 **V0.1 ~ V2.7.0** 所有迁移最终状态（含多租户 Wave1/2、权限补全、课程 AI 字段、课程概览门户表、`sys_menu`、微课节正文/进度、课节讲义 AI 索引、Chunk 向量持久化、深度思考提示词纪律、考查重点、导出进度、作业高级配置、错题本状态、错题归因结论长文本列、试题 LaTeX 规范化转义、高数章节考点补全与题库及错题考点对齐等），**全新空库跑 init 后无需再跑任何 `V*.sql` migration**（Gate E2E 可选种子除外）。
 
 ### 方式二：按版本增量迁移（已有空库分步升级）
 
@@ -180,6 +181,7 @@ mysql -u root -p edumind < sql/migration/R__seed_legacy.sql
 | V2.6.6 消息时间精度 | `V2_6_6__ai_message_create_time_precision.sql` | `ai_message.create_time` 提升为 `DATETIME(3)`，应用侧落库时显式写入 `LocalDateTime.now()`。**修复同一秒内多条消息排序不确定、多轮上下文角色交替错乱**（`ai_message.id` 是随机 UUID 无时序语义，不能当二级排序键）。**幂等，可重复执行。** |
 | V2.6.9 记忆摘要列加宽 | `V2_6_9__widen_ai_memory_summary.sql` | `ai_memory_item.summary` 由 `VARCHAR(512)` 提升为 `TEXT`，应用侧 `MemorySummaryNormalizer` 统一 1000 字收口，DTO 增加 `@Size(max = 1000)`。**预防同类故障**：Agent 记忆提取候选摘要（模型输出长度不可控）、记忆纠错 `correctContent` 覆盖摘要两条路径都可能超出 512 字，触发与 V2.6.8 完全相同的 400「数据操作冲突」。**幂等，可重复执行。** |
 | V2.6.8 错题归因结论列加宽 | `V2_6_8__widen_wrong_question_diagnosis.sql` | `wrong_question_record.diagnosis` 由 `VARCHAR(512)` 提升为 `TEXT`。**修复「点击 AI 诊断报 400 数据操作冲突、结论不入库」**：AI 归因正文（含 LaTeX 公式）普遍超过 512 字符，严格模式下 MySQL 抛 `Data too long for column 'diagnosis'`，被异常处理器映射成 400，模型额度已消耗但结论全部丢失。**幂等，可重复执行。** |
+| V2.7.0 高数考点归属修复 | `V2_7_0__fix_math_knowledge_point_tagging.sql` | 补齐高数（课程103）章节（109/110）与核心考点（20~24），修正试题及错题记录考点挂载。**彻底消除教师端教学质量评估热力榜单「标题与 AI 诊断正文自相矛盾」及盲目推送教学建议的问题。幂等，可重复执行。** |
 
 > **V2.6.4 权限模型变更提示（重要）**
 >

@@ -34,6 +34,8 @@ export function useLessonSidebarCopilotActions(options: {
   knowledgePoints: MaybeRef<KnowledgePoint[]>;
   contentStatus?: MaybeRef<string | undefined>;
   wordCount?: MaybeRef<number>;
+  /** 来自教情报告的学情诊断（薄弱考点 + 错因分析），只用于强化 AI 生成针对性 */
+  diagnosis?: MaybeRef<string>;
   onPatchDescription: (value: string) => void;
 }) {
   const teachingStore = useTeachingCopilotStore();
@@ -65,14 +67,20 @@ export function useLessonSidebarCopilotActions(options: {
     return false;
   }
 
-  function openCopilotPrompt(prompt: string, intent: LessonInsertIntent) {
+  function openCopilotPrompt(
+    prompt: string,
+    intent: LessonInsertIntent,
+    options2?: { startNewSession?: boolean }
+  ) {
     teachingStore.openAssistantWithContext(
       {
         ...buildStudioContext(),
         lessonInsertIntent: intent
       },
       prompt,
-      { autoSend: true }
+      // startNewSession：由「新建备课课节」等入口显式要求开新会话；
+      // 未显式要求时，store 会在课节发生变化时自行开新会话
+      { autoSend: true, startNewSession: options2?.startNewSession === true }
     );
   }
 
@@ -154,7 +162,7 @@ export function useLessonSidebarCopilotActions(options: {
     openCopilotPrompt(prompt, 'objective');
   }
 
-  function aiGenerateLessonBody() {
+  function aiGenerateLessonBody(options2?: { startNewSession?: boolean }) {
     const title = options.meta.title?.trim();
     if (!title) {
       requireTitle('请先填写课节标题，再一键生成课节正文');
@@ -167,13 +175,15 @@ export function useLessonSidebarCopilotActions(options: {
     const description = options.meta.description?.trim();
     const objective = unref(options.objectiveBody)?.trim();
 
+    // 注意：该 prompt 会作为用户消息展示在助教对话里并被 Markdown 渲染，
+    // 因此正文中不能出现成对的美元符号或三连反引号，否则会被渲染成公式/代码块而变形。
     let prompt = `请为课节《${title}》撰写完整教学正文（Markdown），可直接插入课节编辑器。
 要求：
 1. 使用 ## / ### 组织小节，含概念讲解、示例与课堂小结；
 2. 语气专业、适合「${typeLabel}」课型；
 3. 输出完整讲解正文，不要只列学习目标清单，不要单独输出【推荐考点】；
-4. 所有程序示例必须用 Markdown 围栏代码块（\`\`\`java 独占一行开头、\`\`\` 独占一行结尾），不要用反引号包裹整段代码；
-5. 正文里文件名、命令可直接写 Hello.java、javac，不要加 \` 反引号；
+4. 若涉及数学公式，一律使用 LaTeX：行内公式左右各用一个美元符号包裹，独立成行的公式左右各用两个美元符号包裹；不要写成纯文本或图片；
+5. 仅当内容涉及程序代码时，才使用 Markdown 代码围栏（三个反引号独占一行作为开头与结尾，语言标识紧随开头那行），文件名与命令直接书写，不要使用反引号；
 6. 不要输出 JSON、不要客套开场白。`;
 
     if (description) {
@@ -188,7 +198,16 @@ export function useLessonSidebarCopilotActions(options: {
       prompt += '\n\n当前正文为空，请从零生成初稿。';
     }
 
-    openCopilotPrompt(prompt, 'editor');
+    // 教情报告入口带来的学情诊断：决定讲解重点与易错提醒，但不许把诊断原话写进正文
+    const diagnosis = unref(options.diagnosis)?.trim();
+    if (diagnosis) {
+      prompt +=
+        '\n\n学情诊断（来自教情报告，用于决定讲解重点、易错点与练习设计；' +
+        '请勿把诊断原话或「薄弱考点」等后台表述写进正文）：\n' +
+        diagnosis;
+    }
+
+    openCopilotPrompt(prompt, 'editor', options2);
   }
 
   function aiPolishTitle() {

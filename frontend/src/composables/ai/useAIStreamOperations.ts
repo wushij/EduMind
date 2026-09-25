@@ -120,6 +120,7 @@ export function createAIStreamOperations(deps: AIStreamOperationsDeps) {
 
     // 追问：模型结果异步到达后才回写（拿不到就静默回落到规则生成）
     const followUps = requestFollowUps(promptText, finalAnswer, {
+      courseId: deps.activeStreamCourseId.value,
       onUpdate: (prompts) => {
         // 用 pickTurnMessage 按 id 拿「数组里的代理对象」回写：
         // 直接与原始对象做引用比较会恒为 false（响应式代理），表现就是「追问要刷新才出现」

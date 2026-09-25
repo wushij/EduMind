@@ -7,7 +7,10 @@
           <el-icon class="panel-icon panel-icon--blue"><Histogram /></el-icon>
           <h3 class="panel-title">本学期核心考点掌握度热力排行榜</h3>
         </div>
-        <span class="badge-pill">覆盖 {{ knowledgeMasteryList.length }} 个薄弱考点项</span>
+        <div class="header-right-group">
+          <span class="rank-order-hint">按实测掌握度升序 · 同分按答错人次</span>
+          <span class="badge-pill">{{ knowledgeMasteryList.length }} 个薄弱考点</span>
+        </div>
       </div>
 
       <div v-if="knowledgeMasteryList.length === 0" class="empty-kp-box">
@@ -31,14 +34,26 @@
                 <div class="name-row">
                   <span class="kp-title" v-html="renderMath(kp.name)" />
                   <span class="course-name-tag">{{ kp.course }}</span>
+                  <!-- 同一考点的多道错题已合并：如实标注，避免教师以为漏了数据 -->
+                  <span v-if="(kp.wrongQuestionCount ?? 1) > 1" class="merged-wrong-tag">
+                    合并 {{ kp.wrongQuestionCount }} 道错题
+                  </span>
                 </div>
               </div>
             </div>
 
             <!-- 右侧掌握度数值与等级胶囊 -->
             <div class="kp-rate-container">
-              <span class="rate-number" :class="`text-${kp.status}`">{{ kp.rate }}%</span>
+              <span class="rate-number" :class="`text-${kp.status}`">
+                {{ kp.rate === null ? '暂无数据' : `${kp.rate}%` }}
+              </span>
               <span class="status-chip" :class="`chip-${kp.status}`">{{ kp.statusLabel }}</span>
+              <!-- 样本量：0% 常常只是 1~2 名学生的实测结果，必须如实标注口径，避免被读成全班结论 -->
+              <span v-if="kp.masterySampleCount" class="rate-sample-hint">
+                实测 {{ kp.masterySampleCount }} 名学生<template
+                  v-if="kp.masteryAssessmentCount"
+                >（{{ kp.masteryAssessmentCount }} 次测评）</template>{{ kp.masterySampleCount < 3 ? ' · 样本较小' : '' }}
+              </span>
             </div>
           </div>
 
@@ -47,7 +62,7 @@
             <div
               class="capsule-progress-fill"
               :class="`fill-${kp.status}`"
-              :style="{ width: `${kp.rate}%` }"
+              :style="{ width: `${kp.rate ?? 0}%` }"
             />
           </div>
 
@@ -55,25 +70,31 @@
           <div class="diagnosis-detail-card" :class="`diagnosis--${kp.status}`">
             <div class="diagnosis-header-line">
               <div class="diagnosis-tag-group">
-                <span class="category-tag" :class="`cat-${kp.errorType || 'CONCEPT'}`">
-                  {{ kp.errorTypeName || '概念理解错误' }}
+                <span class="category-tag" :class="`cat-${kp.errorType || 'UNKNOWN'}`">
+                  {{ kp.errorTypeName || '待归因' }}{{ kp.errorTypeInferred ? '（推断）' : '' }}
                 </span>
                 <span class="diagnosis-lead-title">AI 学情深度归因诊断：</span>
               </div>
             </div>
 
-            <!-- 渲染数学公式的根本原因剖析 -->
+            <!-- 渲染数学公式的根本原因剖析；无诊断记录时不编造错因 -->
             <div
               v-if="kp.errorReason"
               class="diagnosis-content-text math-rendered-body"
               v-html="renderMath(kp.errorReason)"
             />
+            <div v-else class="diagnosis-content-text diagnosis-content-text--empty">
+              暂无该考点的 AI 错因诊断记录（需先产生错题并由 AI 完成归因）。
+            </div>
 
             <!-- 下方建议与操作按钮行 -->
             <div class="diagnosis-footer-bar">
-              <div class="suggestion-snippet">
+              <div v-if="kp.suggestion" class="suggestion-snippet">
                 <el-icon class="action-light-icon"><AiSparkleIcon /></el-icon>
                 <span class="sugg-text"><strong>教学建议：</strong>{{ kp.suggestion }}</span>
+              </div>
+              <div v-else class="suggestion-snippet suggestion-snippet--empty">
+                <span class="sugg-text">暂无针对性教学建议</span>
               </div>
 
               <div class="kp-card-actions">
@@ -103,30 +124,34 @@
       </div>
     </div>
 
-    <!-- 2. 近 7 日 AI 助教答疑负荷与学生提问时段分布 -->
+    <!-- 2. 统计周期内学生学习活跃趋势（真实日活用户数） -->
     <div class="report-panel-card">
       <div class="panel-header-line">
         <div class="header-left">
           <el-icon class="panel-icon panel-icon--emerald"><TrendCharts /></el-icon>
-          <h3 class="panel-title">近 7 日 AI 助教答疑负荷与学生提问频次分布</h3>
+          <h3 class="panel-title">统计周期内学生学习活跃趋势</h3>
         </div>
-        <span class="total-call-hint">
-          累计响应 <strong>{{ totalCallCount }}</strong> 次
+        <span v-if="weeklyActivity.length > 0" class="total-call-hint">
+          累计活跃 <strong>{{ totalActiveUsers }}</strong> 人次
         </span>
       </div>
 
-      <div class="weekly-bars-chart">
+      <div v-if="weeklyActivity.length === 0" class="empty-kp-box">
+        <el-empty description="当前周期内暂无学生学习行为记录" :image-size="80" />
+      </div>
+
+      <div v-else class="weekly-bars-chart">
         <div
           v-for="day in weeklyActivity"
           :key="day.date"
           class="chart-bar-column"
         >
-          <span class="bar-val-hint">{{ day.count }} 次</span>
+          <span class="bar-val-hint">{{ day.count }} 人</span>
           <div class="bar-track">
             <div
               class="bar-fill"
               :style="{ height: `${calculateBarHeight(day.count)}%` }"
-              :title="`${day.date}: ${day.count} 次咨询`"
+              :title="`${day.date}: ${day.count} 名活跃学生`"
             />
           </div>
           <span class="bar-date-label">{{ day.date }}</span>
@@ -154,7 +179,8 @@ const props = defineProps<{
   onViewQuestion: (kp: KnowledgeMasteryItem) => void;
 }>();
 
-const totalCallCount = computed(() => {
+/** 累计活跃人次：对真实日活学生数求和 */
+const totalActiveUsers = computed(() => {
   return props.weeklyActivity.reduce((acc, curr) => acc + (curr.count || 0), 0);
 });
 
@@ -221,6 +247,20 @@ function renderMath(text?: string): string {
         }
       }
 
+      .header-right-group {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 10px;
+
+        /* 排序口径：标题承诺"掌握度榜"，排序依据必须与之一致，避免被误读为按错题次数排 */
+        .rank-order-hint {
+          font-size: 11.5px;
+          color: #94a3b8;
+        }
+      }
+
       .badge-pill {
         padding: 3px 12px;
         border-radius: 9999px;
@@ -281,16 +321,23 @@ function renderMath(text?: string): string {
           border-left: 4px solid #10b981;
         }
 
+        &.border-level-unknown {
+          border-left: 4px solid #cbd5e1;
+        }
+
         .kp-card-header {
           display: flex;
           align-items: center;
           justify-content: space-between;
           margin-bottom: 12px;
+          gap: 12px;
 
           .header-main-group {
             display: flex;
             align-items: center;
             gap: 12px;
+            min-width: 0;
+            flex: 1;
 
             .kp-badge {
               width: 24px;
@@ -350,6 +397,17 @@ function renderMath(text?: string): string {
                   color: #64748b;
                   font-size: 11px;
                 }
+
+                /* 同考点多道错题已合并，如实标注来源条数 */
+                .merged-wrong-tag {
+                  display: inline-flex;
+                  align-items: center;
+                  padding: 1px 7px;
+                  border-radius: 4px;
+                  background: #fef3c7;
+                  color: #b45309;
+                  font-size: 11px;
+                }
               }
             }
           }
@@ -357,24 +415,34 @@ function renderMath(text?: string): string {
           .kp-rate-container {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+            flex-shrink: 0;
 
             .rate-number {
-              font-size: 16px;
+              font-size: 15px;
               font-weight: 800;
               font-family: ui-monospace, SFMono-Regular, monospace;
+              flex-shrink: 0;
+              white-space: nowrap;
 
               &.text-danger { color: #dc2626; }
               &.text-warning { color: #d97706; }
               &.text-normal { color: #1677ff; }
               &.text-good { color: #059669; }
+              &.text-unknown { color: #94a3b8; font-size: 13px; }
             }
 
             .status-chip {
-              padding: 2px 8px;
+              padding: 2px 7px;
               border-radius: 9999px;
-              font-size: 11px;
+              font-size: 10px;
               font-weight: 600;
+              line-height: 1.4;
+              white-space: nowrap;
+              flex-shrink: 0;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
 
               &.chip-danger {
                 background: #fee2e2;
@@ -395,6 +463,23 @@ function renderMath(text?: string): string {
                 background: #d1fae5;
                 color: #047857;
               }
+
+              &.chip-unknown {
+                background: #f1f5f9;
+                color: #64748b;
+              }
+            }
+
+            /* 实测覆盖人数与测评次数：极小样本下的 0% 需标注口径，避免被读成"全班都不掌握" */
+            .rate-sample-hint {
+              padding: 1px 7px;
+              border-radius: 9999px;
+              background: #ffffff;
+              border: 1px solid #e2e8f0;
+              color: #94a3b8;
+              font-size: 10px;
+              white-space: nowrap;
+              flex-shrink: 0;
             }
           }
         }
@@ -416,6 +501,7 @@ function renderMath(text?: string): string {
             &.fill-normal { background: linear-gradient(90deg, #1677ff 0%, #38bdf8 100%); }
             &.fill-warning { background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%); }
             &.fill-danger { background: linear-gradient(90deg, #ef4444 0%, #f87171 100%); }
+            &.fill-unknown { background: linear-gradient(90deg, #cbd5e1 0%, #e2e8f0 100%); }
           }
         }
 
@@ -449,6 +535,12 @@ function renderMath(text?: string): string {
             color: #166534;
           }
 
+          &.diagnosis--unknown {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #475569;
+          }
+
           .diagnosis-header-line {
             display: flex;
             align-items: center;
@@ -468,6 +560,10 @@ function renderMath(text?: string): string {
                 &.cat-CONCEPT { background: #fee2e2; color: #dc2626; }
                 &.cat-CALC { background: #fef3c7; color: #d97706; }
                 &.cat-LOGIC { background: #e0f2fe; color: #0284c7; }
+                &.cat-READING { background: #ede9fe; color: #6d28d9; }
+                &.cat-TRANSFER { background: #e0f2fe; color: #0369a1; }
+                &.cat-MEMORY { background: #f1f5f9; color: #475569; }
+                &.cat-UNKNOWN { background: #f1f5f9; color: #64748b; }
               }
 
               .diagnosis-lead-title {
@@ -481,6 +577,11 @@ function renderMath(text?: string): string {
             color: #334155;
             margin-bottom: 10px;
             font-size: 12.5px;
+
+            &--empty {
+              color: #94a3b8;
+              font-style: italic;
+            }
 
             :deep(.katex) {
               font-size: 1.05em;
@@ -507,6 +608,10 @@ function renderMath(text?: string): string {
               font-size: 12px;
               color: #475569;
               flex: 1;
+
+              &--empty {
+                color: #94a3b8;
+              }
 
               .action-light-icon {
                 font-size: 13px;
@@ -577,6 +682,12 @@ function renderMath(text?: string): string {
                   box-shadow: 0 2px 6px rgba(22, 119, 255, 0.25);
                   &:hover { background: #2563eb; transform: translateY(-1px); }
                 }
+
+                &.btn-unknown {
+                  background: #64748b;
+                  box-shadow: 0 2px 6px rgba(100, 116, 139, 0.25);
+                  &:hover { background: #475569; transform: translateY(-1px); }
+                }
               }
             }
           }
@@ -588,12 +699,13 @@ function renderMath(text?: string): string {
       display: flex;
       align-items: flex-end;
       justify-content: space-between;
-      gap: 16px;
+      gap: 10px;
       height: 160px;
       padding-top: 20px;
 
       .chart-bar-column {
         flex: 1;
+        min-width: 56px;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -604,6 +716,7 @@ function renderMath(text?: string): string {
           font-weight: 600;
           color: #64748b;
           margin-bottom: 6px;
+          white-space: nowrap;
         }
 
         .bar-track {
@@ -630,10 +743,13 @@ function renderMath(text?: string): string {
         }
 
         .bar-date-label {
-          font-size: 11.5px;
+          font-size: 10px;
           font-weight: 500;
           color: #64748b;
           margin-top: 8px;
+          white-space: nowrap;
+          letter-spacing: -0.2px;
+          line-height: 1.3;
         }
       }
     }

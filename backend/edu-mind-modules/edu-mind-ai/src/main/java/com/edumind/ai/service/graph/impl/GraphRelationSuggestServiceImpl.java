@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.edumind.ai.gateway.AiGatewayFacade;
+import com.edumind.ai.service.audit.AiCallAuditContext;
 import com.edumind.ai.service.graph.GraphRelationSuggestService;
 import com.edumind.ai.service.prompt.PromptService;
 import lombok.RequiredArgsConstructor;
@@ -47,8 +48,12 @@ public class GraphRelationSuggestServiceImpl implements GraphRelationSuggestServ
 
         String userPrompt = promptService.renderTemplate("graph_relation_suggest", vars);
         try {
-            String reply = aiGatewayFacade.chat("GRAPH_SUGGEST",
-                    "你是课程知识图谱关系推断专家，仅输出 JSON 数组。", userPrompt);
+            // 关系推荐总是依托某个知识库发起，带上 knowledgeBaseId 才能经由知识库归属到对应课程
+            AiCallAuditContext auditContext = knowledgeBaseId != null
+                    ? AiCallAuditContext.builder().knowledgeBaseId(knowledgeBaseId).build()
+                    : null;
+            String reply = aiGatewayFacade.chat("GRAPH_SUGGEST", null,
+                    "你是课程知识图谱关系推断专家，仅输出 JSON 数组。", userPrompt, auditContext);
             return parseSuggestions(reply, sourceKnowledgePointId, sourceTitle, candidatePoints, max);
         } catch (Exception ex) {
             log.warn("LLM graph relation suggest failed: {}", ex.getMessage());

@@ -30,6 +30,7 @@
             :blocks="content.blocks"
             :knowledge-points="lesson.knowledgePoints"
             :resources="lesson.resources"
+            :lesson-title="lesson.title"
             @toc-update="tocItems = $event"
           />
           <div v-else class="lesson-empty inline">
@@ -94,7 +95,7 @@ const tocItems = ref<LessonTocItem[]>([]);
 watch(
   () => content.value.blocks,
   blocks => {
-    tocItems.value = buildLessonToc(blocks);
+    tocItems.value = buildLessonToc(blocks, lesson.value?.title);
   },
   { immediate: true, deep: true }
 );

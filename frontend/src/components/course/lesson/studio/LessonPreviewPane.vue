@@ -40,7 +40,8 @@ const props = defineProps<{
 
 const bodyRef = ref<HTMLElement | null>(null);
 
-const bodyHtml = computed(() => renderLessonMarkdown(props.markdown || ''));
+// 课节标题必须以 lessonTitle 传入：正文开头若重复了课节标题会被识别为回声并剥离
+const bodyHtml = computed(() => renderLessonMarkdown(props.markdown || '', props.title));
 const objectiveHtml = computed(() => renderLessonMarkdown(props.objectiveBody || ''));
 
 const metaTags = computed(() => {

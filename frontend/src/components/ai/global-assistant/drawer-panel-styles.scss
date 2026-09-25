@@ -14,8 +14,11 @@
 /* 涓婚潰鏉?*/
 .copilot-drawer-panel {
   position: relative;
-  width: min(610px, 100vw);
+  width: min(640px, 100vw);
+  min-width: 0;
   max-width: 100vw;
+  flex-shrink: 0;
+  box-sizing: border-box;
   height: 100vh;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(28px);
@@ -437,7 +440,12 @@
 /* 2. 鑱婂ぉ瑙嗗彛 */
 .chat-viewport {
   flex: 1;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   overflow-y: auto;
+  overflow-x: hidden;
   overflow-anchor: none;
   padding: 16px 18px;
   display: flex;
@@ -602,11 +610,15 @@
   }
 }
 
-/* 娑堟伅娴佸竷灞€ */
+/* 消息流布局 */
 .message-stream {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .message-row {
@@ -614,9 +626,12 @@
   gap: 10px;
   align-items: flex-start;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 
   &-user {
-    justify-content: flex-end; /* 鏍囧噯闈犲彸瀵归綈锛氭皵娉″湪宸︼紝澶村儚鍦ㄦ渶鍙充晶 */
+    justify-content: flex-end; /* 标准靠右对齐：气泡在左，头像在最右侧 */
 
     .msg-avatar {
       background: #1677ff;
@@ -647,7 +662,9 @@
 
     .message-content-col {
       align-items: flex-end;
-      max-width: 86%;
+      max-width: calc(100% - 44px);
+      min-width: 0;
+      box-sizing: border-box;
     }
 
     .message-bubble {
@@ -655,6 +672,110 @@
       color: #ffffff;
       border-radius: 14px 2px 14px 14px;
       box-shadow: 0 4px 14px rgba(22, 119, 255, 0.2);
+      max-width: 100%;
+      min-width: 0;
+      width: fit-content;
+      box-sizing: border-box;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+
+      /* 用户蓝色气泡内排版对比度与底色全面优化：消灭底色重叠，所有文本公式高亮清晰 */
+      .chat-md-content {
+        color: #ffffff !important;
+
+        p {
+          color: #ffffff !important;
+        }
+
+        h1, h2, h3, h4 {
+          color: #ffffff !important;
+          border-bottom-color: rgba(255, 255, 255, 0.22);
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+        }
+
+        strong,
+        strong * {
+          color: #ffffff !important;
+          font-weight: 700 !important;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+        }
+
+        ul, ol, li,
+        li * {
+          color: #ffffff !important;
+        }
+
+        blockquote {
+          background: rgba(255, 255, 255, 0.15) !important;
+          border-left: 3px solid #ffffff !important;
+          color: #ffffff !important;
+        }
+
+        code.chat-inline-code,
+        :not(pre) > code {
+          background: rgba(255, 255, 255, 0.2) !important;
+          color: #ffffff !important;
+          border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+
+        /* 气泡正文公式：纯白 */
+        .katex,
+        .katex * {
+          color: #ffffff !important;
+        }
+
+        .katex-block-wrapper,
+        .katex-display {
+          scrollbar-color: rgba(255, 255, 255, 0.45) transparent;
+          &::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.35);
+          }
+        }
+
+        /* 核心解决「底色重叠」：表格不再用突兀的白底，而是与蓝色气泡融为一体的半透明微光卡片 */
+        .table-wrap {
+          background: rgba(0, 0, 0, 0.2) !important;
+          border: 1px solid rgba(255, 255, 255, 0.3) !important;
+          border-radius: 8px !important;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15) !important;
+          margin: 10px 0 14px !important;
+        }
+
+        table {
+          width: 100% !important;
+          background: transparent !important;
+          border-collapse: collapse !important;
+          color: #ffffff !important;
+        }
+
+        th {
+          background: rgba(255, 255, 255, 0.22) !important;
+          color: #ffffff !important;
+          font-weight: 700 !important;
+          border: 1px solid rgba(255, 255, 255, 0.28) !important;
+          padding: 8px 12px !important;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        td {
+          background: rgba(0, 0, 0, 0.08) !important;
+          color: #ffffff !important;
+          border: 1px solid rgba(255, 255, 255, 0.2) !important;
+          padding: 8px 12px !important;
+
+          /* 无论普通汉字、英文字符还是嵌套标签全部强制高亮纯白 */
+          &,
+          * {
+            color: #ffffff !important;
+          }
+
+          /* 表格内部所有 KaTeX 数学公式节点全部纯白，杜绝白底白字隐形 */
+          .katex,
+          .katex * {
+            color: #ffffff !important;
+          }
+        }
+      }
     }
   }
 
@@ -675,6 +796,7 @@
       flex: 1;
       max-width: calc(100% - 42px);
       min-width: 0;
+      box-sizing: border-box;
     }
 
     .message-bubble {
@@ -684,7 +806,11 @@
       border-radius: 2px 14px 14px 14px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
       width: 100%;
+      max-width: 100%;
+      min-width: 0;
       box-sizing: border-box;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
   }
 }
@@ -697,7 +823,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: 2px; /* 涓庢皵娉￠《閮ㄥ畬缇庡榻?*/
+  margin-top: 2px; /* 与气泡顶部完美对齐 */
 
   .assistant-avatar-img {
     width: 100%;
@@ -712,6 +838,7 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  box-sizing: border-box;
 }
 
 .message-bubble {
@@ -719,7 +846,10 @@
   font-size: 13.5px;
   line-height: 1.7;
   word-break: break-word;
+  overflow-wrap: anywhere;
   overflow: hidden;
+  max-width: 100%;
+  box-sizing: border-box;
 
   &.is-streaming-bubble {
     border-color: rgba(22, 119, 255, 0.4);
@@ -736,39 +866,76 @@
   }
 }
 
-/* 娣卞害 Markdown 鎺掔増 */
+/* 深度 Markdown 排版 */
 .chat-md-content {
-  :deep(p) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: auto; /* 长公式 / 宽表格在气泡内横向滚动，避免溢出抽屉面板 */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+
+  /* 超长 LaTeX 公式块防撑破 */
+  .katex-block-wrapper,
+  .katex-display,
+  :deep(.katex-block-wrapper),
+  :deep(.katex-display) {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    margin: 8px 0 !important;
+    padding: 4px 2px !important;
+    box-sizing: border-box !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(22, 119, 255, 0.3) transparent;
+
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: rgba(22, 119, 255, 0.25);
+      border-radius: 2px;
+      &:hover {
+        background: rgba(22, 119, 255, 0.45);
+      }
+    }
+  }
+
+  p, :deep(p) {
     margin: 8px 0;
     &:first-child { margin-top: 0; }
     &:last-child { margin-bottom: 0; }
   }
 
-  :deep(strong) {
+  strong, :deep(strong) {
     font-weight: 700;
     color: #0958d9;
   }
 
+  h1, h2, h3, h4,
   :deep(h1), :deep(h2), :deep(h3), :deep(h4) {
     margin: 14px 0 8px;
     color: #0f172a;
     font-weight: 700;
   }
 
-  :deep(h1) { font-size: 1.25em; }
-  :deep(h2) { font-size: 1.15em; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
-  :deep(h3) { font-size: 1.05em; }
+  h1, :deep(h1) { font-size: 1.25em; }
+  h2, :deep(h2) { font-size: 1.15em; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
+  h3, :deep(h3) { font-size: 1.05em; }
 
+  ul, ol,
   :deep(ul), :deep(ol) {
     margin: 8px 0;
     padding-left: 1.5em;
   }
 
-  :deep(li) {
+  li, :deep(li) {
     margin: 4px 0;
   }
 
-  :deep(blockquote) {
+  blockquote, :deep(blockquote) {
     margin: 10px 0;
     padding: 8px 12px;
     background: #f8fafc;
@@ -778,6 +945,8 @@
     font-size: 12.5px;
   }
 
+  code.chat-inline-code,
+  :not(pre) > code,
   :deep(code.chat-inline-code),
   :deep(:not(pre) > code) {
     background: rgba(15, 23, 42, 0.06);
@@ -789,17 +958,19 @@
     word-break: break-word;
   }
 
-  :deep(hr) {
+  hr, :deep(hr) {
     margin: 14px 0;
     border: none;
     border-top: 1px solid #e2e8f0;
   }
 
-  :deep(.katex) {
+  .katex, :deep(.katex) {
+    max-width: 100%;
     word-break: normal;
     overflow-wrap: normal;
   }
 
+  .table-wrap,
   :deep(.table-wrap) {
     width: 100%;
     max-width: 100%;
@@ -812,16 +983,19 @@
     box-sizing: border-box;
   }
 
+  .table-wrap::-webkit-scrollbar,
   :deep(.table-wrap::-webkit-scrollbar) {
     height: 4px;
   }
 
+  .table-wrap::-webkit-scrollbar-button,
   :deep(.table-wrap::-webkit-scrollbar-button) {
     display: none;
     width: 0;
     height: 0;
   }
 
+  table,
   :deep(table) {
     width: 100%;
     min-width: 100%;
@@ -831,6 +1005,8 @@
     table-layout: auto;
   }
 
+  th,
+  td,
   :deep(th),
   :deep(td) {
     border: 1px solid #e2e8f0;
@@ -841,11 +1017,18 @@
     min-width: 72px;
   }
 
+  th,
   :deep(th) {
     background: #f8fafc;
     font-weight: 600;
     color: #1677ff;
     white-space: nowrap;
+  }
+
+  td,
+  :deep(td) {
+    color: #0f172a;
+    background: #ffffff;
   }
 
   :deep(.ascii-tree-wrapper) {

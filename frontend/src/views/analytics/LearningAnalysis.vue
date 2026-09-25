@@ -462,6 +462,7 @@ const activeWeakPoints = computed(() => {
 
 const aiThinkingModalVisible = ref(false);
 let isThinkingAborted = false;
+let isThinkingInProgress = false;
 
 async function handleGenerateAdvice() {
   // AI 学情诊断建议属于教师的教学干预动作，学生端仅提供只读画像
@@ -475,6 +476,7 @@ async function handleGenerateAdvice() {
     : undefined;
 
   isThinkingAborted = false;
+  isThinkingInProgress = true;
   aiThinkingModalVisible.value = true;
   try {
     const fetchPromise = fetchTeachingAdvice({
@@ -488,9 +490,12 @@ async function handleGenerateAdvice() {
     ]);
 
     if (isThinkingAborted || !advice) {
+      isThinkingInProgress = false;
       return;
     }
 
+    // 标记正常推演完成，避免 el-dialog 的 @close 事件触发误报
+    isThinkingInProgress = false;
     aiThinkingModalVisible.value = false;
 
     if (isPersonal && advice.summary && portraitData.value) {
@@ -506,6 +511,7 @@ async function handleGenerateAdvice() {
 
     aiDrawerVisible.value = true;
   } catch {
+    isThinkingInProgress = false;
     if (!isThinkingAborted) {
       aiThinkingModalVisible.value = false;
       ElMessage.error('生成学情诊断建议失败，请稍后重试');
@@ -514,10 +520,13 @@ async function handleGenerateAdvice() {
 }
 
 function handleStopAdvice() {
-  isThinkingAborted = true;
-  stopTeachingAdvice();
-  aiThinkingModalVisible.value = false;
-  ElMessage.info('已中止本次 AI 教学推演');
+  if (isThinkingInProgress) {
+    isThinkingInProgress = false;
+    isThinkingAborted = true;
+    stopTeachingAdvice();
+    aiThinkingModalVisible.value = false;
+    ElMessage.info('已中止本次 AI 教学推演');
+  }
 }
 
 function handleClearAdvice() {

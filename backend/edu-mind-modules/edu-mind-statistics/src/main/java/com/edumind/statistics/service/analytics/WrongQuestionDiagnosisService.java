@@ -79,6 +79,16 @@ public class WrongQuestionDiagnosisService {
     private final QuestionCommandApi questionCommandApi;
 
     public String diagnose(String questionStem, String studentAnswer, String correctAnswer) {
+        return diagnose(questionStem, studentAnswer, correctAnswer, null);
+    }
+
+    /**
+     * 带课程归属的诊断重载。
+     *
+     * <p>错因归因是某门课的教学行为：courseId 为空时该次调用不归属任何课程，
+     * 会被课程维度的 AI 消耗流水过滤掉，表现为「在班里点过归因，课程消耗明细里查不到」。</p>
+     */
+    public String diagnose(String questionStem, String studentAnswer, String correctAnswer, Long courseId) {
         if (!StringUtils.hasText(studentAnswer)) {
             return null;
         }
@@ -86,7 +96,7 @@ public class WrongQuestionDiagnosisService {
                 + "【学生作答】" + studentAnswer + "\n"
                 + "【标准答案】" + correctAnswer + "\n"
                 + "请用一到两句话精准诊断错因，并在文末明确标注类型 CONCEPT/LOGIC/CALC/READING 之一。";
-        return callDiagnosisModel(prompt);
+        return callDiagnosisModel(courseId, prompt);
     }
 
     /**
@@ -94,6 +104,11 @@ public class WrongQuestionDiagnosisService {
      * 返回 null 表示本次无法给出可信结论（未作答 / 模型异常），由调用方决定降级策略。
      */
     public String diagnose(QuestionVO question, String studentAnswer) {
+        return diagnose(question, studentAnswer, null);
+    }
+
+    /** 带课程归属的完整上下文诊断：与 {@link #diagnose(String, String, String, Long)} 同口径 */
+    public String diagnose(QuestionVO question, String studentAnswer, Long courseId) {
         if (question == null || !StringUtils.hasText(studentAnswer)) {
             return null;
         }
@@ -108,7 +123,7 @@ public class WrongQuestionDiagnosisService {
                 + "1. 深入剖析学生作答与标准解答之间的偏差本质（精准识别是属于概念理解模糊、运算推理中断、审题条件遗漏还是逻辑论证漏洞）；\n"
                 + "2. 用一到两句精炼的教学诊断语言说明失分根本原因与教学补救对策；\n"
                 + "3. 在诊断结论末尾务必注明主要失分诱因代码：[类型: CONCEPT]、[类型: CALC]、[类型: LOGIC] 或 [类型: READING] 之一。";
-        return callDiagnosisModel(prompt);
+        return callDiagnosisModel(courseId, prompt);
     }
 
     /**
@@ -136,7 +151,7 @@ public class WrongQuestionDiagnosisService {
               .append("2. 【靶向教学干预对策】：针对上述薄弱环节，给出课堂精讲重点、巩固变式训练设计及个性化补救建议。");
 
         try {
-            String reply = aiChatApi.chat("ANALYTICS", MACRO_DIAGNOSIS_SYSTEM_PROMPT, prompt.toString());
+            String reply = aiChatApi.chat("ANALYTICS", courseId, MACRO_DIAGNOSIS_SYSTEM_PROMPT, prompt.toString());
             if (cancelRegistry.isCancelled(cancelKey)) {
                 cancelRegistry.clear(cancelKey);
                 log.info("[宏观错因推演] 课程 {} 已被用户中止", courseId);
@@ -170,9 +185,10 @@ public class WrongQuestionDiagnosisService {
      * 模型异常或返回空时返回 null，并保留日志——
      * 不再回退成 “CONCEPT: 概念理解不完整” 这类看起来正常、实则会误导学生的假结论。
      */
-    private String callDiagnosisModel(String prompt) {
+    private String callDiagnosisModel(Long courseId, String prompt) {
         try {
-            String reply = aiChatApi.chat("GRADING", DIAGNOSIS_SYSTEM_PROMPT, prompt);
+            // 归因调用按课程归属记账（courseId 可为空，表示确实没有课程上下文）
+            String reply = aiChatApi.chat("GRADING", courseId, DIAGNOSIS_SYSTEM_PROMPT, prompt);
             if (!StringUtils.hasText(reply)) {
                 log.warn("[错题归因] 大模型返回空结论，本次不更新归因结果");
                 return null;
@@ -327,7 +343,7 @@ public class WrongQuestionDiagnosisService {
 
         String diagnosis = null;
         if (StringUtils.hasText(studentAnswer)) {
-            diagnosis = diagnose(question, studentAnswer);
+            diagnosis = diagnose(question, studentAnswer, entity.getCourseId());
         } else {
             // 全员未作答或空白：进行试题难点与考点理解障碍研判
             String kpName = StringUtils.hasText(question.getKnowledgePointName()) ? question.getKnowledgePointName() : "核心考点";

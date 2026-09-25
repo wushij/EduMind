@@ -14,6 +14,7 @@ import com.edumind.statistics.dao.WrongQuestionRecordDao;
 import com.edumind.statistics.entity.KnowledgeMasteryEntity;
 import com.edumind.statistics.entity.LearningRecordEntity;
 import com.edumind.statistics.entity.WrongQuestionRecordEntity;
+import com.edumind.statistics.enums.WrongErrorType;
 import com.edumind.statistics.service.analytics.KnowledgeMasteryService;
 import com.edumind.statistics.service.analytics.LearningAnalyticsService;
 import com.edumind.statistics.service.learning.AdaptivePathService;
@@ -32,6 +33,7 @@ import com.edumind.teaching.vo.submission.SubmissionStatsVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -97,18 +99,35 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
                 : Collections.emptyList();
         vo.setStudentCount(enrolledStudentIds.size());
 
+        // 学情口径统一：learning_record 里混有教师/管理员浏览课程产生的行为（教师预览课节同样会落库），
+        // 因此所有"学生学情"指标必须先按选课学生过滤。
+        // 历史实现直接用全量 records 除以选课人数，导致教师自己的操作把「人均学习时长」「日学习活跃人次」
+        // 「数据更新时间」全部抬高（某课程 167 分钟里 137 分钟来自非选课账号）。
+        Set<Long> enrolledStudentSet = new HashSet<>(enrolledStudentIds);
+        List<LearningRecordEntity> studentRecords = records.stream()
+                .filter(r -> r.getStudentId() != null && enrolledStudentSet.contains(r.getStudentId()))
+                .collect(Collectors.toList());
+
         SubmissionStatsVO submissionStats = courseId != null ? submissionQueryApi.getCourseSubmissionStats(courseId) : new SubmissionStatsVO();
+        // getCourseSubmissionStats 已在同一次答卷扫描中产出学生维度明细（studentScores），
+        // courseHealth.passRate 与学生榜单均分直接复用，无需再单独发起一次全量查询。
         vo.setCompletionRate(submissionStats.getAvgSubmissionRate() != null
                 ? submissionStats.getAvgSubmissionRate() / 100.0 : 0);
         vo.setAvgScore(submissionStats.getAvgScore() != null ? submissionStats.getAvgScore() : 0);
 
-        int totalMinutes = records.stream()
+        int totalMinutes = studentRecords.stream()
                 .mapToInt(r -> r.getDurationMinutes() != null ? r.getDurationMinutes() : 0).sum();
         vo.setAvgStudyMinutes(enrolledStudentIds.isEmpty() ? 0 : totalMinutes / Math.max(1, enrolledStudentIds.size()));
 
+        // 知识点掌握度同样只统计选课学生：非选课账号（管理员/教师试做等）的实测记录会把班级值稀释或抬高，
+        // 与逐考点明细、薄弱考点卡片使用同一口径，保证 KPI 与图表可互相验证。
         List<KnowledgeMasteryEntity> masteries = courseId != null ? knowledgeMasteryDao.listByCourse(courseId) : Collections.emptyList();
-        double masteryAvg = masteries.isEmpty() ? 0
-                : masteries.stream().mapToDouble(m -> m.getMasteryScore().doubleValue()).average().orElse(0);
+        List<KnowledgeMasteryEntity> classMasteries = masteries.stream()
+                .filter(m -> m != null && m.getStudentId() != null && m.getMasteryScore() != null)
+                .filter(m -> enrolledStudentSet.contains(m.getStudentId()))
+                .collect(Collectors.toList());
+        double masteryAvg = classMasteries.isEmpty() ? 0
+                : classMasteries.stream().mapToDouble(m -> m.getMasteryScore().doubleValue()).average().orElse(0);
         vo.setKnowledgeMasteryAvg(masteryAvg);
 
         if (courseId != null) {
@@ -140,7 +159,8 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
             }
         }
 
-        buildTrends(vo, records, statByDate, startDate, endDate);
+        // 日学习活跃人次同样只统计选课学生，避免"教师在线"被画成"学生活跃"
+        buildTrends(vo, studentRecords, statByDate, startDate, endDate);
         if (vo.getAggregated() == null) {
             vo.setAggregated(false);
         }
@@ -151,8 +171,9 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         // 组装课程深入分析专用维度（章节进度、健康度雷达、薄弱考点）
         buildCourseDeepInsights(vo, courseId, enrolledStudentIds, submissionStats, records);
 
-        // 数据更新时间：取统计范围内最近一次真实学习行为，避免用前端本地时间冒充
-        records.stream()
+        // 数据更新时间：取统计范围内最近一次真实"学生"学习行为，
+        // 既避免用前端本地时间冒充，也避免把教师的操作时间当成班级学情更新时间。
+        studentRecords.stream()
                 .map(LearningRecordEntity::getCreateTime)
                 .filter(Objects::nonNull)
                 .max(LocalDateTime::compareTo)
@@ -182,7 +203,15 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
             orgMap = organizationQueryApi.mapPrimaryClassesByUserIds(null, studentIds);
         } catch (Exception ignored) {
         }
-        List<StudentLearningItemVO> list = new ArrayList<>();
+        // 四类学情指标一次性批量加载（学习时长 / 掌握度 / 错题数 / AI 用量），
+        // 替代历史实现的「每个学生 4 次查询」：50 人班级由 200 次查询降为 4 次聚合查询。
+        // 各指标的取值口径与舍入规则与逐学生版本严格一致，结果为空的指标按原兜底值 0 处理。
+        Map<Long, Integer> studyMinutesMap = safeSumStudyMinutes(courseId, studentIds);
+        Map<Long, Double> masteryAvgMap = safeLoadMasteryAvgByStudent(courseId, studentIds);
+        Map<Long, Integer> wrongCountMap = safeCountWrongQuestionsByStudent(courseId, studentIds);
+        Map<Long, Long> aiUsageMap = resolveStudentAiUsageMap(courseId, studentIds, since);
+
+        List<StudentLearningItemVO> list = new ArrayList<>(studentIds.size());
         for (Long sId : studentIds) {
             UserBriefVO user = userMap.get(sId);
             MemberOrgBriefVO orgBrief = orgMap.get(sId);
@@ -198,7 +227,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
             }
             item.setAvatar(user != null ? user.getAvatar() : null);
 
-            item.setStudyMinutes(learningRecordDao.getTotalDuration(courseId, sId));
+            item.setStudyMinutes(studyMinutesMap.getOrDefault(sId, 0));
 
             SubmissionStatsVO.StudentScoreVO sScore = scoreMap.get(sId);
             double avgScore = sScore != null && sScore.getAvgScore() != null ? sScore.getAvgScore() : 0;
@@ -211,16 +240,11 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
             }
             item.setSubmissionRate(Math.round(subRate * 10.0) / 10.0);
 
-            List<KnowledgeMasteryEntity> sMastery = knowledgeMasteryDao.listByCourseAndStudent(courseId, sId);
-            double mAvg = sMastery.isEmpty()
-                    ? 0
-                    : sMastery.stream().mapToDouble(m -> m.getMasteryScore().doubleValue()).average().orElse(0);
-            item.setMasteryScore(Math.round(mAvg * 1000.0) / 10.0);
+            item.setMasteryScore(masteryAvgMap.getOrDefault(sId, 0.0));
 
-            long wrongCount = wrongQuestionRecordDao.countByStudentAndCourse(sId, courseId);
-            item.setWrongCount((int) wrongCount);
+            item.setWrongCount(wrongCountMap.getOrDefault(sId, 0));
 
-            item.setAiUsageCount((int) resolveStudentAiUsageCount(courseId, sId, since));
+            item.setAiUsageCount(aiUsageMap.getOrDefault(sId, 0L).intValue());
 
             if (item.getAvgScore() >= 85 && item.getMasteryScore() >= 80) {
                 item.setStatus("EXCELLENT");
@@ -234,6 +258,98 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
             list.add(item);
         }
         return list;
+    }
+
+    /** 批量学习时长（分钟）：单次 GROUP BY 聚合，口径等同逐学生 getTotalDuration；异常时全量按 0 */
+    private Map<Long, Integer> safeSumStudyMinutes(Long courseId, List<Long> studentIds) {
+        try {
+            return learningRecordDao.sumDurationByCourseStudents(courseId, studentIds);
+        } catch (Exception e) {
+            log.warn("Failed to batch sum study minutes for course {}: {}", courseId, e.getMessage());
+            return Collections.emptyMap();
+        }
+    }
+
+    /**
+     * 批量掌握度均分：一次取课程全部掌握度记录后按学生分组求平均。
+     * 舍入规则与逐学生版本一致（0~1 的分值 × 100 保留 1 位小数）；无记录的学生不进入结果，取 0。
+     */
+    private Map<Long, Double> safeLoadMasteryAvgByStudent(Long courseId, List<Long> studentIds) {
+        Map<Long, Double> result = new HashMap<>();
+        try {
+            Set<Long> scope = new HashSet<>(studentIds);
+            Map<Long, List<KnowledgeMasteryEntity>> byStudent = knowledgeMasteryDao.listByCourse(courseId).stream()
+                    .filter(m -> m.getStudentId() != null && scope.contains(m.getStudentId()))
+                    .filter(m -> m.getMasteryScore() != null)
+                    .collect(Collectors.groupingBy(KnowledgeMasteryEntity::getStudentId));
+            byStudent.forEach((studentId, records) -> {
+                double avg = records.stream()
+                        .mapToDouble(m -> m.getMasteryScore().doubleValue())
+                        .average()
+                        .orElse(0);
+                result.put(studentId, Math.round(avg * 1000.0) / 10.0);
+            });
+        } catch (Exception e) {
+            log.warn("Failed to batch load mastery by student for course {}: {}", courseId, e.getMessage());
+        }
+        return result;
+    }
+
+    /** 批量错题条数：单次 GROUP BY 聚合，口径等同逐学生 countByStudentAndCourse；异常时全量按 0 */
+    private Map<Long, Integer> safeCountWrongQuestionsByStudent(Long courseId, List<Long> studentIds) {
+        Map<Long, Integer> result = new HashMap<>();
+        try {
+            wrongQuestionRecordDao.countGroupByStudentIds(courseId, studentIds)
+                    .forEach((studentId, count) -> result.put(studentId, count.intValue()));
+        } catch (Exception e) {
+            log.warn("Failed to batch count wrong questions for course {}: {}", courseId, e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * 批量 AI 用量：单次 GROUP BY 聚合取每位学生的真实调用次数；
+     * 沿用单学生版本的兜底语义——该生无直连调用记录时退回课程知识库维度总量。
+     * 兜底值对全班一致，因此只计算一次（原实现对每个学生都算一遍）。
+     */
+    private Map<Long, Long> resolveStudentAiUsageMap(Long courseId, List<Long> studentIds, LocalDateTime since) {
+        Map<Long, Long> result = new HashMap<>();
+        if (courseId == null || studentIds.isEmpty()) {
+            return result;
+        }
+        Map<Long, Long> batchUsage;
+        try {
+            batchUsage = aiAuditQueryApi.countCallsByCourseUserBatch(courseId, studentIds, since);
+        } catch (Exception e) {
+            log.warn("Failed to batch count AI usage for course {}: {}", courseId, e.getMessage());
+            batchUsage = null;
+        }
+        final Map<Long, Long> directUsage = batchUsage != null ? batchUsage : Collections.emptyMap();
+
+        boolean needFallback = studentIds.stream().anyMatch(id -> directUsage.getOrDefault(id, 0L) <= 0);
+        long fallback = needFallback ? resolveCourseAiUsageFallback(courseId) : 0L;
+
+        for (Long studentId : studentIds) {
+            long direct = directUsage.getOrDefault(studentId, 0L);
+            result.put(studentId, direct > 0 ? direct : fallback);
+        }
+        return result;
+    }
+
+    /** 课程知识库维度的 AI 调用总量，作为单学生直连记录缺失时的兜底值 */
+    private long resolveCourseAiUsageFallback(Long courseId) {
+        try {
+            List<Long> kbIds = knowledgeQueryApi.listKnowledgeBasesByCourseId(courseId).stream()
+                    .map(KnowledgeBaseVO::getId)
+                    .collect(Collectors.toList());
+            if (kbIds.isEmpty()) {
+                return 0L;
+            }
+            return aiAuditQueryApi.countCallsByKnowledgeBases(kbIds);
+        } catch (Exception e) {
+            log.warn("Failed to resolve course-level AI usage fallback for course {}: {}", courseId, e.getMessage());
+            return 0L;
+        }
     }
 
     @Override
@@ -276,7 +392,10 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
             info.setClassName("未分配行政班");
         }
         info.setRole("选课学员");
-        learningRecordDao.listByCourseAndStudent(courseId, studentId).stream()
+        // 该学员的学习记录只加载一次：最近活跃时间、累计时长、区间时长都由这一份数据算出，
+        // 替代原先三次各自全量查询同一张表
+        List<LearningRecordEntity> studentRecords = learningRecordDao.listByCourseAndStudent(courseId, studentId);
+        studentRecords.stream()
                 .map(LearningRecordEntity::getCreateTime)
                 .filter(Objects::nonNull)
                 .max(LocalDateTime::compareTo)
@@ -284,8 +403,8 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
 
         // 2. 核心 KPI 汇总
         StudentPortraitVO.PortraitSummaryVO summary = vo.getSummary();
-        summary.setTotalStudyMinutesAllTime(learningRecordDao.getTotalDuration(courseId, studentId));
-        summary.setTotalStudyMinutes(learningRecordDao.getTotalDurationSince(courseId, studentId, since));
+        summary.setTotalStudyMinutesAllTime(sumDurations(studentRecords, null));
+        summary.setTotalStudyMinutes(sumDurations(studentRecords, since));
         summary.setClassAvgStudyMinutes(computeClassAvgStudyMinutes(courseId, enrolledIds, since));
 
         SubmissionStatsVO submissionStats = submissionQueryApi.getCourseSubmissionStats(courseId);
@@ -391,7 +510,9 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
             wi.setKnowledgePointId(wr.getKnowledgePointId());
             wi.setKnowledgePointTitle(kpTitleMap.getOrDefault(wr.getKnowledgePointId(), "核心考点 #" + wr.getKnowledgePointId()));
             wi.setErrorTypes(wr.getErrorTypes() != null ? wr.getErrorTypes() : "CONCEPT");
-            wi.setDiagnosis(wr.getDiagnosis());
+            // 展示层统一清洗机器标记，避免「主要失分诱因代码：[ ]」透给学生
+            String cleanDiagnosis = WrongErrorType.stripTypeMarker(wr.getDiagnosis());
+            wi.setDiagnosis(StringUtils.hasText(cleanDiagnosis) ? cleanDiagnosis : null);
             wi.setWrongCount(wr.getWrongCount() != null ? wr.getWrongCount() : 1);
             wi.setCreateTime(wr.getCreateTime() != null ? wr.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) : LocalDate.now().toString());
 
@@ -406,12 +527,31 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         vo.setWrongQuestions(wrongItems);
 
         // 6. 自适应推荐学习周计划
-        LearningPathVO adaptivePath = adaptivePathService.buildAdaptivePath(courseId, studentId);
+        // 复用第 3 步已加载的 masteryVO：路径编排与逐周取题都基于同一份掌握度，
+        // 不再各自重复执行「全班 × 全考点」矩阵计算
+        LearningPathVO adaptivePath = adaptivePathService.buildAdaptivePath(courseId, studentId, masteryVO);
         vo.setAdaptiveWeeks(adaptivePath.getWeeks());
 
         vo.setAiDiagnosis(null);
 
         return vo;
+    }
+
+    /**
+     * 汇总学习时长（分钟）。
+     *
+     * <p>口径与 DAO 保持一致：{@code since} 为 null 时统计全部记录；非 null 时对应
+     * {@code create_time >= since}，即 create_time 为空的记录不纳入区间统计
+     * （SQL 中 NULL 参与比较不会命中条件），duration_minutes 为空按 0 计。</p>
+     */
+    private static int sumDurations(List<LearningRecordEntity> records, LocalDateTime since) {
+        if (records == null || records.isEmpty()) {
+            return 0;
+        }
+        return records.stream()
+                .filter(r -> since == null || (r.getCreateTime() != null && !r.getCreateTime().isBefore(since)))
+                .mapToInt(r -> r.getDurationMinutes() != null ? r.getDurationMinutes() : 0)
+                .sum();
     }
 
     private double computeClassAvgStudyMinutes(Long courseId, List<Long> studentIds, LocalDateTime since) {
@@ -429,6 +569,10 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         return total / (double) studentIds.size();
     }
 
+    /**
+     * 单个学生的 AI 用量（学情画像等单人场景使用）。
+     * 多人榜单请走 {@link #resolveStudentAiUsageMap} 的批量聚合，避免 N+1。
+     */
     private long resolveStudentAiUsageCount(Long courseId, Long studentId, LocalDateTime since) {
         if (courseId == null || studentId == null) {
             return 0L;
@@ -437,13 +581,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         if (direct > 0) {
             return direct;
         }
-        List<Long> kbIds = knowledgeQueryApi.listKnowledgeBasesByCourseId(courseId).stream()
-                .map(KnowledgeBaseVO::getId)
-                .collect(Collectors.toList());
-        if (kbIds.isEmpty()) {
-            return 0L;
-        }
-        return aiAuditQueryApi.countCallsByKnowledgeBases(kbIds);
+        return resolveCourseAiUsageFallback(courseId);
     }
 
     private static final int RADAR_MAX_DIMENSIONS = 8;
@@ -633,7 +771,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
                     r.getDurationMinutes() != null ? r.getDurationMinutes() : 0, Integer::sum);
         }
 
-        Map<Long, Double> chapterMastery = buildChapterMastery(courseId);
+        Map<Long, Double> chapterMastery = buildChapterMastery(courseId, enrolledSet);
 
         int sortIndex = 0;
         for (com.edumind.course.vo.chapter.ChapterTreeVO top : chapters) {
@@ -670,7 +808,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
                 .filter(enrolledSet::contains)
                 .collect(Collectors.toSet());
         int interaction = (int) Math.round(activeStudents.size() * 100.0 / totalStudents);
-        int passRate = computePassRate(submissionStats);
+        int passRate = computePassRate(submissionStats, enrolledSet);
         int aiRate = computeAiPenetration(records, enrolledSet, totalStudents);
 
         health.setSyllabusCoverage(syllabusCov);
@@ -684,12 +822,15 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         health.setHealthLevel(overall >= 85 ? "EXCELLENT" : (overall >= 70 ? "GOOD" : "WARNING"));
         vo.setCourseHealth(health);
 
-        // 3. 高频预警薄弱考点
-        buildWeakPoints(vo, courseId);
+        // 3. 全量考点真实掌握度 + 高频预警薄弱考点
+        buildCourseKnowledgePoints(vo, courseId, enrolledSet);
     }
 
-    /** 章节掌握度：该章关联知识点的真实平均掌握度 × 100，无数据的章节不返回 */
-    private Map<Long, Double> buildChapterMastery(Long courseId) {
+    /**
+     * 章节掌握度：该章关联知识点的真实平均掌握度 × 100，无数据的章节不返回。
+     * 只统计选课学生的实测记录，与课程薄弱考点、概览图保持同一口径。
+     */
+    private Map<Long, Double> buildChapterMastery(Long courseId, Set<Long> enrolledSet) {
         Map<Long, Double> result = new HashMap<>();
         try {
             List<KnowledgePointVO> points = courseQueryApi.listKnowledgePointsByCourseId(courseId);
@@ -697,6 +838,8 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
                 return result;
             }
             Map<Long, Double> masteryByKp = knowledgeMasteryDao.listByCourse(courseId).stream()
+                    .filter(m -> m != null && m.getKnowledgePointId() != null && m.getMasteryScore() != null)
+                    .filter(m -> m.getStudentId() != null && enrolledSet.contains(m.getStudentId()))
                     .collect(Collectors.groupingBy(KnowledgeMasteryEntity::getKnowledgePointId,
                             Collectors.averagingDouble(m -> m.getMasteryScore().doubleValue())));
             Map<Long, List<Double>> byChapter = new HashMap<>();
@@ -717,10 +860,21 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
         return result;
     }
 
-    /** 测验及格率：已批改学生中均分达到 60 分的占比（真实值，无样本记 0） */
-    private int computePassRate(SubmissionStatsVO submissionStats) {
-        List<SubmissionStatsVO.StudentScoreVO> scores = submissionStats != null ? submissionStats.getStudentScores() : null;
-        if (scores == null || scores.isEmpty()) {
+    /**
+     * 测验及格率：本课程选课学生中，已批改均分达到 60 分的占比（真实值，无样本记 0）。
+     *
+     * <p>学生明细来自课程下全部作业的答卷，其中可能混入非选课账号（例如教务/教师试做提交），
+     * 历史实现直接用该明细做分母，导致及格率被非本班学生稀释或抬高，故此处按选课学生名单过滤。</p>
+     */
+    private int computePassRate(SubmissionStatsVO submissionStats, Set<Long> enrolledSet) {
+        List<SubmissionStatsVO.StudentScoreVO> allScores = submissionStats != null ? submissionStats.getStudentScores() : null;
+        if (allScores == null || allScores.isEmpty()) {
+            return 0;
+        }
+        List<SubmissionStatsVO.StudentScoreVO> scores = allScores.stream()
+                .filter(s -> s != null && s.getStudentId() != null && enrolledSet.contains(s.getStudentId()))
+                .collect(Collectors.toList());
+        if (scores.isEmpty()) {
             return 0;
         }
         long pass = scores.stream()
@@ -741,31 +895,69 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
     }
 
     /**
-     * 课程薄弱考点：只统计有真实掌握度记录的知识点，错题数与受影响人数同样取真实值。
-     * 历史实现对无掌握度数据的知识点默认按 0.68 掌握度，并按公式编造错题数与受影响人数。
+     * 课程考点掌握度明细与薄弱考点清单，两者都只取真实数据。
+     *
+     * <p>{@code courseKnowledgePoints} 覆盖课程全部考点：没有实测掌握度记录的考点 mastery 返回 null，
+     * 由前端标注"未测评"，从根上杜绝"先验基准补算"把 0% 渲染成 36% 的口径矛盾；
+     * {@code courseWeakPoints} 只保留掌握度低于 80 的考点，错题累计与受影响人数同样取真实值。
+     * 历史实现对无掌握度数据的知识点默认按 0.68 掌握度，并按公式编造错题数与受影响人数。</p>
+     *
+     * <p>统计范围一律限定在课程选课学生：掌握度取选课学生的实测记录，
+     * 错题累计取选课学生的 <b>wrong_count 累加值</b>（与 KnowledgeMasteryServiceImpl 的"失分累积"同口径：
+     * 同一考点下多道错题记录必须累加而非只数条数），管理员/教师试做产生的记录一律不计入班级指标。</p>
      */
-    private void buildWeakPoints(LearningAnalyticsVO vo, Long courseId) {
+    private void buildCourseKnowledgePoints(LearningAnalyticsVO vo, Long courseId, Set<Long> enrolledSet) {
         try {
             List<KnowledgePointVO> points = courseQueryApi.listKnowledgePointsByCourseId(courseId);
             if (points == null || points.isEmpty()) {
                 return;
             }
-            List<KnowledgeMasteryEntity> masteries = knowledgeMasteryDao.listByCourse(courseId);
-            if (masteries.isEmpty()) {
-                return;
-            }
-            Map<Long, List<KnowledgeMasteryEntity>> masteryByKp = masteries.stream()
+            Map<Long, List<KnowledgeMasteryEntity>> masteryByKp = knowledgeMasteryDao.listByCourse(courseId).stream()
+                    .filter(m -> m != null && m.getKnowledgePointId() != null && m.getMasteryScore() != null)
+                    .filter(m -> m.getStudentId() != null && enrolledSet.contains(m.getStudentId()))
                     .collect(Collectors.groupingBy(KnowledgeMasteryEntity::getKnowledgePointId));
+
+            // 错题累计：一次性取课程错题记录后按考点累加 wrong_count，
+            // 既避免逐考点查询的 N+1，也保证"错题累计频次"与其它口径同源
+            Map<Long, Integer> wrongTotalByKp = new HashMap<>();
+            try {
+                for (WrongQuestionRecordEntity record : wrongQuestionRecordDao.listByCourse(courseId)) {
+                    if (record == null || record.getKnowledgePointId() == null) {
+                        continue;
+                    }
+                    if (record.getStudentId() == null || !enrolledSet.contains(record.getStudentId())) {
+                        continue;
+                    }
+                    wrongTotalByKp.merge(record.getKnowledgePointId(),
+                            record.getWrongCount() != null ? record.getWrongCount() : 1, Integer::sum);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to aggregate wrong question counts for course {}: {}", courseId, e.getMessage());
+            }
 
             for (KnowledgePointVO pt : points) {
                 List<KnowledgeMasteryEntity> kpMasteries = masteryByKp.get(pt.getId());
+                LearningAnalyticsVO.KnowledgePointMasteryVO item = new LearningAnalyticsVO.KnowledgePointMasteryVO();
+                item.setKnowledgePointId(pt.getId());
+                item.setTitle(pt.getTitle());
                 if (kpMasteries == null || kpMasteries.isEmpty()) {
+                    item.setMastery(null);
+                    item.setAssessedStudentCount(0);
+                    vo.getCourseKnowledgePoints().add(item);
                     continue;
                 }
                 double avgMastery = kpMasteries.stream()
                         .mapToDouble(m -> m.getMasteryScore().doubleValue())
                         .average().orElse(0);
                 double mastery = Math.round(avgMastery * 1000.0) / 10.0;
+                item.setMastery(mastery);
+                item.setAssessedStudentCount((int) kpMasteries.stream()
+                        .map(KnowledgeMasteryEntity::getStudentId)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .count());
+                vo.getCourseKnowledgePoints().add(item);
+
                 if (mastery >= 80.0) {
                     continue;
                 }
@@ -773,7 +965,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
                 wp.setKnowledgePointId(pt.getId());
                 wp.setTitle(pt.getTitle());
                 wp.setMastery(mastery);
-                wp.setWrongCount((int) wrongQuestionRecordDao.countByKpAndCourse(pt.getId(), courseId));
+                wp.setWrongCount(wrongTotalByKp.getOrDefault(pt.getId(), 0));
                 wp.setAffectedStudents((int) kpMasteries.stream()
                         .filter(m -> m.getMasteryScore() != null && m.getMasteryScore().doubleValue() < 0.70)
                         .map(KnowledgeMasteryEntity::getStudentId)
@@ -784,7 +976,7 @@ public class LearningAnalyticsServiceImpl implements LearningAnalyticsService {
             }
             vo.getCourseWeakPoints().sort(Comparator.comparing(LearningAnalyticsVO.CourseWeakPointVO::getMastery));
         } catch (Exception e) {
-            log.warn("Failed to build course weak points for course {}: {}", courseId, e.getMessage());
+            log.warn("Failed to build course knowledge point mastery for course {}: {}", courseId, e.getMessage());
         }
     }
 

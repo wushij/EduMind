@@ -12,6 +12,7 @@ import com.edumind.ai.rag.query.QueryRewriter;
 import com.edumind.ai.rag.query.QueryRewriteContext;
 import com.edumind.ai.rag.rerank.ScoreReranker;
 import com.edumind.ai.rag.retrieval.RagRetrieverImpl;
+import com.edumind.ai.service.audit.AiCallAuditContext;
 import com.edumind.ai.service.prompt.PromptService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -121,9 +122,15 @@ public class RagPipelineImpl implements RagPipeline {
             stageTimings.add(stage(STAGE_LLM_GENERATION, "LLM 生成", stageStart, STATUS_SKIPPED, "本次诊断已跳过模型生成"));
         } else {
             try {
+                // 检索增强问答依托具体知识库：带上 knowledgeBaseId 与命中数，
+                // 该次调用才能经由「知识库 → 课程」归属到对应课程的 AI 消耗明细
+                AiCallAuditContext auditContext = AiCallAuditContext.builder()
+                        .knowledgeBaseId(knowledgeBaseId)
+                        .retrievalHitCount(ranked.size())
+                        .build();
                 AiGatewayFacade.ChatOutcome outcome = aiGatewayFacade.chatWithMeta(
                         SCENE, options.modelKey(), systemPrompt, promptPreview,
-                        buildChatOptions(options), null);
+                        buildChatOptions(options), auditContext);
                 usedModelKey = outcome.modelKey();
                 answer = outcome.content();
                 stageTimings.add(stage(STAGE_LLM_GENERATION, "LLM 生成", stageStart, STATUS_SUCCESS,

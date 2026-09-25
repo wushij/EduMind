@@ -64,15 +64,32 @@ public class AdaptivePathOrchestrator {
     private final KnowledgeMasteryQueryApi knowledgeMasteryQueryApi;
 
     public LearningPathVO buildAdaptivePath(Long courseId, Long studentId) {
-        LearningPathDetailVO detail = buildDetail(courseId, studentId, false);
+        return buildAdaptivePath(courseId, studentId, null);
+    }
+
+    /**
+     * 构建自适应学习路径，并复用调用方已加载的掌握度。
+     *
+     * <p>掌握度计算需要跑「全班 × 全考点」矩阵，成本较高。学情画像等页面
+     * 在展示画像时已经算过一次，再次重算属于纯浪费，因此允许传入复用。</p>
+     *
+     * @param presetMastery 调用方已加载的掌握度；为 null 时由本方法自行加载
+     */
+    public LearningPathVO buildAdaptivePath(Long courseId, Long studentId, KnowledgeMasteryVO presetMastery) {
+        LearningPathDetailVO detail = buildDetail(courseId, studentId, false, presetMastery);
         return toSummaryPath(detail);
     }
 
     public LearningPathDetailVO buildDetail(Long courseId, Long studentId) {
-        return buildDetail(courseId, studentId, true);
+        return buildDetail(courseId, studentId, true, null);
     }
 
     public LearningPathDetailVO buildDetail(Long courseId, Long studentId, boolean includeGraphSlice) {
+        return buildDetail(courseId, studentId, includeGraphSlice, null);
+    }
+
+    public LearningPathDetailVO buildDetail(Long courseId, Long studentId, boolean includeGraphSlice,
+                                            KnowledgeMasteryVO presetMastery) {
         if (courseId == null || studentId == null) {
             throw new BusinessException("课程或学员参数无效");
         }
@@ -80,7 +97,8 @@ public class AdaptivePathOrchestrator {
             throw new BusinessException("该学员未加入本课程，无法生成学习路径");
         }
 
-        KnowledgeMasteryVO mastery = knowledgeMasteryService.getMastery(courseId, studentId);
+        KnowledgeMasteryVO mastery = presetMastery != null ? presetMastery
+                : knowledgeMasteryService.getMastery(courseId, studentId);
         Map<Long, Double> masteryByKp = loadFullMasteryMap(courseId, studentId, mastery);
         List<KnowledgePointVO> allKps = courseQueryApi.listKnowledgePointsByCourseId(courseId);
         Map<Long, KnowledgePointVO> kpById = allKps.stream()
@@ -130,7 +148,7 @@ public class AdaptivePathOrchestrator {
             }
 
             List<LearningPathVO.LearningPathTaskVO> tasks = buildTasksForWeek(
-                    courseId, studentId, plan, masteryByKp, kpById, questionCache, pickedQuestionIds);
+                    courseId, studentId, mastery, plan, masteryByKp, kpById, questionCache, pickedQuestionIds);
             week.setTasks(tasks);
             detail.getWeeks().add(week);
 
@@ -369,7 +387,7 @@ public class AdaptivePathOrchestrator {
     }
 
     private List<LearningPathVO.LearningPathTaskVO> buildTasksForWeek(
-            Long courseId, Long studentId, FocusWeekPlan plan, Map<Long, Double> masteryByKp,
+            Long courseId, Long studentId, KnowledgeMasteryVO studentMastery, FocusWeekPlan plan, Map<Long, Double> masteryByKp,
             Map<Long, KnowledgePointVO> kpById, Map<Long, RecommendedQuestionVO> questionCache,
             Set<Long> pickedQuestionIds) {
         List<LearningPathVO.LearningPathTaskVO> tasks = new ArrayList<>();
@@ -397,7 +415,7 @@ public class AdaptivePathOrchestrator {
         tasks.add(read);
 
         RecommendedQuestionVO question =
-                pickQuestion(courseId, studentId, kp, chapterId, questionCache, pickedQuestionIds);
+                pickQuestion(courseId, studentId, studentMastery, kp, chapterId, questionCache, pickedQuestionIds);
         if (question != null) {
             LearningPathVO.LearningPathTaskVO practice = new LearningPathVO.LearningPathTaskVO();
             practice.setId(taskId(kpId, "practice"));
@@ -450,7 +468,8 @@ public class AdaptivePathOrchestrator {
         return tasks;
     }
 
-    private RecommendedQuestionVO pickQuestion(Long courseId, Long studentId, KnowledgePointVO kp, Long chapterId,
+    private RecommendedQuestionVO pickQuestion(Long courseId, Long studentId, KnowledgeMasteryVO studentMastery,
+                                               KnowledgePointVO kp, Long chapterId,
                                                Map<Long, RecommendedQuestionVO> questionCache,
                                                Set<Long> pickedQuestionIds) {
         Long kpKey = kp != null && kp.getId() != null ? kp.getId() : null;
@@ -459,8 +478,9 @@ public class AdaptivePathOrchestrator {
         if (kpKey != null && questionCache.containsKey(kpKey)) {
             return questionCache.get(kpKey);
         }
+        // 复用本轮已加载的掌握度：推荐服务内部不再重复执行「全班 × 全考点」矩阵计算
         List<RecommendedQuestionVO> list = recommendationService.recommendQuestionsForStudent(
-                courseId, chapterId, QUESTION_CANDIDATE_SIZE, studentId);
+                courseId, chapterId, QUESTION_CANDIDATE_SIZE, studentId, studentMastery);
         if (list == null || list.isEmpty()) {
             if (kpKey != null) {
                 questionCache.put(kpKey, null);

@@ -99,6 +99,10 @@
             >
               {{ label }}
             </span>
+            <!-- 无归因结论时不再兜底显示「概念偏差」，如实标注待归因 -->
+            <span v-if="!item.errorTypeLabels?.length" class="error-type-tag error-type-tag--pending">
+              待归因
+            </span>
           </div>
         </div>
       </div>
@@ -502,6 +506,14 @@ function formatTime(t?: string) {
           border-radius: 6px;
           font-weight: 600;
           font-size: 11px;
+        }
+
+        // 待归因：中性灰，避免与任何一种真实错因混淆
+        .error-type-tag--pending {
+          background: #f8fafc;
+          border-color: #cbd5e1;
+          color: #64748b;
+          font-weight: 500;
         }
       }
     }

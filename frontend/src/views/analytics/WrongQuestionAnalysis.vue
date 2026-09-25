@@ -122,6 +122,10 @@
               >
                 {{ label }}
               </span>
+              <!-- 无归因结论时不再兜底显示「概念偏差」，明确标注待归因 -->
+              <span v-if="!row.errorTypeLabels?.length" class="error-type-badge error-type-badge--pending">
+                待归因
+              </span>
             </div>
           </template>
         </el-table-column>
@@ -266,7 +270,6 @@ import { ElMessage } from 'element-plus';
 import { useLearningAnalytics } from '@/composables/analytics/useLearningAnalytics';
 import type { WrongQuestionItemVO } from '@/types/analytics/mastery';
 import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
-import { getCourseDetail } from '@/api/course/course';
 import type { Course } from '@/types/course/course';
 import AppPagination from '@/components/common/AppPagination.vue';
 import MathText from '@/components/common/MathText.vue';
@@ -278,7 +281,7 @@ import WrongQuestionVariantsDrawer from '@/components/analytics/wrong-question/W
 import AiCognitiveThinkingPanel from '@/components/ai/common/AiCognitiveThinkingPanel.vue';
 import { AI_COGNITIVE_THINKING_PRESETS } from '@/constants/ai/cognitive-thinking';
 
-const { courseOptions, courseId, loadCourses } = useTeacherCourses();
+const { courseOptions, courseId, loadCourses, loadCourseDetail } = useTeacherCourses();
 const page = ref(1);
 const pageSize = ref(10);
 const range = ref('7d');
@@ -369,13 +372,8 @@ async function loadCourseMeta(cid: number) {
     courseDetailInfo.value = null;
     return;
   }
-  try {
-    const res = await getCourseDetail(cid);
-    courseDetailInfo.value = res?.data ?? null;
-  } catch {
-    // 无权访问或课程已删除必须清空，否则会继续沿用上一门课程的主讲教师与班级人数
-    courseDetailInfo.value = null;
-  }
+  // 无权访问或课程已删除时返回 null，必须清空，否则会继续沿用上一门课程的主讲教师与班级人数
+  courseDetailInfo.value = await loadCourseDetail(cid);
 }
 
 const kpOptions = computed(() => {
@@ -772,6 +770,8 @@ onMounted(async () => {
       &.err-calc { background: #fffbeb; color: #d97706; }
       &.err-logic { background: #f5f3ff; color: #7c3aed; }
       &.err-reading { background: #fdf2f8; color: #db2777; }
+      // 待归因：中性灰，避免与任何一种真实错因混淆
+      &.error-type-badge--pending { background: #f1f5f9; color: #64748b; }
     }
   }
 

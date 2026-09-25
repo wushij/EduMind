@@ -3,6 +3,7 @@ package com.edumind.ai.service.assistant.impl;
 import com.edumind.ai.dto.assistant.FollowUpSuggestDTO;
 import com.edumind.ai.gateway.AiGatewayFacade;
 import com.edumind.ai.service.assistant.FollowUpSuggestService;
+import com.edumind.ai.service.audit.AiCallAuditContext;
 import com.edumind.ai.service.prompt.PromptService;
 import com.edumind.ai.vo.assistant.FollowUpSuggestVO;
 import com.edumind.common.exception.BusinessException;
@@ -99,7 +100,9 @@ public class FollowUpSuggestServiceImpl implements FollowUpSuggestService {
         }
 
         try {
-            String reply = aiGatewayFacade.chat(SCENE, dto.getModelKey(), SYSTEM_PROMPT, userPrompt);
+            // 追问是本轮课程问答的延续，带上课程归属才不会被课程维度的消耗明细过滤掉
+            String reply = aiGatewayFacade.chat(SCENE, dto.getModelKey(), SYSTEM_PROMPT, userPrompt,
+                    auditContext(dto));
             List<String> prompts = parsePrompts(reply, count, dto.getQuestion());
             if (prompts.size() < count) {
                 // 首次输出条数不足（模型常把三条挤在同一行）：用一次修复请求让它按行重出
@@ -142,7 +145,8 @@ public class FollowUpSuggestServiceImpl implements FollowUpSuggestService {
                 + "】请重新输出：" + count + " 行，每行一条完整追问；"
                 + "禁止把多条追问写在同一行，禁止编号、括号、引号与任何解释文字。";
         try {
-            String retryReply = aiGatewayFacade.chat(SCENE, dto.getModelKey(), SYSTEM_PROMPT, repairPrompt);
+            String retryReply = aiGatewayFacade.chat(SCENE, dto.getModelKey(), SYSTEM_PROMPT, repairPrompt,
+                    auditContext(dto));
             return parsePrompts(retryReply, count, dto.getQuestion());
         } catch (Exception ex) {
             log.warn("[AI FollowUp] 修复请求失败，沿用首次可用结果: {}", ex.getMessage());
@@ -157,6 +161,13 @@ public class FollowUpSuggestServiceImpl implements FollowUpSuggestService {
         }
         String oneLine = raw.replaceAll("\\s+", " ").trim();
         return oneLine.length() <= 300 ? oneLine : oneLine.substring(0, 300) + "…";
+    }
+
+    /** 追问调用的审计上下文：没有课程上下文时返回 null，由网关按「无课程归属」记账 */
+    private static AiCallAuditContext auditContext(FollowUpSuggestDTO dto) {
+        return dto != null && dto.getCourseId() != null
+                ? AiCallAuditContext.builder().courseId(dto.getCourseId()).build()
+                : null;
     }
 
     private FollowUpSuggestVO empty(String sourceLabel) {

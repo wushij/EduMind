@@ -48,6 +48,61 @@ System.out.println("Hello, Java!");
     expect(html).not.toMatch(/<p>- 能够/);
   });
 
+  // 以下四例取自真实 AI 讲义（模型把标题与正文写成同一行，渲染时会整段变成粗体大标题）
+  it('splits a glued heading from the sentence that follows it', () => {
+    const md =
+      '###一、未定式判型：一切计算的起点极限计算的第一步不是求导，而是**准确写出未定式类型**。常见的七种未定式如下。';
+    const html = renderLessonMarkdown(md);
+    expect(html).toMatch(/<h3[^>]*>[\s\S]*一、未定式判型[\s\S]*<\/h3>/);
+    // 正文的首句绝不能被留在标题里
+    expect(html).not.toMatch(/<h3[^>]*>[\s\S]*一切计算的起点[\s\S]*<\/h3>/);
+    expect(html).toMatch(/<p>[\s\S]*一切计算的起点/);
+    // 标题尾部不应残留冒号
+    expect(html).not.toMatch(/<h3[^>]*>[\s\S]*判型：[\s\S]*<\/h3>/);
+  });
+
+  it('keeps a short appositive after the colon inside the heading', () => {
+    const md = '###二、洛必达法则：条件重于计算**定理（$\\dfrac{0}{0}$型）**设 $f,g$ 可导。';
+    const html = renderLessonMarkdown(md);
+    expect(html).toMatch(/<h3[^>]*>[\s\S]*二、洛必达法则：条件重于计算[\s\S]*<\/h3>/);
+    expect(html).toMatch(/<p>[\s\S]*设[\s\S]*可导/);
+  });
+
+  it('splits a glued heading before a list marker and demotes un-splittable长句 to body', () => {
+    const list = renderLessonMarkdown('####使用时的三条纪律- **每次使用前重新判型。**求导一次后必须重新判型。');
+    expect(list).toMatch(/<h4[^>]*>[\s\S]*使用时的三条纪律[\s\S]*<\/h4>/);
+    expect(list).not.toMatch(/<h4[^>]*>[\s\S]*每次使用前重新判型[\s\S]*<\/h4>/);
+
+    // 找不到任何分界信号的长句：整行按正文渲染，不猜边界切出半截标题
+    const long = renderLessonMarkdown(
+      '###四、与两个重要极限的衔接两个重要极限是等价无穷小与洛必达法则的共同源头，必须能相互印证：'
+    );
+    expect(long).not.toContain('<h3');
+    expect(long).toMatch(/<p>[\s\S]*与两个重要极限的衔接/);
+  });
+
+  it('keeps complete short headings that carry a closing bracket', () => {
+    const html = renderLessonMarkdown('####3.2常用等价无穷小（$x\\to0$）\n\n正文内容。');
+    expect(html).toMatch(/<h4[^>]*>[\s\S]*3\.2常用等价无穷小[\s\S]*<\/h4>/);
+  });
+
+  it('strips the lesson title echoed at the beginning of the body', () => {
+    const body =
+      '##1.2洛必达法则求未定式极限专项突破本课节围绕两条主线展开：**适用条件与使用边界**，以及等价无穷小代换的判定标准。';
+    const html = renderLessonMarkdown(body, '1.2 洛必达法则求未定式极限专项突破');
+    // 页面标题已展示课节标题，正文里不得再出现一次
+    expect(html).not.toContain('<h2');
+    expect(html).not.toMatch(/专项突破[\s\S]*本课节围绕/);
+    expect(html).toMatch(/<p>[\s\S]*本课节围绕两条主线展开/);
+  });
+
+  it('strips the echoed title even when the stored title was truncated with an ellipsis', () => {
+    const body = '##1.2洛必达法则求未定式极限专项突破本课节围绕两条主线展开：适用条件与使用边界。';
+    const html = renderLessonMarkdown(body, '1.2 洛必达法则求未定式极…专项突破');
+    expect(html).not.toContain('<h2');
+    expect(html).toMatch(/<p>[\s\S]*本课节围绕两条主线展开/);
+  });
+
   it('preserves ASCII box diagrams in code fences without mangling into tables', () => {
     const md = `\`\`\`
 JVM 运行时数据区域（Runtime Data Area）物理划分：
@@ -66,5 +121,39 @@ JVM 运行时数据区域（Runtime Data Area）物理划分：
     expect(html).toContain('JVM 进程内存空间');
     // Must NOT be parsed into a <table>
     expect(html).not.toContain('<table');
+  });
+
+  it('splits inline numbered items before formulas into clean lines', () => {
+    const md =
+      '定理（$\\frac{0}{0}$型）设 $f, g$ 在 $x_0$ 的去心邻域内可导，且1. $\\lim_{x\\to x_0} f(x) = 0, \\lim_{x\\to x_0} g(x) = 0$; 2. $g\'(x) \\neq 0$;';
+    const html = renderLessonMarkdown(md);
+    expect(html).not.toMatch(/且1\.\s*\$/);
+  });
+
+  it('correctly splits glued headings like ###1.数列极限设数列 and ###2.函数极限函数极限关注', () => {
+    const raw = `##一、极限的思想与基本定义极限是微积分的基础语言。本课节是第一章函数与极限论中的1.1节。
+
+###1.数列极限设数列 \\{a_n\\}，若存在常数 A。
+
+###2.函数极限函数极限关注自变量趋近某一点或趋近无穷时，函数值的变化趋势。
+
+###3.极限存在的常用判别除定义外，本课节常用：`;
+
+    const html = renderLessonMarkdown(raw);
+    expect(html).toMatch(/<h2[^>]*>[\s\S]*一、极限的思想与基本定义[\s\S]*<\/h2>/);
+    expect(html).toMatch(/<h3[^>]*>[\s\S]*1\.数列极限[\s\S]*<\/h3>/);
+    expect(html).toMatch(/<h3[^>]*>[\s\S]*2\.函数极限[\s\S]*<\/h3>/);
+    expect(html).toMatch(/<h3[^>]*>[\s\S]*3\.极限存在的常用判别[\s\S]*<\/h3>/);
+    expect(html).toMatch(/<p>[\s\S]*设数列/);
+    expect(html).toMatch(/<p>[\s\S]*函数极限关注/);
+  });
+
+  it('correctly splits ##一、课节定位与核心问题本课节位于第一章', () => {
+    const raw =
+      '##一、课节定位与核心问题本课节位于第一章“函数与极限论”，承接“1.1数列与函数极限计算”，主题是洛必达法则求未定式极限。';
+    const html = renderLessonMarkdown(raw);
+    expect(html).toMatch(/<h2[^>]*>[\s\S]*一、课节定位与核心问题[\s\S]*<\/h2>/);
+    expect(html).not.toMatch(/<h2[^>]*>[\s\S]*本课节位于[\s\S]*<\/h2>/);
+    expect(html).toMatch(/<p>[\s\S]*本课节位于第一章/);
   });
 });

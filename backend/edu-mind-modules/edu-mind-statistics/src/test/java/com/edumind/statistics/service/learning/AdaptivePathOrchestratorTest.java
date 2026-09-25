@@ -31,6 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -88,7 +90,7 @@ class AdaptivePathOrchestratorTest {
         q.setId(9001L);
         q.setStem("测试题");
         q.setKnowledgePointId(kpId);
-        when(recommendationService.recommendQuestionsForStudent(eq(courseId), eq(10L), anyInt(), eq(studentId)))
+        when(recommendationService.recommendQuestionsForStudent(eq(courseId), eq(10L), anyInt(), eq(studentId), any()))
                 .thenReturn(List.of(q));
         when(wrongQuestionRecordDao.findByStudentCourseAndKp(studentId, courseId, kpId)).thenReturn(null);
 
@@ -139,7 +141,7 @@ class AdaptivePathOrchestratorTest {
         q2.setId(1002L);
         q2.setStem("极限练习二");
         q2.setKnowledgePointId(18L);
-        when(recommendationService.recommendQuestionsForStudent(eq(courseId), any(), anyInt(), eq(studentId)))
+        when(recommendationService.recommendQuestionsForStudent(eq(courseId), any(), anyInt(), eq(studentId), any()))
                 .thenReturn(List.of(q1, q2));
 
         LearningPathDetailVO detail = orchestrator.buildDetail(courseId, studentId);
@@ -158,5 +160,40 @@ class AdaptivePathOrchestratorTest {
         Long practiceId2 = detail.getWeeks().get(1).getTasks().get(1).getRefId();
         assertNotNull(practiceId1);
         assertNotEquals(practiceId1, practiceId2, "同一份学习计划内不应重复推荐同一道练习题");
+    }
+
+    /**
+     * 掌握度复用守护：调用方传入 presetMastery 时，编排器不得再次加载掌握度。
+     *
+     * <p>掌握度计算需要跑「全班 × 全考点」矩阵，而学习路径会逐周取题；
+     * 一旦这里退化为各自加载，学情画像这类接口会把它放大成十几次重复计算，
+     * 直接表现为「选择学员后加载很久」。</p>
+     */
+    @Test
+    void buildDetail_reusesPresetMastery_withoutReloading() {
+        Long courseId = 103L;
+        Long studentId = 1L;
+
+        when(courseQueryApi.isCourseMember(courseId, studentId)).thenReturn(true);
+        when(courseQueryApi.listCoursesByIds(List.of(courseId)))
+                .thenReturn(List.of(com.edumind.course.vo.course.CourseVO.builder()
+                        .id(courseId).name("高等数学（上）").build()));
+
+        KnowledgeMasteryVO preset = new KnowledgeMasteryVO();
+        preset.setWeakPoints(List.of());
+        when(knowledgeMasteryQueryApi.getMasteryByStudentAndCourse(studentId, courseId)).thenReturn(Map.of());
+        when(courseQueryApi.listKnowledgePointsByCourseId(courseId)).thenReturn(List.of());
+        when(courseQueryApi.listChaptersByCourseId(courseId)).thenReturn(List.of(
+                ChapterTreeVO.builder().id(11L).parentId(0L).sort(1).title("第一章 函数与极限论").build()));
+
+        RecommendedQuestionVO q = new RecommendedQuestionVO();
+        q.setId(2001L);
+        q.setStem("章节练习");
+        when(recommendationService.recommendQuestionsForStudent(eq(courseId), any(), anyInt(), eq(studentId), any()))
+                .thenReturn(List.of(q));
+
+        orchestrator.buildDetail(courseId, studentId, false, preset);
+
+        verify(knowledgeMasteryService, never()).getMastery(courseId, studentId);
     }
 }

@@ -46,10 +46,12 @@ public class GradingAnalyticsListener {
             wrongQuestionRecordDao.updateById(existing);
             return;
         }
+        // 透传课程归属：批改触发的归因属于该课程的教学数据，否则不会出现在课程的 AI 消耗流水里
         String diagnosis = wrongQuestionDiagnosisService.diagnose(
                 event.getQuestionStem(),
                 event.getStudentAnswer(),
-                event.getCorrectAnswer()
+                event.getCorrectAnswer(),
+                event.getCourseId()
         );
         wrongQuestionDiagnosisService.recordWrong(
                 event.getStudentId(),

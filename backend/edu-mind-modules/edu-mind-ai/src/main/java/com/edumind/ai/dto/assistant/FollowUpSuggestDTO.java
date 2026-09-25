@@ -22,6 +22,14 @@ public class FollowUpSuggestDTO {
     /** 可选场景上下文（课程名 / 课节标题 / 题目考点），用于让追问贴合当前入口；为空不影响生成 */
     private String context;
 
+    /**
+     * 发起本轮问答的课程 ID。
+     *
+     * <p>追问是对话流程的一部分，属于该课程的 AI 消耗：带上它这条调用才会归属到课程、
+     * 出现在该课程的调用明细里；为空表示这次问答没有课程上下文。</p>
+     */
+    private Long courseId;
+
     /** 生成条数，默认 3，上限 5 */
     private Integer count;
 

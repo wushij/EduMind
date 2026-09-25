@@ -91,6 +91,12 @@ describe('renderMathText', () => {
       expect(renderMathText('The value of x^2 is 4')).not.toContain('katex');
       expect(renderMathText('\\d{3}-\\d{4}')).not.toContain('katex');
     });
+
+    it('renders plain-text math inside AI teaching advice into katex html', () => {
+      // 复现 AI 教学策略建议里的真实句子：模型未用 $ 包裹公式时也必须排版出来
+      expect(renderMathText('重点识别 lim(1+a/x)^(bx)=e^(ab)。')).toContain('katex');
+      expect(renderMathText('让学生比较 sin2x、1-cosx、e^x-1-x 与 x 的比值极限')).toContain('katex');
+    });
   });
 
 describe('normalizeMathTextNewlines', () => {

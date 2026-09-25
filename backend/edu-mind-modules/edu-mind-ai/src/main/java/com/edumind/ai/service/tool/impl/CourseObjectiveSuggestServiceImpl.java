@@ -53,7 +53,7 @@ public class CourseObjectiveSuggestServiceImpl implements CourseObjectiveSuggest
 
         try {
             log.info("[AI Course Objective] 调用网关推演教学目标 courseId={}, count={}", dto.getCourseId(), count);
-            String aiReply = aiChatApi.chat(SCENE, systemPrompt, userPrompt);
+            String aiReply = aiChatApi.chat(SCENE, dto.getCourseId(), systemPrompt, userPrompt);
             log.info("[AI Course Objective] 模型返回 length={}", aiReply != null ? aiReply.length() : 0);
 
             List<CourseObjectiveSuggestItemVO> parsed = parseObjectives(aiReply, count);
@@ -66,7 +66,7 @@ public class CourseObjectiveSuggestServiceImpl implements CourseObjectiveSuggest
             }
 
             String repairPrompt = userPrompt + "\n\n上次输出无法解析，请严格只输出合法 JSON，字段 objectives 为数组。";
-            String retryReply = aiChatApi.chat(SCENE, systemPrompt, repairPrompt);
+            String retryReply = aiChatApi.chat(SCENE, dto.getCourseId(), systemPrompt, repairPrompt);
             parsed = parseObjectives(retryReply, count);
             if (!parsed.isEmpty()) {
                 return CourseObjectiveSuggestResultVO.builder()

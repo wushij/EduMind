@@ -62,6 +62,14 @@ export interface CourseWeakPointVO {
   urgency: 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
+/** 课程全量考点的真实掌握度；mastery 为 null 表示该考点尚无实测记录（未测评） */
+export interface KnowledgePointMasteryVO {
+  knowledgePointId: number;
+  title: string;
+  mastery: number | null;
+  assessedStudentCount: number;
+}
+
 export interface LearningAnalyticsVO {
   courseId: number;
   studentCount: number;
@@ -78,6 +86,8 @@ export interface LearningAnalyticsVO {
   chapterProgressList?: ChapterProgressVO[];
   courseHealth?: CourseHealthVO;
   courseWeakPoints?: CourseWeakPointVO[];
+  /** 全量考点真实掌握度（含未测评考点，mastery 为 null）；旧后端无此字段 */
+  courseKnowledgePoints?: KnowledgePointMasteryVO[];
 }
 
 export interface StudentPortraitStudentInfo {

@@ -133,6 +133,69 @@ public class WrongQuestionRecordDao {
         );
     }
 
+    /**
+     * 批量按学生统计某课程的错题记录条数（单次 GROUP BY 聚合）。
+     *
+     * <p>用于学生学情榜单等"课程 × 全部学生"场景，替代逐学生调用
+     * {@link #countByStudentAndCourse(Long, Long)} 造成的 N+1 查询。</p>
+     *
+     * <p>口径与单学生版本完全一致（course_id + student_id 的记录条数）；
+     * 特意不加载明细实体，避免把 lastStudentAnswer / diagnosis 等大字段拖进内存。</p>
+     *
+     * @param courseId   课程 ID
+     * @param studentIds 学生 ID 集合
+     * @return studentId -> 错题记录条数（无记录的学生不在结果中，由调用方取 0）
+     */
+    public java.util.Map<Long, Long> countGroupByStudentIds(Long courseId, java.util.Collection<Long> studentIds) {
+        java.util.Set<Long> distinctStudentIds = studentIds == null
+                ? java.util.Collections.emptySet()
+                : studentIds.stream().filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        if (courseId == null || distinctStudentIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        java.util.List<java.util.Map<String, Object>> rows = wrongQuestionRecordMapper.selectMaps(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<WrongQuestionRecordEntity>()
+                        .select("student_id AS studentId", "COUNT(*) AS cnt")
+                        .eq("course_id", courseId)
+                        .in("student_id", distinctStudentIds)
+                        .groupBy("student_id"));
+        if (rows == null || rows.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        java.util.Map<Long, Long> result = new java.util.HashMap<>(rows.size());
+        for (java.util.Map<String, Object> row : rows) {
+            Long studentId = toLongKey(row.get("studentId"));
+            if (studentId == null) {
+                continue;
+            }
+            Object count = row.get("cnt");
+            result.put(studentId, count instanceof Number countValue ? countValue.longValue() : 0L);
+        }
+        return result;
+    }
+
+    /**
+     * 聚合结果中的主键转换：不同 JDBC 驱动可能返回 Long / BigInteger / String，
+     * 统一做宽松解析，避免因类型断言过严而静默丢数据。
+     */
+    private static Long toLongKey(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        String text = String.valueOf(value).trim();
+        if (text.isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(text);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     public long countByKpAndCourse(Long knowledgePointId, Long courseId) {
         return wrongQuestionRecordMapper.selectCount(
                 new LambdaQueryWrapper<WrongQuestionRecordEntity>()

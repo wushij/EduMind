@@ -9,6 +9,8 @@
       :teacher-name="teacherName"
       :student-count="studentCount"
       :syllabus-progress="syllabusProgress"
+      :total-chapters="totalChapters"
+      :has-real-data="hasRealData"
       :range="currentRange"
       :loading="loading"
       :courses-loading="coursesLoading"
@@ -25,8 +27,11 @@
     <TeachingReportKpi
       :pass-rate="passRate"
       :mastery-rate="masteryRate"
+      :mastery-estimated="masteryEstimated"
       :ai-call-count="aiCallCount"
       :saved-hours="savedHours"
+      :saved-hours-estimated="savedHoursEstimated"
+      :graded-count="reportData?.gradedCount ?? 0"
     />
 
     <!-- 3. 主体分栏：左侧掌握度热力榜与答疑负荷，右侧错因聚类与策略建议 -->
@@ -39,9 +44,11 @@
       />
 
       <TeachingAdvicePanel
+        ref="advicePanelRef"
         :router="router"
         :course-id="courseId"
         :report-data="reportData"
+        :teaching-advice="teachingAdvice"
         :top-weak-point-names="topWeakPointNames"
         :error-categories="errorCategories"
       />
@@ -78,6 +85,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref, watch } from 'vue';
 import TeachingReportHero from '@/components/analytics/TeachingReportHero.vue';
 import TeachingReportKpi from '@/components/analytics/TeachingReportKpi.vue';
 import TeachingReportCharts from '@/components/analytics/TeachingReportCharts.vue';
@@ -98,12 +106,16 @@ const {
   teacherName,
   studentCount,
   syllabusProgress,
+  totalChapters,
   currentRange,
   reportData,
   passRate,
   masteryRate,
+  masteryEstimated,
   aiCallCount,
   savedHours,
+  savedHoursEstimated,
+  hasRealData,
   lastUpdatedTime,
   topWeakPointNames,
   knowledgeMasteryList,
@@ -113,6 +125,8 @@ const {
   selectedQuestion,
   aiThinkingModalVisible,
   adviceLoading,
+  teachingAdvice,
+  adviceGeneratedTick,
   loadReport,
   handleCourseChange,
   handleRangeChange,
@@ -122,6 +136,13 @@ const {
   handleExportReport,
   handleQuickQuiz
 } = useTeachingReport();
+
+/** 建议面板引用：诊断生成完成后把用户视线带到右栏结果卡片 */
+const advicePanelRef = ref<InstanceType<typeof TeachingAdvicePanel> | null>(null);
+
+watch(adviceGeneratedTick, () => {
+  advicePanelRef.value?.focusAdvice();
+});
 </script>
 
 <style scoped lang="scss">

@@ -66,18 +66,29 @@ export function useLessonAutosave(options: {
     }
   }, 30000);
 
+  /** 确认框是否已打开：导航在弹窗未关闭期间可能被重复触发，需拦回以免叠加多个确认框 */
+  let leaving = false;
+
   onBeforeRouteLeave((_to, _from, next) => {
     if (!options.isDirty.value) {
       next();
       return;
     }
+    if (leaving) {
+      next(false);
+      return;
+    }
+    leaving = true;
     ElMessageBox.confirm('课节内容有未保存的修改，确定离开吗？', '提示', {
       type: 'warning',
       confirmButtonText: '离开',
       cancelButtonText: '继续编辑'
     })
       .then(() => next())
-      .catch(() => next(false));
+      .catch(() => next(false))
+      .finally(() => {
+        leaving = false;
+      });
   });
 
   onUnmounted(() => {

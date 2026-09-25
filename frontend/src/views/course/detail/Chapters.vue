@@ -299,6 +299,7 @@
     <ChapterAiGenerateModal
       v-model="showAiGenerateModal"
       :chapter="activeChapter"
+      :chapter-no="resolveChapterNo(activeChapter)"
       @apply="handleAiApplySections"
     />
   </div>
@@ -325,6 +326,7 @@ import { useCourseEditable } from '@/composables/course/useCourseEditable';
 import ChapterSectionDialog from '@/components/course/ChapterSectionDialog.vue';
 import ChapterAiGenerateModal from '@/components/course/ChapterAiGenerateModal.vue';
 import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
+import { ensureLessonTitle, resolveNextLessonNo } from '@/utils/course/lesson-title-number';
 
 const props = defineProps<{
   course?: Course | null;
@@ -387,6 +389,13 @@ function openAddSectionModal(chapter: any) {
 function openAiGenerateModal(chapter: any) {
   activeChapter.value = chapter;
   showAiGenerateModal.value = true;
+}
+
+/** 章节序号：按课程真实大纲顺序（与 AI 备课入口一致），不随搜索过滤变化 */
+function resolveChapterNo(chapter: any) {
+  if (!chapter?.id) return 1;
+  const idx = chapters.value.findIndex(item => item.id === chapter.id);
+  return idx >= 0 ? idx + 1 : 1;
 }
 
 async function handleChapterCommand(cmd: string, chapter: any) {
@@ -458,21 +467,33 @@ async function handleSectionSubmit(data: any) {
 async function handleAiApplySections(sections: any[]) {
   if (!activeChapter.value?.id) return;
   const cId = Number(courseId.value);
+  const chapterId = Number(activeChapter.value.id);
+  const chapterNo = resolveChapterNo(activeChapter.value);
+  // 冻结基线：createSection 内部会刷新 chapters 列表，循环中不能再读会被替换的章节引用
+  const existsTitles = (activeChapter.value.sections || []).map((sec: any) => sec.title);
+  const baseSortOrder = existsTitles.length + 1;
+  const baseLessonNo = resolveNextLessonNo(existsTitles);
   try {
     for (let i = 0; i < sections.length; i++) {
-      await createSection(cId, activeChapter.value.id, {
-        title: sections[i].title,
-        sortOrder: (activeChapter.value.sections?.length || 0) + i + 1,
+      await createSection(cId, chapterId, {
+        // 弹窗生成阶段已归一化编号，这里兜底教师手工清空编号或历史脏数据的情况
+        title: ensureLessonTitle(sections[i].title, chapterNo, baseLessonNo + i),
+        sortOrder: baseSortOrder + i,
         description: sections[i].description,
         durationMinutes: parseDurationMinutes(sections[i].duration),
         lessonType: sections[i].type
       });
     }
+    const endLessonNo = baseLessonNo + sections.length - 1;
+    const rangeText =
+      sections.length > 1
+        ? `${chapterNo}.${baseLessonNo} ~ ${chapterNo}.${endLessonNo}`
+        : `${chapterNo}.${baseLessonNo}`;
     ElMessage.success(
-      `AI 已导入 ${sections.length} 个课节标题，请点击「编辑内容」或「AI 生成正文」填写微课正文`
+      `AI 已续编并导入 ${sections.length} 个课节（${rangeText}），请点击「编辑内容」或「AI 生成正文」填写微课正文`
     );
-    if (!openChapters.value.includes(activeChapter.value.id)) {
-      openChapters.value.push(activeChapter.value.id);
+    if (!openChapters.value.includes(chapterId)) {
+      openChapters.value.push(chapterId);
     }
   } catch (err: any) {
     ElMessage.error(err?.message || '批量导入微课节失败');

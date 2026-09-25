@@ -101,7 +101,7 @@ export function createAIStreamSessionActions(deps: AIStreamSessionsDeps) {
     }
   }
 
-  function restoreFollowUpsForLastTurn() {
+  function restoreFollowUpsForLastTurn(courseId?: number) {
     if (messages.value.length === 0) {
       followUpPrompts.value = [];
       return;
@@ -116,6 +116,7 @@ export function createAIStreamSessionActions(deps: AIStreamSessionsDeps) {
       if (lastUserMsg?.content) {
         const targetId = lastMsg.id;
         const prompts = requestFollowUps(lastUserMsg.content, lastMsg.content, {
+          courseId,
           onUpdate: (next) => {
             // 按 id 判定「仍然是当轮消息」，并通过数组里的代理对象回写（引用比较在响应式代理下不可靠）
             const current = pickTurnMessage(messages.value, targetId);
@@ -140,7 +141,7 @@ export function createAIStreamSessionActions(deps: AIStreamSessionsDeps) {
       messages.value = mergeServerWithLocalDrafts(serverMsgs, localDraft);
       persistMessageCache(courseId, conversationId, messages.value);
       await syncSessionTitleIfDefaultLocal(conversationId);
-      restoreFollowUpsForLastTurn();
+      restoreFollowUpsForLastTurn(courseId);
     } catch {
       if (localDraft.length > 0) {
         messages.value = localDraft;
