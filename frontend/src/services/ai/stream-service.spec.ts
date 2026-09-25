@@ -5,6 +5,7 @@ import {
   extractKeyTopicsFromContent,
   normalizeFollowUpPrompts,
   requestFollowUps,
+  buildSessionTitleFromPrompt,
   type ChatMessage
 } from './stream-service';
 
@@ -94,6 +95,18 @@ Java源码通过 javac 编译成 .class 字节码。
   });
 });
 
+describe('buildSessionTitleFromPrompt', () => {
+  it('strips template brackets and keeps the title short', () => {
+    expect(
+      buildSessionTitleFromPrompt('请结合「1.1 数列与函数极限计算」，用通俗易懂的逻辑讲透')
+    ).toBe('请结合1.1 数列与函数极限');
+  });
+
+  it('falls back to the default title for blank input', () => {
+    expect(buildSessionTitleFromPrompt('   ')).toBe('新问答会话');
+  });
+});
+
 describe('normalizeFollowUpPrompts', () => {
   it('strips numbering and markdown, drops generic and duplicated prompts', () => {
     const prompts = normalizeFollowUpPrompts([
@@ -119,6 +132,20 @@ describe('normalizeFollowUpPrompts', () => {
       '极限唯一是怎么推导出来的？',
       '收敛必有界有反例吗？',
       '保号性做题第一步判断什么？'
+    ]);
+  });
+
+  it('keeps section numbers such as 1.1 intact while still stripping list numbering', () => {
+    const prompts = normalizeFollowUpPrompts([
+      '1.1 算法复杂度与渐近表示法为什么是衡量尺度？',
+      '2. 渐进表示法里最坏情况怎么算？',
+      '什么是 1.1 算法复杂度与渐近表示法的衡量口径？'
+    ]);
+
+    expect(prompts).toEqual([
+      '1.1 算法复杂度与渐近表示法为什么是衡量尺度？',
+      '渐进表示法里最坏情况怎么算？',
+      '什么是 1.1 算法复杂度与渐近表示法的衡量口径？'
     ]);
   });
 

@@ -89,7 +89,7 @@
 
           <div v-if="item.aiComment" class="answer-block answer-block--ai">
             <div class="block-title">
-              <el-icon><MagicStick /></el-icon>
+              <el-icon><AiSparkleIcon /></el-icon>
               <span>AI 评阅说明</span>
             </div>
             <!-- AI 评语为大模型输出的 Markdown（含 ** 强调、公式、表格），需走 Markdown 渲染而非纯文本 -->
@@ -121,12 +121,13 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { MagicStick, EditPen } from '@element-plus/icons-vue';
+import { EditPen } from '@element-plus/icons-vue';
 import MathText from '@/components/common/MathText.vue';
 import MarkdownLlmOutput from '@/components/system/PromptLlmOutput.vue';
 import AppPagination from '@/components/common/AppPagination.vue';
 import { getSubmissionTypeLabel } from '@/composables/question/useSubmission';
 import type { GradingItem, SubmissionAnswerItem } from '@/types/question/submission';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = withDefaults(
   defineProps<{

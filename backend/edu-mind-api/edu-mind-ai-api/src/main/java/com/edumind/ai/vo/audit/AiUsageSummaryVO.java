@@ -14,6 +14,10 @@ public class AiUsageSummaryVO {
 
     private Long totalCalls = 0L;
     private Long totalTokens = 0L;
+    private Long totalLatencyMs = 0L;
+    private Long todayCalls = 0L;
+    private Long todayTokens = 0L;
+    private Long successfulCalls = 0L;
     private Map<LocalDate, Long> dailyCalls = new HashMap<>();
     private Map<LocalDate, Long> dailyTokens = new HashMap<>();
     private Map<String, Long> providerCalls = new HashMap<>();

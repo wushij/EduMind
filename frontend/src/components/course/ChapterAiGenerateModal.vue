@@ -9,7 +9,7 @@
   >
     <div v-if="!generating" class="ai-modal-header-desc">
       <div class="ai-sparkle-badge">
-        <el-icon><MagicStick /></el-icon>
+        <el-icon><AiSparkleIcon /></el-icon>
         <span>EduMind 教学大纲智能拆解引擎</span>
       </div>
       <p class="ai-tip-text">
@@ -97,12 +97,13 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { MagicStick, Clock, VideoPlay, EditPen, Connection, Refresh } from '@element-plus/icons-vue';
+import { Clock, VideoPlay, EditPen, Connection, Refresh } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { isAxiosError } from 'axios';
 import { askGlobalAssistant } from '@/api/ai/assistant';
 import AiCognitiveThinkingPanel from '@/components/ai/common/AiCognitiveThinkingPanel.vue';
 import { AI_COGNITIVE_THINKING_PRESETS } from '@/constants/ai/cognitive-thinking';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = defineProps<{
   modelValue: boolean;

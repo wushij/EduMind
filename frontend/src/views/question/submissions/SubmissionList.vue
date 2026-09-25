@@ -21,7 +21,7 @@
           :disabled="batchLoading"
           @click="handleBatchAIGrading"
         >
-          <el-icon><MagicStick /></el-icon>
+          <el-icon><AiSparkleIcon /></el-icon>
           <span>{{ batchLoading ? '队列批改中…' : '启动全队列 AI 批改' }}</span>
         </button>
       </template>
@@ -154,7 +154,7 @@
                   title="重新调用 AI 阅卷推演模型重新判分与撰写评语"
                   @click="handleSingleAIGrade(row)"
                 >
-                  <el-icon><MagicStick /></el-icon>
+                  <el-icon><AiSparkleIcon /></el-icon>
                   <span>{{ row.status === 'SUBMITTED' ? 'AI批改' : 'AI复评' }}</span>
                 </button>
                 <button
@@ -197,7 +197,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessageBox } from 'element-plus';
-import { Search, Document, MagicStick, Close, Delete } from '@element-plus/icons-vue';
+import { Search, Document, Close, Delete } from '@element-plus/icons-vue';
 import ModulePageHeroHeader from '@/components/question/common/ModulePageHeroHeader.vue';
 import SubmissionListStatsBar from '@/components/question/submission/SubmissionListStatsBar.vue';
 import AssignmentGradingEngineDialog from '@/components/question/assignment/AssignmentGradingEngineDialog.vue';
@@ -209,6 +209,7 @@ import {
   SUBMISSION_STATUS_TAG
 } from '@/constants/question/assignment';
 import type { SubmissionItem } from '@/types/question/submission';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const router = useRouter();
 const {

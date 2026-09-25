@@ -49,7 +49,7 @@
             class="capsule-tool-btn capsule-tool-btn--ai"
             @click="goAiExam"
           >
-            <el-icon><MagicStick /></el-icon>
+            <el-icon><AiSparkleIcon /></el-icon>
             <span>AI 智能出题</span>
           </button>
           <button
@@ -68,7 +68,7 @@
             class="capsule-tool-btn capsule-tool-btn--ai"
             @click="goAIPractice"
           >
-            <el-icon><MagicStick /></el-icon>
+            <el-icon><AiSparkleIcon /></el-icon>
             <span>AI 考点自适应刷题</span>
           </button>
         </template>
@@ -163,7 +163,7 @@
       <div class="empty-actions-row">
         <template v-if="isTeacherView">
           <button type="button" class="cta-pill-btn cta-pill-btn--ai" @click="goAiExam">
-            <el-icon><MagicStick /></el-icon>
+            <el-icon><AiSparkleIcon /></el-icon>
             <span>使用 AI 智能快速出题</span>
           </button>
           <button type="button" class="cta-pill-btn cta-pill-btn--primary" @click="goManage">
@@ -177,7 +177,7 @@
             <span>前往章节大纲学习</span>
           </button>
           <button type="button" class="cta-pill-btn cta-pill-btn--ai" @click="goAIPractice">
-            <el-icon><MagicStick /></el-icon>
+            <el-icon><AiSparkleIcon /></el-icon>
             <span>开启 AI 考点自适应测验</span>
           </button>
         </template>
@@ -199,7 +199,6 @@ import {
   Document,
   DocumentChecked,
   Refresh,
-  MagicStick,
   Plus,
   Reading
 } from '@element-plus/icons-vue';
@@ -212,6 +211,7 @@ import {
 } from '@/constants/question/assignment';
 import { useAuthStore } from '@/stores/auth/auth';
 import { RoleEnum } from '@/constants/auth';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = defineProps<{ course?: { id?: number } }>();
 

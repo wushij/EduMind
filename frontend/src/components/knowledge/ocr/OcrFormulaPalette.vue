@@ -19,7 +19,7 @@
       <div class="format-tools-group">
         <el-dropdown trigger="click" @command="handleFormatCommand">
           <button type="button" class="format-trigger-btn">
-            <el-icon><MagicStick /></el-icon>
+            <el-icon><AiSparkleIcon /></el-icon>
             <span>智能排版格式化</span>
             <el-icon class="arrow-down"><ArrowDown /></el-icon>
           </button>
@@ -72,12 +72,12 @@ import {
   TrendCharts,
   Compass,
   Tickets,
-  MagicStick,
   ArrowDown,
   EditPen,
   Delete,
   RefreshLeft
 } from '@element-plus/icons-vue';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const emit = defineEmits<{
   'insert-formula': [latex: string];

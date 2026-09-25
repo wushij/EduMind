@@ -15,8 +15,30 @@ export interface TeachingReportErrorCategory {
   percent: number;
 }
 
+export interface TeachingReportWeakPoint {
+  questionId?: number | string;
+  questionStem?: string;
+  knowledgePointId?: number | string;
+  knowledgePointName?: string;
+  chapterName?: string;
+  title: string;
+  wrongCount: number;
+  masteryRate?: number;
+  errorType?: string;
+  errorTypeName?: string;
+  errorReason?: string;
+  suggestion: string;
+  status?: 'good' | 'normal' | 'warning' | 'danger';
+  statusLabel?: string;
+}
+
 export interface TeachingReportVO {
   courseId: number;
+  courseName?: string;
+  courseCode?: string;
+  teacherName?: string;
+  studentCount?: number;
+  syllabusProgress?: number;
   range: string;
   totalChapters: number;
   recommendedQuestions: number;
@@ -26,9 +48,6 @@ export interface TeachingReportVO {
   knowledgeMasteryAvg?: number;
   weeklyActivity?: TeachingReportWeeklyActivity[];
   errorCategories?: TeachingReportErrorCategory[];
-  weakPoints: Array<{
-    title: string;
-    wrongCount: number;
-    suggestion: string;
-  }>;
+  weakPoints: TeachingReportWeakPoint[];
 }
+

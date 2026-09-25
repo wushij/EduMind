@@ -25,10 +25,13 @@
       </el-form-item>
 
       <el-form-item label="记忆摘要描述" required>
+        <!-- 上限与后端 MemorySummaryNormalizer.MAX_SUMMARY_CHARS 对齐，避免超长提交后才在服务端被拒 -->
         <el-input
           v-model="form.summary"
           type="textarea"
           :rows="3"
+          maxlength="1000"
+          show-word-limit
         />
       </el-form-item>
 

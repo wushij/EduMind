@@ -15,6 +15,8 @@ import com.edumind.ai.vo.MessageVO;
 import com.edumind.ai.service.audit.AiCallAuditContext;
 import com.edumind.common.context.TenantContext;
 import com.edumind.common.exception.BusinessException;
+import com.edumind.common.model.LoginUser;
+import com.edumind.common.model.UserContext;
 import com.edumind.infrastructure.redis.cache.AiSessionCacheService;
 import com.edumind.security.context.LoginUserResolver;
 import lombok.RequiredArgsConstructor;
@@ -26,12 +28,19 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ConversationServiceImpl implements ConversationService {
+
+    /** 取不到模型时的兜底标题长度（历史值是「提问前 20 字」，又长又不像标题） */
+    private static final int SHORT_TITLE_CHARS = 12;
+    /** 模型返回标题的硬性裁剪长度 */
+    private static final int MAX_TITLE_CHARS = 14;
+    private static final int TITLE_TIMEOUT_SECONDS = 6;
 
     private final ConversationDao conversationDao;
     private final MessageDao messageDao;
@@ -138,44 +147,117 @@ public class ConversationServiceImpl implements ConversationService {
     @Override
     public String generateTitle(String conversationId) {
         ConversationEntity entity = assertConversationOwner(conversationId);
-        List<MessageEntity> messages = messageDao.listByConversationId(conversationId);
-        String firstUser = messages.stream()
-                .filter(msg -> "user".equals(msg.getRole()))
-                .map(MessageEntity::getContent)
-                .findFirst()
-                .orElse("新问答会话");
-        String cleanPrompt = firstUser.replaceAll("^\\[[^\\]]+\\]\\s*", "").trim();
+        return doGenerateTitle(entity, firstUserPrompt(conversationId));
+    }
+
+    @Override
+    public void generateTitleIfAutoDerivedAsync(String conversationId) {
+        if (!StringUtils.hasText(conversationId)) {
+            return;
+        }
+        // 异步线程没有请求上下文：必须把租户/用户带过去，否则 DAO 的租户隔离取不到租户
+        final LoginUser currentUser = UserContext.get();
+        final Long tenantId = TenantContext.getTenantId();
+        CompletableFuture.runAsync(() -> {
+            if (tenantId != null && tenantId > 0) {
+                TenantContext.setTenantId(tenantId);
+            }
+            if (currentUser != null) {
+                UserContext.set(currentUser);
+            }
+            try {
+                ConversationEntity entity = conversationDao.findById(conversationId);
+                if (entity == null) {
+                    return;
+                }
+                String firstUser = firstUserPrompt(conversationId);
+                if (!isAutoDerivedTitle(entity.getTitle(), firstUser)) {
+                    return;
+                }
+                doGenerateTitle(entity, firstUser);
+            } catch (Exception ex) {
+                log.warn("Async title generation failed conv={}: {}", conversationId, ex.getMessage());
+            } finally {
+                UserContext.clear();
+                TenantContext.clear();
+            }
+        });
+    }
+
+    private String doGenerateTitle(ConversationEntity entity, String firstUserPrompt) {
+        String cleanPrompt = firstUserPrompt == null
+                ? ""
+                : firstUserPrompt.replaceAll("^\\[[^\\]]+\\]\\s*", "").trim();
         String rawFallback = StringUtils.hasText(cleanPrompt) ? cleanPrompt : "新问答会话";
-        String fallbackTitle = rawFallback.length() <= 15 ? rawFallback : rawFallback.substring(0, 15);
+        String fallbackTitle = rawFallback.length() <= SHORT_TITLE_CHARS
+                ? rawFallback
+                : rawFallback.substring(0, SHORT_TITLE_CHARS);
         try {
             String modelKey = modelRouter.resolveModelKey("CHAT", null);
             AiCallAuditContext auditContext = AiCallAuditContext.builder()
-                    .userId(LoginUserResolver.resolveUserId())
-                    .tenantId(TenantContext.getTenantId())
+                    .userId(entity.getUserId())
+                    .tenantId(entity.getTenantId())
                     .courseId(entity.getCourseId())
-                    .conversationId(conversationId)
+                    .conversationId(entity.getId())
                     .build();
             CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> aiGatewayFacade.chat(
                     "CHAT_TITLE",
                     modelKey,
-                    "你是会话标题生成器，请用不超过12个字概括用户问题，不要输出标点符号和引号。",
+                    "你是会话标题生成器。只输出标题本身：不超过10个汉字，不带标点、引号、书名号，不要任何解释。",
                     cleanPrompt,
                     auditContext
             ));
-            String title = future.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            String title = cleanTitle(future.get(TITLE_TIMEOUT_SECONDS, TimeUnit.SECONDS));
             if (StringUtils.hasText(title)) {
-                entity.setTitle(title.trim().replace("\"", "").replace("'", ""));
+                entity.setTitle(title);
                 conversationDao.updateById(entity);
-                return entity.getTitle();
+                return title;
             }
         } catch (Exception ex) {
-            log.warn("Failed to generate title via LLM for conversation {}, fallback to user prompt: {}", conversationId, ex.getMessage());
+            log.warn("Failed to generate title via LLM for conversation {}, fallback to user prompt: {}",
+                    entity.getId(), ex.getMessage());
         }
-        if (StringUtils.hasText(fallbackTitle)) {
-            entity.setTitle(fallbackTitle);
-            conversationDao.updateById(entity);
+        entity.setTitle(fallbackTitle);
+        conversationDao.updateById(entity);
+        return fallbackTitle;
+    }
+
+    /** 模型偶尔仍会带书名号 / 引号 / 换行或「标题：」前缀，统一清掉并按标题长度裁剪 */
+    private String cleanTitle(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return "";
         }
-        return entity.getTitle();
+        String cleaned = raw.replaceAll("[\\r\\n]+", " ")
+                .replaceAll("[\"'“”‘’《》「」【】]", "")
+                .replaceAll("^(标题|会话标题)\\s*[:：]?", "")
+                .trim();
+        return cleaned.length() > MAX_TITLE_CHARS ? cleaned.substring(0, MAX_TITLE_CHARS) : cleaned;
+    }
+
+    private String firstUserPrompt(String conversationId) {
+        return messageDao.listByConversationId(conversationId).stream()
+                .filter(msg -> "user".equals(msg.getRole()))
+                .map(MessageEntity::getContent)
+                .findFirst()
+                .orElse("");
+    }
+
+    /**
+     * 标题是否仍由系统自动生成：默认标题，或就是首条提问的前缀（历史行为）。
+     * 用户手动改过名的一律不再覆盖。
+     */
+    private boolean isAutoDerivedTitle(String title, String firstUserPrompt) {
+        if (!StringUtils.hasText(title)) {
+            return true;
+        }
+        String trimmed = title.trim();
+        if ("新问答会话".equals(trimmed) || "新会话".equals(trimmed)) {
+            return true;
+        }
+        String cleanPrompt = firstUserPrompt == null
+                ? ""
+                : firstUserPrompt.replaceAll("^\\[[^\\]]+\\]\\s*", "").trim();
+        return StringUtils.hasText(cleanPrompt) && cleanPrompt.startsWith(trimmed);
     }
 
     private Long requireUserId() {

@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 public class AiToolManageServiceImpl implements AiToolManageService {
 
     private static final Set<String> SEED_TOOL_IDS = Set.of(
-            "tool_question_gen", "tool_exam_gen", "tool_grading", "tool_lesson", "tool_summary",
+            "tool_question_gen", "tool_exam_gen", "tool_grading", "tool_summary",
             "tool_chat", "tool_practice"
     );
 

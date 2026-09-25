@@ -59,7 +59,14 @@ export function createAIStreamSessionActions(deps: AIStreamSessionsDeps) {
     promptHint?: string,
     options?: { tryLlmTitle?: boolean }
   ): Promise<void> {
-    await syncSessionTitleIfDefault(sessions.value, conversationId, messages.value, promptHint, options);
+    // 传 getter：会话列表刷新时会被整体替换，用闭包读当前数组，标题才写得回正在渲染的那一份
+    await syncSessionTitleIfDefault(
+      () => sessions.value,
+      conversationId,
+      messages.value,
+      promptHint,
+      options
+    );
   }
 
   async function refreshSessionsMeta(courseId?: number) {

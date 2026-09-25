@@ -6,6 +6,7 @@ import type { KnowledgeHeatmapVO } from '@/types/analytics/mastery';
 export interface HeatmapKpItem {
   id: number;
   title: string;
+  chapterId?: number;
   chapterName?: string;
 }
 
@@ -13,6 +14,9 @@ export interface HeatmapStudentItem {
   id: number;
   name: string;
   studentNo?: string;
+  avatar?: string;
+  className?: string;
+  avgScore?: number;
   scores: Record<number, number>;
 }
 
@@ -23,9 +27,11 @@ export interface ParsedHeatmapData {
 }
 
 export function parseHeatmapVO(vo: KnowledgeHeatmapVO): ParsedHeatmapData {
-  const kpList: HeatmapKpItem[] = vo.knowledgePoints.map((p) => ({
+  const kpList: HeatmapKpItem[] = (vo.knowledgePoints || []).map((p) => ({
     id: p.id,
-    title: p.title
+    title: p.title,
+    chapterId: p.chapterId,
+    chapterName: p.chapterName || '核心章节'
   }));
 
   const cellMap = new Map<string, number>();
@@ -46,6 +52,9 @@ export function parseHeatmapVO(vo: KnowledgeHeatmapVO): ParsedHeatmapData {
       id: s.id,
       name: s.name,
       studentNo: s.studentNo,
+      avatar: s.avatar,
+      className: s.className,
+      avgScore: s.avgScore,
       scores
     });
   }
@@ -75,8 +84,6 @@ export function useKnowledgeHeatmap(getCourseId: () => number | undefined) {
     kpList.value = [];
     studentRows.value = [];
     classAvgScores.value = {};
-    // 没有有效课程上下文时不再兜底成固定课程（原实现为 `getCourseId() || 102`），
-    // 否则会去拉取一门与当前上下文无关的课程热力图，看起来「有数据」实则张冠李戴。
     if (!courseId || courseId <= 0) {
       loadError.value = false;
       loading.value = false;
@@ -87,14 +94,13 @@ export function useKnowledgeHeatmap(getCourseId: () => number | undefined) {
 
     try {
       const res = await getKnowledgeHeatmap(courseId);
-      const data: KnowledgeHeatmapVO = res?.data || res;
-      if (data?.knowledgePoints?.length) {
+      const data: KnowledgeHeatmapVO = (res as any)?.data || res;
+      if (data) {
         const parsed = parseHeatmapVO(data);
         kpList.value = parsed.kpList;
         studentRows.value = parsed.studentRows;
         classAvgScores.value = parsed.classAvgScores;
-      } else {
-        loadError.value = true;
+        loadError.value = false;
       }
     } catch {
       loadError.value = true;
@@ -113,3 +119,4 @@ export function useKnowledgeHeatmap(getCourseId: () => number | undefined) {
     fetchHeatmap
   };
 }
+

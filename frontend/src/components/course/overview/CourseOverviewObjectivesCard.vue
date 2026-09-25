@@ -6,8 +6,8 @@
         <h3 class="card-title">教学目标与能力达成度</h3>
       </div>
       <div v-if="editable" class="header-actions">
-        <button type="button" class="table-action-pill" @click="emit('ai-lesson')">
-          AI 教案
+        <button type="button" class="table-action-pill" @click="emit('ai-prep')">
+          AI 备课
         </button>
         <button type="button" class="table-action-pill table-action-pill--primary" @click="emit('manage')">
           管理目标
@@ -41,7 +41,7 @@ defineProps<{
   editable?: boolean;
 }>();
 
-const emit = defineEmits<{ manage: []; 'ai-lesson': [] }>();
+const emit = defineEmits<{ manage: []; 'ai-prep': [] }>();
 </script>
 
 <style scoped lang="scss">

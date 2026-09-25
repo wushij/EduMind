@@ -76,6 +76,7 @@ public class ChatServiceImpl implements ChatService {
     private final AiUserModelPolicy aiUserModelPolicy;
     private final com.edumind.ai.service.chat.ChatAttachmentService chatAttachmentService;
     private final com.edumind.ai.service.search.WebSearchService webSearchService;
+    private final com.edumind.ai.service.conversation.ConversationService conversationService;
 
     @Override
     public SseEmitter streamChat(ChatStreamDTO dto) {
@@ -343,6 +344,8 @@ public class ChatServiceImpl implements ChatService {
                     );
                     updateConversationStats(conversation, regenerateTurn);
                     aiSessionCacheService.markStreamComplete(conversation.getId(), assistantContent.toString());
+                    // 标题仍是「提问前缀」时异步生成短标题：不能只指望前端那次 generate-title（页面切走/中断就丢了）
+                    conversationService.generateTitleIfAutoDerivedAsync(conversation.getId());
                     Map<String, String> done = new HashMap<>();
                     done.put("conversationId", conversation.getId());
                     done.put("messageId", assistantMsg.getId());

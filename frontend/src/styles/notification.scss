@@ -78,23 +78,33 @@
 }
 
 .notify-card-item {
+  box-sizing: border-box;
   padding: 14px 16px;
   border-radius: 12px;
   background: #ffffff;
   border: 1px solid rgba(203, 213, 225, 0.8);
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
   cursor: pointer;
-  transition: all 0.2s ease;
+  outline: none;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 
   &:hover {
-    transform: translateY(-2px);
     border-color: #1677ff;
-    box-shadow: 0 8px 20px rgba(22, 119, 255, 0.12);
+    box-shadow: 0 4px 14px rgba(22, 119, 255, 0.12);
+
+    .notify-link-hint {
+      color: #0958d9;
+    }
   }
 
   &.unread {
     background: #eff6ff;
     border-color: #bfdbfe;
+
+    &:hover {
+      background: #e6f0ff;
+      border-color: #1677ff;
+    }
   }
 
   &.unread .notify-card-title::before {
@@ -195,8 +205,20 @@
   font-size: 13px;
   line-height: 1.6;
   color: #64748b;
-  word-break: break-word;
-  white-space: pre-wrap;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notify-card-footer {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .notify-action-btn {
@@ -208,7 +230,7 @@
   font-weight: 600;
   padding: 3px 10px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 
   &:hover {
     background: #fef2f2;
@@ -220,6 +242,8 @@
   font-size: 12px;
   font-weight: 600;
   color: #1677ff;
+  user-select: none;
+  transition: color 0.15s ease;
 }
 
 .notify-panel-head {

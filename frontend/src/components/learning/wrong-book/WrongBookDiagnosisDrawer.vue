@@ -119,7 +119,7 @@
               :loading="variantsLoading"
               @click="emit('generate-variants')"
             >
-              <el-icon v-if="!variantsLoading"><MagicStick /></el-icon>
+              <el-icon v-if="!variantsLoading"><AiSparkleIcon /></el-icon>
               <span>{{ variantsLoading ? 'AI 生成中…' : (variantQuestions.length ? '重新生成' : '生成同构变式题') }}</span>
             </el-button>
           </header>
@@ -177,7 +177,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Compass, Connection, Tickets, Refresh, MagicStick, Warning, Cpu } from '@element-plus/icons-vue';
+import { Compass, Connection, Tickets, Refresh, Warning, Cpu } from '@element-plus/icons-vue';
 import MathText from '@/components/common/MathText.vue';
 import AiCognitiveThinkingPanel from '@/components/ai/common/AiCognitiveThinkingPanel.vue';
 import { AI_COGNITIVE_THINKING_PRESETS } from '@/constants/ai/cognitive-thinking';
@@ -186,6 +186,7 @@ import type {
   WrongBookVariantSummary,
   WrongQuestionRecordItem
 } from '@/types/learning/wrong-question';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = defineProps<{
   visible: boolean;

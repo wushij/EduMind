@@ -25,10 +25,13 @@
       </el-form-item>
 
       <el-form-item label="记忆核心摘要 (明文索引)" required>
+        <!-- 上限与后端 MemorySummaryNormalizer.MAX_SUMMARY_CHARS 对齐，避免超长提交后才在服务端被拒 -->
         <el-input
           v-model="form.memoryValue"
           type="textarea"
           :rows="3"
+          maxlength="1000"
+          show-word-limit
           placeholder="如：该学生对复合函数求导链式法则极度敏感，但极易遗忘定义域前置检查，建议提问时多设陷阱校验。"
         />
       </el-form-item>

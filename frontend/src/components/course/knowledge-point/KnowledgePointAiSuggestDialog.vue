@@ -10,7 +10,7 @@
   >
     <div v-if="!loading" class="ai-dialog-intro">
       <div class="spark-badge">
-        <el-icon><MagicStick /></el-icon>
+        <el-icon><AiSparkleIcon /></el-icon>
         <span>AI 课程知识图谱引擎</span>
       </div>
       <p>结合当前课程章节与已有考点，生成可入库的结构化考点（含说明与考查重点）。</p>
@@ -66,10 +66,11 @@
 </template>
 
 <script setup lang="ts">
-import { MagicStick, Refresh, EditPen } from '@element-plus/icons-vue';
+import { Refresh, EditPen } from '@element-plus/icons-vue';
 import type { CourseKnowledgePointSuggestItem } from '@/types/course/knowledge-point';
 import AiCognitiveThinkingPanel from '@/components/ai/common/AiCognitiveThinkingPanel.vue';
 import { AI_COGNITIVE_THINKING_PRESETS } from '@/constants/ai/cognitive-thinking';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 defineProps<{
   visible: boolean;

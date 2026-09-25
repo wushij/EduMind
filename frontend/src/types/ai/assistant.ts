@@ -93,6 +93,8 @@ export interface FollowUpSuggestResponse {
 export interface GlobalAssistantSession {
   id: string;
   title: string;
+  /** true 表示标题已由模型生成/用户改过，后续保存不得再用「提问前缀」覆盖 */
+  titleFromAi?: boolean;
   updatedAt: number | string;
   messageCount?: number;
   messages?: GlobalAssistantMessage[];

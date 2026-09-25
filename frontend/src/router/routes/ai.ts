@@ -81,13 +81,7 @@ export const aiRoutes: RouteRecordRaw[] = [
     meta: { title: '批改结果与复核', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
   },
 
-  // AI 教案与总结
-  {
-    path: '/ai/lesson',
-    name: 'AILessonPlan',
-    component: () => import('@/views/ai/lesson/LessonPlan.vue'),
-    meta: { title: 'AI 教案设计', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
-  },
+  // AI 课堂总结与推荐
   {
     path: '/ai/summary',
     name: 'AISummary',
@@ -99,6 +93,16 @@ export const aiRoutes: RouteRecordRaw[] = [
     name: 'AIRecommendation',
     component: () => import('@/views/ai/recommendation/Recommendation.vue'),
     meta: { title: 'AI 智能推荐', requiresAuth: true }
+  },
+
+  // 旧版独立 AI 教案页已下线，AI 备课统一收敛到课程内课节的教案工作台，兼容历史链接
+  {
+    path: '/ai/lesson',
+    redirect: '/course/ai'
+  },
+  {
+    path: '/ai/lesson-plan',
+    redirect: '/course/ai'
   },
 
   // 旧版独立 AI 助手页已下线，兼容历史链接重定向至课程 AI 工作台

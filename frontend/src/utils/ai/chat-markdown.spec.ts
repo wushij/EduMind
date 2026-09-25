@@ -127,4 +127,41 @@ $$\\frac{0}{0}, \\frac{\\infty}{\\infty}, \\infty - \\infty, \\0 \\cdot \\infty,
     expect(html8).not.toContain('\\0');
     expect(html8).not.toContain('\\1');
   });
+
+  it('副标题连字符与未闭合括号内部不应被拆行为列表项', () => {
+    // 题目一/二（数列极限 - 四则运算与同除最高阶）必须保持单行，绝不能拆成 <li>
+    const inputQuestion1 = `题目一（数列极限 - 四则运算与同除最高阶）
+
+求极限：
+$$\\lim_{n\\to\\infty} \\frac{5n^3 - 2n^2 + 1}{2n^3 + 7n - 4}$$
+
+考查点：数列极限的四则运算、无穷小性质、分子分母同除最高阶。`;
+
+    const html1 = renderChatMarkdown(inputQuestion1);
+    expect(html1).not.toContain('<li>四则运算与同除最高阶');
+    expect(html1).toContain('题目一（数列极限 - 四则运算与同除最高阶）');
+
+    // Markdown 标题行同理
+    const inputHeading = `### 题目二（等价无穷小 - 加减结构需谨慎）`;
+    const htmlHeading = renderChatMarkdown(inputHeading);
+    expect(htmlHeading).not.toContain('<li>加减结构需谨慎');
+    expect(htmlHeading).toContain('等价无穷小 - 加减结构需谨慎');
+
+    // 中文人名间隔号 · 不应被误拆
+    const inputName = `计算机之父：约翰·冯·诺依曼与图灵`;
+    const htmlName = renderChatMarkdown(inputName);
+    expect(htmlName).not.toContain('<li>冯');
+
+    // 真正同一行粘连的无序列表项应正常拆分
+    const inputList = `考查重点如下：- 极限四则运算 - 无穷小性质比较`;
+    const htmlList = renderChatMarkdown(inputList);
+    expect(htmlList).toContain('<li>极限四则运算</li>');
+    expect(htmlList).toContain('<li>无穷小性质比较</li>');
+
+    const sampleNoBold = `易错提醒1. 数列极限同除最高阶时，要同时处理分子分母，不能只除一边。 2.等价无穷小替换在乘除结构中较安全，在加减结构中要谨慎，通常需要先变形或提取公因式。 3.洛必达法则使用前必须验证未定式类型，并且要满足可导、分母导数不为零等条件。 4.若求导后极限仍为未定式，可以继续洛必达，但要注意每一步都成立。`;
+    const htmlNoBold = renderChatMarkdown(sampleNoBold);
+    expect(htmlNoBold).toContain('<ol>');
+    expect(htmlNoBold).toContain('<li>');
+  });
 });
+

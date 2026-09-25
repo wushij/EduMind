@@ -18,7 +18,7 @@
         class="module-capsule-btn module-capsule-btn--ai"
         @click="routerInstance.push('/ai/exam/generate')"
       >
-        <el-icon><MagicStick /></el-icon>
+        <el-icon><AiSparkleIcon /></el-icon>
         <span>AI 智能组卷</span>
         <span class="pill-bubble">双向细目表</span>
       </button>
@@ -37,9 +37,10 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import { Tickets, MagicStick, EditPen } from '@element-plus/icons-vue';
+import { Tickets, EditPen } from '@element-plus/icons-vue';
 import ModulePageHeroHeader from '@/components/question/common/ModulePageHeroHeader.vue';
 import ExamListStatsBar from '@/components/question/exam/ExamListStatsBar.vue';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 defineProps<{
   pageReady: boolean;

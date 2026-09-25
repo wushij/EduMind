@@ -64,6 +64,8 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
     private final MessageDao messageDao;
     private final ConversationDao conversationDao;
     private final ChatHistoryBuilder chatHistoryBuilder;
+    /** 标题生成：副驾驶历史此前长期显示「提问前 30 字」，答完一轮后由服务端异步改写为短标题 */
+    private final com.edumind.ai.service.conversation.ConversationService conversationService;
     private final java.util.concurrent.ExecutorService assistantExecutor = java.util.concurrent.Executors.newCachedThreadPool();
 
     @Override
@@ -176,6 +178,7 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                                         reasoningBuilder.toString(),
                                         citationsForSave.isEmpty() ? null : JSON.toJSONString(citationsForSave));
                                 updateConversationStatsQuietly(convId, 2);
+                                conversationService.generateTitleIfAutoDerivedAsync(convId);
                                 Map<String, Object> done = new HashMap<>();
                                 done.put("conversationId", convId);
                                 done.put("citations", plan.getCitations() != null ? plan.getCitations() : List.of());
@@ -241,6 +244,7 @@ public class GlobalAssistantServiceImpl implements GlobalAssistantService {
                 citationsForSave.isEmpty() ? null : JSON.toJSONString(citationsForSave));
         // 去重命中时本轮只新增了一条 assistant 消息
         updateConversationStatsQuietly(convId, userTurnSaved ? 2 : 1);
+        conversationService.generateTitleIfAutoDerivedAsync(convId);
 
         String targetCode = resolveTargetCode(intent, plan);
 

@@ -26,7 +26,7 @@
             class="ai-pill-btn"
             @click="handleAiSuggest"
           >
-            <el-icon><MagicStick /></el-icon>
+            <el-icon><AiSparkleIcon /></el-icon>
             AI 根据课程生成
           </button>
         </div>
@@ -89,12 +89,13 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { MagicStick } from '@element-plus/icons-vue';
+
 import type { CourseObjectiveVO } from '@/types/course/overview';
 import { suggestCourseObjectives } from '@/api/ai/course-objectives';
 import AiCognitiveThinkingPanel from '@/components/ai/common/AiCognitiveThinkingPanel.vue';
 import { AI_COGNITIVE_THINKING_PRESETS } from '@/constants/ai/cognitive-thinking';
 import { isAxiosError } from 'axios';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 type EditorRow = { _key: string; title: string; description?: string };
 

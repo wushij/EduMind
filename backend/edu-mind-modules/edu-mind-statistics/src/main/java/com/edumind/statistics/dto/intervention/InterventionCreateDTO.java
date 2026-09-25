@@ -23,7 +23,17 @@ public class InterventionCreateDTO implements Serializable {
     private String courseName;
 
     /**
-     * 触发类型 (EXAM_WEAK: 考试薄弱 / ACTIVITY_DROP: 活跃度骤降 / HOMEWORK_ABNORMAL: 作业异常)
+     * 关联薄弱知识点 ID
+     */
+    private Long knowledgePointId;
+
+    /**
+     * 关联薄弱知识点名称
+     */
+    private String knowledgePointTitle;
+
+    /**
+     * 触发类型 (EXAM_WEAK: 考试薄弱 / ACTIVITY_DROP: 活跃度骤降 / HOMEWORK_DELAY: 作业滞后)
      */
     private String triggerType;
 
@@ -45,7 +55,22 @@ public class InterventionCreateDTO implements Serializable {
     private Integer affectedStudentCount;
 
     /**
+     * 关联的具体预警学生用户 ID 列表
+     */
+    private List<Long> targetStudentIds;
+
+    /**
+     * 选配的课程微课/课件资源 ID 列表
+     */
+    private List<Long> resourceIds;
+
+    /**
      * 靶向习题 ID 列表
      */
     private List<Long> customQuestionIds;
+
+    /**
+     * 预期掌握度提升预估 (如 "+15% ~ +20%")
+     */
+    private String expectedImprovement;
 }

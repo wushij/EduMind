@@ -152,13 +152,6 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
       gradient: 'linear-gradient(135deg, #059669 0%, #047857 100%)'
     },
     {
-      id: 'ai_lesson',
-      title: 'AI 教案',
-      icon: 'Notebook',
-      path: '/ai/lesson',
-      gradient: 'linear-gradient(135deg, #722ED1 0%, #531DAB 100%)'
-    },
-    {
       id: 'ai_summary',
       title: 'AI 总结',
       icon: 'DocumentCopy',

@@ -15,6 +15,7 @@ import { getCourseList } from '@/api/course/course';
 import { getChapters } from '@/api/course/chapter';
 import { getCourseResources } from '@/api/course/resource';
 import { useAIStream } from '@/composables/ai/useAIStream';
+import { requestFollowUps } from '@/services/ai/stream-service';
 import {
   getCourseAiPersonaPromptPrefix,
   normalizeCourseAiPersona
@@ -116,6 +117,37 @@ export function mapChapterTree(nodes: Chapter[], expandedFirst = true): ChapterN
       sections
     };
   });
+}
+
+/**
+ * 为「推荐问题」构造模型材料：课程名 + 章节结构 + 当前小节。
+ *
+ * <p>只给一个小节标题，模型只能套通用说法；把章节结构一起给它，才知道本节在课程中的位置、
+ * 前后相邻内容是什么，问出来的问题才会落在真实的知识点上。</p>
+ */
+export function buildRecommendedQuestionMaterial(
+  courseTitle: string,
+  chapters: ChapterNode[],
+  sectionTitle?: string
+): string {
+  const lines = [`课程：${courseTitle?.trim() || '未命名课程'}`];
+  const structure = chapters
+    .slice(0, 12)
+    .map((chapter) => {
+      const sections = chapter.sections
+        .slice(0, 12)
+        .map((sec) => `    - ${sec.title}`)
+        .join('\n');
+      return `  - ${chapter.title}${sections ? `\n${sections}` : ''}`;
+    })
+    .join('\n');
+  if (structure) {
+    lines.push('章节结构：', structure);
+  }
+  if (sectionTitle?.trim()) {
+    lines.push(`当前正在学习的小节：${sectionTitle.trim()}`);
+  }
+  return lines.join('\n');
 }
 
 export interface UseCourseAIWorkspaceOptions {
@@ -516,28 +548,56 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     }
   }
 
-  const recommendedQuestions = computed(() => {
-    const courseName = displayCourseTitle.value;
+  const recommendedQuestions = ref<string[]>([]);
+  const recommendedQuestionsLoading = ref(false);
+  let recommendedTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * 按「课程 + 当前小节」动态生成推荐问题（模型优先，失败回落到规则生成）。
+   * 命中本地缓存时同步出结果，不重复调用模型；章节结构未加载完时做一次防抖，
+   * 避免先按标题生成一版、章节加载后又重来一版。
+   */
+  function refreshRecommendedQuestions() {
+    const courseTitle = displayCourseTitle.value;
     const secTitle = activeSectionTitle.value?.trim();
+    const material = buildRecommendedQuestionMaterial(courseTitle, chaptersData.value, secTitle);
+    const asking = secTitle
+      ? `我正准备学习「${secTitle}」，请给出我最该先弄清楚的几个问题`
+      : `我想系统学习【${courseTitle}】，请给出我最该先弄清楚的几个问题`;
 
-    if (secTitle) {
-      return [
-        `请结合「${secTitle}」，用通俗易懂的逻辑讲透其核心底层原理与运行机制`,
-        `学习「${secTitle}」时，有哪些最容易混淆的概念或踩坑点？该如何规避？`,
-        `请针对「${secTitle}」，提供一个典型的工程实战代码示例并解析关键实现`,
-        `请围绕「${secTitle}」出一道考查深度理解的典型思考自测题，并附解析`,
-        `「${secTitle}」在【${courseName}】整个知识脉络中起到了怎样的承上启下作用？`
-      ];
+    recommendedQuestionsLoading.value = true;
+    const prompts = requestFollowUps(asking, material, {
+      courseTitle,
+      sectionTitle: secTitle || undefined,
+      minMaterialChars: 0,
+      count: 5,
+      onUpdate: (list) => {
+        recommendedQuestions.value = list.slice(0, 5);
+        recommendedQuestionsLoading.value = false;
+      }
+    });
+    if (prompts.length > 0) {
+      recommendedQuestions.value = prompts.slice(0, 5);
+      recommendedQuestionsLoading.value = false;
     }
+  }
 
-    return [
-      `请结合教学大纲，为我梳理【${courseName}】的核心知识图谱架构与系统学习路径`,
-      `在【${courseName}】整门课程中，有哪些公认的高频难点与最易混淆的重点？`,
-      `请结合【${courseName}】核心考点，出一道跨章节的综合业务实战题并附解题思路`,
-      `【${courseName}】在企业级实际工业研发中有哪些典型落地场景？`,
-      `当前阶段如何科学高效地复习【${courseName}】？请给出阶段性备战指引`
-    ];
-  });
+  function scheduleRecommendedQuestions(delay = 600) {
+    if (recommendedTimer) clearTimeout(recommendedTimer);
+    recommendedTimer = setTimeout(() => {
+      recommendedTimer = undefined;
+      refreshRecommendedQuestions();
+    }, delay);
+  }
+
+  // 课程 / 小节 / 章节结构变化时重新生成推荐问题（防抖 + 本地缓存，切回同一小节不再调模型）
+  watch(
+    [currentCourseIdNum, activeSectionTitle, () => chaptersData.value],
+    () => {
+      scheduleRecommendedQuestions();
+    },
+    { immediate: true }
+  );
 
   function handleSendRecommended(question: string) {
     handleSend(question);
@@ -630,6 +690,8 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
     downloadResource,
     navigateToResources,
     recommendedQuestions,
+    recommendedQuestionsLoading,
+    refreshRecommendedQuestions,
     handleSendRecommended
   };
 }

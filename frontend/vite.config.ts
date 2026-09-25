@@ -1,4 +1,6 @@
-import { defineConfig } from 'vite';
+// 使用 vitest/config 的 defineConfig：它在 Vite 配置类型基础上扩展了 test 字段，
+// 否则下方 test 配置会触发 ts(2769)「对象字面量只能指定已知属性」。
+import { defineConfig } from 'vitest/config';
 import vue from '@vitejs/plugin-vue';
 import path from 'path';
 

@@ -61,25 +61,6 @@ export const MOCK_AI_TOOLS: AITool[] = [
     usageCount: 956
   },
   {
-    id: 'tool_lesson',
-    name: 'AI 教案生成',
-    category: 'TEACHER',
-    categoryLabel: '教师提效',
-    description: '输入授课主题与学时，生成结构化教案与课堂设计',
-    detailedIntro: '覆盖教学目标、重难点、课堂互动与板书建议，辅助青年教师快速备课。',
-    iconBg: 'linear-gradient(135deg, #F43F5E 0%, #BE123C 100%)',
-    iconName: 'Notebook',
-    iconTheme: 'rose',
-    modelId: 'deepseek-chat',
-    route: '/ai/lesson',
-    executionMode: 'ROUTE',
-    tags: ['教案', '教师'],
-    isRecommended: false,
-    isHot: false,
-    isFavorite: false,
-    usageCount: 420
-  },
-  {
     id: 'tool_summary',
     name: 'AI 课程总结',
     category: 'TEACHER',

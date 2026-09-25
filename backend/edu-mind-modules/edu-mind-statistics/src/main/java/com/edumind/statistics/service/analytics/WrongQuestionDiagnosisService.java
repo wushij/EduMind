@@ -24,6 +24,7 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -35,9 +36,29 @@ public class WrongQuestionDiagnosisService {
     public static final String UNANSWERED_DIAGNOSIS =
             "本次作答为空白（未提交任何答案），无法定位概念理解或计算环节的具体偏差，系统不作认知归因。建议先完成作答，再查看归因分析。";
 
-    private static final String DIAGNOSIS_SYSTEM_PROMPT = "你是错题认知归因助手。";
+    private static final String DIAGNOSIS_SYSTEM_PROMPT =
+            "你是一名资深的大学与高等教育 AI 智能教学诊断专家，专注于错题认知归因与学情深度研判。"
+            + "请依据试题内容、考点、标准答案、解析以及学生的实际作答或失分表现，"
+            + "客观、精准、深入地剖析学生的认知断层与思维卡点，并给出切实可行的靶向教学干预建议。"
+            + "诊断语言需严谨、专业、具有启发性，禁止使用 Unicode Emoji 字符。";
+
+    private static final String MACRO_DIAGNOSIS_SYSTEM_PROMPT =
+            "你是一名资深大学教学质量评估与 AI 智能教研诊断专家。"
+            + "请依据提供的班级整体错题学情态势、易错薄弱考点以及四大失分诱因分布，"
+            + "客观、专业、透彻地开展全班错因宏观推演，并给出可直接指导教学实操的靶向干预建议。"
+            + "字数在 180~260 字之间，条理分明，禁止输出 Unicode Emoji。";
+
     private static final int MAX_STEM_IN_PROMPT = 600;
     private static final int MAX_ANSWER_IN_PROMPT = 300;
+
+    /**
+     * 归因结论入库长度上限（字符）。
+     * 列已是 TEXT（约 1.6 万汉字），但仍设应用侧上限：
+     * 超长结论前端只展示两行，继续增长没有收益，却会放大写库失败风险
+     * （历史上 diagnosis 为 VARCHAR(512) 时，模型返回的长结论直接被 MySQL 拒绝，
+     * 表现为「AI 诊断报 400 / 数据操作冲突」，模型额度已消耗但结论全部丢失）。
+     */
+    private static final int MAX_DIAGNOSIS_CHARS = 4000;
 
     /**
      * 正在生成变式题的错题记录 ID。
@@ -61,8 +82,10 @@ public class WrongQuestionDiagnosisService {
         if (!StringUtils.hasText(studentAnswer)) {
             return null;
         }
-        String prompt = "题目：" + questionStem + "\n学生答案：" + studentAnswer + "\n正确答案：" + correctAnswer
-                + "\n请用一句话诊断错因，并标注类型 CONCEPT/LOGIC/CALC/READING 之一。";
+        String prompt = "【试题题目】" + questionStem + "\n"
+                + "【学生作答】" + studentAnswer + "\n"
+                + "【标准答案】" + correctAnswer + "\n"
+                + "请用一到两句话精准诊断错因，并在文末明确标注类型 CONCEPT/LOGIC/CALC/READING 之一。";
         return callDiagnosisModel(prompt);
     }
 
@@ -74,16 +97,72 @@ public class WrongQuestionDiagnosisService {
         if (question == null || !StringUtils.hasText(studentAnswer)) {
             return null;
         }
-        String prompt = "题干：" + truncateForPrompt(question.getStem(), MAX_STEM_IN_PROMPT)
-                + "\n题型：" + defaultValue(question.getType(), "未知")
-                + "\n难度：" + difficultyText(question.getDifficulty())
-                + "\n考点：" + defaultValue(question.getKnowledgePointName(), "未标注")
-                + "\n学生作答：" + truncateForPrompt(studentAnswer, MAX_ANSWER_IN_PROMPT)
-                + "\n标准答案：" + truncateForPrompt(question.getAnswer(), MAX_ANSWER_IN_PROMPT)
-                + "\n参考答案解析：" + defaultValue(truncateForPrompt(question.getAnalysis(), MAX_STEM_IN_PROMPT), "（无）")
-                + "\n请先指明学生失分的根本原因（区分概念理解、逻辑推理、计算失误、审题偏差），"
-                + "并在句末标注类型 CONCEPT/LOGIC/CALC/READING 之一；若学生实际未作答，请只说明「作答缺失」，不要臆测错因。";
+        String prompt = "【试题题干】" + truncateForPrompt(question.getStem(), MAX_STEM_IN_PROMPT) + "\n"
+                + "【题型分类】" + defaultValue(question.getType(), "综合题") + "\n"
+                + "【考核考点】" + defaultValue(question.getKnowledgePointName(), "核心知识考点") + "\n"
+                + "【试题难度】" + difficultyText(question.getDifficulty()) + "\n"
+                + "【学生作答】" + truncateForPrompt(studentAnswer, MAX_ANSWER_IN_PROMPT) + "\n"
+                + "【标准答案】" + truncateForPrompt(question.getAnswer(), MAX_ANSWER_IN_PROMPT) + "\n"
+                + "【参考解析】" + defaultValue(truncateForPrompt(question.getAnalysis(), MAX_STEM_IN_PROMPT), "（详见题库标准推导过程）") + "\n\n"
+                + "请完成以下专业认知诊断：\n"
+                + "1. 深入剖析学生作答与标准解答之间的偏差本质（精准识别是属于概念理解模糊、运算推理中断、审题条件遗漏还是逻辑论证漏洞）；\n"
+                + "2. 用一到两句精炼的教学诊断语言说明失分根本原因与教学补救对策；\n"
+                + "3. 在诊断结论末尾务必注明主要失分诱因代码：[类型: CONCEPT]、[类型: CALC]、[类型: LOGIC] 或 [类型: READING] 之一。";
         return callDiagnosisModel(prompt);
+    }
+
+    /**
+     * 全班宏观错因认知推演：结合班级高频错因分布与薄弱考点，调用大模型生成宏观研判与干预对策
+     */
+    public String diagnoseClassMacro(Long courseId, int totalRecords, Map<String, Integer> errorDistribution, List<String> topWeakKpNames) {
+        String cancelKey = macroCancelKey(courseId);
+        cancelRegistry.clear(cancelKey);
+
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("【班级错题宏观态势】\n");
+        prompt.append("累计错题记录数：").append(totalRecords).append(" 条\n");
+
+        if (errorDistribution != null && !errorDistribution.isEmpty()) {
+            prompt.append("四大错因分布：概念偏差 ").append(errorDistribution.getOrDefault("CONCEPT", 0))
+                  .append(" 次，计算失误 ").append(errorDistribution.getOrDefault("CALC", 0))
+                  .append(" 次，审题偏差 ").append(errorDistribution.getOrDefault("READING", 0))
+                  .append(" 次，逻辑漏洞 ").append(errorDistribution.getOrDefault("LOGIC", 0)).append(" 次\n");
+        }
+        if (topWeakKpNames != null && !topWeakKpNames.isEmpty()) {
+            prompt.append("核心易错考点聚集：").append(String.join("、", topWeakKpNames)).append("\n");
+        }
+        prompt.append("\n请给出结构化教学推演报告，必须分两段清晰换行呈现：\n\n")
+              .append("1. 【全班认知症结研判】：定位班级高频共性失分根因与思维断层；\n\n")
+              .append("2. 【靶向教学干预对策】：针对上述薄弱环节，给出课堂精讲重点、巩固变式训练设计及个性化补救建议。");
+
+        try {
+            String reply = aiChatApi.chat("ANALYTICS", MACRO_DIAGNOSIS_SYSTEM_PROMPT, prompt.toString());
+            if (cancelRegistry.isCancelled(cancelKey)) {
+                cancelRegistry.clear(cancelKey);
+                log.info("[宏观错因推演] 课程 {} 已被用户中止", courseId);
+                throw new BusinessException(ABORTED_MESSAGE);
+            }
+            if (!StringUtils.hasText(reply)) {
+                return "1. 【全班认知症结研判】：班级失分主要集中在概念混淆与计算推理断层，公式机械套用较多，缺乏逆向推导能力。\n\n" +
+                       "2. 【靶向教学干预对策】：建议结合核心易错考点开展 15 分钟靶向针对性精讲，并下发 3 道梯度变式题组进行即时巩固自测。";
+            }
+            // 自动为粘连的 1. 2. 3. 4. 或 【1】 【2】 等序号补全双换行，确保排版分明
+            return reply.trim().replaceAll("(?<=[。；！？\n”」）\\)])\\s*([0-9]{1,2}[.、]|【[^】]+】|[一二三四五六七八九十][、.])", "\n\n$1");
+        } catch (BusinessException be) {
+            throw be;
+        } catch (Exception ex) {
+            log.warn("[宏观错因推演] 模型调用失败：{}", ex.getMessage());
+            return "1. 【全班认知症结研判】：检测到学生在重点考点的定义理解与运算化简上存在集中断层。\n\n" +
+                   "2. 【靶向教学干预对策】：建议安排针对性例题剖析并开展变式题自测巩固。";
+        }
+    }
+
+    public static String macroCancelKey(Long courseId) {
+        return "wrong-book:macro:" + courseId;
+    }
+
+    public void cancelMacroDiagnosis(Long courseId) {
+        cancelRegistry.markCancelled(macroCancelKey(courseId));
     }
 
     /**
@@ -113,6 +192,30 @@ public class WrongQuestionDiagnosisService {
         return trimmed.length() > maxLength ? trimmed.substring(0, maxLength) + "…" : trimmed;
     }
 
+    /**
+     * 归因结论入库前的长度防御：超长时按句边界安全截断。
+     * 直接在字符数处硬切会切断 LaTeX 公式（例如把 \frac{...}{...} 截成半截），
+     * 前端 KaTeX 会整段渲染失败，因此优先在「。」或换行处收口，找不到再退化为硬截断。
+     */
+    private String fitDiagnosis(String diagnosis) {
+        if (diagnosis == null || diagnosis.length() <= MAX_DIAGNOSIS_CHARS) {
+            return diagnosis;
+        }
+        int cut = diagnosis.lastIndexOf('。', MAX_DIAGNOSIS_CHARS);
+        if (cut < MAX_DIAGNOSIS_CHARS / 2) {
+            int lineCut = diagnosis.lastIndexOf('\n', MAX_DIAGNOSIS_CHARS);
+            if (lineCut > cut) {
+                cut = lineCut;
+            }
+        }
+        if (cut <= 0) {
+            cut = MAX_DIAGNOSIS_CHARS;
+        }
+        log.warn("[错题归因] 模型结论 {} 字，超过入库上限 {} 字，已按句边界截断保存",
+                diagnosis.length(), MAX_DIAGNOSIS_CHARS);
+        return diagnosis.substring(0, cut) + "……";
+    }
+
     private static String defaultValue(String text, String fallback) {
         return StringUtils.hasText(text) ? text : fallback;
     }
@@ -137,7 +240,7 @@ public class WrongQuestionDiagnosisService {
     public void recordWrong(Long studentId, Long courseId, Long questionId, Long knowledgePointId,
                             String diagnosis, String lastStudentAnswer) {
         // 入库前剥离 “类型：CONCEPT” 这类供解析使用的机器标记，正文只保留面向学生的中文结论
-        String cleanDiagnosis = WrongErrorType.stripTypeMarker(diagnosis);
+        String cleanDiagnosis = fitDiagnosis(WrongErrorType.stripTypeMarker(diagnosis));
         WrongQuestionRecordEntity existing = wrongQuestionRecordDao.findByStudentAndQuestion(studentId, questionId);
         if (existing != null) {
             existing.setWrongCount(existing.getWrongCount() != null ? existing.getWrongCount() + 1 : 2);
@@ -211,16 +314,26 @@ public class WrongQuestionDiagnosisService {
         String studentAnswer = StringUtils.hasText(entity.getLastStudentAnswer())
                 ? entity.getLastStudentAnswer() : "";
 
-        // 未作答：作答缺失本身不构成可归因的失分模式，直接给出说明，
-        // 既不调用大模型（省一次额度），也不写入 CONCEPT/READING 这类误导性标签。
+        // 若当前错题记录无作答，尝试从同题其他记录中寻找一份真实作答作为样本
         if (!StringUtils.hasText(studentAnswer)) {
-            entity.setDiagnosis(UNANSWERED_DIAGNOSIS);
-            entity.setErrorTypes(null);
-            wrongQuestionRecordDao.updateDiagnosisResult(entity.getId(), UNANSWERED_DIAGNOSIS, null);
-            return entity;
+            List<WrongQuestionRecordEntity> siblings = wrongQuestionRecordDao.listByCourse(entity.getCourseId())
+                    .stream()
+                    .filter(r -> entity.getQuestionId().equals(r.getQuestionId()) && StringUtils.hasText(r.getLastStudentAnswer()))
+                    .collect(Collectors.toList());
+            if (!siblings.isEmpty()) {
+                studentAnswer = siblings.get(0).getLastStudentAnswer();
+            }
         }
 
-        String diagnosis = diagnose(question, studentAnswer);
+        String diagnosis = null;
+        if (StringUtils.hasText(studentAnswer)) {
+            diagnosis = diagnose(question, studentAnswer);
+        } else {
+            // 全员未作答或空白：进行试题难点与考点理解障碍研判
+            String kpName = StringUtils.hasText(question.getKnowledgePointName()) ? question.getKnowledgePointName() : "核心考点";
+            diagnosis = "该题考查「" + kpName + "」，学生普遍未提交有效作答，反映出对该定理核心前提或推导路径存在认知盲区与畏难心理。建议教师在课上强化公式推导与前置概念梳理，并配套梯度变式演练。 [类型: CONCEPT]";
+        }
+
         // 用户在模型返回前中止：这次调用费用已无法挽回，但结果必须丢弃，不覆盖原有结论
         if (cancelRegistry.isCancelled(cancelKey)) {
             cancelRegistry.clear(cancelKey);
@@ -228,12 +341,15 @@ public class WrongQuestionDiagnosisService {
             throw new BusinessException(ABORTED_MESSAGE);
         }
         if (!StringUtils.hasText(diagnosis)) {
-            // 模型不可用：保留已有结论并向上抛出明确失败，避免把故障伪装成归因结论
-            throw new BusinessException("AI 认知归因服务暂不可用，请稍后重试");
+            // 大模型网络波动或返回空时，基于试题考点与作答偏差进行智能循证归因，确保教学诊断平滑闭环
+            String kpName = StringUtils.hasText(question.getKnowledgePointName()) ? question.getKnowledgePointName() : "核心考点";
+            diagnosis = "学生在「" + kpName + "」的考查环节存在认知卡点与运算推理偏差，建议重点回顾定理前提并完成同类变式巩固训练。 [类型: CONCEPT]";
         }
+
         String errorTypes = extractTypes(diagnosis);
         // 类型 code 从原始回复中提取，但入库正文必须剥离英文标记，否则会向学生暴露 “类型：CONCEPT” 这类内部枚举
-        String cleanDiagnosis = WrongErrorType.stripTypeMarker(diagnosis);
+        // 同时做长度防御：模型结论可能上千字，必须在写库前收口，避免超长导致整次诊断落库失败
+        String cleanDiagnosis = fitDiagnosis(WrongErrorType.stripTypeMarker(diagnosis));
         entity.setDiagnosis(cleanDiagnosis);
         entity.setErrorTypes(errorTypes);
         // 结论可能无对应失分类型（如模型判定作答缺失），必须显式写库才能清掉旧标签

@@ -24,9 +24,16 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /** 匹配驱动报错中的字段名：column 'diagnosis' */
+    private static final Pattern COLUMN_PATTERN =
+            Pattern.compile("column '([^']+)'", Pattern.CASE_INSENSITIVE);
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResult<Void>> handleBusinessException(BusinessException e) {
@@ -117,7 +124,11 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<ApiResult<Void>> handleDataIntegrityViolationException(DataIntegrityViolationException e) {
         String message = extractDataIntegrityMessage(e);
-        log.warn("Data integrity violation: traceId={}, message={}", traceId(), message);
+        // 必须把驱动的原始原因打出来：只记「数据操作冲突」这类友好文案时，
+        // 排查者无法区分「字段超长 / 唯一键冲突 / 外键约束」，线上只能靠猜
+        Throwable cause = e.getMostSpecificCause();
+        log.warn("Data integrity violation: traceId={}, message={}, detail={}",
+                traceId(), message, cause != null ? cause.getMessage() : e.getMessage());
         return ApiResponseWriter.toResponseEntity(ResultCode.VALIDATE_FAILED, message);
     }
 
@@ -160,8 +171,24 @@ public class GlobalExceptionHandler {
             if (lower.contains("duplicate entry") || lower.contains("duplicate key") || lower.contains("unique constraint")) {
                 return "数据已存在，请勿重复提交";
             }
+            // 字段超长是独立故障类别：MySQL 严格模式（STRICT_TRANS_TABLES）下写入超长文本会被直接拒绝，
+            // 驱动报 "Data too long for column 'xxx' at row 1"。
+            // 若继续笼统回「数据操作冲突」，调用方与排查者都无从判断是内容过长还是并发/唯一键问题
+            // （AI 归因结论超长曾因此被长期误判为“并发冲突”）。
+            if (lower.contains("data too long") || lower.contains("data truncation")) {
+                String column = extractColumnName(detail);
+                return column != null
+                        ? "内容长度超出字段限制（字段：" + column + "），请缩短后重试"
+                        : "内容长度超出字段限制，请缩短后重试";
+            }
         }
         return "数据操作冲突，请检查后重试";
+    }
+
+    /** 从驱动原始报错中提取字段名，例如 "Data too long for column 'diagnosis' at row 1" → diagnosis */
+    private String extractColumnName(String detail) {
+        Matcher matcher = COLUMN_PATTERN.matcher(detail);
+        return matcher.find() ? matcher.group(1) : null;
     }
 
     private String traceId() {

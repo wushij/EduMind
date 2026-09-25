@@ -1,7 +1,14 @@
 import { ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { getLearningAnalytics, getAiUsageAnalytics, getStudentPortrait } from '@/api/analytics/learning';
-import { diagnoseWrongQuestion, getKnowledgeMastery, getWrongQuestions } from '@/api/analytics/knowledge';
+import { getLearningAnalytics, getAiUsageAnalytics, getAiUsageLogs, getStudentPortrait } from '@/api/analytics/learning';
+import {
+  cancelDiagnoseWrongQuestion,
+  cancelDiagnoseWrongQuestionMacro,
+  diagnoseWrongQuestion,
+  diagnoseWrongQuestionMacro,
+  getKnowledgeMastery,
+  getWrongQuestions
+} from '@/api/analytics/knowledge';
 import { getTeachingReport } from '@/api/analytics/report';
 import { generateTeachingAdvice } from '@/api/analytics/teaching';
 import { fetchOverviewAnalyticsBundle } from '@/services/analytics/overview-service';
@@ -14,7 +21,14 @@ import {
   MOCK_TEACHING_ADVICE,
   MOCK_WRONG_QUESTIONS
 } from '@/mock/analytics';
-import type { AiUsageAnalyticsVO, LearningAnalyticsVO, StudentPortraitVO } from '@/types/analytics/learning';
+import type {
+  AiCallLogItem,
+  AiCallLogPageResult,
+  AiUsageAnalyticsVO,
+  AiUsageLogQuery,
+  LearningAnalyticsVO,
+  StudentPortraitVO
+} from '@/types/analytics/learning';
 import type { TeachingReportVO } from '@/types/analytics/report';
 import type {
   KnowledgeMasteryVO,
@@ -194,7 +208,7 @@ export function useLearningAnalytics() {
     usedMockFallback.value = false;
     try {
       const res = await getKnowledgeMastery({ courseId, studentId });
-      masteryData.value = res.data;
+      masteryData.value = (res as any)?.data ?? res;
     } catch {
       if (USE_MOCK) {
         usedMockFallback.value = true;
@@ -257,22 +271,46 @@ export function useLearningAnalytics() {
     return fetchOverviewAnalyticsBundle(courseId, range, startDate, endDate);
   }
 
-  async function diagnoseWrong(recordId: number): Promise<WrongQuestionDiagnoseResult | null> {
+  async function diagnoseWrong(recordId: number): Promise<WrongQuestionDiagnoseResult> {
+    const res = await diagnoseWrongQuestion(recordId);
+    const rawVariantIds = res.data?.variantQuestionIds as unknown;
+    let variantIds: number[] = [];
+    if (Array.isArray(rawVariantIds)) {
+      variantIds = rawVariantIds.map((id) => Number(id));
+    } else if (typeof rawVariantIds === 'string') {
+      variantIds = rawVariantIds.split(',').filter(Boolean).map((id) => Number(id));
+    }
+    return {
+      diagnosis: res.data?.diagnosis,
+      variantQuestionIds: variantIds
+    };
+  }
+
+  async function cancelDiagnoseWrong(recordId: number): Promise<void> {
     try {
-      const res = await diagnoseWrongQuestion(recordId);
-      const variantIds = res.data?.variantQuestionIds?.split(',').filter(Boolean) ?? [];
-      return {
-        diagnosis: res.data?.diagnosis,
-        variantQuestionIds: variantIds.map((id) => Number(id))
-      };
+      await cancelDiagnoseWrongQuestion(recordId);
     } catch {
-      return null;
+      // 容错忽略
     }
   }
 
-  async function fetchTeachingReport(courseId: number): Promise<TeachingReportVO | null> {
+  async function diagnoseWrongMacro(courseId: number): Promise<string | null> {
+    const res = await diagnoseWrongQuestionMacro(courseId);
+    return res.data?.report ?? null;
+  }
+
+
+  async function cancelDiagnoseWrongMacro(courseId: number): Promise<void> {
     try {
-      const res = await getTeachingReport(courseId);
+      await cancelDiagnoseWrongQuestionMacro(courseId);
+    } catch {
+      // 容错忽略
+    }
+  }
+
+  async function fetchTeachingReport(courseId: number, range = '7d'): Promise<TeachingReportVO | null> {
+    try {
+      const res = await getTeachingReport(courseId, range);
       return res?.data ?? null;
     } catch {
       return null;
@@ -339,6 +377,21 @@ export function useLearningAnalytics() {
     }
   }
 
+  const aiLogsData = ref<AiCallLogPageResult | null>(null);
+  const logsLoading = ref(false);
+
+  async function fetchAiUsageLogs(query: AiUsageLogQuery) {
+    logsLoading.value = true;
+    try {
+      const res = await getAiUsageLogs(query);
+      aiLogsData.value = res.data;
+    } catch {
+      aiLogsData.value = null;
+    } finally {
+      logsLoading.value = false;
+    }
+  }
+
   return {
     loading,
     adviceLoading,
@@ -349,6 +402,8 @@ export function useLearningAnalytics() {
     masteryData,
     wrongQuestions,
     aiUsageData,
+    aiLogsData,
+    logsLoading,
     teachingAdvice,
     activeTab,
     selectedStudentId,
@@ -357,8 +412,12 @@ export function useLearningAnalytics() {
     fetchMastery,
     fetchWrongQuestions,
     fetchAiUsage,
+    fetchAiUsageLogs,
     fetchOverview,
     diagnoseWrong,
+    cancelDiagnoseWrong,
+    diagnoseWrongMacro,
+    cancelDiagnoseWrongMacro,
     fetchTeachingReport,
     fetchTeachingAdvice,
     clearTeachingAdvice,

@@ -266,6 +266,11 @@ export const MOCK_WRONG_QUESTIONS: WrongQuestionAnalyticsVO = {
 export const MOCK_AI_USAGE: AiUsageAnalyticsVO = {
   totalCalls: 3248,
   totalTokens: 1842000,
+  avgLatencyMs: 320,
+  todayCalls: 286,
+  todayTokens: 164000,
+  successRate: 99.8,
+  totalSavedHours: 260.0,
   daily: [
     { date: '周一', calls: 420, tokens: 238000 },
     { date: '周二', calls: 510, tokens: 291000 },

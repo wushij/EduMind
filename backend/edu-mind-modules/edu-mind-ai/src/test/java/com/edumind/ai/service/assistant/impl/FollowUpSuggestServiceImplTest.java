@@ -136,6 +136,21 @@ class FollowUpSuggestServiceImplTest {
     }
 
     @Test
+    void parsePrompts_shouldKeepSectionNumbersIntact() {
+        // 回归：小节号「1.1」曾被当成列表编号剥掉，追问变成「1算法复杂度与渐近表示法…」
+        String raw = """
+                1.1 算法复杂度与渐近表示法为什么是衡量尺度？
+                2. 渐进表示法里最坏情况怎么算？
+                """;
+
+        List<String> prompts = FollowUpSuggestServiceImpl.parsePrompts(raw, 2, "算法复杂度");
+
+        assertEquals(2, prompts.size());
+        assertEquals("1.1 算法复杂度与渐近表示法为什么是衡量尺度？", prompts.get(0));
+        assertEquals("渐进表示法里最坏情况怎么算？", prompts.get(1));
+    }
+
+    @Test
     void parsePrompts_shouldDropEchoOfUserQuestion() {
         List<String> prompts = FollowUpSuggestServiceImpl.parsePrompts(
                 "git worktree 怎么用？\ngit worktree 怎么用\nworktree 与 clone 有什么差别？", 3,

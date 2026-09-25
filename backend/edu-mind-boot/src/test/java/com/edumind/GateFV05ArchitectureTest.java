@@ -5,7 +5,6 @@ import com.edumind.ai.controller.prompt.PromptController;
 import com.edumind.ai.controller.quota.AiQuotaController;
 import com.edumind.ai.controller.rag.RagDebugController;
 import com.edumind.ai.controller.rag.RetrievalController;
-import com.edumind.ai.controller.tool.LessonPlanController;
 import com.edumind.ai.controller.tool.SummaryController;
 import com.edumind.knowledge.controller.chunk.ChunkController;
 import com.edumind.knowledge.controller.graph.KnowledgeGraphController;
@@ -36,7 +35,6 @@ class GateFV05ArchitectureTest {
 
     @Test
     void v05ExtensionControllersShouldBePresent() {
-        Assertions.assertNotNull(LessonPlanController.class);
         Assertions.assertNotNull(SummaryController.class);
         Assertions.assertNotNull(KnowledgeGraphController.class);
         Assertions.assertNotNull(AiRecommendationController.class);

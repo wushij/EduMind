@@ -10,6 +10,7 @@ import com.edumind.ai.entity.memory.AiMemoryItemEntity;
 import com.edumind.ai.entity.memory.AiMemoryNamespaceEntity;
 import com.edumind.ai.service.memory.AgentMemoryService;
 import com.edumind.ai.service.memory.MemoryCryptoService;
+import com.edumind.ai.service.memory.MemorySummaryNormalizer;
 import com.edumind.ai.service.memory.retrieval.MemoryContextBlock;
 import com.edumind.ai.service.memory.retrieval.MemoryRetrievalService;
 import com.edumind.ai.vo.memory.MemoryItemVO;
@@ -60,6 +61,7 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
     private final AiMemoryDao aiMemoryDao;
     private final MemoryConverter memoryConverter;
     private final MemoryCryptoService memoryCryptoService;
+    private final MemorySummaryNormalizer memorySummaryNormalizer;
     private final MemoryRetrievalService memoryRetrievalService;
     private final ConversationDao conversationDao;
     private final MessageDao messageDao;
@@ -168,7 +170,8 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
             finalSummary = memoryCryptoService.buildDesensitizedSummary(dto.getSummary(), sensitivity);
         }
 
-        dto.setSummary(finalSummary);
+        // 落库前长度收口：HIGH_RISK 脱敏摘要与普通摘要都必须限制在摘要列可容纳范围内
+        dto.setSummary(memorySummaryNormalizer.toStorageText(finalSummary));
         dto.setSensitivityLevel(sensitivity);
 
         int retentionDays = namespace.getRetentionDays() != null ? namespace.getRetentionDays() : 180;
@@ -257,7 +260,8 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
         aiMemoryDao.insertFeedback(fb);
 
         if ("MODIFY".equalsIgnoreCase(action) && StringUtils.hasText(dto.getCorrectContent())) {
-            item.setSummary(dto.getCorrectContent());
+            // 纠错修正内容会直接覆盖摘要落库，correct_content 本身是 TEXT 不设长度限制，此处必须收口
+            item.setSummary(memorySummaryNormalizer.toStorageText(dto.getCorrectContent()));
             aiMemoryDao.updateItem(item);
         } else if ("FORGET".equalsIgnoreCase(action)) {
             forgetMemory(memoryId);
@@ -435,7 +439,7 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
             item.setContentCiphertext(null);
         }
 
-        item.setSummary(summary);
+        item.setSummary(memorySummaryNormalizer.toStorageText(summary));
         item.setMemoryType(StringUtils.hasText(dto.getMemoryType()) ? dto.getMemoryType() : item.getMemoryType());
         item.setSensitivityLevel(sensitivity);
         aiMemoryDao.updateItem(item);
@@ -489,7 +493,7 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
             item.setTenantId(tenantId);
             item.setNamespaceId(namespace.getId());
             item.setMemoryType(def.type());
-            item.setSummary(summary);
+            item.setSummary(memorySummaryNormalizer.toStorageText(summary));
             item.setContentCiphertext(ciphertext);
             item.setKeyVersion(keyVersion != null ? keyVersion : 1);
             item.setSensitivityLevel(def.sensitivity());
@@ -682,7 +686,8 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
                     finalSummary = memoryCryptoService.buildDesensitizedSummary(dto.getSummary(), sensitivity);
                 }
 
-                dto.setSummary(finalSummary);
+                // 模型生成的候选摘要长度不可控，批量确认落库前必须收口
+                dto.setSummary(memorySummaryNormalizer.toStorageText(finalSummary));
                 dto.setSensitivityLevel(sensitivity);
                 String vectorRef = "vec_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
 
@@ -798,10 +803,12 @@ public class AgentMemoryServiceImpl implements AgentMemoryService {
                 String reasoning = obj.getString("reasoning");
                 Double conf = obj.getDouble("confidenceScore");
                 if (StringUtils.hasText(summary)) {
+                    // 候选摘要在此统一收口，保证「展示给用户的草稿 = 去重比对文本 = 最终入库文本」三者一致，
+                    // 否则超长候选会在确认时被截断，展示与落库内容对不上
                     list.add(new ExtractedCandidate(
                         StringUtils.hasText(type) ? type : "PREFERENCE",
                         StringUtils.hasText(sensitivity) ? sensitivity : "NORMAL",
-                        summary,
+                        memorySummaryNormalizer.toStorageText(summary),
                         StringUtils.hasText(reasoning) ? reasoning : "AI 基于多轮教学对话与解题推演综合提炼",
                         conf != null ? conf : 0.95
                     ));

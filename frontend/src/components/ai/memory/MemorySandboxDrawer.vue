@@ -8,7 +8,7 @@
   >
     <div class="sandbox-container">
       <div class="sandbox-intro-box">
-        <el-icon class="intro-icon"><MagicStick /></el-icon>
+        <el-icon class="intro-icon"><AiSparkleIcon /></el-icon>
         <p class="intro-text">
           在提问或规划任务前，Agent 将自动调用本空间的向量语义管线召回 Top-K 相关上下文片段，并以非侵入方式拼接入 System Prompt。在此可对召回效果进行即时诊断调试：
         </p>
@@ -91,9 +91,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { MagicStick, Search, Document } from '@element-plus/icons-vue';
+import { Search, Document } from '@element-plus/icons-vue';
 import type { MemoryItemVO } from '@/types/ai/memory';
 import { getMemoryTypeLabel } from '@/composables/ai/useAgentMemory';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = defineProps<{
   visible: boolean;

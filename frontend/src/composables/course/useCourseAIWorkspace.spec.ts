@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { mapChapterTree, resolveActiveCourse } from './useCourseAIWorkspace';
+import {
+  buildRecommendedQuestionMaterial,
+  mapChapterTree,
+  resolveActiveCourse
+} from './useCourseAIWorkspace';
 import type { Chapter } from '@/types/course/chapter';
 import type { Course } from '@/types/course/course';
 
@@ -50,5 +54,31 @@ describe('resolveActiveCourse', () => {
 
   it('falls back to first course when stored id is missing', () => {
     expect(resolveActiveCourse(courses, 99)?.id).toBe(1);
+  });
+});
+
+describe('buildRecommendedQuestionMaterial', () => {
+  it('carries course + chapter structure + active section so questions anchor on real content', () => {
+    const chapters = mapChapterTree([
+      {
+        id: 1,
+        title: '第一章 函数与极限',
+        children: [{ id: 11, title: '1.1 数列与函数极限计算', children: [] }]
+      }
+    ] as Chapter[]);
+
+    const material = buildRecommendedQuestionMaterial('高等数学', chapters, '1.1 数列与函数极限计算');
+
+    expect(material).toContain('课程：高等数学');
+    expect(material).toContain('第一章 函数与极限');
+    expect(material).toContain('1.1 数列与函数极限计算');
+    expect(material).toContain('当前正在学习的小节：1.1 数列与函数极限计算');
+  });
+
+  it('still yields usable material before chapters are loaded', () => {
+    const material = buildRecommendedQuestionMaterial('高等数学', []);
+
+    expect(material).toContain('课程：高等数学');
+    expect(material).not.toContain('章节结构');
   });
 });

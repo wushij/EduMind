@@ -104,7 +104,7 @@
         class="capsule-btn capsule-btn--ai"
         @click="routerInstance.push('/ai/exam/generate')"
       >
-        <el-icon class="mr-1"><MagicStick /></el-icon>
+        <el-icon class="mr-1"><AiSparkleIcon /></el-icon>
         <span>立即使用 AI 智能组卷</span>
       </button>
     </div>
@@ -129,10 +129,10 @@ import {
   View,
   Promotion,
   Tickets,
-  MagicStick
 } from '@element-plus/icons-vue';
 import AppPagination from '@/components/common/AppPagination.vue';
 import type { ExamPaper } from '@/types/question/exam';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 defineProps<{
   exams: ExamPaper[];

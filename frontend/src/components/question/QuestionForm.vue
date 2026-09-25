@@ -23,7 +23,7 @@
                   class="ai-mini-btn"
                   @click="handlePolishStem"
                 >
-                  <el-icon><MagicStick /></el-icon>
+                  <el-icon><AiSparkleIcon /></el-icon>
                   <span>AI 润色题干</span>
                 </button>
               </div>
@@ -224,7 +224,6 @@
 import { ref, reactive, watch, onMounted, nextTick, computed } from 'vue';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import {
-  MagicStick,
   Opportunity,
   Reading,
   Plus,
@@ -239,6 +238,7 @@ import { useQuestionFormAiCopilot } from '@/composables/question/useQuestionForm
 import { useAuthStore } from '@/stores/auth/auth';
 import type { Question, QuestionType, Difficulty } from '@/types/question/question';
 import type { Course } from '@/types/course/course';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = defineProps<{
   modelValue?: Partial<Question>;

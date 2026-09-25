@@ -558,13 +558,21 @@ function handleOpenDiagnosisDrawer() {
 }
 
 function handleDispatchPractice() {
-  // 真正的干预编排与下发在「教学干预决策」模块完成。
-  // 原先这里只弹「已下发 5 道强化题」的成功提示却没有任何后端调用，属于虚假反馈，现改为跳转真实入口。
   aiDrawerVisible.value = false;
-  const query: Record<string, string> = { courseId: String(courseId.value) };
+  const query: Record<string, string> = {
+    courseId: String(courseId.value),
+    autoCreate: 'true'
+  };
   const targetStudentId = portraitData.value?.studentInfo?.studentId;
   if (activeTab.value === 'personal' && targetStudentId) {
     query.studentId = String(targetStudentId);
+  }
+  const weakPoint = learningData.value?.courseWeakPoints?.[0];
+  if (weakPoint?.title) {
+    query.knowledgePointTitle = weakPoint.title;
+    if (weakPoint.knowledgePointId) {
+      query.knowledgePointId = String(weakPoint.knowledgePointId);
+    }
   }
   router.push({ path: '/analytics/interventions', query });
 }

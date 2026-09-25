@@ -15,7 +15,7 @@
           class="capsule-tool-btn is-magic"
           @click="$emit('auto-balance')"
         >
-          <el-icon><MagicStick /></el-icon>
+          <el-icon><AiSparkleIcon /></el-icon>
           <span>一键均衡 100 分</span>
         </button>
 
@@ -170,8 +170,9 @@
 </template>
 
 <script setup lang="ts">
-import { Check, Warning, MagicStick, Delete } from '@element-plus/icons-vue';
+import { Check, Warning, Delete } from '@element-plus/icons-vue';
 import type { ExamFormState } from './exam-generate-types';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = defineProps<{
   examForm: ExamFormState;

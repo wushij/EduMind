@@ -90,7 +90,7 @@
       <div v-else class="empty-guide-stage">
         <div class="guide-illustration">
           <div class="sparkle-circle">
-            <el-icon><MagicStick /></el-icon>
+            <el-icon><AiSparkleIcon /></el-icon>
           </div>
         </div>
         <h4 class="guide-title">专业级试卷 OCR · AI 认知赋能引擎</h4>
@@ -120,7 +120,6 @@ import {
   Files,
   Cpu,
   CollectionTag,
-  MagicStick,
   Check,
   Select,
   CopyDocument,
@@ -131,6 +130,7 @@ import MathText from '@/components/common/MathText.vue';
 import { SSEClient } from '@/core/sse/client';
 import { API_BASE_URL } from '@/config';
 import { OCR_AI_PROMPTS } from '@/constants/ai/ocr-ai-prompts';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = defineProps<{
   modelValue: boolean;

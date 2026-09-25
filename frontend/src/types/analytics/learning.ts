@@ -195,10 +195,56 @@ export interface AiUsageSceneVO {
 export interface AiUsageAnalyticsVO {
   totalCalls: number;
   totalTokens: number;
+  avgLatencyMs?: number;
+  todayCalls?: number;
+  todayTokens?: number;
+  successRate?: number;
+  totalSavedHours?: number;
   daily: AiUsageDailyVO[];
   byProvider: AiUsageByProviderVO[];
   /** 按真实调用场景聚合的分布（课程维度优先） */
   byScene?: AiUsageSceneVO[];
+}
+
+export interface AiCallLogItem {
+  id: number;
+  userId?: number;
+  username?: string;
+  realName?: string;
+  avatar?: string;
+  userRole?: string;
+  courseId?: number;
+  courseName?: string;
+  conversationId?: string;
+  model?: string;
+  modelKey?: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  latencyMs?: number;
+  scene?: string;
+  sceneLabel?: string;
+  knowledgeBaseId?: number;
+  knowledgeBaseName?: string;
+  retrievalHitCount?: number;
+  citationDocIds?: string;
+  createTime?: string;
+}
+
+export interface AiCallLogPageResult {
+  list: AiCallLogItem[];
+  total: number;
+  pageNum: number;
+  pageSize: number;
+}
+
+export interface AiUsageLogQuery {
+  courseId?: number;
+  range?: string;
+  scene?: string;
+  model?: string;
+  pageNum?: number;
+  pageSize?: number;
 }
 
 export interface LearningAnalyticsQuery {

@@ -116,7 +116,7 @@
               class="action-pill-btn action-pill-btn--ai"
               @click="$emit('ai-grade', row)"
             >
-              <el-icon><MagicStick /></el-icon>
+              <el-icon><AiSparkleIcon /></el-icon>
               <span>AI 重新评估</span>
             </button>
             <button
@@ -150,8 +150,9 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { Search, Cpu, MagicStick, Delete } from '@element-plus/icons-vue';
+import { Search, Cpu, Delete } from '@element-plus/icons-vue';
 import AppPagination from '@/components/common/AppPagination.vue';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = defineProps<{
   studentSearch: string;

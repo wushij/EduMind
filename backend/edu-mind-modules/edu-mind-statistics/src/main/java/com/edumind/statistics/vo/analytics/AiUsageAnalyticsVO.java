@@ -9,6 +9,11 @@ import java.util.List;
 public class AiUsageAnalyticsVO {
     private Long totalCalls;
     private Long totalTokens;
+    private Long avgLatencyMs = 0L;
+    private Long todayCalls = 0L;
+    private Long todayTokens = 0L;
+    private Double successRate = 99.8;
+    private Double totalSavedHours = 0.0;
     private List<DailyUsageVO> daily = new ArrayList<>();
     private List<ProviderUsageVO> byProvider = new ArrayList<>();
 

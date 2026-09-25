@@ -110,7 +110,7 @@
             :loading="extracting"
             @click="handleExtractMemories"
           >
-            <el-icon><MagicStick /></el-icon>
+            <el-icon><AiSparkleIcon /></el-icon>
             <span>AI 学情智能萃取</span>
           </el-button>
 
@@ -181,7 +181,7 @@
               :loading="extracting"
               @click="handleExtractMemories"
             >
-              <el-icon><MagicStick /></el-icon>
+              <el-icon><AiSparkleIcon /></el-icon>
               <span>从近期学情萃取认知特征 (AI 研判)</span>
             </el-button>
             <el-button
@@ -230,7 +230,6 @@
 <script setup lang="ts">
 import {
   Search,
-  MagicStick,
   Plus,
   Brush,
   FolderOpened,
@@ -246,6 +245,7 @@ import MemoryExtractDialog from '@/components/ai/memory/MemoryExtractDialog.vue'
 import MemoryCreateDialog from '@/components/ai/memory/MemoryCreateDialog.vue';
 import MemoryEditDialog from '@/components/ai/memory/MemoryEditDialog.vue';
 import { useAgentMemory } from '@/composables/ai/useAgentMemory';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const {
   loading,

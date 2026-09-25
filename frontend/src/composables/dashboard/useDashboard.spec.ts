@@ -12,7 +12,7 @@ import {
 describe('dashboard static data', () => {
   it('defines eight common function shortcuts', () => {
     expect(COMMON_FUNCTIONS).toHaveLength(8);
-    expect(COMMON_FUNCTIONS[0].route).toBe('/ai/lesson');
+    expect(COMMON_FUNCTIONS[0].route).toBe('/ai/marketplace');
   });
 
   it('defines five default todo items', () => {

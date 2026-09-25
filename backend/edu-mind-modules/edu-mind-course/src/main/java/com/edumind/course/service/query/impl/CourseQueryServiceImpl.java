@@ -84,10 +84,10 @@ public class CourseQueryServiceImpl implements CourseQueryService {
     @Override
     public KnowledgePointVO getKnowledgePointById(Long id) {
         KnowledgePointEntity entity = knowledgePointDao.findById(id);
-        if (entity == null || entity.getCourseId() == null) {
+        if (entity == null) {
             return null;
         }
-        return knowledgePointService.getById(entity.getCourseId(), id);
+        return courseConverter.toKnowledgePointVO(entity);
     }
 
     @Override

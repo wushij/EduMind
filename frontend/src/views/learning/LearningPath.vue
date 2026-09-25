@@ -40,7 +40,7 @@
           />
         </el-select>
         <button type="button" class="capsule-btn capsule-btn--default" @click="router.push('/learning/practice')">
-          <el-icon class="btn-icon"><MagicStick /></el-icon>
+          <el-icon class="btn-icon"><AiSparkleIcon /></el-icon>
           <span>AI 练习</span>
         </button>
         <button type="button" class="capsule-btn capsule-btn--primary" :disabled="loading" @click="loadPath">
@@ -99,13 +99,14 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import { Back, MagicStick, Refresh, Cpu } from '@element-plus/icons-vue';
+import { Back, Refresh, Cpu } from '@element-plus/icons-vue';
 import LearningSubpageHero from '@/components/learning/LearningSubpageHero.vue';
 import LearningPathHeroStats from '@/components/learning/path/LearningPathHeroStats.vue';
 import LearningPathGraphPanel from '@/components/learning/path/LearningPathGraphPanel.vue';
 import LearningPathWeekGrid from '@/components/learning/path/LearningPathWeekGrid.vue';
 import LearningPathInterpretPanel from '@/components/learning/path/LearningPathInterpretPanel.vue';
 import { useLearningPathPage } from '@/composables/learning/useLearningPathPage';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const router = useRouter();
 const {

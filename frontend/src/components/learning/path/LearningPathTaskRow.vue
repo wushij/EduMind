@@ -4,7 +4,7 @@
     <div class="task-type-badge" :class="typeBadgeClass">
       <el-icon v-if="task.type === 'LESSON'"><Reading /></el-icon>
       <el-icon v-else-if="task.type === 'PRACTICE' || task.type === 'EXERCISE'"><EditPen /></el-icon>
-      <el-icon v-else-if="task.type === 'AI_TUTOR'"><MagicStick /></el-icon>
+      <el-icon v-else-if="task.type === 'AI_TUTOR'"><AiSparkleIcon /></el-icon>
       <el-icon v-else><DocumentChecked /></el-icon>
     </div>
 
@@ -32,7 +32,7 @@
         :class="btnTypeClass"
         @click="emit('execute', task)"
       >
-        <el-icon v-if="task.type === 'AI_TUTOR'" class="btn-icon"><MagicStick /></el-icon>
+        <el-icon v-if="task.type === 'AI_TUTOR'" class="btn-icon"><AiSparkleIcon /></el-icon>
         <el-icon v-else-if="task.type === 'LESSON'" class="btn-icon"><VideoPlay /></el-icon>
         <el-icon v-else class="btn-icon"><Edit /></el-icon>
         <span>{{ task.actionLabel || '开始' }}</span>
@@ -50,7 +50,6 @@ import { computed } from 'vue';
 import {
   Reading,
   EditPen,
-  MagicStick,
   DocumentChecked,
   Timer,
   VideoPlay,
@@ -62,6 +61,7 @@ import {
   resolvePathTaskStatusLabel,
   resolvePathTaskTypeLabel
 } from '@/constants/learning-path';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = defineProps<{
   task: LearningPathTask;

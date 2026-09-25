@@ -150,7 +150,7 @@
       <div class="ai-suggestion-card">
         <div class="ai-card-header">
           <div class="ai-title">
-            <el-icon class="ai-sparkle-icon"><MagicStick /></el-icon>
+            <el-icon class="ai-sparkle-icon"><AiSparkleIcon /></el-icon>
             <h4>基于掌握度的学情导学建议</h4>
           </div>
           <!-- 该文案由掌握度分档规则生成，并非大模型输出，因此不再标注模型名 -->
@@ -197,11 +197,11 @@ import {
   CircleCheckFilled,
   Promotion,
   ChatDotRound,
-  MagicStick
 } from '@element-plus/icons-vue';
 import { getStudentCognitiveProfile } from '@/composables/system/useOrganization';
 import { canAccessRoute } from '@/utils/router/route-access';
 import type { OrganizationMemberVO, StudentCognitiveProfileVO } from '@/types/system/tenant';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = defineProps<{
   modelValue: boolean;

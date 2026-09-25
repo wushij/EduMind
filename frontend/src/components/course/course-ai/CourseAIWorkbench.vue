@@ -282,6 +282,14 @@
           </div>
 
           <div class="recommended-prompts-list">
+            <!-- 推荐问题由模型按「课程 + 当前小节」实时生成，首次进入会有短暂等待 -->
+            <div
+              v-if="recommendedQuestionsLoading && recommendedQuestions.length === 0"
+              class="prompt-item-row is-loading"
+            >
+              <el-icon class="prompt-arrow-icon is-loading"><Loading /></el-icon>
+              <span class="prompt-text">正在根据本节内容生成推荐问题…</span>
+            </div>
             <div
               v-for="(question, qIdx) in recommendedQuestions.slice(0, 5)"
               :key="qIdx"
@@ -310,7 +318,8 @@ import {
   Document,
   Close,
   Reading,
-  Check
+  Check,
+  Loading
 } from '@element-plus/icons-vue';
 import ChatMessage from '@/components/ai/ChatMessage.vue';
 import ChatInput from '@/components/ai/ChatInput.vue';
@@ -358,6 +367,7 @@ const {
   downloadResource,
   navigateToResources,
   recommendedQuestions,
+  recommendedQuestionsLoading,
   handleSendRecommended,
   activeSectionTitle
 } = inject(courseAiUiKey)!;

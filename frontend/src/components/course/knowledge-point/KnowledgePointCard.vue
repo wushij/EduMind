@@ -44,7 +44,7 @@
           <span>关联图谱</span>
         </el-button>
         <el-button size="small" class="card-action-btn card-action-btn--ai" @click="$emit('ask-ai')">
-          <el-icon><MagicStick /></el-icon>
+          <el-icon><AiSparkleIcon /></el-icon>
           <span>AI解析</span>
         </el-button>
       </div>
@@ -64,8 +64,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { StarFilled, Connection, MagicStick, Delete, Reading, EditPen, Warning } from '@element-plus/icons-vue';
+import { StarFilled, Connection, Delete, Reading, EditPen, Warning } from '@element-plus/icons-vue';
 import type { KnowledgePoint } from '@/types/course/knowledge-point';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = defineProps<{
   kp: KnowledgePoint;

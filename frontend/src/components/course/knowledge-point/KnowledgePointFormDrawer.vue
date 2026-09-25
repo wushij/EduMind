@@ -21,7 +21,7 @@
 
     <div class="kp-ai-helper-banner" @click="$emit('open-ai')">
       <div class="ai-spark-icon">
-        <el-icon><MagicStick /></el-icon>
+        <el-icon><AiSparkleIcon /></el-icon>
       </div>
       <div class="ai-spark-meta">
         <strong>使用 AI 辅助智能提炼核心考点</strong>
@@ -113,7 +113,8 @@
 </template>
 
 <script setup lang="ts">
-import { Connection, MagicStick } from '@element-plus/icons-vue';
+import { Connection } from '@element-plus/icons-vue';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 defineProps<{
   visible: boolean;

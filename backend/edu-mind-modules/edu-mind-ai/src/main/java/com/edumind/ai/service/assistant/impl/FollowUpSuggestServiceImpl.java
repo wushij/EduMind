@@ -49,15 +49,22 @@ public class FollowUpSuggestServiceImpl implements FollowUpSuggestService {
     private static final int MAX_ANSWER_CHARS = 6000;
     private static final int ANSWER_TAIL_CHARS = 2000;
 
-    /** 行首编号 / 项目符号，例如「1. 」「2）」「- 」「* 」「• 」 */
+    /**
+     * 行首编号 / 项目符号，例如「1. 」「2）」「- 」「* 」「• 」。
+     *
+     * <p>{@code (?!\\d)} 是关键：内容里的小节号写法是「1.1 算法复杂度与渐近表示法」，
+     * 若不加这个断言，会把小节号的「1.」当成列表编号剥掉，输出变成「1算法复杂度…」——
+     * 用户看到的「怎么这么多个 1」就是这么来的。</p>
+     */
     private static final Pattern LEADING_MARKER =
-            Pattern.compile("^(?:[-*•·]+|\\d{1,2}\\s*[.、)）:：]|[（(]\\d{1,2}[)）])\\s*");
+            Pattern.compile("^(?:[-*•·]+|\\d{1,2}\\s*[.、)）:：](?!\\d)|[（(]\\d{1,2}[)）])\\s*");
     /**
      * 模型把多条追问挤进同一行时的切分点：
      * 「1. 甲？ 2. 乙？ 3. 丙？」这类输出必须先拆开，否则整行超长会被当成无效内容丢弃。
+     * 同样用 {@code (?!\\d)} 避免把「1.1 小节名」从中间切开。
      */
     private static final Pattern MERGED_MARKER =
-            Pattern.compile("(?:(?<=\\s)|(?<=[？?。！!]))(?=\\d{1,2}\\s*[.、)）:：])");
+            Pattern.compile("(?:(?<=\\s)|(?<=[？?。！!]))(?=\\d{1,2}\\s*[.、)）:：](?!\\d))");
     private static final Pattern MARKDOWN_NOISE = Pattern.compile("[*`_#>]");
     private static final Pattern WRAP_QUOTES =
             Pattern.compile("^[\"'“”‘’「」《》【】]+|[\"'“”‘’「」《》【】]+$");

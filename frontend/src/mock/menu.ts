@@ -146,19 +146,6 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
         visible: true
       },
       {
-        id: 205,
-        parentId: 200,
-        name: 'AI 教案生成',
-        type: 2,
-        path: '/ai/lesson',
-        component: 'views/ai/AILessonPlan.vue',
-        icon: 'Notebook',
-        permission: 'ai:lesson:generate',
-        sort: 5,
-        status: 1,
-        visible: true
-      },
-      {
         id: 206,
         parentId: 200,
         name: 'AI 课堂总结',

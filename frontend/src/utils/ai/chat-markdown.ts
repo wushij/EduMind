@@ -55,10 +55,23 @@ function isMarkdownTableRowLine(line: string): boolean {
   return trimmed.startsWith('|') && (trimmed.endsWith('|') || trimmed.includes('|', 1));
 }
 
+function hasUnclosedBrackets(text: string): boolean {
+  let round = 0;
+  let square = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '(' || ch === '（') round++;
+    else if ((ch === ')' || ch === '）') && round > 0) round--;
+    else if (ch === '[' || ch === '【') square++;
+    else if ((ch === ']' || ch === '】') && square > 0) square--;
+  }
+  return round > 0 || square > 0;
+}
+
 /**
  * 大模型常把「1.知识地图…2.概念辨析…3.定理…」挤在同一行；
  * Markdown 无法识别，需拆行并在序号后补空格。
- * 必须严格保护表格行及带加粗的序号，防止在表格单元格内插入换行切碎表格。
+ * 必须严格保护表格行、标题行、未闭合括号及带加粗的序号，防止截断正文。
  */
 function normalizeInlineNumberedLists(text: string): string {
   return text
@@ -68,15 +81,20 @@ function normalizeInlineNumberedLists(text: string): string {
 
       const lines = segment.split('\n');
       const processed = lines.map((line) => {
-        // 表格行必须完整保护，绝不可在单元格内插入换行切断表格
+        // 表格行与标题行必须完整保护
         if (isMarkdownTableRowLine(line)) return line;
+        if (/^#{1,6}\s/.test(line.trim())) return line;
 
         let s = line;
 
-        // 1. 若同一行前文粘连了带加粗的序号小标题（仅在标点符号、中文、括号之后粘连，绝不在 | 等非文本符号后拆行）
+        // 1. 若同一行前文粘连了带加粗的序号小标题（不在未闭合括号内）
         s = s.replace(
           /([\p{Extended_Pictographic}\u4e00-\u9fa5a-zA-Z0-9。；;!?！？:：）)”"』」】])[ \t]*\*\*(\d{1,2})\.[ \t]*/gu,
-          '$1\n\n**$2. '
+          (match, char, num, offset, fullStr) => {
+            const before = fullStr.slice(0, offset + char.length);
+            if (hasUnclosedBrackets(before)) return match;
+            return `${char}\n\n**${num}. `;
+          }
         );
 
         // 2. 确保已在行首的加粗序号内部有标准空格（如「**1.知识体系**」->「**1. 知识体系**」），绝不拆开 ** 与数字
@@ -85,14 +103,14 @@ function normalizeInlineNumberedLists(text: string): string {
           '$1$2**$3. '
         );
 
-        // 3. 普通无加粗序号拆行：仅在标点符号、中文后粘连时拆行，避免误伤。
-        //    序号后允许紧跟 **加粗**（如「存储结构2.**逻辑结构**-集合结构」）——
-        //    旧字符集不含 *，导致这类「粘连序号 + 加粗标题」漏拆，序号被挤在同一行。
+        // 3. 普通无加粗序号拆行：仅在标点符号、中文后粘连且不在未闭合括号内时拆行
         s = s.replace(
           /([\p{Extended_Pictographic}\u4e00-\u9fa5。；;!?！？:：）)”"』」】])[ \t]*(\d{1,2})\.[ \t]*(?=[\p{Extended_Pictographic}\u4e00-\u9fa5（(「『【A-Za-z]|\*\*)/gu,
-          // 必须补空行：单换行时 Markdown 会把「2. xxx」当作上一列表项的惰性续行吞掉，
-          // 表现为换行了却没有自己的列表标记（前面少了 ·/序号），且行距被压缩。
-          '$1\n\n$2. '
+          (match, char, num, offset, fullStr) => {
+            const before = fullStr.slice(0, offset + char.length);
+            if (hasUnclosedBrackets(before)) return match;
+            return `${char}\n\n${num}. `;
+          }
         );
 
         // 4. 行首普通序号后补齐标准空格
@@ -111,7 +129,8 @@ function normalizeInlineNumberedLists(text: string): string {
 
 /**
  * 同一行粘连的「-两个重要极限 … -连续判定 …」拆成 Markdown 无序列表。
- * 全面支持 Emoji 图标及句末交流引导句自动分段。表格行内不拆行。
+ * 注意：必须严格排除副标题连接符（如「题目一（数列极限 - 四则运算）」）、人名间隔号（如「约翰·冯·诺依曼」）、
+ * 标题行（# 开头）以及未闭合括号内部的内容，防止错误拆行断裂语义。
  */
 function normalizeInlineBulletLists(text: string): string {
   return text
@@ -121,30 +140,54 @@ function normalizeInlineBulletLists(text: string): string {
 
       const lines = segment.split('\n');
       const processed = lines.map((line) => {
+        // 表格行与 Markdown 标题行绝不可在行内拆出列表
         if (isMarkdownTableRowLine(line)) return line;
+        if (/^#{1,6}\s/.test(line.trim())) return line;
 
         let s = line;
 
-        // 1. 将行首（包含缩进）或行内实心圆点 • 或 · 转换为标准 Markdown 无序列表项 - 
-        s = s.replace(/([^\n])\s*[•·]\s*(?=[\p{Extended_Pictographic}\*\*\u4e00-\u9fa5【「『（])/gu, '$1\n- ');
+        // 1. 将行首（包含缩进）的实心圆点 • 或 · 转换为标准 Markdown 无序列表项 -
         s = s.replace(/^([ \t]*)[•·]\s*/gmu, '$1- ');
 
-        // 2. 标点符号、冒号或中文后紧贴的 -项（包含 Emoji、粗体**、中文小标题等，排除 --- 水平分割线）
+        // 2. 行内实心圆点 • 转换为无序列表项（仅限明确的 bullet •，不包含中文人名/书名间隔号 ·，且不在未闭合括号内）
+        s = s.replace(/([^\n])\s*•\s*(?=[\p{Extended_Pictographic}\*\*\u4e00-\u9fa5【「『（])/gu, (match, prefix, offset, fullStr) => {
+          const before = fullStr.slice(0, offset + prefix.length);
+          if (hasUnclosedBrackets(before)) return match;
+          return `${prefix}\n- `;
+        });
+
+        // 3. 明确的列表引导标点（冒号、分号、句号、感叹号、问号、已闭合括号/引号）之后紧贴的 -项（排除 --- 水平分割线与括号内副标题）
         s = s.replace(
-          /(?<!-)([\u4e00-\u9fa5。；;!?！？:：）)”"』」】])\s*-(?:\s*|\s+)(?=[\p{Extended_Pictographic}\*\*\u4e00-\u9fa5【「『（])/gu,
-          '$1\n- '
+          /(?<!-)([。；;!?！？:：）)”"』」】])[ \t]*-[ \t]+(?=[\p{Extended_Pictographic}\*\*\u4e00-\u9fa5【「『（])/gu,
+          (match, punc, offset, fullStr) => {
+            const before = fullStr.slice(0, offset + punc.length);
+            if (hasUnclosedBrackets(before)) return match;
+            return `${punc}\n- `;
+          }
         );
 
-        // 3. 段末/行中同一行粘连 -列表（仅中文/Emoji/** 开头），必须排除减号与换行，且空格仅限行内空白
-        s = s.replace(
-          /(?<!-)([^\n\r\t -])[ \t]*-[ \t]+(?=\*\*|[\p{Extended_Pictographic}\u4e00-\u9fff（(「『【])/gu,
-          '$1\n- '
-        );
+        // 4. 若当前行（或拆行后的列表行）以无序列表项开头（- 开头），则该行内后续粘连的 -列表项也允许拆行（不在未闭合括号内）
+        s = s
+          .split('\n')
+          .map((subLine) => {
+            if (/^[ \t]*-[ \t]+/.test(subLine)) {
+              return subLine.replace(
+                /(?<!-)([^\n\r\t -])[ \t]+-[ \t]+(?=\*\*|[\p{Extended_Pictographic}\u4e00-\u9fff（(「『【])/gu,
+                (match, prevChar, offset, fullStr) => {
+                  const before = fullStr.slice(0, offset + prevChar.length);
+                  if (hasUnclosedBrackets(before)) return match;
+                  return `${prevChar}\n- `;
+                }
+              );
+            }
+            return subLine;
+          })
+          .join('\n');
 
-        // 4. CommonMark 规范化：确保行首（允许带缩进空格）- 后面有空格，支持 Emoji、中英文、粗体
+        // 5. CommonMark 规范化：确保行首（允许带缩进空格）- 后面有空格，支持 Emoji、中英文、粗体
         s = s.replace(/^([ \t]*)-(?=[\p{Extended_Pictographic}\u4e00-\u9fa5*（(「『【A-Za-z0-9])/gmu, '$1- ');
 
-        // 5. 列表项末尾粘连的交流互动引导句自动脱离列表形成独立自然段
+        // 6. 列表项末尾粘连的交流互动引导句自动脱离列表形成独立自然段
         s = s.replace(
           /([\u4e00-\u9fa5。；;!?！？）)”"』」】])\s*(不妨(?:先聊|告诉|直接|说说)|那么[，, ]?我们|请问(?:你|您)|你现在(?:是|想)|你是(?:刚|想))/gu,
           '$1\n\n$2'

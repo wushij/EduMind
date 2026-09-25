@@ -576,7 +576,7 @@ core/http/                    →  全局唯一 Axios 实例
 | Agent 记忆 | GET/POST/DELETE | `/api/ai/memories` |
 | AI 工具广场 | GET/POST | `/api/ai/tools`（师生）· `/api/system/ai-tools`（管理端） |
 | AI 出题 / 组卷 | POST | `/api/ai/questions` · `/api/ai/paper` · `/api/ai/exams` |
-| AI 教学创作 | POST | `/api/ai/lesson-plan` · `/api/ai/lesson-content` · `/api/ai/summary` · `/api/ai/course-objectives` · `/api/ai/course-knowledge-points` · `/api/ai/course-profile` |
+| AI 教学创作 | POST | `/api/ai/lesson-content` · `/api/ai/summary` · `/api/ai/course-objectives` · `/api/ai/course-knowledge-points` · `/api/ai/course-profile` |
 | 模型与网关 | GET/POST | `/api/system/ai-models` · `/api/system/gateway` |
 | Prompt 管理 | GET/POST | `/api/system/prompts` |
 | Token 审计 | GET | `/api/system/ai-audit` |

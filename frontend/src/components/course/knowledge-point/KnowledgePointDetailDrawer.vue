@@ -43,7 +43,7 @@
           编辑考点
         </el-button>
         <el-button class="capsule-btn" @click="$emit('ask-ai')">
-          <el-icon><MagicStick /></el-icon>
+          <el-icon><AiSparkleIcon /></el-icon>
           AI 解析
         </el-button>
       </div>
@@ -52,8 +52,9 @@
 </template>
 
 <script setup lang="ts">
-import { Reading, EditPen, MagicStick } from '@element-plus/icons-vue';
+import { Reading, EditPen } from '@element-plus/icons-vue';
 import type { KnowledgePoint } from '@/types/course/knowledge-point';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 defineProps<{
   visible: boolean;

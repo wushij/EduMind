@@ -78,7 +78,7 @@
             <el-button
               type="primary"
               class="btn-hero-action btn-hero-action--primary"
-              :icon="MagicStick"
+              :icon="AiSparkleIcon"
               @click="handleOpenAiAdvice"
             >
               AI 智能诊断
@@ -566,7 +566,7 @@
         <template v-if="teachingAdvice">
           <div class="advice-hero-banner">
             <div class="advice-hero-icon">
-              <el-icon><MagicStick /></el-icon>
+              <el-icon><AiSparkleIcon /></el-icon>
             </div>
             <div class="advice-hero-text">
               <div class="hero-title-row">
@@ -646,7 +646,6 @@ import { ElMessage } from 'element-plus';
 import {
   Refresh,
   Download,
-  MagicStick,
   Clock,
   InfoFilled,
   Trophy,
@@ -664,6 +663,7 @@ import {
 import AiCognitiveThinkingPanel from '@/components/ai/common/AiCognitiveThinkingPanel.vue';
 import { AI_COGNITIVE_THINKING_PRESETS } from '@/constants/ai/cognitive-thinking';
 import { useAnalyticsOverview } from '@/composables/analytics/useAnalyticsOverview';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const router = useRouter();
 

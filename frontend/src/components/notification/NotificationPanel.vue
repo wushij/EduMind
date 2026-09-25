@@ -78,8 +78,10 @@
           </div>
         </div>
         <p class="notify-card-content">{{ item.content }}</p>
-        <div v-if="item.navigatePath" class="notify-card-footer">
-          <span class="notify-link-hint">点击查看详情 →</span>
+        <div class="notify-card-footer">
+          <span class="notify-link-hint">
+            {{ item.navigatePath ? '查看关联内容 →' : '点击查看详情 →' }}
+          </span>
         </div>
       </article>
     </div>

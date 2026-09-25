@@ -29,7 +29,7 @@
         <span>错题本</span>
       </button>
       <button type="button" class="capsule-btn capsule-btn--primary" @click="router.push('/learning/practice')">
-        <el-icon class="btn-icon"><MagicStick /></el-icon>
+        <el-icon class="btn-icon"><AiSparkleIcon /></el-icon>
         <span>AI 练习</span>
       </button>
     </template>
@@ -59,8 +59,9 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import { List, Warning, MagicStick } from '@element-plus/icons-vue';
+import { List, Warning } from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 defineProps<{
   stats: {

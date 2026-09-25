@@ -14,6 +14,10 @@ public interface AiAuditQueryService {
 
     AiUsageSummaryVO getUsageSummary(List<Long> knowledgeBaseIds, LocalDateTime since);
 
+    AiUsageSummaryVO getUsageSummary(Long courseId, List<Long> knowledgeBaseIds, LocalDateTime since);
+
+    com.edumind.ai.vo.audit.AiCallLogPageVO pageLogs(Long courseId, List<Long> knowledgeBaseIds, String scene, String model, LocalDateTime since, long pageNum, long pageSize);
+
     long countCallsByCourse(Long courseId, LocalDateTime since);
 
     Map<Long, Long> countCallsByCourseBatch(List<Long> courseIds, LocalDateTime since);

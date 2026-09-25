@@ -146,7 +146,7 @@
         class="ai-studio-action-btn"
         @click="$emit('openAiDrawer')"
       >
-        <el-icon class="sparkle-icon"><MagicStick /></el-icon>
+        <el-icon class="sparkle-icon"><AiSparkleIcon /></el-icon>
         <span class="btn-text">AI 智能辅助校对</span>
         <span class="badge-tag">大模型</span>
       </button>
@@ -186,7 +186,7 @@
                 <el-icon><Refresh /></el-icon> 重新识别本页切片
               </el-dropdown-item>
               <el-dropdown-item @click="$emit('openAiDrawer')">
-                <el-icon><MagicStick /></el-icon> AI 智能辅助校对
+                <el-icon><AiSparkleIcon /></el-icon> AI 智能辅助校对
               </el-dropdown-item>
               <el-dropdown-item divided @click="$emit('openIngestModal')">
                 <el-icon><Files /></el-icon> 一键入库至题库
@@ -210,13 +210,13 @@ import {
   ArrowLeft,
   ArrowRight,
   Refresh,
-  MagicStick,
   Files,
   Check,
   Grid,
   MoreFilled
 } from '@element-plus/icons-vue';
 import type { PresetPaper } from '@/composables/knowledge/useOcrWorkspace';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = defineProps<{
   selectedPresetId: string;

@@ -28,7 +28,7 @@
           class="module-capsule-btn module-capsule-btn--ai"
           @click="router.push('/ai/question/generate')"
         >
-          <el-icon><MagicStick /></el-icon>
+          <el-icon><AiSparkleIcon /></el-icon>
           <span>AI 智能出题</span>
           <span class="pill-bubble">秒级出题</span>
         </button>
@@ -188,7 +188,7 @@
             <span>新建首个题库</span>
           </button>
           <button type="button" class="capsule-btn capsule-btn--ai" @click="router.push('/ai/question/generate')">
-            <el-icon><MagicStick /></el-icon>
+            <el-icon><AiSparkleIcon /></el-icon>
             <span>前往 AI 智能出题</span>
           </button>
         </div>
@@ -285,7 +285,6 @@
 import {
   FolderOpened,
   Plus,
-  MagicStick,
   Reading,
   Search,
   Close,
@@ -301,6 +300,7 @@ import AppPagination from '@/components/common/AppPagination.vue';
 import ModulePageHeroHeader from '@/components/question/common/ModulePageHeroHeader.vue';
 import BankListStatsBar from '@/components/question/bank/BankListStatsBar.vue';
 import { computed } from 'vue';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const {
   router,

@@ -21,7 +21,7 @@
         />
       </el-select>
       <button type="button" class="capsule-btn capsule-btn--default" @click="router.push('/learning/practice')">
-        <el-icon class="btn-icon"><MagicStick /></el-icon>
+        <el-icon class="btn-icon"><AiSparkleIcon /></el-icon>
         <span>AI 练习</span>
       </button>
       <button type="button" class="capsule-btn capsule-btn--primary" @click="emit('batch-practice')">
@@ -55,9 +55,10 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import { Lightning, MagicStick } from '@element-plus/icons-vue';
+import { Lightning } from '@element-plus/icons-vue';
 import PageHeroBanner from '@/components/common/PageHeroBanner.vue';
 import type { WrongBookOverviewVO } from '@/types/learning/wrong-question';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 defineProps<{
   courseOptions: Array<{ id: number; name: string }>;

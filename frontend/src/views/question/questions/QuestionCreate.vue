@@ -28,7 +28,7 @@
           :disabled="aiFullAutoLoading"
           @click="triggerAiFullAuto"
         >
-          <el-icon><MagicStick /></el-icon>
+          <el-icon><AiSparkleIcon /></el-icon>
           <span>{{ aiFullAutoLoading ? 'AI 装配中...' : 'AI 一键全套智能补全' }}</span>
           <span class="pill-bubble">一键出题</span>
         </button>
@@ -61,7 +61,7 @@
 import { ref, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { ArrowLeft, EditPen, MagicStick, ChatDotRound } from '@element-plus/icons-vue';
+import { ArrowLeft, EditPen, ChatDotRound } from '@element-plus/icons-vue';
 import ModulePageHeroHeader from '@/components/question/common/ModulePageHeroHeader.vue';
 import QuestionForm from '@/components/question/QuestionForm.vue';
 import { useQuestion } from '@/composables/question/useQuestion';
@@ -69,6 +69,7 @@ import { addQuestionsToBank } from '@/api/question/question-bank';
 import type { Question } from '@/types/question/question';
 
 import { useAuthStore } from '@/stores/auth/auth';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const router = useRouter();
 const route = useRoute();

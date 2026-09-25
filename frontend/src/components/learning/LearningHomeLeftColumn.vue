@@ -13,7 +13,7 @@
               class="capsule-action-link"
               @click="emit('generate-weak')"
             >
-              <el-icon class="action-icon"><MagicStick /></el-icon>
+              <el-icon class="action-icon"><AiSparkleIcon /></el-icon>
               <span>一键 AI 生成巩固练习</span>
             </button>
           </div>
@@ -119,7 +119,6 @@
 <script setup lang="ts">
 import {
   WarningFilled,
-  MagicStick,
   DocumentChecked,
   Timer,
   Check,
@@ -127,6 +126,7 @@ import {
 } from '@element-plus/icons-vue';
 
 import type { LearningHomeTaskUI, LearningHomeWeakPointUI } from '@/types/learning/home';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 defineProps<{
   loading?: boolean;

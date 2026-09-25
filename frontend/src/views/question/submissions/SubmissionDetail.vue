@@ -76,7 +76,7 @@
           <div v-if="item.aiComment" class="answer-block answer-block--ai">
             <div class="block-title">
               <span class="title-left">
-                <el-icon><MagicStick /></el-icon>
+                <el-icon><AiSparkleIcon /></el-icon>
                 <span>AI 评阅说明</span>
               </span>
             </div>
@@ -112,7 +112,7 @@
       <div v-else class="questions-list-card submission-empty-card">
         <div class="empty-questions-panel">
         <div class="empty-icon">
-          <el-icon><MagicStick /></el-icon>
+          <el-icon><AiSparkleIcon /></el-icon>
         </div>
         <h3 class="empty-title">尚未生成评阅明细</h3>
         <p class="empty-text">点击下方按钮触发 AI 深度评阅，系统将按题输出建议得分与评阅说明。</p>
@@ -122,7 +122,7 @@
           :disabled="gradingInProgress"
           @click="handleTriggerGradeNow"
         >
-          <el-icon><MagicStick /></el-icon>
+          <el-icon><AiSparkleIcon /></el-icon>
           <span>{{ gradingInProgress ? 'AI 评阅中…' : '立即执行 AI 智能批改' }}</span>
         </button>
         </div>
@@ -167,12 +167,13 @@
 </template>
 
 <script setup lang="ts">
-import { User, Reading, MagicStick, Select, Finished } from '@element-plus/icons-vue';
+import { User, Reading, Select, Finished } from '@element-plus/icons-vue';
 import MathText from '@/components/common/MathText.vue';
 import MarkdownLlmOutput from '@/components/system/PromptLlmOutput.vue';
 import SubmissionDetailHeroSection from '@/components/question/submission/SubmissionDetailHeroSection.vue';
 import AssignmentGradingEngineDialog from '@/components/question/assignment/AssignmentGradingEngineDialog.vue';
 import { useSubmission } from '@/composables/question/useSubmission';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const {
   router,

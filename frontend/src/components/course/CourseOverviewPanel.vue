@@ -14,7 +14,7 @@
           :objectives="overview.objectives"
           :editable="overview.editable"
           @manage="showObjectiveDialog = true"
-          @ai-lesson="goAiLessonPlan"
+          @ai-prep="goLessonStudio"
         />
         <CourseOverviewAnnouncementsCard
           :announcements="overview.announcementsPreview"
@@ -94,6 +94,7 @@ import CourseAnnouncementEditorDialog from '@/components/course/overview/CourseA
 import CourseAnnouncementListDrawer from '@/components/course/overview/CourseAnnouncementListDrawer.vue';
 import CourseInstructorEditorDialog from '@/components/course/overview/CourseInstructorEditorDialog.vue';
 import { useCourseOverview } from '@/composables/course/useCourseOverview';
+import { openLessonStudio } from '@/services/course/lesson-studio-entry';
 
 const props = defineProps<{
   course?: Course | null;
@@ -122,14 +123,10 @@ const announcementDrawerRef = ref<{ reload: () => Promise<void> } | null>(null);
 const showInstructorDialog = ref(false);
 const actionSaving = ref(false);
 
-function goAiLessonPlan() {
+function goLessonStudio() {
   const id = courseId.value;
   if (!id) return;
-  const name = overview.value?.course?.name ?? props.course?.name ?? '';
-  router.push({
-    path: '/ai/lesson',
-    query: { courseId: String(id), topic: name }
-  });
+  void openLessonStudio(router, id);
 }
 
 function handleKnowledgeBaseNavigate() {

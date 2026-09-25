@@ -155,5 +155,14 @@ export const AI_COGNITIVE_THINKING_PRESETS = {
       '深度识别知识点认知断层与群体薄弱点',
       '调用智教大模型推演生成精准教学干预清单'
     ]
+  },
+  interventionGenerate: {
+    title: 'AI 教学决策引擎正在深度推演循证干预方案...',
+    steps: [
+      '检索课程大纲知识图谱与薄弱考点掌握度分布',
+      '定位预警学生群体失分归因与前置认知障碍',
+      '智能匹配攻坚微课切片与布鲁姆梯度变式练习题组',
+      '联动大模型推演生成高实操性循证教学干预提案'
+    ]
   }
 } as const satisfies Record<string, AiCognitiveThinkingPreset>;

@@ -119,7 +119,7 @@
                 @click="handleAiDescription"
               >
                 <el-icon v-if="descAiLoading" class="is-loading"><Loading /></el-icon>
-                <el-icon v-else><MagicStick /></el-icon>
+                <el-icon v-else><AiSparkleIcon /></el-icon>
                 AI 帮写
               </button>
             </div>
@@ -203,7 +203,7 @@
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue';
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus';
-import { EditPen, Reading, Service, Loading, Opportunity, Tools, Sunny, MagicStick } from '@element-plus/icons-vue';
+import { EditPen, Reading, Service, Loading, Opportunity, Tools, Sunny } from '@element-plus/icons-vue';
 import { suggestCourseDescription } from '@/api/ai/course-profile';
 import type { Course } from '@/types/course/course';
 import { useCourse } from '@/composables/course/useCourse';
@@ -215,6 +215,7 @@ import {
 } from '@/constants/course/ai-persona';
 import AiCognitiveThinkingSlot from '@/components/ai/common/AiCognitiveThinkingSlot.vue';
 import { isAxiosError } from 'axios';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const courseCategoryPresets = COURSE_CATEGORY_PRESETS;
 

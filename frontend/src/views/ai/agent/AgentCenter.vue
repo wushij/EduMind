@@ -93,12 +93,12 @@ import {
   Tools,
   Histogram,
   Timer,
-  MagicStick,
   Reading,
   Collection,
   Checked
 } from '@element-plus/icons-vue';
 import { useAgentRun } from '@/composables/ai/useAgentRun';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const router = useRouter();
 const { loading, usedMockFallback, agents, fetchAgents } = useAgentRun();
@@ -122,7 +122,7 @@ const agentStyleMap: Record<string, { icon: any; iconColor: string; bgColor: str
   'course-tutor': { icon: Reading, iconColor: '#1677FF', bgColor: '#EAF3FF' },
   'exam-builder': { icon: Collection, iconColor: '#52C41A', bgColor: '#F6FFED' },
   'grading-assistant': { icon: Checked, iconColor: '#722ED1', bgColor: '#F9F0FF' },
-  'lesson-planner': { icon: MagicStick, iconColor: '#FA8C16', bgColor: '#FFF7E6' }
+  'lesson-planner': { icon: AiSparkleIcon, iconColor: '#FA8C16', bgColor: '#FFF7E6' }
 };
 
 function getAgentStyle(code: string) {

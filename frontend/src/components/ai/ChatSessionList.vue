@@ -133,21 +133,24 @@ const filteredSessions = computed(() => {
 .chat-session-list {
   display: flex;
   flex-direction: column;
-  width: 260px;
+  width: 100%;
+  min-width: 260px;
   height: 100%;
+  box-sizing: border-box;
   background: #F8FAFC;
-  border-right: 1px solid #E2E8F0;
   flex-shrink: 0;
 
   .session-list-header {
     padding: 16px 14px 10px;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: stretch;
     gap: 8px;
 
     .capsule-new-chat-btn {
-      width: 100%;
-      height: 38px;
+      flex: 1;
+      min-width: 0;
+      height: 36px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -176,14 +179,16 @@ const filteredSessions = computed(() => {
     }
 
     .capsule-clear-all-btn {
-      width: 100%;
-      height: 34px;
+      flex-shrink: 0;
+      height: 36px;
+      padding: 0 12px;
       border-radius: 9999px;
       border: 1px solid #fecaca;
       background: #fff;
       color: #dc2626;
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 600;
+      white-space: nowrap;
       cursor: pointer;
       transition: all 0.2s ease;
 

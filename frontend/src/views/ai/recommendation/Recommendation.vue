@@ -12,8 +12,16 @@
     </ProfilePageHero>
 
     <div class="toolbar ai-teaching-surface-card toolbar-surface">
-      <span class="toolbar-label">课程 ID</span>
-      <el-input-number v-model="courseId" :min="1" />
+      <span class="toolbar-label">课程</span>
+      <el-select
+        v-model="courseId"
+        placeholder="请选择课程"
+        style="width: 260px"
+        :loading="courseLoading"
+        @change="loadData"
+      >
+        <el-option v-for="c in courseOptions" :key="c.id" :label="c.name" :value="c.id" />
+      </el-select>
     </div>
 
     <div class="grid">
@@ -40,7 +48,8 @@ import { Refresh } from '@element-plus/icons-vue';
 import ProfilePageHero from '@/components/profile/ProfilePageHero.vue';
 import { useAIRecommendation } from '@/composables/ai/useAIRecommendation';
 
-const { courseId, loading, questions, resources, loadData } = useAIRecommendation();
+const { courseId, courseOptions, courseLoading, loading, questions, resources, loadData } =
+  useAIRecommendation();
 </script>
 
 <style scoped lang="scss">

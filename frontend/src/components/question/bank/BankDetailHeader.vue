@@ -81,7 +81,7 @@
             class="action-pill action-pill--ai"
             @click="onAiExpand"
           >
-            <el-icon><MagicStick /></el-icon>
+            <el-icon><AiSparkleIcon /></el-icon>
             <span>AI 智能扩题</span>
           </button>
         </div>
@@ -145,7 +145,6 @@ import {
   DocumentCopy,
   FolderOpened,
   Download,
-  MagicStick,
   Clock,
   Delete,
   Collection
@@ -153,6 +152,7 @@ import {
 import type { Router } from 'vue-router';
 import BankDetailStatsBar from '@/components/question/bank/BankDetailStatsBar.vue';
 import type { QuestionItem } from '@/types/question/question';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 defineProps<{
   router: Router;

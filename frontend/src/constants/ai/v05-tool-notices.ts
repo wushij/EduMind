@@ -6,15 +6,6 @@ const DEFAULT_ALTERNATIVES: V05Alternative[] = [
 ];
 
 export const V05_TOOL_NOTICES: Record<string, V05ToolNoticeConfig> = {
-  tool_lesson: {
-    title: 'AI 教案生成',
-    description:
-      'V0.5 已上线：输入授课主题、学时与教学目标，生成教学大纲与课堂设计建议。',
-    alternatives: [
-      { label: '打开 AI 教案', route: '/ai/lesson' },
-      { label: 'AI 智能出题', route: '/ai/question/generate' }
-    ]
-  },
   tool_summary: {
     title: 'AI 课程总结',
     description:
@@ -56,7 +47,7 @@ export const V05_TOOL_NOTICES: Record<string, V05ToolNoticeConfig> = {
     description:
       'V0.5 将支持根据教学大纲生成课件页结构与演讲备注。',
     alternatives: [
-      { label: 'AI 教案', route: '/ai/lesson' },
+      { label: '课程 AI 助手', route: '/course/ai' },
       { label: '知识库', route: '/knowledge' }
     ]
   },

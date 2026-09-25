@@ -28,7 +28,17 @@ public class AiAuditQueryApiImpl implements AiAuditQueryApi {
 
     @Override
     public AiUsageSummaryVO getUsageSummary(List<Long> knowledgeBaseIds, LocalDateTime since) {
-        return aiAuditQueryService.getUsageSummary(knowledgeBaseIds, since);
+        return aiAuditQueryService.getUsageSummary(null, knowledgeBaseIds, since);
+    }
+
+    @Override
+    public AiUsageSummaryVO getUsageSummary(Long courseId, List<Long> knowledgeBaseIds, LocalDateTime since) {
+        return aiAuditQueryService.getUsageSummary(courseId, knowledgeBaseIds, since);
+    }
+
+    @Override
+    public com.edumind.ai.vo.audit.AiCallLogPageVO pageLogs(Long courseId, List<Long> knowledgeBaseIds, String scene, String model, LocalDateTime since, long pageNum, long pageSize) {
+        return aiAuditQueryService.pageLogs(courseId, knowledgeBaseIds, scene, model, since, pageNum, pageSize);
     }
 
     @Override

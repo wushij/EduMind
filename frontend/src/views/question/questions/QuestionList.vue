@@ -26,7 +26,7 @@
             class="capsule-btn capsule-btn--ai"
             @click="router.push('/ai/question/generate')"
           >
-            <el-icon class="sparkle-icon"><MagicStick /></el-icon>
+            <el-icon class="sparkle-icon"><AiSparkleIcon /></el-icon>
             <span>AI 智能出题</span>
             <span class="pill-bubble">秒级出题</span>
           </button>
@@ -202,7 +202,7 @@
           class="capsule-btn capsule-btn--ai"
           @click="router.push('/ai/question/generate')"
         >
-          <el-icon><MagicStick /></el-icon>
+          <el-icon><AiSparkleIcon /></el-icon>
           <span>立即前往 AI 智能出题</span>
           <span class="pill-bubble">秒级出题</span>
         </button>
@@ -237,7 +237,6 @@ import { useRouter, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import {
   Reading,
-  MagicStick,
   Plus,
   Tickets,
   Search,
@@ -252,6 +251,7 @@ import { useQuestion } from '@/composables/question/useQuestion';
 import { useQuestionAiTutor } from '@/composables/question/useQuestionAiTutor';
 import { difficultyToLevel } from '@/utils/question/difficulty-level';
 import type { Question } from '@/types/question/question';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const router = useRouter();
 const route = useRoute();

@@ -228,7 +228,7 @@
         <span>默认初始密码 (123456)</span>
       </button>
       <button type="button" class="preset-chip-btn random-chip" @click="onGenerateRandom">
-        <el-icon class="chip-icon"><MagicStick /></el-icon>
+        <el-icon class="chip-icon"><AiSparkleIcon /></el-icon>
         <span>生成高强度随机密码</span>
       </button>
     </div>
@@ -355,7 +355,6 @@ import {
   Calendar,
   School,
   Lightning,
-  MagicStick,
   Check,
   Loading,
   WarningFilled,
@@ -363,6 +362,7 @@ import {
 } from '@element-plus/icons-vue';
 import UserDetailStatsBar from '@/components/system/user/UserDetailStatsBar.vue';
 import { isUserEnabled, getRoleDescription } from '@/composables/system/useUserDetail';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const resetPasswordDialogVisible = defineModel<boolean>('resetPasswordDialogVisible', { required: true });
 const resetPasswordForm = defineModel<{ newPassword: string; confirmPassword: string }>('resetPasswordForm', {

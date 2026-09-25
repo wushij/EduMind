@@ -41,7 +41,7 @@
             class="capsule-tool-btn capsule-tool-btn--ai"
             @click="handleChapterAiQuiz"
           >
-            <el-icon><MagicStick /></el-icon>
+            <el-icon><AiSparkleIcon /></el-icon>
             <span>针对本大纲 AI 出题</span>
           </button>
         </template>
@@ -221,7 +221,7 @@
                 class="capsule-mini-add-btn capsule-mini-add-btn--ai"
                 @click="openAiGenerateModal(chapter)"
               >
-                <el-icon><MagicStick /></el-icon>
+                <el-icon><AiSparkleIcon /></el-icon>
                 <span>AI 扩充微课大纲</span>
               </button>
             </div>
@@ -310,7 +310,6 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   Search,
-  MagicStick,
   Check,
   Clock,
   Connection,
@@ -325,6 +324,7 @@ import { useCourse } from '@/composables/course/useCourse';
 import { useCourseEditable } from '@/composables/course/useCourseEditable';
 import ChapterSectionDialog from '@/components/course/ChapterSectionDialog.vue';
 import ChapterAiGenerateModal from '@/components/course/ChapterAiGenerateModal.vue';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = defineProps<{
   course?: Course | null;

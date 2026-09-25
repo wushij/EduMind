@@ -19,8 +19,10 @@ export function repairLatexDoubleEscapes(text: string): string {
   if (!text) return '';
   return text
     .replace(/\\{2,}([a-zA-Z]+)/g, '\\$1')
-    .replace(/\\+([0-9])/g, '$1');
+    .replace(/\\+([0-9])/g, '$1')
+    .replace(/\\{2,}(\(|\)|\[|\])/g, '\\$1');
 }
+
 
 function renderKatex(formula: string, displayMode: boolean): string {
   try {

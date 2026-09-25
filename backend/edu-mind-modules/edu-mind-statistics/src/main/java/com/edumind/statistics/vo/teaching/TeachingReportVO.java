@@ -1,5 +1,7 @@
 package com.edumind.statistics.vo.teaching;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.util.ArrayList;
@@ -8,6 +10,11 @@ import java.util.List;
 @Data
 public class TeachingReportVO {
     private Long courseId;
+    private String courseName;
+    private String courseCode;
+    private String teacherName;
+    private Integer studentCount;
+    private Integer syllabusProgress;
     private String range;
     private Integer totalChapters;
     private Integer recommendedQuestions;
@@ -34,8 +41,22 @@ public class TeachingReportVO {
 
     @Data
     public static class WeakPointVO {
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long questionId;
+        private String questionStem;
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long knowledgePointId;
+        private String knowledgePointName;
+        private String chapterName;
         private String title;
         private Integer wrongCount;
+        private Integer masteryRate;
+        private String errorType;
+        private String errorTypeName;
+        private String errorReason;
         private String suggestion;
+        private String status;
+        private String statusLabel;
     }
 }
+

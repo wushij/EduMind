@@ -43,6 +43,15 @@ describe('filterInterventions', () => {
     expect(filterInterventions(sample, 101, undefined, 'PENDING')).toHaveLength(1);
   });
 
+  it('filters correctly when courseId is serialized as string from backend', () => {
+    const stringCourseSample = [
+      { ...sample[0], courseId: '103' as unknown as number },
+      { ...sample[1], courseId: '101' as unknown as number }
+    ];
+    expect(filterInterventions(stringCourseSample, 103)).toHaveLength(1);
+    expect(filterInterventions(stringCourseSample, 103)[0].courseId).toBe('103');
+  });
+
   it('filters by trigger type', () => {
     expect(filterInterventions(sample, undefined, 'ACTIVITY_DROP')).toHaveLength(1);
   });
@@ -54,7 +63,7 @@ describe('intervention label helpers', () => {
   });
 
   it('maps status labels', () => {
-    expect(getInterventionStatusLabel('DISPATCHED')).toBe('已分发');
+    expect(getInterventionStatusLabel('DISPATCHED')).toBe('执行追踪中');
   });
 
   it('resolves course names from the real course options', () => {

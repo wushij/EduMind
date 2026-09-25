@@ -245,7 +245,7 @@
           <h3 class="card-title">AI 智囊命题策略与专属提示词</h3>
         </div>
         <span class="ai-sparkle-pill">
-          <el-icon><MagicStick /></el-icon>
+          <el-icon><AiSparkleIcon /></el-icon>
           大模型认知指导
         </span>
       </div>
@@ -327,8 +327,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Lightning, MagicStick } from '@element-plus/icons-vue';
+import { Lightning } from '@element-plus/icons-vue';
 import type { ExamFormState } from './exam-generate-types';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = defineProps<{
   examForm: ExamFormState;

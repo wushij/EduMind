@@ -51,7 +51,7 @@
           @click="$emit('ai-generate')"
         >
           <el-icon v-if="isAiGeneratingOutline" class="is-loading"><Loading /></el-icon>
-          <el-icon v-else class="ai-btn-icon"><MagicStick /></el-icon>
+          <el-icon v-else class="ai-btn-icon"><AiSparkleIcon /></el-icon>
           <span>{{ isAiGeneratingOutline ? 'AI 正在智能推导大纲...' : 'AI 智能推荐课程大纲' }}</span>
         </button>
       </div>
@@ -122,8 +122,9 @@
 </template>
 
 <script setup lang="ts">
-import { List, MagicStick, Plus, Close, Loading, Cpu } from '@element-plus/icons-vue';
+import { List, Plus, Close, Loading, Cpu } from '@element-plus/icons-vue';
 import type { SyllabusTemplateType } from '@/composables/course/useCourseCreate';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 defineProps<{
   initialChapters: string[];

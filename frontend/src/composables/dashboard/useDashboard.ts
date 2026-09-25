@@ -70,7 +70,7 @@ export interface KpiCardItem {
 }
 
 export const COMMON_FUNCTIONS: CommonFunctionItem[] = [
-  { title: 'AI 备课教案', icon: EditPen, theme: 'blue', route: '/ai/lesson', desc: '秒级生成结构化互动教案' },
+  { title: 'AI 工具广场', icon: EditPen, theme: 'blue', route: '/ai/marketplace', desc: '备课批改类 AI 工具统一入口' },
   { title: '智能出题组卷', icon: Tickets, theme: 'cyan', route: '/ai/question/generate', desc: '按大纲自适应多题型生成' },
   { title: 'AI 作业批改', icon: CircleCheck, theme: 'emerald', route: '/ai/grading', desc: '全自动语义批阅与错因诊断' },
   { title: '学情全景分析', icon: TrendCharts, theme: 'amber', route: '/analytics/learning', desc: '多维认知掌握与薄弱点透视' },
@@ -400,7 +400,7 @@ export function useDashboard(options?: { enableCharts?: boolean }) {
         title: '本周备课与教案编排更新',
         count: '推进中',
         dotColor: '#3B82F6',
-        route: '/ai/lesson'
+        route: '/course'
       });
       items.push({
         id: 'todo-analytics',

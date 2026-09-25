@@ -150,14 +150,6 @@ export const SIDEBAR_SUBMENUS: Record<string, SidebarSubMenuMeta> = {
     icon: 'CircleCheck',
     sort: 4
   },
-  'ai-lesson': {
-    key: 'ai-lesson',
-    moduleKey: 'ai-teaching',
-    name: 'AI 教案',
-    path: '/ai/lesson',
-    icon: 'Notebook',
-    sort: 5
-  },
   'ai-summary': {
     key: 'ai-summary',
     moduleKey: 'ai-teaching',
@@ -630,7 +622,6 @@ export function mapCodeToSubMenuKey(code: string): string {
   if (lower.startsWith('ai:question')) return 'ai-question';
   if (lower.startsWith('ai:exam')) return 'ai-exam';
   if (lower.startsWith('ai:grading')) return 'ai-grading';
-  if (lower.startsWith('ai:lesson')) return 'ai-lesson';
   if (lower.startsWith('ai:summary')) return 'ai-summary';
   if (lower.startsWith('ai:recommendation')) return 'ai-recommendation';
   if (lower.startsWith('ai:tool')) return 'ai-agent';
@@ -951,7 +942,6 @@ export const DEFAULT_SYSTEM_PERMISSIONS: PermissionVO[] = [
   { id: 19, permissionCode: 'ai:question', permissionName: 'AI 出题' },
   { id: 20, permissionCode: 'ai:exam', permissionName: 'AI 组卷' },
   { id: 18, permissionCode: 'ai:grading', permissionName: 'AI 批改' },
-  { id: 73, permissionCode: 'ai:lesson:generate', permissionName: 'AI 教案生成' },
   { id: 74, permissionCode: 'ai:summary:view', permissionName: 'AI 课堂总结查看' },
   { id: 75, permissionCode: 'ai:recommendation:view', permissionName: 'AI 推荐查看' },
   { id: 31, permissionCode: 'ai:tool:use', permissionName: 'Agent 工具调用' },

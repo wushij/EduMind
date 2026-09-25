@@ -40,7 +40,7 @@
           <span>查看课程全景拓扑</span>
         </el-button>
         <el-button v-if="editable" class="capsule-btn capsule-btn--ai" @click="openAiSuggestModal">
-          <el-icon><MagicStick /></el-icon>
+          <el-icon><AiSparkleIcon /></el-icon>
           <span>AI 提炼考点</span>
         </el-button>
         <el-button v-if="editable" class="capsule-btn capsule-btn--primary" @click="openCreateDrawer">
@@ -198,7 +198,7 @@
 </template>
 
 <script setup lang="ts">
-import { Search, Plus, Opportunity, Connection, MagicStick } from '@element-plus/icons-vue';
+import { Search, Plus, Opportunity, Connection } from '@element-plus/icons-vue';
 import { toRef } from 'vue';
 import type { Course } from '@/types/course/course';
 import { useKnowledgePoint } from '@/composables/course/useKnowledgePoint';
@@ -206,6 +206,7 @@ import KnowledgePointCard from '@/components/course/knowledge-point/KnowledgePoi
 import KnowledgePointFormDrawer from '@/components/course/knowledge-point/KnowledgePointFormDrawer.vue';
 import KnowledgePointDetailDrawer from '@/components/course/knowledge-point/KnowledgePointDetailDrawer.vue';
 import KnowledgePointAiSuggestDialog from '@/components/course/knowledge-point/KnowledgePointAiSuggestDialog.vue';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = withDefaults(
   defineProps<{

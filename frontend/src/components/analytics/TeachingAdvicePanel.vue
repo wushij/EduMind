@@ -15,13 +15,13 @@
           class="error-cat-box"
         >
           <div class="error-top-line">
-            <span class="err-name">{{ err.name }}</span>
+            <span class="err-name">{{ getErrorName(err) }}</span>
             <span class="err-percent">{{ err.percent }}% 占比</span>
           </div>
           <div class="capsule-progress-track">
             <div class="capsule-progress-fill" :style="{ width: `${err.percent}%`, background: err.color }"></div>
           </div>
-          <p class="err-desc">{{ err.desc }}</p>
+          <p class="err-desc">{{ getErrorDesc(err) }}</p>
         </div>
       </div>
     </div>
@@ -54,10 +54,10 @@
           <button
             type="button"
             class="capsule-card-action-btn"
-            @click="router.push('/ai/lesson-plan')"
+            @click="goLessonStudio"
           >
             <el-icon class="btn-inner-icon"><DocumentAdd /></el-icon>
-            <span>一键由 AI 自动生成针对性教案</span>
+            <span>进入课节用 AI 备课生成针对性教案</span>
           </button>
 
           <button
@@ -78,14 +78,37 @@
 import { PieChart, Opportunity, Service, DocumentAdd, ChatDotRound } from '@element-plus/icons-vue';
 import type { Router } from 'vue-router';
 import type { TeachingReportVO } from '@/types/analytics/report';
+import { openLessonStudio } from '@/services/course/lesson-studio-entry';
 
-defineProps<{
+const props = defineProps<{
   router: Router;
   courseId: number;
   reportData: TeachingReportVO | null;
   topWeakPointNames: string;
   errorCategories: Array<{ type: string; name: string; percent: number; color: string; desc: string }>;
 }>();
+
+const errorDescMap: Record<string, string> = {
+  CONCEPT: '对基础概念定义判定标准或充分必要条件认知模糊',
+  CALC: '步骤繁琐导致的运算失误、符号漏算或恒等变形错误',
+  LOGIC: '解题步骤推理跳跃、前后因果倒置或推导链断层',
+  READING: '未准确提炼题设核心限定条件或忽略了隐含边界'
+};
+
+function getErrorDesc(err: { type: string; name: string; desc: string }): string {
+  if (errorDescMap[err.type]) return errorDescMap[err.type];
+  if (err.desc && err.desc !== err.name && err.desc !== err.type) return err.desc;
+  return '典型薄弱项成因，需结合变式训练加深理解';
+}
+
+function getErrorName(err: { type: string; name: string }): string {
+  if (err.type === 'READING') return '审题理解偏差';
+  return err.name;
+}
+
+function goLessonStudio() {
+  void openLessonStudio(props.router, props.courseId);
+}
 </script>
 
 <style scoped lang="scss">

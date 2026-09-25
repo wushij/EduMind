@@ -232,14 +232,16 @@ export function clearStoredSessionId(courseId: number | undefined, sessionId: st
   }
 }
 
+/** 兜底标题：去掉模板前缀与装饰括号，并压到 14 字以内（历史列表里 20 字太长、不像标题） */
 export function buildSessionTitleFromPrompt(text: string): string {
   const cleaned = text
     .replace(/^\[当前知识锚定章节:[^\]]+\]\s*/i, '')
     .replace(/^\[当前章节:[^\]]+\]\s*/i, '')
     .replace(/^\[当前微课节ID:[^\]]+\]\s*/i, '')
+    .replace(/[「」『』“”"'《》【】]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-  return cleaned.slice(0, 20) || '新问答会话';
+  return cleaned.slice(0, 14) || '新问答会话';
 }
 
 export function formatSessionTime(raw: unknown): string {
@@ -269,6 +271,15 @@ export function mapCitation(raw: Record<string, unknown>): CitationItem {
 export interface FollowUpOptions {
   sectionTitle?: string;
   courseTitle?: string;
+}
+
+/** 追问请求的可选参数：onUpdate 用于异步回写，其余用于放宽 / 收紧生成门槛 */
+export interface FollowUpRequestOptions extends FollowUpOptions {
+  onUpdate?: (prompts: string[]) => void;
+  /** 材料长度门槛：低于该长度直接不展示（默认 80，避免寒暄、报错占位生成无意义追问） */
+  minMaterialChars?: number;
+  /** 期望条数，默认 3，上限 5（后端同样封顶 5） */
+  count?: number;
 }
 
 /** 章节结构词：本身不承载知识点，不能拿来当追问锚点 */
@@ -422,7 +433,8 @@ function buildAnchoredFollowUps(domain: FollowUpDomain, anchors: [string, string
 
 /** 提不出锚点时：仍按学科给出可用的追问方向，但不再硬塞「企业级 / 代码示例」这类错位说法 */
 function buildContextFollowUps(domain: FollowUpDomain, sectionTitle?: string): string[] {
-  const spot = sectionTitle ? `「${sectionTitle}」` : '这一节';
+  // 与锚点模板一致：不加「」这类装饰括号，避免看起来像机器模板
+  const spot = sectionTitle ? `本节内容（${sectionTitle}）` : '这一节';
   if (domain === 'math') {
     return [
       `${spot}里最容易混淆的两个定义是什么？`,
@@ -480,7 +492,16 @@ export function generateSmartFollowUps(
   return buildContextFollowUps(domain, sectionTitle);
 }
 
-const FOLLOW_UP_CACHE_STORAGE_KEY = 'edumind:ai:follow-up-cache';
+/**
+ * 追问缓存版本号：净化规则 / 提示词变更后**必须递增**。
+ *
+ * <p>否则旧结果会被缓存原样回放，表现就是「代码已经改了、界面还是老样子」——
+ * v1 的缓存里存着被错误剥掉小节号的结果（1.1 → 1），所以升到 v2 并顺手清掉 v1。</p>
+ */
+const FOLLOW_UP_CACHE_VERSION = 'v2';
+const FOLLOW_UP_CACHE_STORAGE_KEY = `edumind:ai:follow-up-cache-${FOLLOW_UP_CACHE_VERSION}`;
+const LEGACY_FOLLOW_UP_CACHE_KEYS = ['edumind:ai:follow-up-cache'];
+let legacyFollowUpCachePurged = false;
 const FOLLOW_UP_CACHE_LIMIT = 80;
 const FOLLOW_UP_REQUEST_TIMEOUT_MS = 12000;
 /** 回答短于该长度（报错占位、寒暄）不足以支撑内容化追问，直接不展示胶囊 */
@@ -507,7 +528,14 @@ function followUpCacheKey(question: string, answer: string): string {
   return `q${(hash >>> 0).toString(36)}_${raw.length}`;
 }
 
+function purgeLegacyFollowUpCache(): void {
+  if (legacyFollowUpCachePurged) return;
+  legacyFollowUpCachePurged = true;
+  LEGACY_FOLLOW_UP_CACHE_KEYS.forEach((key) => storage.remove(key));
+}
+
 function readFollowUpCache(): Record<string, string[]> {
+  purgeLegacyFollowUpCache();
   try {
     const cached = storage.get(FOLLOW_UP_CACHE_STORAGE_KEY);
     return cached && typeof cached === 'object' ? (cached as Record<string, string[]>) : {};
@@ -544,7 +572,8 @@ export function readCachedFollowUps(question: string, answer: string): string[] 
  * 前端也不会因为「单条超长」把整批追问丢干净。刻意不用正则后行断言，避免老浏览器解析期报错。</p>
  */
 function splitMergedFollowUpLines(text: string): string[] {
-  const marked = text.replace(/([？?。！!\s])(\d{1,2}\s*[.、)）:：])/g, '$1\u0000$2');
+  // (?!\d)：小节号「1.1」不能被当成切分点，否则「什么是 1.1 算法复杂度…」会被从中间切开
+  const marked = text.replace(/([？?。！!\s])(\d{1,2}\s*[.、)）:：](?!\d))/g, '$1\u0000$2');
   const segments: string[] = [];
   for (const line of marked.split(/\r?\n/)) {
     for (const part of line.split('\u0000')) {
@@ -581,7 +610,8 @@ export function normalizeFollowUpPrompts(raw: unknown, max = FOLLOW_UP_PROMPT_CO
   const seen = new Set<string>();
   for (const item of flattened) {
     const text = item
-      .replace(/^\s*(?:[-*•·]+|\d{1,2}\s*[.、)）:：]|[（(]\d{1,2}[)）])\s*/, '')
+      // (?!\d) 不可省：内容里的小节号「1.1 算法复杂度…」不能被当成列表编号剥掉，否则会变成「1算法复杂度…」
+      .replace(/^\s*(?:[-*•·]+|\d{1,2}\s*[.、)）:：](?!\d)|[（(]\d{1,2}[)）])\s*/, '')
       .replace(/[*`_#>]/g, '')
       .replace(/^["'“”‘’「」《》【】]+|["'“”‘’「」《》【】]+$/g, '')
       .trim();
@@ -627,11 +657,12 @@ function warnFollowUpDegrade(error: unknown): void {
 export function requestFollowUps(
   question: string,
   answer: string,
-  options?: FollowUpOptions & { onUpdate?: (prompts: string[]) => void }
+  options?: FollowUpRequestOptions
 ): string[] {
   const cleanQuestion = (question || '').trim();
   const cleanAnswer = (answer || '').trim();
-  if (!cleanQuestion || cleanAnswer.length < FOLLOW_UP_MIN_ANSWER_CHARS) {
+  const minMaterialChars = options?.minMaterialChars ?? FOLLOW_UP_MIN_ANSWER_CHARS;
+  if (!cleanQuestion || cleanAnswer.length < minMaterialChars) {
     return [];
   }
 
@@ -643,6 +674,7 @@ export function requestFollowUps(
     return fallback();
   }
 
+  const wanted = Math.min(Math.max(options?.count ?? FOLLOW_UP_PROMPT_COUNT, 1), 5);
   const cacheKey = followUpCacheKey(cleanQuestion, cleanAnswer);
   const seq = (followUpRequestSeq += 1);
   const context = [options.courseTitle, options.sectionTitle].filter(Boolean).join(' · ');
@@ -651,13 +683,13 @@ export function requestFollowUps(
       question: cleanQuestion.slice(0, 1000),
       answer: clipAnswerForFollowUp(cleanAnswer),
       ...(context ? { context } : {}),
-      count: FOLLOW_UP_PROMPT_COUNT
+      count: wanted
     },
     { silent: true, timeout: FOLLOW_UP_REQUEST_TIMEOUT_MS }
   )
     .then((res) => {
       if (seq !== followUpRequestSeq) return;
-      const prompts = res?.data?.aiGenerated ? normalizeFollowUpPrompts(res.data.prompts) : [];
+      const prompts = res?.data?.aiGenerated ? normalizeFollowUpPrompts(res.data.prompts, wanted) : [];
       if (prompts.length === 0) {
         options.onUpdate?.(fallback());
         return;
@@ -734,22 +766,24 @@ export async function generateRemoteSessionTitle(conversationId: string) {
 }
 
 export async function syncSessionTitleIfDefault(
-  sessions: ChatSession[],
+  sessions: ChatSession[] | (() => ChatSession[]),
   conversationId: string,
   messages: ChatMessage[],
   promptHint?: string,
   options?: { tryLlmTitle?: boolean }
 ): Promise<void> {
   if (!conversationId) return;
-  const sess = sessions.find((s) => s.id === conversationId);
+  // 会话列表在刷新时会被整体替换，因此统一用 getter 读「当前数组」，避免把标题写到已被丢弃的旧数组上
+  const readSessions = typeof sessions === 'function' ? sessions : () => sessions;
   const prompt = promptHint || findFirstUserPrompt(messages);
 
   if (prompt) {
     const fallbackTitle = buildSessionTitleFromPrompt(prompt);
-    if (!isDefaultSessionTitle(fallbackTitle)) {
-      if (sess && isDefaultSessionTitle(sess.title)) {
-        sess.title = fallbackTitle;
-      }
+    const sess = readSessions().find((s) => s.id === conversationId);
+    // 仅当本地标题仍是默认标题时才回落到「提问前缀」并改名：
+    // 否则会把已经生成好的 AI 标题重新覆盖成长提问，历史列表就越看越长
+    if (!isDefaultSessionTitle(fallbackTitle) && (!sess || isDefaultSessionTitle(sess.title))) {
+      if (sess) sess.title = fallbackTitle;
       try {
         await renameRemoteSession(conversationId, fallbackTitle);
       } catch {
@@ -762,11 +796,9 @@ export async function syncSessionTitleIfDefault(
   void generateRemoteSessionTitle(conversationId)
     .then((res) => {
       const aiTitle = String(res?.data || '').trim();
-      if (aiTitle && !isDefaultSessionTitle(aiTitle)) {
-        if (sess) {
-          sess.title = aiTitle;
-        }
-      }
+      if (!aiTitle || isDefaultSessionTitle(aiTitle)) return;
+      const target = readSessions().find((s) => s.id === conversationId);
+      if (target) target.title = aiTitle;
     })
     .catch(() => {});
 }

@@ -85,7 +85,6 @@ import {
   HomeFilled,
   Compass,
   Reading,
-  MagicStick,
   FolderOpened,
   Document,
   TrendCharts,
@@ -144,6 +143,7 @@ import {
   setStoredKnowledgeBaseId,
   parseKnowledgeBaseIdFromPath
 } from '@/composables/knowledge/useKnowledgeRoute';
+import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -259,14 +259,13 @@ function buildModuleDefinitions(): NavModule[] {
     {
       key: 'ai-teaching',
       name: 'AI 教学',
-      icon: MagicStick,
+      icon: AiSparkleIcon,
       roles: ['ADMIN', 'TEACHER'],
       permissions: ['ai:question', 'ai:exam', 'ai:grading', 'ai:chat', 'ai:tool:use'],
       children: [
         { path: '/ai/question/generate', name: 'AI 出题', icon: EditPen, permissions: ['ai:question'] },
         { path: '/ai/exam/generate', name: 'AI 组卷', icon: Tickets, permissions: ['ai:exam'] },
         { path: '/ai/grading', name: 'AI 批改', icon: CircleCheck, permissions: ['ai:grading'] },
-        { path: '/ai/lesson', name: 'AI 教案', icon: Notebook },
         { path: '/ai/summary', name: 'AI 总结', icon: DocumentCopy },
         { path: '/ai/recommendation', name: 'AI 推荐', icon: Promotion },
         { path: '/ai/agent', name: 'Agent 中心', icon: Cpu, permissions: ['ai:tool:use'] }
@@ -319,7 +318,7 @@ function buildModuleDefinitions(): NavModule[] {
       children: [
         { path: '/learning', name: '学习总览', icon: DataBoard },
         { path: '/learning/tasks', name: '学习任务', icon: List },
-        { path: '/learning/practice', name: 'AI 练习', icon: MagicStick },
+        { path: '/learning/practice', name: 'AI 练习', icon: AiSparkleIcon },
         { path: '/learning/wrong-questions', name: '错题本', icon: Warning },
         { path: '/learning/report', name: '学习报告', icon: DataLine },
         { path: '/learning/path', name: '学习路径', icon: MapLocation }

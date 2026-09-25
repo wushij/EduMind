@@ -25,7 +25,7 @@ import {
 import { useStreamingMarkdown } from '@/composables/ai/useStreamingMarkdown';
 import { bindMarkdownCodeCopy } from '@/utils/ai/chat-markdown';
 import { formatCitationMatchLabel } from '@/utils/ai/citation-score';
-import { requestFollowUps } from '@/services/ai/stream-service';
+import { requestFollowUps, generateRemoteSessionTitle } from '@/services/ai/stream-service';
 import { pickTurnMessage } from '@/utils/ai/follow-up-message';
 import type {
   CitationItem,
@@ -86,9 +86,13 @@ function resolveSessionStorageKey(
   return `${SESSION_STORAGE_PREFIX}${courseId ?? 'global'}`;
 }
 
+/** 兜底标题：与课程 AI 口径一致，去掉装饰括号并压到 14 字（历史列表里 20/36 字太长） */
 function buildSessionTitleFromPrompt(text: string): string {
-  const cleaned = text.replace(/\s+/g, ' ').trim();
-  return cleaned.slice(0, 20) || '新问答会话';
+  const cleaned = text
+    .replace(/[「」『』“”"'《》【】]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned.slice(0, 14) || '新问答会话';
 }
 
 function formatSessionTime(raw: unknown): string {
@@ -524,11 +528,16 @@ export function useGlobalAssistant() {
     const currentId = conversationId.value;
     const firstUserMsg = messages.value.find((m) => m.role === 'user');
     const rawTitle = firstUserMsg?.content?.trim() || '全新教学研读会话';
-    const title = rawTitle.slice(0, 36).replace(/\n/g, ' ');
+    const promptTitle = buildSessionTitleFromPrompt(rawTitle);
+    const existing = sessions.value.find((s) => s.id === currentId);
+    // 关键：每轮保存都会重写会话对象，已被 AI 命名的标题不能被「提问前 14 字」重新覆盖，
+    // 否则历史列表永远停在长提问上（与课程 AI 之前的同类问题）
+    const keepAiTitle = Boolean(existing?.titleFromAi && existing.title);
 
     const sessionItem: GlobalAssistantSession = {
       id: currentId,
-      title: title || '智教云研读会话',
+      title: keepAiTitle ? existing!.title : promptTitle,
+      titleFromAi: keepAiTitle ? existing!.titleFromAi : undefined,
       updatedAt: Date.now(),
       messageCount: messages.value.length,
       messages: JSON.parse(JSON.stringify(messages.value))
@@ -546,6 +555,28 @@ export function useGlobalAssistant() {
     }
     writeSessionsToStorage(sessions.value);
     storeSessionId(activeCourseId.value, currentId);
+  }
+
+  /**
+   * 副驾驶会话标题：交给模型生成短标题（此前历史列表一直显示「提问前 36 字」）。
+   *
+   * <p>后端在答完后也会异步兜底生成；这里再主动请求一次是为了拿到标题后**立刻**刷新本地列表，
+   * 不必等用户刷新页面。失败静默保留兜底标题。</p>
+   */
+  function refreshSessionAiTitle() {
+    const convId = conversationId.value;
+    if (!convId) return;
+    void generateRemoteSessionTitle(convId)
+      .then((res) => {
+        const aiTitle = String(res?.data || '').trim();
+        if (!aiTitle) return;
+        const target = sessions.value.find((s) => s.id === convId);
+        if (!target) return;
+        target.title = aiTitle;
+        target.titleFromAi = true;
+        writeSessionsToStorage(sessions.value);
+      })
+      .catch(() => {});
   }
 
   function restoreFollowUpsForLastTurn() {
@@ -848,6 +879,8 @@ export function useGlobalAssistant() {
     // 关键修复：一旦回答结算入库，流式状态必须立即置为 false，消除正在进行的思考气泡
     isStreaming.value = false;
     saveCurrentSessionToHistory();
+    // 会话标题改由模型生成：先落库兜底标题，再异步换取短标题并刷新本地历史列表
+    refreshSessionAiTitle();
     window.dispatchEvent(new CustomEvent('edumind:ai-usage-changed'));
     nextTick(() => bindMarkdownCodeCopy(messagesScrollRef.value));
   }

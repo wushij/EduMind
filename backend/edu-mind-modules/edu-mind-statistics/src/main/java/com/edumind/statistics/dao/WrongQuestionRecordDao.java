@@ -150,4 +150,17 @@ public class WrongQuestionRecordDao {
                         .last(limit > 0 ? "LIMIT " + limit : "")
         );
     }
+
+    public java.util.List<WrongQuestionRecordEntity> listByCourse(Long courseId) {
+        return listByCourse(courseId, null);
+    }
+
+    public java.util.List<WrongQuestionRecordEntity> listByCourse(Long courseId, Long knowledgePointId) {
+        return wrongQuestionRecordMapper.selectList(
+                new LambdaQueryWrapper<WrongQuestionRecordEntity>()
+                        .eq(WrongQuestionRecordEntity::getCourseId, courseId)
+                        .eq(knowledgePointId != null, WrongQuestionRecordEntity::getKnowledgePointId, knowledgePointId)
+                        .orderByDesc(WrongQuestionRecordEntity::getWrongCount)
+        );
+    }
 }
