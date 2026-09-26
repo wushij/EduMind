@@ -44,13 +44,19 @@
           <el-form-item label="开课学期" prop="semester" required>
             <el-select
               v-model="form.semester"
-              placeholder="请选择开课学期"
+              placeholder="请选择或输入开课学期"
               size="large"
               class="w-100 capsule-select"
+              filterable
+              allow-create
+              default-first-option
             >
-              <el-option label="2026年秋季学期" value="2026年秋季学期" />
-              <el-option label="2027年春季学期" value="2027年春季学期" />
-              <el-option label="2026年暑期实训专周" value="2026年暑期实训专周" />
+              <el-option
+                v-for="option in semesterOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
             </el-select>
           </el-form-item>
         </div>
@@ -309,6 +315,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { isCourseCategoryPreset } from '@/constants/course';
+import { buildSemesterOptions } from '@/constants/semester';
 import {
   Document,
   Connection,
@@ -328,6 +335,9 @@ import type {
   CourseCreateFormState,
   PRESET_COVERS
 } from '@/composables/course/useCourseCreate';
+
+/** 开课学期选项：按系统当前时间动态推导（当前学期置顶），不再写死具体年份 */
+const semesterOptions = buildSemesterOptions();
 
 const props = defineProps<{
   form: CourseCreateFormState;
@@ -457,6 +467,12 @@ defineEmits<{
     &.is-focus {
       box-shadow: 0 0 0 2px #1677FF inset !important;
     }
+  }
+
+  // 课程全称输入框：撑满整行，避免胶囊边框过短、占位符被截断
+  .capsule-input-wrap {
+    width: 100%;
+    min-width: 0;
   }
 
   .form-row-two-cols {

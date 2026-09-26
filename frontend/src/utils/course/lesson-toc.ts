@@ -19,31 +19,79 @@ function normalizeForHeadingParse(body: string, lessonTitle?: string): string {
 }
 
 function stripHeadingTitle(raw: string): string {
-  return raw
+  // 保护 $...$ 内的 LaTeX 标记（例如公式下标 \lim_{x\to0}），避免被 Markdown 斜体正则误删 _
+  const mathBlocks: string[] = [];
+  let s = raw.replace(/\$\$?[^$]+?\$\$?/g, (m) => {
+    const key = `XMATHTITLEX${mathBlocks.length}X`;
+    mathBlocks.push(m);
+    return key;
+  });
+
+  s = s
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/[*_`~]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-}
 
-function parseMarkdownHeadings(body: string, lessonTitle?: string): { level: number; title: string }[] {
-  const items: { level: number; title: string }[] = [];
-  const text = normalizeForHeadingParse(body, lessonTitle);
-  let match: RegExpExecArray | null;
-  MD_HEADING_RE.lastIndex = 0;
-  while ((match = MD_HEADING_RE.exec(text))) {
-    const hashes = match[1].length;
-    const title = stripHeadingTitle(match[2]);
-    if (!title) continue;
-    const level = Math.min(4, Math.max(2, hashes));
-    items.push({ level, title });
-  }
-  return items;
+  mathBlocks.forEach((m, idx) => {
+    s = s.replace(`XMATHTITLEX${idx}X`, m);
+  });
+  return s;
 }
 
 /** 常见理科/通识教学概念小节前缀 */
 const TEACHING_CONCEPT_PREFIX_RE =
   /^(?:定理|公理|定义|准则|法则|公式|推论|引理|性质|判据|判别法|考点|方法|技巧)/;
+
+/** 习题/变式/练习/小结等题目或结构化要点小节关键词 */
+export const EXERCISE_SECTION_KEYWORD_RE =
+  /(?:变式|训练|例题|习题|练习|思考题|作业|自测|检测|题库|挑战|精选|随堂测|小结|总结|归纳|复习|步骤|方法|清单|要点|策略)/;
+
+/** 题目行或核心规则开头特征词 */
+export const EXERCISE_ITEM_KEYWORD_RE =
+  /^(?:(?:\d{1,2}[\.、．]\s*)?(?:求|若|设|当|如果|先|证明|判断|计算|已知|简述|分析|例\d+|变式\d*|题\d*|【题))/;
+
+function parseMarkdownHeadings(body: string, lessonTitle?: string): { level: number; title: string }[] {
+  const items: { level: number; title: string }[] = [];
+  const text = normalizeForHeadingParse(body, lessonTitle);
+  const lines = text.split('\n');
+  let inExerciseSection = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(/^(#{1,6})\s+(.+)$/);
+    if (match) {
+      const hashes = match[1].length;
+      const title = stripHeadingTitle(match[2]);
+      if (!title) continue;
+      const level = Math.min(4, Math.max(2, hashes));
+      inExerciseSection = EXERCISE_SECTION_KEYWORD_RE.test(title);
+      items.push({ level, title });
+      continue;
+    }
+
+    if (inExerciseSection) {
+      const listMatch = line.match(/^(\d{1,2}\.)\s+(.+)$/);
+      if (listMatch) {
+        let itemTitle = `${listMatch[1]} ${listMatch[2].trim()}`;
+        const hintIdx = itemTitle.search(/(?:[。；;]?\s*(?:提示|解析|答案|说明|分析|解[：:]|答[：:]))/);
+        if (hintIdx > 0) {
+          itemTitle = itemTitle.slice(0, hintIdx).trim();
+        } else {
+          const firstPunct = itemTitle.search(/[。；;]/);
+          if (firstPunct > 0 && firstPunct <= 45) {
+            itemTitle = itemTitle.slice(0, firstPunct).trim();
+          }
+        }
+        itemTitle = stripHeadingTitle(itemTitle);
+        if (itemTitle) {
+          items.push({ level: 3, title: itemTitle });
+        }
+      }
+    }
+  }
+  return items;
+}
 
 /** 常见正文陈述句引导词（在这些词之前截断为纯标题） */
 const TITLE_BODY_BOUNDARY_KEYWORDS = [
@@ -87,10 +135,74 @@ function isPseudoHeadingParagraph(p: HTMLParagraphElement): boolean {
   return false;
 }
 
+function findPrecedingHeadingText(el: HTMLElement): string {
+  let cur: Element | null = el;
+  while (cur && cur !== el.ownerDocument.body) {
+    let prev = cur.previousElementSibling;
+    while (prev) {
+      if (
+        /^H[1-6]$/.test(prev.tagName) ||
+        prev.classList.contains('block-heading') ||
+        prev.classList.contains('callout-title')
+      ) {
+        return prev.textContent || '';
+      }
+      const deepHeading = prev.querySelector('h1, h2, h3, h4, h5, h6, .block-heading, .callout-title');
+      if (deepHeading) {
+        return deepHeading.textContent || '';
+      }
+      prev = prev.previousElementSibling;
+    }
+    cur = cur.parentElement;
+  }
+  return '';
+}
+
+function isExerciseListItem(li: HTMLElement): boolean {
+  if (li.tagName !== 'LI') return false;
+  const parentOl = li.parentElement;
+  if (parentOl?.tagName !== 'OL') return false;
+
+  const text = (li.textContent || '').replace(/\s+/g, ' ').trim();
+  if (!text || text.length < 4) return false;
+
+  // 1. 如果所在大节是习题/训练/例题/练习/小结/总结/方法/步骤等关键章节
+  const headingText = findPrecedingHeadingText(li);
+  if (EXERCISE_SECTION_KEYWORD_RE.test(headingText)) {
+    return true;
+  }
+
+  // 2. 如果当前项符合特征词
+  if (
+    EXERCISE_ITEM_KEYWORD_RE.test(text) &&
+    (text.includes('提示') || text.includes('解析') || text.includes('答案') || text.includes('$') || text.length >= 10)
+  ) {
+    return true;
+  }
+
+  // 3. 如果同属一个 <ol> 列表中有其他兄弟项命中题型/规则特征词，整组有序列表一并作为结构化条目收录（防止 1. 被遗漏）
+  const siblings = Array.from(parentOl.children) as HTMLElement[];
+  const hasMatchingSibling = siblings.some((sib) => {
+    const sText = (sib.textContent || '').replace(/\s+/g, ' ').trim();
+    return (
+      EXERCISE_ITEM_KEYWORD_RE.test(sText) &&
+      (sText.includes('提示') || sText.includes('解析') || sText.includes('答案') || sText.includes('$') || sText.length >= 10)
+    );
+  });
+  if (hasMatchingSibling) {
+    return true;
+  }
+
+  return false;
+}
+
 function headingLevelFromElement(el: HTMLElement, titleText?: string): number {
   const tag = el.tagName;
   if (/^H[1-6]$/.test(tag)) {
     return Math.min(4, Math.max(2, parseInt(tag[1], 10)));
+  }
+  if (tag === 'LI') {
+    return 3;
   }
   const t = (titleText || el.textContent || '').trim();
   if (/^(\d+\.\d+|\d+\.|例\d+|变式|定理|公理|定义|准则|法则|公式|推论|引理|性质|判据)/.test(t)) return 3;
@@ -102,7 +214,8 @@ function headingLevelFromElement(el: HTMLElement, titleText?: string): number {
  * 1. 若为段落 <p> 且含有开头的 <strong>/<b>，优先提取加粗部分的标题，避免将后文大段正文全部吸入目录；
  * 2. 处理已渲染的 KaTeX 节点（.katex）：
  *    从 annotation[encoding="application/x-tex"] 提取最准确的原生 LaTeX 源码并包装为 $...$ 文本；
- * 3. 对定理带括号名称（如「定理 ($0/0$型)」）或后文说明性长句进行分界截断，保证目录干净整洁。
+ * 3. 对定理带括号名称（如「定理 ($0/0$型)」）或后文说明性长句进行分界截断，保证目录干净整洁；
+ * 4. 若为习题列表项 <li>，补齐有序序号并剥离后方提示/答案说明。
  */
 export function extractCleanTitleFromElement(el: HTMLElement): string {
   let targetNode: Node = el;
@@ -139,6 +252,28 @@ export function extractCleanTitleFromElement(el: HTMLElement): string {
   });
 
   let raw = (clone.textContent || '').replace(/\s+/g, ' ').trim();
+
+  // 若为习题/练习列表项 LI，补全序号前缀（如「1. 求...」），并截断提示/解析等后文
+  if (el.tagName === 'LI') {
+    if (el.parentElement?.tagName === 'OL') {
+      const siblings = Array.from(el.parentElement.children);
+      const idx = siblings.indexOf(el) + 1;
+      if (!/^\d+[\.、．]/.test(raw) && idx > 0) {
+        raw = `${idx}. ${raw}`;
+      }
+    }
+
+    // 截断提示/解析/答案说明（如「。提示：洛必达或使用...」-> 截断到「。提示」之前）
+    const hintIdx = raw.search(/(?:[。；;]?\s*(?:提示|解析|答案|说明|分析|解[：:]|答[：:]))/);
+    if (hintIdx > 0) {
+      raw = raw.slice(0, hintIdx).trim();
+    } else {
+      const firstPunct = raw.search(/[。；;]/);
+      if (firstPunct > 0 && firstPunct <= 45) {
+        raw = raw.slice(0, firstPunct).trim();
+      }
+    }
+  }
 
   // 仅对普通段落 P 伪标题进行正文截断，原生 H1~H6 保留完整标题（含冒号副标题）
   if (el.tagName === 'P') {
@@ -191,6 +326,11 @@ function collectHeadingsInMarkdownRoot(mdRoot: Element): HTMLElement[] {
   mdRoot.querySelectorAll('p').forEach(p => {
     if (isPseudoHeadingParagraph(p as HTMLParagraphElement)) {
       nodes.push(p as HTMLParagraphElement);
+    }
+  });
+  mdRoot.querySelectorAll('ol > li').forEach(li => {
+    if (isExerciseListItem(li as HTMLElement)) {
+      nodes.push(li as HTMLElement);
     }
   });
   nodes.sort((a, b) => {

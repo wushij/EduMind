@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderChatMarkdown, normalizeChatMarkdown, repairChatBoldMarkers } from './chat-markdown';
 import { renderMarkdownForChat } from '@/utils/markdown';
+import { normalizeChatTables } from './chat-table-normalize';
 
 /** 复现截图场景：同一代码块内连续 3 个类，且代码里有中文注释 */
 const MULTI_CLASS_SAMPLE = `核心机制是：**编译时看引用类型，运行时看实际对象类型**。
@@ -199,6 +200,162 @@ $$\\lim_{n\\to\\infty} \\frac{5n^3 - 2n^2 + 1}{2n^3 + 7n - 4}$$
     const htmlNormalSub = renderChatMarkdown(rawNormalSub);
     expect(htmlNormalSub).toContain('<h2>模块一 - 基础篇</h2>');
     expect(htmlNormalSub).not.toContain('<li>');
+  });
+
+  it('标题行与正文中的数学绝对值表达式不应被误判为表格导致公式断裂', () => {
+    // 用户实际反馈的场景：标题中含有极限定义与带绝对值的公式 $| a_n - A | < \varepsilon$
+    const raw = `## 必记结论-数列极限定义：对任意 $\\varepsilon > 0$，存在正整数 $N$，当 $n > N$ 时，$| a_n-A | <\\varepsilon$，记作 $\\lim_{n\\to\\infty}a_n=A$。
+
+• 收敛数列三性质：极限唯一；必有界；保号性。`;
+
+    // 1. 表格规范化步骤不应破坏该标题，绝不能拆出伪表格行或截断公式
+    const normalizedTables = normalizeChatTables(raw);
+    expect(normalizedTables).toContain('## 必记结论-数列极限定义：对任意 $\\varepsilon > 0$，存在正整数 $N$，当 $n > N$ 时，$| a_n-A | <\\varepsilon$，记作 $\\lim_{n\\to\\infty}a_n=A$。');
+    expect(normalizedTables).not.toContain('\n\n| a_n-A |');
+
+    // 2. 最终渲染的 HTML 中，标题必须为完整的一行 h2，且内部公式正常渲染为 KaTeX，绝不能有孤立的美元符 $ 或残缺表格
+    const html = renderChatMarkdown(raw);
+    expect(html).toContain('<h2>');
+    expect(html).toContain('必记结论-数列极限定义');
+    expect(html).toContain('class="katex"');
+    // 不应有孤立未闭合的美元符或伪表格
+    expect(html).not.toContain('>$<');
+    expect(html).not.toContain('<table>');
+    expect(html).not.toContain('| a_n-A | <\\varepsilon');
+
+    // 3. 标题中包含普通副标题分隔线（如「第一章 | 极限与连续」）不被误拆为表格
+    const rawSubtitle = `## 第一章 | 极限与连续`;
+    const subHtml = renderChatMarkdown(rawSubtitle);
+    expect(subHtml).toContain('<h2>第一章 | 极限与连续</h2>');
+    expect(subHtml).not.toContain('<table>');
+  });
+
+  it('结构化属性引导词赋予主题蓝类名，句中随文加粗保持普通强调避免满屏蓝色', () => {
+    const raw = `**为什么错：** 洛必达法则要求原极限**可能仍然存在**，只是此路不通。
+**正确做法：** 每步先代入判型，结果**不确定**时不要过早下结论。
+- **错误表现**：直接套用公式`;
+
+    const html = renderChatMarkdown(raw);
+
+    // 结构化引导词（带冒号或列表首标头）应带有 chat-md-label 类名，渲染为蓝色
+    expect(html).toContain('<strong class="chat-md-label">为什么错：</strong>');
+    expect(html).toContain('<strong class="chat-md-label">正确做法：</strong>');
+    expect(html).toContain('<strong class="chat-md-label">错误表现：</strong>');
+
+    // 句中的普通强调词应为普通 <strong>，不带 chat-md-label，保持自然深黑字重
+    expect(html).toContain('<strong>可能仍然存在</strong>');
+    expect(html).not.toContain('<strong class="chat-md-label">可能仍然存在</strong>');
+    expect(html).toContain('<strong>不确定</strong>');
+    expect(html).not.toContain('<strong class="chat-md-label">不确定</strong>');
+  });
+
+  it('复现用户反馈的标题粘连表格表头导致要点错位场景', () => {
+    const raw = `##六、方法总结与易错点回顾|要点 |说明 |
+|---|---|
+|①判断类型 |先看是不是 \\(\\dfrac00\\)型未定式 |
+|②不能直接替换 |加减结构中直接写 \\(\\tan x-\\sin x\\sim x-x=0\\)是典型错误 |`;
+
+    const html = renderChatMarkdown(raw);
+
+    // 1. 标题必须独立渲染为 h2，绝不能被吞入表格成为 th
+    expect(html).toContain('<h2>六、方法总结与易错点回顾</h2>');
+    expect(html).not.toContain('<th>## 六、方法总结与易错点回顾</th>');
+
+    // 2. 表格表头必须为标准的两列「要点」「说明」
+    expect(html).toContain('<th>要点</th>');
+    expect(html).toContain('<th>说明</th>');
+
+    // 3. 数据行中的内容正确对齐两列
+    expect(html).toContain('<td>①判断类型</td>');
+    expect(html).toContain('<td>②不能直接替换</td>');
+  });
+
+  it('复现公式清单表格错位场景', () => {
+    const raw = `##公式清单|公式 |适用条件 |常见变形 |
+|---|---|---|
+| $\\lim\\limits_{n\\to\\infty}a_n=A$ |数列 $n$无限增大时 $a_n$无限接近 $A$ |严格定义用 $\\varepsilon\\text{-}N$语言表述 |`;
+
+    const html = renderChatMarkdown(raw);
+
+    // 1. 标题独立成行
+    expect(html).toContain('<h2>公式清单</h2>');
+    expect(html).not.toContain('<th>## 公式清单</th>');
+
+    // 2. 表头必须为标准三列
+    expect(html).toContain('<th>公式</th>');
+    expect(html).toContain('<th>适用条件</th>');
+    expect(html).toContain('<th>常见变形</th>');
+
+    // 3. 第一列数据行直接为公式，不能有空 td 占位导致右移错位
+    expect(html).not.toContain('<tr>\n<td></td>');
+    expect(html).toMatch(/<td>\s*<span class="katex">[\s\S]*?<\/td>\s*<td>数列/);
+  });
+
+  it('同一行粘连的句末无空格减号列表项应被自动拆分成各独立 li', () => {
+    // 场景 1：带 ** 加粗且句末紧贴 -** 的列表
+    const raw1 = `如果按目标选：
+
+- **减负**优先看：AI备课、AI批改、AI组卷。-**精准教学**优先看：AI学情、AI个性化学习。-**课堂改革**优先看：AI互动、数字人授课、课堂分析。-**教研提升**优先看：AI听评课、课堂实录分析。-**语言学科**优先看：AI口语评测、对话陪练。`;
+
+    const html1 = renderChatMarkdown(raw1);
+    expect(html1.match(/<li>/g)?.length).toBe(5);
+    expect(html1).toContain('<li><strong class="chat-md-label">减负</strong>优先看：AI备课、AI批改、AI组卷。</li>');
+    expect(html1).toContain('<li><strong class="chat-md-label">语言学科</strong>优先看：AI口语评测、对话陪练。</li>');
+
+    // 场景 2：带空格连字符且无加粗
+    const raw2 = `如果按目标选：
+
+- 减负优先看：AI备课、AI批改、AI组卷。 -精准教学优先看：AI学情、AI个性化学习。 -课堂改革优先看：AI互动、数字人授课、课堂分析。 -教研提升优先看：AI听评课、课堂实录分析。 -语言学科优先看：AI口语评测、对话陪练。`;
+
+    const html2 = renderChatMarkdown(raw2);
+    expect(html2.match(/<li>/g)?.length).toBe(5);
+    expect(html2).toContain('<li>减负优先看：AI备课、AI批改、AI组卷。</li>');
+
+    // 场景 3：首项未显式书写 - 但首句后紧随连续 。- 并列列表项
+    const raw3 = `如果按目标选：
+
+减负优先看：AI备课、AI批改、AI组卷。-精准教学优先看：AI学情、AI个性化学习。-课堂改革优先看：AI互动、数字人授课、课堂分析。-教研提升优先看：AI听评课、课堂实录分析。-语言学科优先看：AI口语评测、对话陪练。`;
+
+    const html3 = renderChatMarkdown(raw3);
+    expect(html3.match(/<li>/g)?.length).toBe(5);
+  });
+
+  it('修复 LaTeX 命令与后续变量粘连导致的 KaTeX 红色报错（如 \\leS_n、\\geX、\\inR）', () => {
+    const raw = `即
+
+$$\\frac{n}{\\sqrt{n^2+n}} \\leS_n \\le \\frac{n}{\\sqrt{n^2+1}}$$
+
+且满足 $x \\inR$ 以及 $f(x) \\geM$。`;
+
+    const html = renderChatMarkdown(raw);
+    expect(html).toContain('katex');
+    expect(html).not.toContain('katex-error');
+    expect(html).not.toContain('\\leS');
+  });
+
+  it('数学公式内部减号 (1+x)-x 绝不应被误拆为列表项，且公式正常渲染为 KaTeX', () => {
+    const raw = `## 七、变式训练1.求 $\\displaystyle \\lim_{x\\to0}\\frac{\\ln(1+x)-x}{x^2}。提示：洛必达或使用\\ln(1+x)-x\\sim -\\frac{x^2}{2}，结果为-\\frac12$。
+
+2. 求 \\lim_{x\\to0}\\frac{\\tan x - x}{x^3}。提示：洛必达后利用 \\tan^2 x \\sim x^2，结果为 \\frac{1}{3}。`;
+
+    const html = renderChatMarkdown(raw);
+    expect(html).toContain('<h2>七、变式训练</h2>');
+    expect(html).toContain('katex');
+    expect(html).not.toContain('katex-error');
+    // 场景 2：标题行末尾带 1. 且换行写题目
+    const rawTwoLine = `## 七、变式训练1.
+求 $\\displaystyle \\lim_{x\\to0}\\frac{\\ln(1+x)-x}{x^2}。提示：洛必达或使用\\ln(1+x)-x\\sim -\\frac{x^2}{2}，结果为-\\frac12$。
+
+2. 求 \\lim_{x\\to0}\\frac{\\tan x - x}{x^3}。提示：洛必达后利用 \\tan^2 x \\sim x^2，结果为 \\frac{1}{3}。`;
+
+    const htmlTwoLine = renderChatMarkdown(rawTwoLine);
+    expect(htmlTwoLine).toContain('<h2>七、变式训练</h2>');
+    expect(htmlTwoLine).toContain('katex');
+    expect(htmlTwoLine).not.toContain('katex-error');
+    expect(htmlTwoLine).not.toContain('<li>x}{x^2}');
+    // 确认 1. 紧密附着在题目开头，绝不会产生空的 <li></li> 孤立行
+    expect(htmlTwoLine).not.toMatch(/<li>\s*<\/li>/);
+    expect(htmlTwoLine).not.toContain('<ol>\n<li>\n</li>');
   });
 });
 

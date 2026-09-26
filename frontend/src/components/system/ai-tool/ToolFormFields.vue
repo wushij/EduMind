@@ -167,12 +167,12 @@
           </p>
         </el-form-item>
 
-        <el-form-item label="绑定的默认 AI 模型">
+        <el-form-item label="默认 AI 模型（运营备注）">
           <el-select
             v-model="form.modelId"
             clearable
             filterable
-            placeholder="可选，绑定默认 Chat 模型"
+            placeholder="可选，留空表示跟随平台默认模型"
             class="custom-select"
             style="width: 100%"
           >
@@ -183,7 +183,9 @@
               :value="model.modelKey || model.name"
             />
           </el-select>
-          <p class="field-hint">调用该工具时优先接入的推理模型</p>
+          <p class="field-hint">
+            仅作运营登记，不参与实际调度；调用时统一由 AI 网关按「场景路由 → 平台默认模型」解析
+          </p>
         </el-form-item>
       </div>
     </div>

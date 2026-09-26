@@ -162,18 +162,20 @@ class FollowUpSuggestServiceImplTest {
     }
 
     @Test
-    void parsePrompts_shouldKeepSectionNumbersIntact() {
-        // 回归：小节号「1.1」曾被当成列表编号剥掉，追问变成「1算法复杂度与渐近表示法…」
+    void parsePrompts_shouldStripSectionNumbers() {
+        // 用户体验优化：推荐问题中不再出现 1.1、1.1的 等硬编码小节编号，净化为纯知识点提问
         String raw = """
                 1.1 算法复杂度与渐近表示法为什么是衡量尺度？
-                2. 渐进表示法里最坏情况怎么算？
+                1.1求函数极限时为什么要先分左右极限？
+                1.1的数列极限题什么时候不能用单调有界定理？
                 """;
 
-        List<String> prompts = FollowUpSuggestServiceImpl.parsePrompts(raw, 2, "算法复杂度");
+        List<String> prompts = FollowUpSuggestServiceImpl.parsePrompts(raw, 3, "算法复杂度");
 
-        assertEquals(2, prompts.size());
-        assertEquals("1.1 算法复杂度与渐近表示法为什么是衡量尺度？", prompts.get(0));
-        assertEquals("渐进表示法里最坏情况怎么算？", prompts.get(1));
+        assertEquals(3, prompts.size());
+        assertEquals("算法复杂度与渐近表示法为什么是衡量尺度？", prompts.get(0));
+        assertEquals("求函数极限时为什么要先分左右极限？", prompts.get(1));
+        assertEquals("数列极限题什么时候不能用单调有界定理？", prompts.get(2));
     }
 
     @Test

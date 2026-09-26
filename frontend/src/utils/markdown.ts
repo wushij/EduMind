@@ -11,7 +11,7 @@ import {
   expandAsciiTreeToMultiline,
   looksLikeAsciiKnowledgeTree
 } from './ai/ascii-tree-graph';
-import { repairLatexDoubleEscapes } from './format/render-math';
+import { repairLatexDoubleEscapes, repairCommonLatexSpacing } from './format/render-math';
 
 const FENCED_CODE_BLOCK_RE = /(```[\s\S]*?```)/g;
 
@@ -177,33 +177,6 @@ function repairMalformedLeftRight(latex: string): string {
   s = s.replace(/\\left\(((?:[^\\]|\\.)*?)\\right(?![\]\).|])/g, '\\left($1\\right)');
 
   return repairCommonLatexSpacing(s);
-}
-
-/** 修复模型输出里 LaTeX 命令与后续字母粘连（如 \\quadB → \\quad B） */
-function repairCommonLatexSpacing(latex: string): string {
-  let s = latex;
-  const cmds = [
-    'quad',
-    'qquad',
-    'Rightarrow',
-    'Leftrightarrow',
-    'rightarrow',
-    'leftarrow',
-    'subseteq',
-    'supseteq',
-    'subset',
-    'supset',
-    'leq',
-    'geq',
-    'neq',
-    'mid',
-    'cdot',
-    'times'
-  ];
-  for (const cmd of cmds) {
-    s = s.replace(new RegExp(`\\\\${cmd}([A-Za-z])`, 'g'), `\\${cmd} $1`);
-  }
-  return s;
 }
 
 /** 将常见 Unicode 数学符号转为 LaTeX（仅在即将进入公式的片段内使用） */

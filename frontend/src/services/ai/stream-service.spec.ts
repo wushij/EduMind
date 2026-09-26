@@ -135,17 +135,19 @@ describe('normalizeFollowUpPrompts', () => {
     ]);
   });
 
-  it('keeps section numbers such as 1.1 intact while still stripping list numbering', () => {
+  it('strips section numbers such as 1.1 and list numbering from follow up prompts', () => {
     const prompts = normalizeFollowUpPrompts([
       '1.1 算法复杂度与渐近表示法为什么是衡量尺度？',
+      '1.1求函数极限时为什么要先分左右极限？',
       '2. 渐进表示法里最坏情况怎么算？',
       '什么是 1.1 算法复杂度与渐近表示法的衡量口径？'
-    ]);
+    ], 4);
 
     expect(prompts).toEqual([
-      '1.1 算法复杂度与渐近表示法为什么是衡量尺度？',
+      '算法复杂度与渐近表示法为什么是衡量尺度？',
+      '求函数极限时为什么要先分左右极限？',
       '渐进表示法里最坏情况怎么算？',
-      '什么是 1.1 算法复杂度与渐近表示法的衡量口径？'
+      '什么是算法复杂度与渐近表示法的衡量口径？'
     ]);
   });
 

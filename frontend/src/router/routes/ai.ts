@@ -86,7 +86,7 @@ export const aiRoutes: RouteRecordRaw[] = [
     path: '/ai/summary',
     name: 'AISummary',
     component: () => import('@/views/ai/summary/Summary.vue'),
-    meta: { title: 'AI 课堂总结', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
+    meta: { title: 'AI 智能总结', requiresAuth: true, roles: ['ADMIN', 'TEACHER'] }
   },
   {
     path: '/ai/recommendation',

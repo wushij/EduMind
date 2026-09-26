@@ -156,4 +156,25 @@ JVM 运行时数据区域（Runtime Data Area）物理划分：
     expect(html).not.toMatch(/<h2[^>]*>[\s\S]*本课节位于[\s\S]*<\/h2>/);
     expect(html).toMatch(/<p>[\s\S]*本课节位于第一章/);
   });
+
+  it('preserves list dash when glued heading is followed by bullet item', () => {
+    const raw = `###字节码的三个关键属性- **平台无关**：指令语义由 JVM规范统一定义，不绑定任何物理 CPU。
+- **面向栈**：绝大多数指令操作的是**操作数栈**，而非寄存器，简化了指令编码。
+- **紧凑**：单条指令多为1字节操作码加若干操作数，.class文件体积小，利于网络传输。`;
+    const html = renderLessonMarkdown(raw);
+    expect(html).toMatch(/<h3[^>]*>[\s\S]*字节码的三个关键属性[\s\S]*<\/h3>/);
+    // 列表项必须渲染为 <ul><li>，包含「平台无关」
+    expect(html).toContain('<ul>');
+    expect(html).toMatch(/<li>[\s\S]*平台无关[\s\S]*<\/li>/);
+    expect(html).toMatch(/<li>[\s\S]*面向栈[\s\S]*<\/li>/);
+    expect(html).toMatch(/<li>[\s\S]*紧凑[\s\S]*<\/li>/);
+  });
+
+  it('splits section heading glued with prose statement starting with acronym subject', () => {
+    const raw = `##二、JVM指令与栈帧执行模型JVM是“字节码的 CPU”，它的运算模型是**基于栈**的。每调用一个方法，JVM就为该方法分配一个**栈帧（Frame）**，栈帧中包含：`;
+    const html = renderLessonMarkdown(raw);
+    expect(html).toMatch(/<h2[^>]*>[\s\S]*二、JVM指令与栈帧执行模型[\s\S]*<\/h2>/);
+    expect(html).not.toMatch(/<h2[^>]*>[\s\S]*字节码的 CPU[\s\S]*<\/h2>/);
+    expect(html).toMatch(/<p>[\s\S]*JVM是“字节码的 CPU”/);
+  });
 });

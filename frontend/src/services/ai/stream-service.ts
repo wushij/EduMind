@@ -503,15 +503,26 @@ export function generateSmartFollowUps(
 /**
  * 追问缓存版本号：净化规则 / 提示词变更后**必须递增**。
  *
- * <p>否则旧结果会被缓存原样回放，表现就是「代码已经改了、界面还是老样子」——
- * v1 的缓存里存着被错误剥掉小节号的结果（1.1 → 1），所以升到 v2 并顺手清掉 v1。</p>
+ * <p>升级到 v3：净化剥离小节编号（1.1、1.2、第1节等），使推荐问题只呈现纯知识点口语化提问，
+ * 并自动清理旧版带小节号的本地缓存。</p>
  */
-const FOLLOW_UP_CACHE_VERSION = 'v2';
+const FOLLOW_UP_CACHE_VERSION = 'v3';
 const FOLLOW_UP_CACHE_STORAGE_KEY = `edumind:ai:follow-up-cache-${FOLLOW_UP_CACHE_VERSION}`;
-const LEGACY_FOLLOW_UP_CACHE_KEYS = ['edumind:ai:follow-up-cache'];
+const LEGACY_FOLLOW_UP_CACHE_KEYS = [
+  'edumind:ai:follow-up-cache',
+  'edumind:ai:follow-up-cache-v2'
+];
 let legacyFollowUpCachePurged = false;
 const FOLLOW_UP_CACHE_LIMIT = 80;
 const FOLLOW_UP_REQUEST_TIMEOUT_MS = 12000;
+
+/** 剥离行首小节号/章节代码（如「1.1 」「1.1求...」「1.1的...」「第1.1节 」「1.1.1 」「第1章 」） */
+const LEADING_SECTION_NO_PATTERN =
+  /^\s*(?:第\s*[\d一二三四五六七八九十]+(?:\.[\d]+)*\s*[章节讲课节]|[\d]{1,2}(?:\.[\d]{1,2})+)\s*(?:节|课|讲)?(?:的|：|:|——|\s+)?/;
+
+/** 剥离行内夹带的小节号（如「能拿一道1.1的题测我」「什么是 1.1 算法复杂度」「学1.2洛必达法则」） */
+const INLINE_SECTION_NO_PATTERN =
+  /(?<=[^a-zA-Z0-9_.]|^)(?:第\s*[\d]+(?:\.[\d]+)*\s*[章节讲课节]|[\d]{1,2}\.[\d]{1,2}(?:\.[\d]{1,2})?)\s*(?:节|课|讲)?(?:的)?\s*(?=[\u4e00-\u9fa5]|$)/g;
 /** 回答短于该长度（报错占位、寒暄）不足以支撑内容化追问，直接不展示胶囊 */
 const FOLLOW_UP_MIN_ANSWER_CHARS = 80;
 const FOLLOW_UP_PROMPT_COUNT = 3;
@@ -618,8 +629,10 @@ export function normalizeFollowUpPrompts(raw: unknown, max = FOLLOW_UP_PROMPT_CO
   const seen = new Set<string>();
   for (const item of flattened) {
     const text = item
-      // (?!\d) 不可省：内容里的小节号「1.1 算法复杂度…」不能被当成列表编号剥掉，否则会变成「1算法复杂度…」
       .replace(/^\s*(?:[-*•·]+|\d{1,2}\s*[.、)）:：](?!\d)|[（(]\d{1,2}[)）])\s*/, '')
+      .replace(LEADING_SECTION_NO_PATTERN, '')
+      .replace(INLINE_SECTION_NO_PATTERN, '')
+      .replace(/([\u4e00-\u9fa5])\s+([\u4e00-\u9fa5])/g, '$1$2')
       .replace(/[*`_#>]/g, '')
       .replace(/^["'“”‘’「」《》【】]+|["'“”‘’「」《》【】]+$/g, '')
       .trim();

@@ -177,7 +177,7 @@
                   class="capsule-sec-btn capsule-sec-btn--edit"
                   @click.stop="goEditLesson(sec)"
                 >
-                  <span>编辑内容</span>
+                  <span>AI智能备课</span>
                 </button>
                 <button
                   type="button"
@@ -490,7 +490,7 @@ async function handleAiApplySections(sections: any[]) {
         ? `${chapterNo}.${baseLessonNo} ~ ${chapterNo}.${endLessonNo}`
         : `${chapterNo}.${baseLessonNo}`;
     ElMessage.success(
-      `AI 已续编并导入 ${sections.length} 个课节（${rangeText}），请点击「编辑内容」或「AI 生成正文」填写微课正文`
+      `AI 已续编并导入 ${sections.length} 个课节（${rangeText}），请点击「AI智能备课」或「AI 生成正文」填写微课正文`
     );
     if (!openChapters.value.includes(chapterId)) {
       openChapters.value.push(chapterId);
@@ -1013,6 +1013,34 @@ onMounted(async () => {
               cursor: pointer;
               transition: all 0.2s ease;
               border: none;
+              // 关键：显式声明基础态与 hover 态背景，避免退化为浏览器 UA 默认按钮样式
+              // （UA 默认按钮 :hover 不改变 background，表现为「鼠标悬浮没效果」）
+              background: #F1F5F9;
+              color: #334155;
+              -webkit-user-select: none;
+              user-select: none;
+
+              &:active {
+                transform: translateY(1px);
+              }
+
+              &:focus-visible {
+                outline: 2px solid #1677FF;
+                outline-offset: 2px;
+              }
+
+              // AI 智能备课：次级中性胶囊（保持原有灰底观感，补齐 hover 反馈）
+              &--edit {
+                background: #F1F5F9;
+                color: #334155;
+
+                &:hover {
+                  background: #E2E8F0;
+                  color: #0F172A;
+                  transform: translateY(-1px);
+                  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+                }
+              }
 
               &--ai {
                 background: #EEF2FF;
@@ -1020,6 +1048,9 @@ onMounted(async () => {
 
                 &:hover {
                   background: #E0E7FF;
+                  color: #4338CA;
+                  transform: translateY(-1px);
+                  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.18);
                 }
               }
 

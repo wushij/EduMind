@@ -296,18 +296,70 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     private List<Map<String, String>> buildMessagePayload(String systemPrompt, List<LlmChatMessage> messages) {
         List<Map<String, String>> payload = new ArrayList<>();
         payload.add(Map.of("role", "system", "content", systemPrompt != null ? systemPrompt : ""));
+
+        boolean needProxyDefense = isThirdPartyProxy() && StringUtils.hasText(systemPrompt);
+
         if (messages == null || messages.isEmpty()) {
-            payload.add(Map.of("role", "user", "content", ""));
+            String content = needProxyDefense
+                    ? "【系统规则与指引】\n" + systemPrompt.trim() + "\n\n【用户提问】\n"
+                    : "";
+            payload.add(Map.of("role", "user", "content", content));
             return payload;
         }
+
+        boolean firstUserHandled = false;
         for (LlmChatMessage message : messages) {
             if (message == null || !StringUtils.hasText(message.getContent())) {
                 continue;
             }
             String role = "assistant".equalsIgnoreCase(message.getRole()) ? "assistant" : "user";
-            payload.add(Map.of("role", role, "content", message.getContent()));
+            String content = message.getContent();
+
+            // 防吞防御：针对第三方中转代理，在首条 user 提问前置注入系统规则约束
+            // 确保即便中转代理直接过滤/丢弃了 role: system，模型依然能在首条消息中读到系统提示词与业务规则
+            if (needProxyDefense && !firstUserHandled && "user".equals(role)) {
+                if (!content.contains(systemPrompt.trim())) {
+                    content = "【系统规则与指引】\n" + systemPrompt.trim() + "\n\n【用户提问】\n" + content.trim();
+                }
+                firstUserHandled = true;
+            }
+
+            payload.add(Map.of("role", role, "content", content));
         }
+
+        if (needProxyDefense && !firstUserHandled) {
+            payload.add(Map.of("role", "user", "content", "【系统规则与指引】\n" + systemPrompt.trim()));
+        }
+
         return payload;
+    }
+
+    /**
+     * 判断当前模型端点是否为第三方代理/聚合中转站。
+     *
+     * <p>特征：
+     * 1. 非官方云厂商公共 API 域名（如 api.deepseek.com、api.openai.com 等）；
+     * 2. 或 URL 包含 IP 地址、私有端口（如 :7863 等）；
+     * 3. 或型号中带有非官方自定义别名（如 v4.1 等自定义别名）。
+     * </p>
+     */
+    private boolean isThirdPartyProxy() {
+        String baseUrl = properties.getBaseUrl() != null ? properties.getBaseUrl().toLowerCase() : "";
+        if (!StringUtils.hasText(baseUrl)) {
+            return false;
+        }
+        boolean isOfficialDomain = baseUrl.contains("api.deepseek.com")
+                || baseUrl.contains("api.openai.com")
+                || baseUrl.contains("dashscope.aliyuncs.com")
+                || baseUrl.contains("open.bigmodel.cn")
+                || baseUrl.contains("api.anthropic.com")
+                || baseUrl.contains("api.moonshot.cn")
+                || baseUrl.contains("api.minimax.chat");
+        if (!isOfficialDomain) {
+            return true;
+        }
+        String model = properties.getModel() != null ? properties.getModel().toLowerCase() : "";
+        return model.contains("v4.1") || model.contains("proxy") || model.contains("oneapi") || model.contains("newapi");
     }
 
     /**

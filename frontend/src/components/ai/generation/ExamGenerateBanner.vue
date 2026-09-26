@@ -16,7 +16,7 @@
         </el-button>
         <el-button
           round
-          class="hero-pill-btn is-primary"
+          class="hero-pill-btn is-outline"
           @click="$emit('back')"
         >
           <el-icon><Back /></el-icon>

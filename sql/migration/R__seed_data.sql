@@ -139,7 +139,9 @@ INSERT IGNORE INTO course_chapter (id, course_id, parent_id, title, sort_order) 
 (11, 103, 0,  '第一章 函数与极限论',        1),
 (12, 103, 11, '1.1 数列与函数极限计算',      1),
 (13, 103, 0,  '第二章 导数与微分',          2),
-(14, 103, 13, '2.1 复合函数与隐函数求导',    1);
+(14, 103, 13, '2.1 复合函数与隐函数求导',    1),
+(109, 103, 11, '1.3 函数的连续性与零点定理',        3),
+(110, 103, 13, '2.2 导数的几何意义与函数性质研究',  2);
 
 INSERT IGNORE INTO course_knowledge_point (id, course_id, chapter_id, title, sort_order) VALUES
 (10, 101, 2,  '时间与空间复杂度分析',            1),
@@ -151,7 +153,23 @@ INSERT IGNORE INTO course_knowledge_point (id, course_id, chapter_id, title, sor
 (16, 102, 10, 'ArrayList 与 LinkedList 源码剖析', 3),
 (17, 103, 12, '等价无穷小代换及其应用条件',      1),
 (18, 103, 12, '洛必达法则求未定式极限',          2),
-(19, 103, 14, '复合函数链式求导法则',            3);
+(19, 103, 14, '复合函数链式求导法则',            3),
+(20, 103, 109, '函数的连续性与零点定理',          1),
+(21, 103, 12,  '两个重要极限及其应用',            3),
+(22, 103, 110, '导数的几何意义与切线方程',        1),
+(23, 103, 110, '导数应用：单调性、极值与最值',    2),
+(24, 103, 14,  '隐函数与参数方程求导',            4);
+
+INSERT IGNORE INTO course_chapter_knowledge_point (tenant_id, course_id, chapter_id, knowledge_point_id, sort_order)
+VALUES (1, 102, 8, 14, 1),
+       (1, 103, 12, 17, 1),
+       (1, 103, 12, 18, 2),
+       (1, 103, 14, 19, 3),
+       (1, 103, 109, 20, 1),
+       (1, 103, 12, 21, 3),
+       (1, 103, 110, 22, 1),
+       (1, 103, 110, 23, 2),
+       (1, 103, 14, 24, 4);
 
 INSERT IGNORE INTO course_member (course_id, user_id, member_role) VALUES
 (101, 2, 'TEACHER'), (101, 3, 'STUDENT'), (101, 4, 'STUDENT'),
@@ -280,12 +298,13 @@ INSERT IGNORE INTO course_resource (id, course_id, resource_id, document_id, tit
 -- 10. AI 工具广场元数据（核心可用工具）
 -- -----------------------------------------------------------------------------
 INSERT INTO ai_tool (id, name, description, detailed_intro, category, icon, model_id, route, execution_mode, tags, is_recommended, is_hot, use_count, status) VALUES
-('tool_question_gen', 'AI 智能出题', '根据课程、章节和知识点智能生成高质量题目', '支持按章节与知识点勾选范围，配置题型、难度与题量后批量生成结构化试题，并可一键入库。', 'TEACHER', 'EditPen', 'deepseek-chat', '/ai/question/generate', 'ROUTE', '出题,教师,热门', 1, 1, 2436, 1),
-('tool_exam_gen', 'AI 智能组卷', '按总分、题型比例与难度规则快速生成标准化试卷', '内置总分校验与题型配比引擎，支持预览换题、调分并保存为可复用试卷。', 'TEACHER', 'Document', 'deepseek-chat', '/ai/exam/generate', 'ROUTE', '组卷,教师', 1, 1, 1820, 1),
-('tool_grading', 'AI 智能批改', '客观题秒级判分，主观题 AI 评分与评语生成', '支持作业提交后自动批改与教师复核改分，减轻期末阅卷压力。', 'TEACHER', 'Checked', 'deepseek-chat', '/ai/grading', 'ROUTE', '批改,教师', 1, 0, 956, 1),
-('tool_summary', 'AI 课程总结', '按章节或知识模块提炼核心要点与易错清单', '支持长文档与课件要点结构化摘要，生成考前复习精要。', 'TEACHER', 'DataAnalysis', 'deepseek-chat', '/ai/summary', 'ROUTE', '总结,知识提炼', 0, 0, 310, 1),
-('tool_chat', 'AI 课程问答', '基于课程资料的上下文助教答疑（SSE 流式）', '在课程空间内多轮对话，支持 Markdown、公式与代码高亮渲染。', 'GENERAL', 'ChatDotRound', 'deepseek-chat', '/course/101/ai', 'ROUTE', '问答,助教,热门', 1, 1, 5200, 1),
-('tool_practice', 'AI 自适应刷题', '根据薄弱知识点智能生成阶梯练习', '分析近期学习数据，推送专项巩固题包与难度递进练习。', 'STUDENT', 'Reading', 'deepseek-chat', '/learning/recommendations', 'ROUTE', '练习,学生,推荐', 1, 0, 1680, 1)
+('tool_question_gen', 'AI 智能出题', '根据课程、章节和知识点智能生成高质量题目', '支持按章节与知识点勾选范围，配置题型、难度与题量后批量生成结构化试题，并可一键入库。', 'TEACHER', 'EditPen', '', '/ai/question/generate', 'ROUTE', '出题,教师,热门', 1, 1, 0, 1),
+('tool_exam_gen', 'AI 智能组卷', '按总分、题型比例与难度规则快速生成标准化试卷', '内置总分校验与题型配比引擎，支持预览换题、调分并保存为可复用试卷。', 'TEACHER', 'Document', '', '/ai/exam/generate', 'ROUTE', '组卷,教师', 1, 1, 0, 1),
+('tool_grading', 'AI 智能批改', '客观题秒级判分，主观题 AI 评分与评语生成', '支持作业提交后自动批改与教师复核改分，减轻期末阅卷压力。', 'TEACHER', 'Checked', '', '/ai/grading', 'ROUTE', '批改,教师', 1, 0, 0, 1),
+('tool_summary', 'AI 课程总结', '按章节或知识模块提炼核心要点与易错清单', '支持长文档与课件要点结构化摘要，生成考前复习精要。', 'TEACHER', 'DataAnalysis', '', '/ai/summary', 'ROUTE', '总结,知识提炼', 0, 0, 0, 1),
+('tool_chat', 'AI 课程问答', '基于课程资料的上下文助教答疑（SSE 流式）', '在课程空间内多轮对话，支持 Markdown、公式与代码高亮渲染。', 'GENERAL', 'ChatDotRound', '', '/course/101/ai', 'ROUTE', '问答,助教,热门', 1, 1, 0, 1),
+('tool_practice', 'AI 自适应刷题', '根据薄弱知识点智能生成阶梯练习', '分析近期学习数据，推送专项巩固题包与难度递进练习。', 'STUDENT', 'Reading', '', '/learning/recommendations', 'ROUTE', '练习,学生,推荐', 1, 0, 0, 1),
+('tool_lesson_prep', 'AI 智能备课', '结合课程大纲、课节目标与知识库资料，一键生成结构化课节教案', '从创建课程空间开始备课：完成课程初始化与教学大纲后，进入课节教案工作台，依据教学设计目标与 RAG 检索资料生成教学目标、重难点、师生活动与板书建议，正文确认后即可插入课节，落库留存并可继续编辑。', 'TEACHER', 'Notebook', '', '/course/create', 'ROUTE', '备课,教师', 1, 0, 0, 1)
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   description = VALUES(description),
@@ -319,6 +338,17 @@ WHERE NOT EXISTS (SELECT 1 FROM wrong_question_record WHERE student_id = 3 AND q
 INSERT INTO wrong_question_record (student_id, course_id, question_id, knowledge_point_id, error_types, diagnosis, wrong_count, last_student_answer, status)
 SELECT 4, 102, 1007, 16, 'READING', 'READING: 审题不清，误选 LinkedList 内存占用描述', 1, 'D', 0
 WHERE NOT EXISTS (SELECT 1 FROM wrong_question_record WHERE student_id = 4 AND question_id = 1007);
+
+INSERT IGNORE INTO course_chapter_knowledge_point (tenant_id, course_id, chapter_id, knowledge_point_id, sort_order)
+VALUES (1, 102, 8, 14, 1),
+       (1, 103, 12, 17, 1),
+       (1, 103, 12, 18, 2),
+       (1, 103, 14, 19, 3),
+       (1, 103, 109, 20, 1),
+       (1, 103, 12, 21, 3),
+       (1, 103, 110, 22, 1),
+       (1, 103, 110, 23, 2),
+       (1, 103, 14, 24, 4);
 
 INSERT IGNORE INTO course_member (course_id, user_id, member_role) VALUES (102, 1, 'STUDENT');
 

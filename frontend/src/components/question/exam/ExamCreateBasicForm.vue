@@ -32,10 +32,21 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="考试学期" prop="semester">
-              <el-select v-model="examForm.semester" size="large" class="w-full">
-                <el-option label="2025-2026 第二学期" value="2025-2026-2" />
-                <el-option label="2025-2026 第一学期" value="2025-2026-1" />
-                <el-option label="2024-2025 第二学期" value="2024-2025-2" />
+              <el-select
+                v-model="examForm.semester"
+                placeholder="请选择或输入考试学期"
+                size="large"
+                class="w-full"
+                filterable
+                allow-create
+                default-first-option
+              >
+                <el-option
+                  v-for="option in academicTermOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
               </el-select>
             </el-form-item>
           </el-col>
@@ -116,6 +127,10 @@
 import type { FormInstance, FormRules } from 'element-plus';
 import { ArrowRight, EditPen } from '@element-plus/icons-vue';
 import type { Course } from '@/types/course/course';
+import { buildAcademicTermOptions } from '@/constants/semester';
+
+/** 考试学期选项：按当前学年动态推导（学年制，最近的学期在前），不再写死具体学年 */
+const academicTermOptions = buildAcademicTermOptions();
 
 const props = defineProps<{
   setStep1FormRef: (el: FormInstance | undefined) => void;

@@ -81,6 +81,20 @@ function findHeadingBoundary(
       if (dashIdx >= 2 && dashIdx <= 15) {
         return { index: leaderMatch[0].length + dashIdx, consume: 0, colon: false };
       }
+      // 4. 序号小标题后紧随英文实体/缩写 + 谓词引导的正文（如「二、JVM指令与栈帧执行模型JVM是“字节码的 CPU”」）
+      const entityProseMatch = afterLeader.match(
+        /^([\u4e00-\u9fa5A-Za-z0-9_（）()]{2,24}?)(?=[A-Za-z]{2,}(?:是|为|指|由|在|采用|负责|主要|可以|将|通过|用于))/
+      );
+      if (entityProseMatch && entityProseMatch[1].length >= 2 && entityProseMatch[1].length <= 24) {
+        return { index: leaderMatch[0].length + entityProseMatch[1].length, consume: 0, colon: false };
+      }
+      // 5. 序号小标题后紧随代词/指示词/常见谓词引导的正文（如「二、栈帧模型它是指令运算…」或「二、栈帧模型是指…」）
+      const proseBoundaryMatch = afterLeader.match(
+        /^([\u4e00-\u9fa5A-Za-z0-9_（）()]{2,24}?)(?=(?:它[们的是]|这[项个是门种]|此[类项处时]|该[系统模型算法]|在[实际此本]|是指|所谓|主要包括|核心在于|通常由|通常是|一般是))/
+      );
+      if (proseBoundaryMatch && proseBoundaryMatch[1].length >= 2 && proseBoundaryMatch[1].length <= 24) {
+        return { index: leaderMatch[0].length + proseBoundaryMatch[1].length, consume: 0, colon: false };
+      }
     }
   }
 
@@ -133,8 +147,16 @@ function splitGluedHeadingLine(line: string): string {
     }
   }
 
-  const head = text.slice(0, headEnd).trim().replace(/[-—\s]+$/, '');
-  const rest = text.slice(restStart).trim();
+  const rawHead = text.slice(0, headEnd).trim();
+  const trailingListBullet = /[-–—•·]\s*$/.test(rawHead);
+  const head = rawHead.replace(/[-–—•·\s]+$/, '');
+  let rest = text.slice(restStart).trim();
+  // 若分界处原本包含无序列表符号（如「###小节标题- **加粗列表项**」），剥离标题尾部符号后需归还给列表正文
+  // 注意：排除 ** 加粗标记，列表标记必须包含空格（如 "- " 或 "* "）
+  const isAlreadyList = /^(?:[-+•·]\s|\*(?!\*)\s|\d+\.\s)/.test(rest);
+  if (trailingListBullet && !isAlreadyList) {
+    rest = `- ${rest}`;
+  }
   return rest ? `${marker} ${head}\n\n${rest}` : `${marker} ${head}`;
 }
 

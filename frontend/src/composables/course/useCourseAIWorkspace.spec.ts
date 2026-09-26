@@ -70,9 +70,10 @@ describe('buildRecommendedQuestionMaterial', () => {
     const material = buildRecommendedQuestionMaterial('高等数学', chapters, '1.1 数列与函数极限计算');
 
     expect(material).toContain('课程：高等数学');
-    expect(material).toContain('第一章 函数与极限');
-    expect(material).toContain('1.1 数列与函数极限计算');
-    expect(material).toContain('当前正在学习的小节：1.1 数列与函数极限计算');
+    expect(material).toContain('函数与极限');
+    expect(material).toContain('数列与函数极限计算');
+    expect(material).toContain('当前正在学习的知识点：数列与函数极限计算');
+    expect(material).toContain('【提问规范】');
   });
 
   it('still yields usable material before chapters are loaded', () => {

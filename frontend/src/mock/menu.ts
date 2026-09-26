@@ -148,10 +148,10 @@ export const DEFAULT_MENU_TREE: SysMenu[] = [
       {
         id: 206,
         parentId: 200,
-        name: 'AI 课堂总结',
+        name: 'AI 总结',
         type: 2,
         path: '/ai/summary',
-        component: 'views/ai/AISummary.vue',
+        component: 'views/ai/summary/Summary.vue',
         icon: 'DocumentCopy',
         permission: 'ai:summary:view',
         sort: 6,

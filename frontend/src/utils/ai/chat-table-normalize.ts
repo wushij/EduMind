@@ -2,14 +2,15 @@ const FENCED_CODE_BLOCK_RE = /(```[\s\S]*?```)/g;
 
 function protectCodeSegments(content: string): { text: string; segments: string[] } {
   const segments: string[] = [];
-  // 保护代码块、数学公式（$$...$$、$...$、\[...\]、\(...\)）以及几何线段绝对值（如 |AF|、|BF|）
-  const text = content.replace(
-    /(```[\s\S]*?```|`[^`\n]+`|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|(?<!\$)\$(?!\$)[^$\n]+?(?<!\$)\$(?!\$)|\\\([\s\S]*?\\\)|\b\|[A-Za-z0-9_+^.-]{1,10}\|\b|(?<!\S)\|[A-Za-z0-9_+^.-]{1,10}\|(?!\S))/g,
+  // 1. 先保护所有代码块、行内代码、LaTeX 公式环境及美元符公式（$$...$$、$...$、\[...\]、\(...\)、\begin{...}...\end{...}）
+  let text = content.replace(
+    /(```[\s\S]*?```|`[^`\n]+`|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\begin\{[a-zA-Z*]+\}[\s\S]*?\\end\{[a-zA-Z*]+\}|(?<!\$)\$(?!\$)[^$\n]+?(?<!\$)\$(?!\$)|\\\([\s\S]*?\\\))/g,
     (segment) => {
       segments.push(segment);
       return `\u0000CODE${segments.length - 1}\u0000`;
     }
   );
+
   return { text, segments };
 }
 
@@ -53,12 +54,29 @@ function isMarkdownTableRow(trimmed: string): boolean {
   );
 }
 
-/** 模型常把「## 标题|列1|列2…」压成一行，需拆成标题 + 表格 */
-function splitHeadingFromPipeLine(line: string): string {
+/**
+ * 模型常把「## 标题 | 列1 | 列2 …」压成一行，需拆成标题 + 表格。
+ * 必须确保后半段真正是表格表头（紧随分隔行，或以 | 开头结尾且拥有至少 2 个列单元格），绝不误拆数学公式（如绝对值）与普通副标题。
+ */
+function splitHeadingFromPipeLine(line: string, nextLine?: string): string {
   const trimmed = line.trim();
-  const match = trimmed.match(/^(#{1,6}\s+[^\n|]+?)(\s*\|.+)$/);
+  if (!/^#{1,6}/.test(trimmed)) return line;
+
+  const match = trimmed.match(/^([ \t]*#{1,6}[ \t]*[^\n|]+?)(\s*\|[^|\n]+\|.*)$/);
   if (!match) return line;
-  return `${match[1].trim()}\n\n${match[2].trim()}`;
+
+  const candidateTable = match[2].trim();
+  const hasSepNext = nextLine ? isMarkdownTableSep(nextLine.trim()) : false;
+  const pipeCount = (candidateTable.match(/\|/g) || []).length;
+  // 仅当下行紧跟表格分隔行，或者该部分具有完整表头结构（以 | 开头且结尾，包含至少 2 个列）时才拆分
+  const isLikelyTableHeader = candidateTable.startsWith('|') && candidateTable.endsWith('|') && pipeCount >= 3;
+
+  if (hasSepNext || isLikelyTableHeader) {
+    const heading = match[1].trim().replace(/^(#{1,6})\s*/, '$1 ');
+    return `${heading}\n\n${candidateTable}`;
+  }
+
+  return line;
 }
 
 function extractLeadingHeading(cells: string[]): { heading?: string; cells: string[] } {
@@ -207,8 +225,7 @@ function expandCompressedPipeLine(trimmed: string): string | null {
 }
 
 function normalizePlainPipeTables(content: string): string {
-  const { text, segments } = protectCodeSegments(content);
-  const lines = text.split('\n');
+  const lines = content.split('\n');
   const out: string[] = [];
   let i = 0;
 
@@ -244,61 +261,78 @@ function normalizePlainPipeTables(content: string): string {
     i += 1;
   }
 
-  return restoreCodeSegments(out.join('\n'), segments);
+  return out.join('\n');
 }
 
 function normalizeMarkdownTables(content: string): string {
-  const { text, segments } = protectCodeSegments(content);
-  const lines = text.split('\n');
+  const lines = content.split('\n');
   const out: string[] = [];
-  let inTable = false;
-  let tableRowIndex = 0;
-  let sawSeparator = false;
-  let tableColCount = 0;
+  let i = 0;
 
-  for (let idx = 0; idx < lines.length; idx++) {
-    const line = lines[idx];
-    const trimmed = line.trim();
-    const isTableSep = isMarkdownTableSep(trimmed);
-    const isTableRow = isMarkdownTableRow(trimmed);
-
-    if (isTableRow || isTableSep) {
-      if (!inTable) {
-        inTable = true;
-        tableRowIndex = 0;
-        sawSeparator = false;
-        const nextLine = idx + 1 < lines.length ? lines[idx + 1].trim() : '';
-        tableColCount = isMarkdownTableSep(nextLine) ? countTableColumns(nextLine) : countTableColumns(trimmed);
-      }
-
-      if (tableRowIndex === 1 && !isTableSep) {
-        out.push(buildTableSeparator(tableColCount));
-        sawSeparator = true;
-        tableRowIndex += 1;
-      }
-
-      if (isTableSep) {
-        if (sawSeparator) continue;
-        sawSeparator = true;
-        tableColCount = countTableColumns(trimmed);
-        out.push(buildTableSeparator(tableColCount));
-        tableRowIndex += 1;
-        continue;
-      }
-
-      out.push(repairTableRow(trimmed, tableColCount));
-      tableRowIndex += 1;
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
+    if (!isMarkdownTableRow(trimmed) && !isMarkdownTableSep(trimmed)) {
+      out.push(lines[i]);
+      i++;
       continue;
     }
 
-    inTable = false;
-    tableRowIndex = 0;
-    sawSeparator = false;
-    tableColCount = 0;
-    out.push(line);
+    // 收集连续的候选表格行
+    const tableLines: string[] = [];
+    while (
+      i < lines.length &&
+      (isMarkdownTableRow(lines[i].trim()) || isMarkdownTableSep(lines[i].trim()))
+    ) {
+      tableLines.push(lines[i]);
+      i++;
+    }
+
+    // 判断该连续块是否真正构成表格：
+    // 1. 包含明确的分隔行（|---|---|）；或者
+    // 2. 至少有 2 行数据行（大模型漏写分隔行）
+    const hasSep = tableLines.some((l) => isMarkdownTableSep(l.trim()));
+    const isRealTable = hasSep || tableLines.length >= 2;
+
+    if (!isRealTable) {
+      // 只有单行且无分隔行，绝非 Markdown 表格（如带有数学绝对值的独立行），按原样输出
+      for (const line of tableLines) {
+        out.push(line);
+      }
+      continue;
+    }
+
+    // 对真正的表格块进行规范化
+    let sawSeparator = false;
+    const firstSep = tableLines.find((l) => isMarkdownTableSep(l.trim()));
+    let tableColCount = firstSep ? countTableColumns(firstSep.trim()) : countTableColumns(tableLines[0].trim());
+
+    let processedRowIndex = 0;
+    for (const rawLine of tableLines) {
+      const lineTrim = rawLine.trim();
+      const isSep = isMarkdownTableSep(lineTrim);
+
+      if (isSep) {
+        if (sawSeparator) continue;
+        sawSeparator = true;
+        tableColCount = Math.max(tableColCount, countTableColumns(lineTrim));
+        out.push(buildTableSeparator(tableColCount));
+        processedRowIndex++;
+        continue;
+      }
+
+      // 如果到了第 2 行（索引 1）还没有分隔行，自动插入分隔行
+      if (processedRowIndex === 1 && !sawSeparator) {
+        out.push(buildTableSeparator(tableColCount));
+        sawSeparator = true;
+        processedRowIndex++;
+      }
+
+      out.push(repairTableRow(lineTrim, tableColCount));
+      processedRowIndex++;
+    }
   }
 
-  return restoreCodeSegments(out.join('\n'), segments);
+  return out.join('\n');
 }
 
 /** 聊天 Markdown 表格容错：pipe 单行表、缺分隔符表、标准 GFM 表 */
@@ -306,17 +340,23 @@ export function normalizeChatTables(content: string): string {
   if (!content?.trim()) return content;
   const withoutCodeBlocks = content.split(FENCED_CODE_BLOCK_RE).map((segment, index) => {
     if (index % 2 === 1) return segment;
-    const withHeadingSplit = segment
-      .split('\n')
-      .map((line) => splitHeadingFromPipeLine(line))
+
+    // 先保护代码块、数学公式（$$...$$、$...$、\[...\]、\(...\)）及绝对值
+    const { text: protectedSegment, segments } = protectCodeSegments(segment);
+    const lines = protectedSegment.split('\n');
+    const withHeadingSplit = lines
+      .map((line, idx) => splitHeadingFromPipeLine(line, lines[idx + 1]))
       .join('\n');
+
     let text = normalizePlainPipeTables(withHeadingSplit);
     text = normalizeMarkdownTables(text);
+    let restored = restoreCodeSegments(text, segments);
+
     // 若非代码段末尾是以 | 结尾的表格行，确保其末尾保留空行，防止在还原代码块时与 ``` 紧贴
-    if (text.trimEnd().endsWith('|') && !text.endsWith('\n\n')) {
-      text = text.trimEnd() + '\n\n';
+    if (restored.trimEnd().endsWith('|') && !restored.endsWith('\n\n')) {
+      restored = restored.trimEnd() + '\n\n';
     }
-    return text;
+    return restored;
   });
   return withoutCodeBlocks.join('');
 }

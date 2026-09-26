@@ -16,7 +16,11 @@
 
   strong {
     font-weight: 700;
-    color: #0958d9;
+    color: #0f172a;
+
+    &.chat-md-label {
+      color: #0958d9;
+    }
   }
 
   h1, h2, h3, h4 {

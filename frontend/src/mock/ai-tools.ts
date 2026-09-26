@@ -2,6 +2,13 @@ import type { AITool } from '@/types/ai/tool';
 
 export type { AITool };
 
+/**
+ * 开发兜底数据（仅 VITE_USE_MOCK=true 且 DEV 时启用）。
+ *
+ * 注意：这里刻意不写 `modelId` 与「调用次数」——
+ * - 绑定模型由后端按「场景路由 → 平台默认模型」实时解析，前端 mock 无从得知，写了就是假的；
+ * - 调用次数是真实累计值，mock 里填演示数字会与真实统计口径不一致。
+ */
 export const MOCK_AI_TOOLS: AITool[] = [
   {
     id: 'tool_question_gen',
@@ -13,14 +20,13 @@ export const MOCK_AI_TOOLS: AITool[] = [
     iconBg: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
     iconName: 'EditPen',
     iconTheme: 'cyan',
-    modelId: 'deepseek-chat',
     route: '/ai/question/generate',
     executionMode: 'ROUTE',
     tags: ['出题', '教师', '热门'],
     isRecommended: true,
     isHot: true,
     isFavorite: true,
-    usageCount: 2436
+    usageCount: 0
   },
   {
     id: 'tool_exam_gen',
@@ -32,14 +38,13 @@ export const MOCK_AI_TOOLS: AITool[] = [
     iconBg: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
     iconName: 'Tickets',
     iconTheme: 'purple',
-    modelId: 'deepseek-chat',
     route: '/ai/exam/generate',
     executionMode: 'ROUTE',
     tags: ['组卷', '教师'],
     isRecommended: true,
     isHot: true,
     isFavorite: true,
-    usageCount: 1820
+    usageCount: 0
   },
   {
     id: 'tool_grading',
@@ -51,14 +56,13 @@ export const MOCK_AI_TOOLS: AITool[] = [
     iconBg: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
     iconName: 'CircleCheck',
     iconTheme: 'emerald',
-    modelId: 'deepseek-chat',
     route: '/ai/grading',
     executionMode: 'ROUTE',
     tags: ['批改', '教师'],
     isRecommended: true,
     isHot: false,
     isFavorite: false,
-    usageCount: 956
+    usageCount: 0
   },
   {
     id: 'tool_summary',
@@ -70,14 +74,31 @@ export const MOCK_AI_TOOLS: AITool[] = [
     iconBg: 'linear-gradient(135deg, #14B8A6 0%, #0D9488 100%)',
     iconName: 'DocumentCopy',
     iconTheme: 'teal',
-    modelId: 'deepseek-chat',
     route: '/ai/summary',
     executionMode: 'ROUTE',
     tags: ['总结', '知识提炼'],
     isRecommended: false,
     isHot: false,
     isFavorite: false,
-    usageCount: 310
+    usageCount: 0
+  },
+  {
+    id: 'tool_lesson_prep',
+    name: 'AI 智能备课',
+    category: 'TEACHER',
+    categoryLabel: '教师提效',
+    description: '结合课程大纲、课节目标与知识库资料，一键生成结构化课节教案',
+    detailedIntro: '从创建课程空间开始备课：完成课程初始化与教学大纲后，进入课节教案工作台，依据教学设计目标与 RAG 检索资料生成教学目标、重难点、师生活动与板书建议，正文确认后即可插入课节，落库留存并可继续编辑。',
+    iconBg: 'linear-gradient(135deg, #6366F1 0%, #4338CA 100%)',
+    iconName: 'Notebook',
+    iconTheme: 'indigo',
+    route: '/course/create',
+    executionMode: 'ROUTE',
+    tags: ['备课', '教师'],
+    isRecommended: true,
+    isHot: false,
+    isFavorite: false,
+    usageCount: 0
   },
   {
     id: 'tool_chat',
@@ -89,14 +110,13 @@ export const MOCK_AI_TOOLS: AITool[] = [
     iconBg: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
     iconName: 'Service',
     iconTheme: 'blue',
-    modelId: 'deepseek-chat',
     route: '/course/101/ai',
     executionMode: 'ROUTE',
     tags: ['问答', '助教', '热门'],
     isRecommended: true,
     isHot: true,
     isFavorite: true,
-    usageCount: 5200
+    usageCount: 0
   },
   {
     id: 'tool_practice',
@@ -108,13 +128,12 @@ export const MOCK_AI_TOOLS: AITool[] = [
     iconBg: 'linear-gradient(135deg, #F97316 0%, #C2410C 100%)',
     iconName: 'Reading',
     iconTheme: 'amber',
-    modelId: 'deepseek-chat',
     route: '/learning/recommendations',
     executionMode: 'ROUTE',
     tags: ['练习', '学生', '推荐'],
     isRecommended: true,
     isHot: false,
     isFavorite: false,
-    usageCount: 1680
+    usageCount: 0
   }
 ];

@@ -1198,6 +1198,29 @@ CREATE TABLE IF NOT EXISTS ai_memory_feedback (
     KEY idx_memory (memory_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI长期记忆反馈与纠错记录';
 
+CREATE TABLE IF NOT EXISTS ai_summary_record (
+    id             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+    tenant_id      BIGINT       NOT NULL DEFAULT 1 COMMENT '租户ID',
+    user_id        BIGINT       NOT NULL COMMENT '创建用户ID',
+    course_id      BIGINT       DEFAULT NULL COMMENT '关联课程ID（可选，用于课程上下文与筛选）',
+    source_type    VARCHAR(16)  NOT NULL DEFAULT 'TEXT' COMMENT '来源类型：DOCUMENT(知识库文档) / TEXT(自由文本)',
+    document_id    BIGINT       DEFAULT NULL COMMENT '知识库文档ID（source_type=DOCUMENT 时）',
+    document_name  VARCHAR(255) DEFAULT NULL COMMENT '来源文档/文本名称快照',
+    summary_mode   VARCHAR(24)  NOT NULL DEFAULT 'OVERVIEW' COMMENT '总结模式：OVERVIEW/CHAPTER/MISTAKE/REVIEW',
+    title          VARCHAR(255) NOT NULL COMMENT '总结标题',
+    source_excerpt TEXT         DEFAULT NULL COMMENT '原始资料摘要片段（前 500 字）',
+    content        MEDIUMTEXT   DEFAULT NULL COMMENT '总结正文（Markdown，最大 16MB）',
+    source_length  INT          DEFAULT 0 COMMENT '原始资料字符数',
+    word_count     INT          DEFAULT 0 COMMENT '总结正文有效字符数（去空白）',
+    create_time    DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time    DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    KEY idx_tenant_id (tenant_id),
+    KEY idx_summary_user_course (user_id, course_id),
+    KEY idx_summary_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 智能总结记录';
+
+
 CREATE TABLE IF NOT EXISTS knowledge_ocr_task (
     id              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '任务ID',
     tenant_id       BIGINT       NOT NULL COMMENT '租户ID',
@@ -1648,6 +1671,170 @@ INSERT IGNORE INTO prompt_template (
     NULL,
     0.50,
     3000
+),
+(
+    'SUMMARY_OVERVIEW',
+    'AI 总结 · 全文速览',
+    'teaching',
+    '面向长文档的整体速览：一句话主旨 + 6~10 条核心要点 + 一图流总结',
+    'PUBLISHED',
+    1,
+    '请对以下资料进行【全文速览】模式的总结。
+
+【资料名称】
+{{sourceName}}
+
+【资料正文】
+{{sourceText}}',
+    '你是智教云 EduMind 教学总结助手，当前任务模式为【全文速览】。
+
+【本模式专属要求】
+1. 开头先用一句话给出资料主旨（不超过 60 字），让读者立刻知道这份材料在讲什么。
+2. 随后按逻辑顺序提炼 6~10 条核心要点，每条独立成行、以要点句开头，禁止把多条挤在一行。
+3. 要点须覆盖：适用范围与前置概念、核心方法与步骤、关键结论、结论成立的条件或边界。
+4. 结尾用一段 2~3 行的「一图流总结」，把整份资料压缩成可背诵的三句话。
+
+【通用要求】
+1. 必须严格依据用户提供的原始资料，不得编造资料中不存在的事实、数据与结论；资料明显不足时直接说明。
+2. 使用 Markdown：二级标题用 ##，要点用有序或无序列表，需要对比时使用表格。
+3. 数学公式使用 $...$（行内）或 $$...$$（独立成行）；代码使用 ```language 围栏并单独成行。
+4. 标题与列表必须各自独占一行，禁止把列表项挤进标题行或与正文粘连。
+5. 只输出总结正文，禁止输出「以下是总结」「希望对你有所帮助」等寒暄或元说明。',
+    'sourceName,sourceText',
+    NULL,
+    0.30,
+    8000
+),
+(
+    'SUMMARY_CHAPTER',
+    'AI 总结 · 章节要点',
+    'teaching',
+    '沿用原资料章节层级提取要点，保留关键定义、公式与结论，逐节附自测题',
+    'PUBLISHED',
+    1,
+    '请对以下资料进行【章节要点】模式的总结。
+
+【资料名称】
+{{sourceName}}
+
+【资料正文】
+{{sourceText}}',
+    '你是智教云 EduMind 教学总结助手，当前任务模式为【章节要点】。
+
+【本模式专属要求】
+1. 必须严格沿用原始资料的章节 / 标题层级组织输出：一级结构用 ##，其下级用 ###，禁止打乱原有知识顺序或自行重排章节。
+2. 每个章节下按「核心概念 → 关键公式 / 定义 → 典型结论 → 注意事项」的顺序提取，不得漏项。
+3. 原文中的定义、定理、公式、算法步骤必须原样保留其准确表述（含符号、上下标与适用条件），不得改写含义。
+4. 若原文缺少清晰章节结构，可依据内容逻辑归纳出层级，但须在标题后以「（归纳）」标注，避免读者误以为原文如此。
+5. 每个二级章节末尾补一行「本节自测：……」提出 1 个检验掌握程度的问题。
+
+【通用要求】
+1. 必须严格依据用户提供的原始资料，不得编造资料中不存在的事实、数据与结论；资料明显不足时直接说明。
+2. 使用 Markdown：标题独占一行并空行分隔，要点用有序或无序列表，需要对比时使用表格。
+3. 数学公式使用 $...$（行内）或 $$...$$（独立成行）；代码使用 ```language 围栏并单独成行。
+4. 只输出总结正文，禁止输出「以下是总结」「希望对你有所帮助」等寒暄或元说明。',
+    'sourceName,sourceText',
+    NULL,
+    0.25,
+    8000
+),
+(
+    'SUMMARY_MISTAKE',
+    'AI 总结 · 易错清单',
+    'teaching',
+    '逐条梳理易错点，每条按「易错点 → 为什么错 → 正确做法」三要素展开并表格汇总',
+    'PUBLISHED',
+    1,
+    '请对以下资料进行【易错清单】模式的总结。
+
+【资料名称】
+{{sourceName}}
+
+【资料正文】
+{{sourceText}}',
+    '你是智教云 EduMind 教学总结助手，当前任务模式为【易错清单】。
+
+【本模式专属要求】
+1. 输出主体必须是一份易错清单，逐条编号（### 易错点 1：……），禁止写成知识综述。
+2. 每条必须完整给出三要素，缺一不可：
+   - **错误表现**：一句话点明学生最容易在哪一步出错（不要写成「易错点：」，避免与上方大标题字样重复）；
+   - **为什么错**：说明导致错误的思维惯性、概念混淆或条件遗漏；
+   - **正确做法**：给出可操作的纠正步骤或判断口径。
+3. 严格排版纪律：仅在上述三要素小标头（**错误表现：**、**为什么错：**、**正确做法：**）处使用加粗，正文描述中禁止随意滥用加粗，保持排版清爽。
+4. 优先覆盖：符号与取值范围、充分必要条件混淆、公式适用条件、边界与特殊情况、单位与量纲、易混概念对比。
+5. 若原文中确实没有易错信息，则依据该资料的知识结构主动推演高频易错点，并在每条后标注「（推演）」。
+6. 结尾用表格汇总全部易错点，列为：易错点 / 典型错误表现 / 一句话纠正。
+
+【通用要求】
+1. 必须严格依据用户提供的原始资料，不得编造资料中不存在的事实、数据与结论；资料明显不足时直接说明。
+2. 使用 Markdown：标题独占一行，公式使用 $...$ 或 $$...$$，代码使用 ```language 围栏并单独成行。
+3. 只输出总结正文，禁止输出「以下是总结」「希望对你有所帮助」等寒暄或元说明。',
+    'sourceName,sourceText',
+    NULL,
+    0.35,
+    8000
+),
+(
+    'SUMMARY_REVIEW',
+    'AI 总结 · 复习精要',
+    'teaching',
+    '考前冲刺：必记结论、公式清单、高频考点与记忆口诀，精简可直接背诵',
+    'PUBLISHED',
+    1,
+    '请对以下资料进行【复习精要】模式的总结。
+
+【资料名称】
+{{sourceName}}
+
+【资料正文】
+{{sourceText}}',
+    '你是智教云 EduMind 教学总结助手，当前任务模式为【复习精要】。
+
+【本模式专属要求】
+1. 面向考前冲刺，只保留必须记住的内容，禁止展开推导过程与背景铺垫。
+2. 按以下固定小节组织（只保留原文确实涉及的小节）：
+   - ## 必记结论：逐条列出可直接背记的结论；
+   - ## 公式清单：用表格给出「公式 / 适用条件 / 常见变形」；
+   - ## 高频考点：说明每类考点最常见的考法与设问角度；
+   - ## 记忆口诀：为易忘内容提供简短口诀或对比记忆法。
+3. 每个公式必须标注适用条件与符号含义，禁止给出来源不明或原文未出现的结论。
+4. 篇幅优先精简：能用短句不用长段，能用表格不用散文。
+
+【通用要求】
+1. 必须严格依据用户提供的原始资料，不得编造资料中不存在的事实、数据与结论；资料明显不足时直接说明。
+2. 使用 Markdown：标题独占一行，公式使用 $...$（行内）或 $$...$$（独立成行）；代码使用 ```language 围栏并单独成行。
+3. 只输出总结正文，禁止输出「以下是总结」「希望对你有所帮助」等寒暄或元说明。',
+    'sourceName,sourceText',
+    NULL,
+    0.20,
+    8000
+),
+(
+    'SUMMARY_TITLE',
+    'AI 总结 · 自动命名',
+    'teaching',
+    '为教学总结拟定简短标题：只输出标题本身，8~20 字，体现资料主题与总结模式',
+    'PUBLISHED',
+    1,
+    '【资料名称】
+{{sourceName}}
+
+【总结模式】
+{{modeLabel}}
+
+【总结正文节选】
+{{excerpt}}',
+    '你是智教云 EduMind 教学资料的标题拟定助手。请为下面这份教学总结起一个标题。
+
+【要求】
+1. 只输出标题本身：不要引号、书名号、Markdown 标记、序号与结尾标点，不要任何解释、前缀或后缀。
+2. 标题需同时体现「资料主题」与「本次总结模式」，长度 8~20 个汉字，最长不超过 30 字。
+3. 不要出现「总结」「AI」「资料」等冗余词，直接给信息点。
+4. 示例：查找算法核心要点·易错清单；线性代数矩阵运算·复习精要；第三次课件·章节要点。',
+    'sourceName,modeLabel,excerpt',
+    NULL,
+    0.20,
+    64
 );
 
 -- 6.1 已发布 Prompt 模板 v1 基线快照（V2.0.9）
@@ -1839,12 +2026,13 @@ INSERT IGNORE INTO course_resource (id, course_id, resource_id, document_id, tit
 
 -- 25. AI 工具广场（核心可用工具）
 INSERT IGNORE INTO ai_tool (id, name, description, detailed_intro, category, icon, model_id, route, execution_mode, tags, is_recommended, is_hot, use_count, status) VALUES
-('tool_question_gen', 'AI 智能出题', '根据课程、章节和知识点智能生成高质量题目', '支持按章节与知识点勾选范围，配置题型、难度与题量后批量生成结构化试题，并可一键入库。', 'TEACHER', 'EditPen', 'deepseek-chat', '/ai/question/generate', 'ROUTE', '出题,教师,热门', 1, 1, 2436, 1),
-('tool_exam_gen', 'AI 智能组卷', '按总分、题型比例与难度规则快速生成标准化试卷', '内置总分校验与题型配比引擎，支持预览换题、调分并保存为可复用试卷。', 'TEACHER', 'Document', 'deepseek-chat', '/ai/exam/generate', 'ROUTE', '组卷,教师', 1, 1, 1820, 1),
-('tool_grading', 'AI 智能批改', '客观题秒级判分，主观题 AI 评分与评语生成', '支持作业提交后自动批改与教师复核改分，减轻期末阅卷压力。', 'TEACHER', 'Checked', 'deepseek-chat', '/ai/grading', 'ROUTE', '批改,教师', 1, 0, 956, 1),
-('tool_summary', 'AI 课程总结', '按章节或知识模块提炼核心要点与易错清单', '支持长文档与课件要点结构化摘要，生成考前复习精要。', 'TEACHER', 'DataAnalysis', 'deepseek-chat', '/ai/summary', 'ROUTE', '总结,知识提炼', 0, 0, 310, 1),
-('tool_chat', 'AI 课程问答', '基于课程资料的上下文助教答疑（SSE 流式）', '在课程空间内多轮对话，支持 Markdown、公式与代码高亮渲染。', 'GENERAL', 'ChatDotRound', 'deepseek-chat', '/course/101/ai', 'ROUTE', '问答,助教,热门', 1, 1, 5200, 1),
-('tool_practice', 'AI 自适应刷题', '根据薄弱知识点智能生成阶梯练习', '分析近期学习数据，推送专项巩固题包与难度递进练习。', 'STUDENT', 'Reading', 'deepseek-chat', '/learning/recommendations', 'ROUTE', '练习,学生,推荐', 1, 0, 1680, 1);
+('tool_question_gen', 'AI 智能出题', '根据课程、章节和知识点智能生成高质量题目', '支持按章节与知识点勾选范围，配置题型、难度与题量后批量生成结构化试题，并可一键入库。', 'TEACHER', 'EditPen', '', '/ai/question/generate', 'ROUTE', '出题,教师,热门', 1, 1, 0, 1),
+('tool_exam_gen', 'AI 智能组卷', '按总分、题型比例与难度规则快速生成标准化试卷', '内置总分校验与题型配比引擎，支持预览换题、调分并保存为可复用试卷。', 'TEACHER', 'Document', '', '/ai/exam/generate', 'ROUTE', '组卷,教师', 1, 1, 0, 1),
+('tool_grading', 'AI 智能批改', '客观题秒级判分，主观题 AI 评分与评语生成', '支持作业提交后自动批改与教师复核改分，减轻期末阅卷压力。', 'TEACHER', 'Checked', '', '/ai/grading', 'ROUTE', '批改,教师', 1, 0, 0, 1),
+('tool_summary', 'AI 课程总结', '按章节或知识模块提炼核心要点与易错清单', '支持长文档与课件要点结构化摘要，生成考前复习精要。', 'TEACHER', 'DataAnalysis', '', '/ai/summary', 'ROUTE', '总结,知识提炼', 0, 0, 0, 1),
+('tool_chat', 'AI 课程问答', '基于课程资料的上下文助教答疑（SSE 流式）', '在课程空间内多轮对话，支持 Markdown、公式与代码高亮渲染。', 'GENERAL', 'ChatDotRound', '', '/course/101/ai', 'ROUTE', '问答,助教,热门', 1, 1, 0, 1),
+('tool_practice', 'AI 自适应刷题', '根据薄弱知识点智能生成阶梯练习', '分析近期学习数据，推送专项巩固题包与难度递进练习。', 'STUDENT', 'Reading', '', '/learning/recommendations', 'ROUTE', '练习,学生,推荐', 1, 0, 0, 1),
+('tool_lesson_prep', 'AI 智能备课', '结合课程大纲、课节目标与知识库资料，一键生成结构化课节教案', '从创建课程空间开始备课：完成课程初始化与教学大纲后，进入课节教案工作台，依据教学设计目标与 RAG 检索资料生成教学目标、重难点、师生活动与板书建议，正文确认后即可插入课节，落库留存并可继续编辑。', 'TEACHER', 'Notebook', '', '/course/create', 'ROUTE', '备课,教师', 1, 0, 0, 1);
 
 -- 26. AI 示例会话
 INSERT IGNORE INTO ai_conversation (id, user_id, course_id, title, message_count, total_tokens, deleted) VALUES

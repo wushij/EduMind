@@ -65,6 +65,22 @@ public class ModelRouterImpl implements ModelRouter {
     }
 
     @Override
+    public String resolveModelDisplayName(String scene) {
+        String modelKey = resolveModelKey(scene, null);
+        AiModelConfigEntity config = findConfig(modelKey);
+        if (config == null) {
+            return modelKey;
+        }
+        if (StringUtils.hasText(config.getModelName())) {
+            return config.getModelName();
+        }
+        if (StringUtils.hasText(config.getModelKey())) {
+            return config.getModelKey();
+        }
+        return config.getConfigName();
+    }
+
+    @Override
     public String resolveFallback(String modelKey) {
         AiModelConfigEntity config = findConfig(modelKey);
         if (config != null && StringUtils.hasText(config.getFallbackModelKey())

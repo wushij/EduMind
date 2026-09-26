@@ -77,7 +77,7 @@ export const COMMON_FUNCTIONS: CommonFunctionItem[] = [
   { title: '课程资源中心', icon: FolderOpened, theme: 'rose', route: '/course', desc: '教案课件与视频多媒体管理' },
   { title: '课程 AI 助教', icon: ChatDotRound, theme: 'purple', route: '/course/ai-assistant', desc: '24小时智能在线释疑解惑' },
   { title: '知识库管理', icon: Collection, theme: 'indigo', route: '/knowledge', desc: '文档切片切分与向量索引库' },
-  { title: 'AI 教学总结', icon: DocumentCopy, theme: 'teal', route: '/ai/summary', desc: '课堂互动回顾与教学洞察' }
+  { title: 'AI 智能总结', icon: DocumentCopy, theme: 'teal', route: '/ai/summary', desc: '课件讲义一键提炼知识精要与复习清单' }
 ];
 
 export const DEFAULT_TODO_ITEMS: TodoItem[] = [

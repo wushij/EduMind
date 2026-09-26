@@ -10,6 +10,76 @@ function escapeHtml(text: string): string {
 }
 
 /**
+ * 修复模型输出里 LaTeX 命令与后续字母/变量粘连导致 KaTeX 抛出 Undefined control sequence 错误
+ * 例如：\leS_n → \le S_n、\leX → \le X、\geS → \ge S、\inR → \in R、\toA → \to A 等
+ */
+export function repairCommonLatexSpacing(latex: string): string {
+  if (!latex) return '';
+  let s = latex;
+
+  // 1. \le / \ge / \ne 紧贴大写字母（如 \leS、\geX、\neA），LaTeX 中绝无此类大写命令，必为变量粘连
+  s = s.replace(/\\le(?=[A-Z])/g, '\\le ');
+  s = s.replace(/\\ge(?=[A-Z])/g, '\\ge ');
+  s = s.replace(/\\ne(?=[A-Z])/g, '\\ne ');
+
+  // 2. \le 紧贴小写字母（排除 \left, \leq, \less..., \leadsto, \lbrack, \lbrace）
+  s = s.replace(/\\le(?![ftq]|ss|ad|b[ra])(?=[a-z])/g, '\\le ');
+
+  // 3. \ge 紧贴小写字母（排除 \geq, \gets）
+  s = s.replace(/\\ge(?![q]|ts)(?=[a-z])/g, '\\ge ');
+
+  // 4. \ne 紧贴小写字母（排除 \neq, \nearrow, \neg）
+  s = s.replace(/\\ne(?![qg]|arrow)(?=[a-z])/g, '\\ne ');
+
+  // 5. 集合包含与属于关系（如 x \inR, x \notinS）
+  s = s.replace(/\\in(?=[A-Z])/g, '\\in ');
+  s = s.replace(/\\notin(?=[A-Za-z])/g, '\\notin ');
+
+  // 6. 趋近关系 \to（排除 \top, \tbinom, \today）
+  s = s.replace(/\\to(?=[A-Z])/g, '\\to ');
+  s = s.replace(/\\to(?![pbd])(?=[a-z])/g, '\\to ');
+
+  // 7. 正负号 \pm（排除 \pmod）、\mp
+  s = s.replace(/\\pm(?=[A-Z])/g, '\\pm ');
+  s = s.replace(/\\pm(?!od)(?=[a-z])/g, '\\pm ');
+  s = s.replace(/\\mp(?=[A-Za-z])/g, '\\mp ');
+
+  // 8. 等价与相似关系 \sim（排除 \simeq）、\approx（排除 \approxeq）、\equiv
+  s = s.replace(/\\sim(?!eq)(?=[A-Za-z])/g, '\\sim ');
+  s = s.replace(/\\approx(?!eq)(?=[A-Za-z])/g, '\\approx ');
+  s = s.replace(/\\equiv(?=[A-Za-z])/g, '\\equiv ');
+
+  // 9. 独立长命令（必须保护前缀，例如 \subseteq 与 \subset）
+  s = s.replace(/\\subseteq(?=[A-Za-z])/g, '\\subseteq ');
+  s = s.replace(/\\subset(?!eq)(?=[A-Za-z])/g, '\\subset ');
+  s = s.replace(/\\supseteq(?=[A-Za-z])/g, '\\supseteq ');
+  s = s.replace(/\\supset(?!eq)(?=[A-Za-z])/g, '\\supset ');
+
+  const otherCmds = [
+    'quad',
+    'qquad',
+    'Rightarrow',
+    'Leftarrow',
+    'Leftrightarrow',
+    'rightarrow',
+    'leftarrow',
+    'leq',
+    'geq',
+    'neq',
+    'mid',
+    'cdot',
+    'times',
+    'parallel',
+    'perp'
+  ];
+  for (const cmd of otherCmds) {
+    s = s.replace(new RegExp(`\\\\${cmd}(?=[A-Za-z])`, 'g'), `\\${cmd} `);
+  }
+
+  return s;
+}
+
+/**
  * 修复因 JSON/SQL/大模型多重转义导致的 LaTeX 命令双斜杠问题（如 \\frac, \\cos, \\sin, \\ln, \\sim, \\to 等）
  * 以及大模型常误输出的非法数字转义宏（如 \0 \cdot \infty、\1^\infty、\0^0 等）
  * 在 LaTeX 中，单个斜杠加字母是命令；双斜杠 \\ 紧跟字母会被 KaTeX 误当作“强制换行 + 普通英文字母”；
@@ -17,10 +87,11 @@ function escapeHtml(text: string): string {
  */
 export function repairLatexDoubleEscapes(text: string): string {
   if (!text) return '';
-  return text
+  const s = text
     .replace(/\\{2,}([a-zA-Z]+)/g, '\\$1')
     .replace(/\\+([0-9])/g, '$1')
     .replace(/\\{2,}(\(|\)|\[|\])/g, '\\$1');
+  return repairCommonLatexSpacing(s);
 }
 
 

@@ -38,6 +38,11 @@ const TOOL_STYLE_MAP: Record<string, ToolStyleConfig> = {
     theme: 'rose',
     gradient: 'linear-gradient(135deg, #F43F5E 0%, #BE123C 100%)'
   },
+  tool_lesson_prep: {
+    iconName: 'Notebook',
+    theme: 'indigo',
+    gradient: 'linear-gradient(135deg, #6366F1 0%, #4338CA 100%)'
+  },
   tool_doc_summary: {
     iconName: 'DocumentCopy',
     theme: 'teal',
@@ -73,6 +78,7 @@ function resolveToolStyle(raw: Record<string, any>): ToolStyleConfig {
   if (name.includes('组卷')) return TOOL_STYLE_MAP.tool_exam_gen;
   if (name.includes('助教') || name.includes('问答')) return TOOL_STYLE_MAP.tool_course_tutor;
   if (name.includes('批改')) return TOOL_STYLE_MAP.tool_grading;
+  if (name.includes('备课')) return TOOL_STYLE_MAP.tool_lesson_prep;
   if (name.includes('教案')) return TOOL_STYLE_MAP.tool_lesson_plan;
   if (name.includes('总结') || name.includes('速记')) return TOOL_STYLE_MAP.tool_doc_summary;
   if (name.includes('练习') || name.includes('刷题')) return TOOL_STYLE_MAP.tool_practice_gen;

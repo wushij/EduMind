@@ -125,9 +125,16 @@ public class RagPipelineImpl implements RagPipeline {
                 "拼装上下文 " + (context != null ? context.length() : 0) + " 字符"));
 
         Map<String, String> vars = new HashMap<>();
-        vars.put("context", context);
+        vars.put("context", context != null ? context : "");
         vars.put("question", query);
-        String promptPreview = promptService.renderTemplate("chat_rag", vars);
+        String promptPreview = promptService.renderUserContent("chat_rag", vars);
+        if (!StringUtils.hasText(promptPreview) || (StringUtils.hasText(context) && !promptPreview.contains(context))) {
+            promptPreview = promptService.renderTemplate("chat_rag", vars);
+        }
+        if (!StringUtils.hasText(promptPreview) || (StringUtils.hasText(context) && !promptPreview.contains(context))) {
+            promptPreview = "请结合以下课程参考资料，回答用户的学习问题。\n\n【参考资料】\n"
+                    + (context != null ? context : "") + "\n\n【用户问题】\n" + query;
+        }
         // 跳过生成时不解析系统提示词，保持与「仅检索」链路完全一致的调用行为
         String systemPrompt = skipLlm ? null : resolveSystemPrompt(options);
 
@@ -199,10 +206,17 @@ public class RagPipelineImpl implements RagPipeline {
         return Math.min(minScore, ragProperties.getMinRrfScore());
     }
 
-    /** 系统提示词：诊断覆盖优先，其次平台默认 chat 系统提示词 */
+    /** 系统提示词：诊断覆盖优先，其次 chat_rag 系统提示词，最后平台默认 chat 系统提示词 */
     private String resolveSystemPrompt(RagDebugOptions options) {
         String override = options.effectiveSystemPrompt();
-        return override != null ? override : promptService.getSystemPrompt("chat");
+        if (override != null) {
+            return override;
+        }
+        String chatRagSys = promptService.getSystemPrompt("chat_rag");
+        if (StringUtils.hasText(chatRagSys)) {
+            return chatRagSys;
+        }
+        return promptService.getSystemPrompt("chat");
     }
 
     /** 计入 Prompt Token 的完整报文（系统提示词 + 组装后的用户 Prompt） */

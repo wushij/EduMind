@@ -23,8 +23,9 @@
               <CourseChapterInitEditor
                 :initial-chapters="form.initialChapters"
                 :is-ai-generating-outline="isAiGeneratingOutline"
+                :thinking-time-text="aiThinkingElapsedTime"
                 @ai-generate="handleAiGenerateOutline"
-                @apply-template="applySyllabusTemplate"
+                @cancel-ai-generate="cancelAiGenerateOutline"
                 @add-chapter="addChapter"
                 @remove-chapter="removeChapter"
                 @update-chapter="(idx, value) => (form.initialChapters[idx] = value)"
@@ -85,8 +86,9 @@ const {
   formRef, form, rules, submitting, isAiGeneratingOutline, selectedCoverId, kbMode, enableRagAutoIndex,
   successModalVisible, createdCourse, createdCourseChaptersCount, categoryPresets, presetCovers, aiPersonas,
   availableKnowledgeBases, currentCoverClass, kbLabel, currentPersonaName, selectPresetCover,
-  generateRandomCourseCode, selectPersona, addChapter, removeChapter, applySyllabusTemplate,
-  handleAiGenerateOutline, handleSubmit, handleCopyCode, goToCreatedCourse, goToCourseList
+  generateRandomCourseCode, selectPersona, addChapter, removeChapter,
+  handleAiGenerateOutline, cancelAiGenerateOutline, aiThinkingElapsedTime,
+  handleSubmit, handleCopyCode, goToCreatedCourse, goToCourseList
 } = useCourseCreate();
 </script>
 

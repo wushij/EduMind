@@ -31,9 +31,13 @@
         <p class="section-p">{{ tool.detailedIntro || tool.description }}</p>
       </div>
 
-      <div v-if="tool.modelId" class="drawer-section">
+      <div class="drawer-section">
         <h4 class="section-title">绑定模型</h4>
-        <p class="section-p model-id">{{ tool.modelId }}</p>
+        <!-- 工具不单独绑模型：modelId 由后端按「场景路由 → 平台默认模型」解析回填；
+             拿不到解析结果（如本地 Mock 兜底）时如实说明，不展示假的模型名 -->
+        <p class="section-p" :class="{ 'model-id': !!tool.modelId }">
+          {{ tool.modelId || '跟随平台默认模型（运行时由 AI 网关解析）' }}
+        </p>
       </div>
 
       <div class="drawer-section">
@@ -123,6 +127,10 @@ const TOOL_HINTS: Record<string, { input: string; output: string }> = {
   tool_practice: {
     input: '自动结合学生薄弱知识点画像与错题记录，也可由学生主动勾选需要巩固的章节模块。',
     output: '自适应推送难度阶梯递进的针对性练习题包，实时反馈作答正误并提供变式解析。'
+  },
+  tool_lesson_prep: {
+    input: '先在「创建新课程空间」完成课程初始化与教学大纲，再进入课节的教案工作台；填写课节标题、课时与导读（导读可用「AI 提炼」，从教情报告进入时会自动带入薄弱考点），系统自动关联课程知识库。',
+    output: '依据教学设计目标与 RAG 检索资料生成结构化课节教案：教学目标、重难点、师生活动与板书建议，在右侧助教确认后可直接插入课节正文并落库保存、继续编辑。'
   }
 };
 

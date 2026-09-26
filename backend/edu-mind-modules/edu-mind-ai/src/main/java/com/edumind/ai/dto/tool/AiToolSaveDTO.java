@@ -29,6 +29,13 @@ public class AiToolSaveDTO {
     @Size(max = 64, message = "图标名称长度不能超过 64")
     private String icon;
 
+    /**
+     * 运营登记的默认 Chat 模型（可选）。
+     *
+     * <p>注意：该字段<b>不参与运行时模型选择</b>。工具执行统一走 AI 网关的
+     * 「场景路由 → 平台默认模型」解析，工具广场展示的也是该解析结果。
+     * 此处仅作运营备注，留空表示"跟随平台默认模型"。</p>
+     */
     @Size(max = 64, message = "模型 ID 长度不能超过 64")
     private String modelId;
 

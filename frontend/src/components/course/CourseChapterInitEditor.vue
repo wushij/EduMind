@@ -8,56 +8,33 @@
         <h3 class="block-title">2. 教学大纲与章节初始化</h3>
         <p class="block-desc">全链路直接生成教学章节，杜绝新课程“0章节空壳”，可利用 AI 一键智能推导</p>
       </div>
-    </div>
 
-    <div
-      class="block-card-body"
-      v-loading="isAiGeneratingOutline"
-      element-loading-text="DeepSeek AI 正在深度理解课程学科知识体系，推演生成高标准教学大纲..."
-      element-loading-background="rgba(255, 255, 255, 0.85)"
-    >
-      <div class="syllabus-generator-toolbar">
-        <span class="template-label">标准模板：</span>
+      <div class="chapter-ai-action">
         <button
+          v-if="isAiGeneratingOutline"
           type="button"
-          class="template-pill-btn"
-          :disabled="isAiGeneratingOutline"
-          @click="$emit('apply-template', 'core')"
+          class="ai-generate-capsule-btn is-loading is-cancellable"
+          title="点击中止本次大纲推演"
+          @click="$emit('cancel-ai-generate')"
         >
-          高校核心课 (6章)
+          <el-icon class="is-loading"><Loading /></el-icon>
+          <span>推演中 ({{ thinkingTimeText || '0.0s' }}) · 停止</span>
         </button>
         <button
-          type="button"
-          class="template-pill-btn"
-          :disabled="isAiGeneratingOutline"
-          @click="$emit('apply-template', 'practical')"
-        >
-          前沿实训课 (4阶段)
-        </button>
-        <button
-          type="button"
-          class="template-pill-btn"
-          :disabled="isAiGeneratingOutline"
-          @click="$emit('apply-template', 'general')"
-        >
-          通识导论课 (4章)
-        </button>
-
-        <button
+          v-else
           type="button"
           class="ai-generate-capsule-btn"
-          :class="{ 'is-loading': isAiGeneratingOutline }"
-          :disabled="isAiGeneratingOutline"
           @click="$emit('ai-generate')"
         >
-          <el-icon v-if="isAiGeneratingOutline" class="is-loading"><Loading /></el-icon>
-          <el-icon v-else class="ai-btn-icon"><AiSparkleIcon /></el-icon>
-          <span>{{ isAiGeneratingOutline ? 'AI 正在智能推导大纲...' : 'AI 智能推荐课程大纲' }}</span>
+          <el-icon class="ai-btn-icon"><AiSparkleIcon /></el-icon>
+          <span>AI <span class="ai-btn-text-optional">智能</span>推荐课程大纲</span>
         </button>
       </div>
+    </div>
 
+    <div class="block-card-body">
       <div class="chapters-dynamic-list">
-        <!-- AI 生成中微动效卡片 (与学情分析推演保持一致的 AI 认知推导动画) -->
+        <!-- AI 生成中微动效卡片 (与学情分析推演保持一致的 AI 认知推导动画，含推演计时与终止) -->
         <div v-if="isAiGeneratingOutline" class="ai-generating-banner">
           <div class="bot-avatar is-breathing">
             <el-icon class="is-spin"><Cpu /></el-icon>
@@ -65,12 +42,25 @@
           <div class="generating-info">
             <div class="generating-title-row">
               <span class="generating-badge">DeepSeek AI 认知推演中</span>
+              <span class="generating-timer-badge">
+                <el-icon><Timer /></el-icon>
+                <span>已推演 {{ thinkingTimeText || '0.0s' }}</span>
+              </span>
               <span class="generating-hint">正在基于课程学科体系，推导演进结构化章节大纲目录...</span>
             </div>
             <div class="generating-shimmer-bar">
               <div class="shimmer-progress"></div>
             </div>
           </div>
+          <button
+            type="button"
+            class="cancel-thinking-btn"
+            title="中止本次大纲推演"
+            @click="$emit('cancel-ai-generate')"
+          >
+            <el-icon><VideoPause /></el-icon>
+            <span>停止生成</span>
+          </button>
         </div>
 
         <template v-else-if="initialChapters.length > 0">
@@ -104,7 +94,7 @@
             <el-icon><List /></el-icon>
           </div>
           <p class="empty-main-text">暂未添加教学大纲章节</p>
-          <p class="empty-sub-text">可点击右上角「AI 智能推荐课程大纲」一键智能生成，选用左侧标准模板快速导入，或点击下方手动添加章节</p>
+          <p class="empty-sub-text">可点击右上角「AI 智能推荐课程大纲」一键智能生成，或点击下方手动添加章节</p>
         </div>
 
         <button
@@ -122,18 +112,18 @@
 </template>
 
 <script setup lang="ts">
-import { List, Plus, Close, Loading, Cpu } from '@element-plus/icons-vue';
-import type { SyllabusTemplateType } from '@/composables/course/useCourseCreate';
+import { List, Plus, Close, Loading, Cpu, Timer, VideoPause } from '@element-plus/icons-vue';
 import AiSparkleIcon from '@/components/common/AiSparkleIcon.vue';
 
 defineProps<{
   initialChapters: string[];
   isAiGeneratingOutline: boolean;
+  thinkingTimeText?: string;
 }>();
 
 defineEmits<{
   'ai-generate': [];
-  'apply-template': [type: SyllabusTemplateType];
+  'cancel-ai-generate': [];
   'add-chapter': [];
   'remove-chapter': [idx: number];
   'update-chapter': [idx: number, value: string];
@@ -157,6 +147,7 @@ defineEmits<{
   .block-card-header {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 14px;
     margin-bottom: 22px;
     padding-bottom: 16px;
@@ -178,6 +169,9 @@ defineEmits<{
     }
 
     .block-title-box {
+      flex: 1;
+      min-width: 0;
+
       .block-title {
         margin: 0 0 3px 0;
         font-size: 16px;
@@ -199,39 +193,23 @@ defineEmits<{
     gap: 18px;
   }
 
-  .syllabus-generator-toolbar {
+  // 右上角 AI 一键生成入口：跟随标题行右对齐
+  .chapter-ai-action {
     display: flex;
     align-items: center;
-    flex-wrap: nowrap;
-    gap: 8px;
-    background: #F8FAFC;
-    border: 1px solid #EDF2F7;
-    border-radius: 14px;
-    padding: 10px 14px;
-    overflow-x: auto;
-    scrollbar-width: thin;
+    flex-shrink: 0;
+    margin-left: auto;
 
-    &::-webkit-scrollbar {
-      height: 4px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: #CBD5E1;
-      border-radius: 4px;
-    }
-
-    .template-label {
-      flex-shrink: 0;
-      font-size: 12.5px;
-      font-weight: 600;
-      color: #475569;
-      white-space: nowrap;
+    // 窄屏空间不足时省略「智能」，退化为「AI 推荐课程大纲」
+    @media (max-width: 640px) {
+      .ai-btn-text-optional {
+        display: none;
+      }
     }
 
     .ai-generate-capsule-btn {
       display: inline-flex;
       flex-shrink: 0;
-      margin-left: auto;
       align-items: center;
       white-space: nowrap;
       gap: 7px;
@@ -264,34 +242,17 @@ defineEmits<{
       &.is-loading {
         background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
         box-shadow: 0 3px 12px rgba(99, 102, 241, 0.35);
+
+        &.is-cancellable {
+          cursor: pointer;
+          &:hover {
+            background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+          }
+        }
       }
     }
 
-    .template-pill-btn {
-      flex-shrink: 0;
-      height: 32px;
-      padding: 0 12px;
-      border-radius: 9999px;
-      background: #FFFFFF;
-      border: 1px solid #E2E8F0;
-      color: #475569;
-      font-size: 12px;
-      font-weight: 500;
-      white-space: nowrap;
-      cursor: pointer;
-      transition: all 0.2s;
-
-      &:hover:not(:disabled) {
-        color: #1677FF;
-        border-color: #93C5FD;
-        background: #F0F7FF;
-      }
-
-      &:disabled {
-        opacity: 0.55;
-        cursor: not-allowed;
-      }
-    }
   }
 
   .chapters-dynamic-list {
@@ -416,6 +377,20 @@ defineEmits<{
           font-weight: 700;
         }
 
+        .generating-timer-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 11.5px;
+          font-family: var(--font-mono, monospace);
+          padding: 2px 9px;
+          border-radius: 9999px;
+          background: #EFF6FF;
+          color: #2563EB;
+          font-weight: 600;
+          border: 1px solid #DBEAFE;
+        }
+
         .generating-hint {
           font-size: 13px;
           color: #475569;
@@ -437,6 +412,31 @@ defineEmits<{
           background: linear-gradient(90deg, #7C3AED 0%, #2563EB 50%, #7C3AED 100%);
           border-radius: 9999px;
           animation: shimmerSlide 1.5s infinite ease-in-out;
+        }
+      }
+
+      .cancel-thinking-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 9999px;
+        background: #FFFFFF;
+        border: 1px solid #FCA5A5;
+        color: #DC2626;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        box-shadow: 0 2px 6px rgba(220, 38, 38, 0.08);
+        transition: all 0.2s;
+        flex-shrink: 0;
+
+        &:hover {
+          background: #FEF2F2;
+          border-color: #EF4444;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 10px rgba(220, 38, 38, 0.15);
         }
       }
     }

@@ -26,8 +26,12 @@
         @update:model-value="handleSemesterChange"
       >
         <el-option label="全部学期" value="ALL" />
-        <el-option label="2026秋季学期" value="2026秋季学期" />
-        <el-option label="2026春季学期" value="2026春季学期" />
+        <el-option
+          v-for="option in semesterOptions"
+          :key="option.value"
+          :label="option.label"
+          :value="option.value"
+        />
       </el-select>
 
       <!-- 纯正长圆搜索条 (1:1 继承登录页输入框设计基因) -->
@@ -53,6 +57,10 @@
 
 <script setup lang="ts">
 import { CircleClose } from '@element-plus/icons-vue';
+import { buildSemesterOptions } from '@/constants/semester';
+
+/** 学期筛选项：与课程创建 / 编辑同源，按当前时间动态推导 */
+const semesterOptions = buildSemesterOptions();
 
 defineProps<{
   statusTabs: Array<{ label: string; value: string; count: number }>;

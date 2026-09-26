@@ -54,6 +54,13 @@ sql/
 │   ├── V2_6_8__widen_wrong_question_diagnosis.sql # V2.6.8 错题 AI 归因结论列加宽为 TEXT（修复 AI 诊断落库 400）
 │   ├── V2_6_9__widen_ai_memory_summary.sql     # V2.6.9 AI 长期记忆摘要列加宽为 TEXT（同类超长隐患预防）
 │   ├── V2_7_0__fix_math_knowledge_point_tagging.sql # V2.7.0 修正高数（课程103）考题知识点归属与章节挂载（消除评估榜单矛盾）
+│   ├── V2_7_1__chat_rag_example_exercise_discipline.sql # V2.7.1 课程 AI-RAG 对话例题锁定与解答纪律强化（严禁推脱拒答）
+│   ├── V2_7_2__add_ai_lesson_prep_tool.sql     # V2.7.2 上线「AI 智能备课」工具入口（跳转创建课程页 /course/create，幂等）
+│   ├── V2_7_3__ai_summary_record.sql           # V2.7.3 AI 智能总结记录表（ai_summary_record，沉淀历史记录）
+│   ├── V2_7_4__ai_summary_prompt_templates.sql # V2.7.4 AI 智能总结四种模式专属提示词模板（OVERVIEW/CHAPTER/MISTAKE/REVIEW）
+│   ├── V2_7_5__strip_demo_ai_tool_usage.sql    # V2.7.5 清除工具卡片写死的演示调用次数（只保留真实累计，幂等）
+│   ├── V2_7_6__ai_summary_ai_title_prompt.sql  # V2.7.6 AI 智能总结自动拟定标题提示词模板（SUMMARY_TITLE）
+│   ├── V2_7_7__unbind_stale_ai_tool_model.sql  # V2.7.7 清空工具里已失效的默认模型登记值（幂等）
 │   ├── R__seed_data.sql                        # V0 增量路径演示种子（用户/课程/题库/AI 等，幂等）
 │   ├── R__seed_legacy.sql                      # 旧库升级补丁（租户角色/组织成员/权限乱码修复，幂等）
 │   └── R__gate_e2e_seeds.sql                   # Gate F/G/H 集成测试种子（幂等，init 不含 Gate F）
@@ -77,7 +84,7 @@ mysql -u root -p < sql/init.sql
 
 > 已有业务数据的库 **禁止** 执行 `init.sql`；补表、改结构、版本升级请走 `sql/migration/V*.sql`（执行前 `mysqldump` 备份）。
 
-`init.sql` 已包含 **V0.1 ~ V2.7.0** 所有迁移最终状态（含多租户 Wave1/2、权限补全、课程 AI 字段、课程概览门户表、`sys_menu`、微课节正文/进度、课节讲义 AI 索引、Chunk 向量持久化、深度思考提示词纪律、考查重点、导出进度、作业高级配置、错题本状态、错题归因结论长文本列、试题 LaTeX 规范化转义、高数章节考点补全与题库及错题考点对齐等），**全新空库跑 init 后无需再跑任何 `V*.sql` migration**（Gate E2E 可选种子除外）。
+`init.sql` 已包含 **V0.1 ~ V2.7.7** 所有迁移最终状态（含多租户 Wave1/2、权限补全、课程 AI 字段、课程概览门户表、`sys_menu`、微课节正文/进度、课节讲义 AI 索引、Chunk 向量持久化、深度思考提示词纪律、考查重点、导出进度、作业高级配置、错题本状态、错题归因结论长文本列、试题 LaTeX 规范化转义、高数章节考点补全与题库及错题考点对齐等），**全新空库跑 init 后无需再跑任何 `V*.sql` migration**（Gate E2E 可选种子除外）。
 
 ### 方式二：按版本增量迁移（已有空库分步升级）
 
@@ -182,6 +189,13 @@ mysql -u root -p edumind < sql/migration/R__seed_legacy.sql
 | V2.6.9 记忆摘要列加宽 | `V2_6_9__widen_ai_memory_summary.sql` | `ai_memory_item.summary` 由 `VARCHAR(512)` 提升为 `TEXT`，应用侧 `MemorySummaryNormalizer` 统一 1000 字收口，DTO 增加 `@Size(max = 1000)`。**预防同类故障**：Agent 记忆提取候选摘要（模型输出长度不可控）、记忆纠错 `correctContent` 覆盖摘要两条路径都可能超出 512 字，触发与 V2.6.8 完全相同的 400「数据操作冲突」。**幂等，可重复执行。** |
 | V2.6.8 错题归因结论列加宽 | `V2_6_8__widen_wrong_question_diagnosis.sql` | `wrong_question_record.diagnosis` 由 `VARCHAR(512)` 提升为 `TEXT`。**修复「点击 AI 诊断报 400 数据操作冲突、结论不入库」**：AI 归因正文（含 LaTeX 公式）普遍超过 512 字符，严格模式下 MySQL 抛 `Data too long for column 'diagnosis'`，被异常处理器映射成 400，模型额度已消耗但结论全部丢失。**幂等，可重复执行。** |
 | V2.7.0 高数考点归属修复 | `V2_7_0__fix_math_knowledge_point_tagging.sql` | 补齐高数（课程103）章节（109/110）与核心考点（20~24），修正试题及错题记录考点挂载。**彻底消除教师端教学质量评估热力榜单「标题与 AI 诊断正文自相矛盾」及盲目推送教学建议的问题。幂等，可重复执行。** |
+| V2.7.1 RAG例题解答纪律 | `V2_7_1__chat_rag_example_exercise_discipline.sql` | 强化 `chat_rag` 提示词模板：当用户询问例题且参考资料命中时，必须直接基于题干推导演算，严禁推脱拒答。**幂等，可重复执行。** |
+| V2.7.2 AI 智能备课入口 | `V2_7_2__add_ai_lesson_prep_tool.sql` | 新增 `ai_tool` 卡片 `tool_lesson_prep`（教师提效，路由 `/course/create`）。**为 V2.6.7 下线独立教案页后补回面向教师的显式备课入口**：点击后跳转「创建课程」页，先完成课程空间初始化（大纲 / 知识库 / AI 助教）再进入备课，避免落入课程的任意首个课节。**幂等，可重复执行。** |
+| V2.7.3 AI 总结记录表 | `V2_7_3__ai_summary_record.sql` | 新建数据表 `ai_summary_record`，保存用户每次总结的资料来源、模式、标题、正文与字符统计。**支撑总结历史沉淀、回看、重命名与导出。幂等，可重复执行。** |
+| V2.7.4 AI 总结专属模板 | `V2_7_4__ai_summary_prompt_templates.sql` | 为全文速览（`SUMMARY_OVERVIEW`）、章节要点（`SUMMARY_CHAPTER`）、易错清单（`SUMMARY_MISTAKE`）、复习精要（`SUMMARY_REVIEW`）四种模式分别注册专属 Prompt 模板与版本。**幂等，可重复执行。** |
+| V2.7.5 清除工具演示调用次数 | `V2_7_5__strip_demo_ai_tool_usage.sql` | 扣掉 `ai_tool.use_count` 里写死的演示基线（2436 / 1820 / 956 / 310 / 5200 / 1680），只保留真实累计。**修复 AI 工具广场卡片「N 次调用」是假统计、与新工具口径不一致的问题**；`use_count >= 基线` 条件保证幂等。种子已同步为 0。**幂等，可重复执行。** |
+| V2.7.6 AI 总结自动命名模板 | `V2_7_6__ai_summary_ai_title_prompt.sql` | 注册自动拟定标题 Prompt 模板（`SUMMARY_TITLE`）及版本。**由大模型根据资料主题与模式拟定 8~20 字简短标题。幂等，可重复执行。** |
+| V2.7.7 清理失效工具模型登记 | `V2_7_7__unbind_stale_ai_tool_model.sql` | 把 `ai_tool.model_id` 里**在 `ai_model_config` 查不到**的失效登记值清为空串（语义＝未单独登记，跟随平台默认模型）。**修复后台「AI 工具管理」保存历史工具时报「绑定的 AI 模型不存在或未启用」**：该字段只是运营备注、不参与运行时调度，工具执行统一由网关按「场景路由 → 平台默认模型」解析，广场展示的也是该解析结果。**幂等，可重复执行。** |
 
 > **V2.6.4 权限模型变更提示（重要）**
 >

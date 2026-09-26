@@ -51,11 +51,20 @@
           </el-form-item>
 
           <el-form-item label="开课学期" prop="semester">
-            <el-select v-model="formData.semester" placeholder="选择学期" class="w-full">
-              <el-option label="2026年秋季学期" value="2026年秋季学期" />
-              <el-option label="2026年春季学期" value="2026年春季学期" />
-              <el-option label="2025年秋季学期" value="2025年秋季学期" />
-              <el-option label="2025年春季学期" value="2025年春季学期" />
+            <el-select
+              v-model="formData.semester"
+              placeholder="选择或输入学期"
+              class="w-full"
+              filterable
+              allow-create
+              default-first-option
+            >
+              <el-option
+                v-for="option in semesterOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
             </el-select>
           </el-form-item>
         </div>
@@ -208,6 +217,7 @@ import { suggestCourseDescription } from '@/api/ai/course-profile';
 import type { Course } from '@/types/course/course';
 import { useCourse } from '@/composables/course/useCourse';
 import { COURSE_CATEGORY_PRESETS } from '@/constants/course';
+import { buildSemesterOptions, getCurrentSemester, type SemesterOption } from '@/constants/semester';
 import {
   COURSE_AI_PERSONA_OPTIONS,
   normalizeCourseAiPersona,
@@ -243,7 +253,7 @@ const visible = computed({
 const formData = reactive({
   name: '',
   code: '',
-  semester: '2026年秋季学期',
+  semester: getCurrentSemester(),
   category: '计算机与软件',
   credits: 3.0,
   plannedHours: 48,
@@ -251,6 +261,18 @@ const formData = reactive({
   description: '',
   aiPersona: 'socrates' as CourseAiPersonaId,
   welcomeMessage: ''
+});
+
+/**
+ * 开课学期选项：只列当前及未来学期。
+ * 编辑历史课程时其原学期已不在候选中，这里兜底把它补回首位，
+ * 否则 el-select 找不到匹配项会显示为空，看起来像学期数据丢了。
+ */
+const semesterOptions = computed<SemesterOption[]>(() => {
+  const options = buildSemesterOptions();
+  const original = formData.semester;
+  if (!original || options.some(option => option.value === original)) return options;
+  return [{ label: original, value: original }, ...options];
 });
 
 const formRules: FormRules = {
@@ -274,7 +296,7 @@ const personaList = COURSE_AI_PERSONA_OPTIONS.map(p => ({
 function applyCourseToForm(newCourse: Course) {
   formData.name = newCourse.title || newCourse.name || '';
   formData.code = newCourse.code || '';
-  formData.semester = newCourse.semester || '2026年秋季学期';
+  formData.semester = newCourse.semester || getCurrentSemester();
   formData.category = newCourse.category || '计算机与软件';
   formData.credits = Number(newCourse.credits) || 3.0;
   formData.plannedHours = Number(newCourse.plannedHours) || 48;

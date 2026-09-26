@@ -69,12 +69,78 @@ function hasUnclosedBrackets(text: string): boolean {
 }
 
 /**
+ * 保护数学公式（$$...$$、\[...\]、\(...\)、$...$），防止公式内部的减号（如 (1+x)-x）或小数点被列表拆行器误切
+ */
+function protectMathBlocks(text: string): { masked: string; unmask: (s: string) => string } {
+  const placeholders: string[] = [];
+  const masked = text.replace(
+    /(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\(.+?\\\)|\$(?!\$)[^$\n]+?\$(?!\$))/g,
+    (m) => {
+      const key = `%%%CHAT_MD_MATH_${placeholders.length}%%%`;
+      placeholders.push(m);
+      return key;
+    }
+  );
+  return {
+    masked,
+    unmask: (s: string) =>
+      s.replace(/%%%CHAT_MD_MATH_(\d+)%%%/g, (_m, idx) => placeholders[Number(idx)] ?? _m)
+  };
+}
+
+/**
+ * 修复模型在行内公式中漏写闭合 $ 符号便直接开始写中文标点或说明文字的问题
+ * 例如：「求 $\displaystyle \lim_{x\to0}\frac{...}{...}。提示：...」
+ * 在中文标点（。；！？）之前自动补齐闭合 $，并修复紧跟中文说明后的孤立结尾 $
+ */
+function repairUnclosedMathBeforeChinesePunct(text: string): string {
+  return text
+    .split(FENCED_CODE_BLOCK_RE)
+    .map((segment) => {
+      if (segment.startsWith('```')) return segment;
+
+      // 先保护合法的 $$...$$ 独立数学块，绝不在 $$ 块内部乱插 $
+      const blockMathList: string[] = [];
+      let s = segment.replace(/\$\$[\s\S]+?\$\$/g, (m) => {
+        const key = `%%%BLOCK_MATH_UNCLOSED_${blockMathList.length}%%%`;
+        blockMathList.push(m);
+        return key;
+      });
+
+      // 1. 匹配 $ 开头且含有 LaTeX 指令（如 \lim, \frac 等），但在遇到中文句末标点时未闭合 $ 的情况
+      s = s.replace(
+        /(?<![\$\\a-zA-Z0-9])(\$(?!\$)(?:[^\$\n]*?\\[a-zA-Z]+[^\$\n]*?))([。；;!?！？])/g,
+        (match, mathPart: string, punc: string) => {
+          const dollars = (mathPart.match(/(?<!\\)\$/g) || []).length;
+          if (dollars % 2 === 0) return match;
+          return `${mathPart}$${punc}`;
+        }
+      );
+
+      // 2. 补齐紧随中文说明（如「结果为」）后的孤立闭合 $ 对应的开启 $（排除 $$）
+      s = s.replace(
+        /([\u4e00-\u9fa5][：:]?)[ \t]*([+\\-]?\\(?:frac|sqrt|[a-zA-Z]+)[^$\n]*?)(?<!\$)\$(?!\$)/g,
+        (_match, prefix, expr) => `${prefix} $${expr.trim()}$`
+      );
+
+      // 还原 $$...$$ 块
+      blockMathList.forEach((m, idx) => {
+        s = s.replaceAll(`%%%BLOCK_MATH_UNCLOSED_${idx}%%%`, () => m);
+      });
+
+      return s;
+    })
+    .join('');
+}
+
+/**
  * 大模型常把「1.知识地图…2.概念辨析…3.定理…」挤在同一行；
  * Markdown 无法识别，需拆行并在序号后补空格。
  * 必须严格保护表格行、标题行、未闭合括号及带加粗的序号，防止截断正文。
  */
 function normalizeInlineNumberedLists(text: string): string {
-  return text
+  const { masked, unmask } = protectMathBlocks(text);
+  const result = masked
     .split(FENCED_CODE_BLOCK_RE)
     .map((segment) => {
       if (segment.startsWith('```')) return segment;
@@ -125,6 +191,8 @@ function normalizeInlineNumberedLists(text: string): string {
       return processed.join('\n');
     })
     .join('');
+
+  return unmask(result);
 }
 
 /**
@@ -133,7 +201,8 @@ function normalizeInlineNumberedLists(text: string): string {
  * 标题行（# 开头）以及未闭合括号内部的内容，防止错误拆行断裂语义。
  */
 function normalizeInlineBulletLists(text: string): string {
-  return text
+  const { masked, unmask } = protectMathBlocks(text);
+  const result = masked
     .split(FENCED_CODE_BLOCK_RE)
     .map((segment) => {
       if (segment.startsWith('```')) return segment;
@@ -156,9 +225,11 @@ function normalizeInlineBulletLists(text: string): string {
           return `${prefix}\n- `;
         });
 
-        // 3. 明确的列表引导标点（冒号、分号、句号、感叹号、问号、已闭合括号/引号）之后紧贴的 -项（排除 --- 水平分割线与括号内副标题）
+        // 3. 明确的列表引导标点（冒号、分号、句号、感叹号、问号、已闭合引号、中文括号）之后紧贴的 -项
+        // 严格排除英文半角括号 )（在数学公式与英文表达式中 ) - x 属于减法或复合词，绝非列表）
+        // 且仅对中文、加粗及 Emoji 放宽空格限制；英文单词/字母后必须有空格（防止误伤 -x 等变量）
         s = s.replace(
-          /(?<!-)([。；;!?！？:：）)”"』」】])[ \t]*-[ \t]+(?=[\p{Extended_Pictographic}\*\*\u4e00-\u9fa5【「『（])/gu,
+          /(?<!-)([。；;!?！？:：）”"』」】])[ \t]*-(?:[ \t]*(?=\*\*|[\p{Extended_Pictographic}\u4e00-\u9fa5【「『（])|[ \t]+(?=[A-Za-z]))/gu,
           (match, punc, offset, fullStr) => {
             const before = fullStr.slice(0, offset + punc.length);
             if (hasUnclosedBrackets(before)) return match;
@@ -170,12 +241,15 @@ function normalizeInlineBulletLists(text: string): string {
         s = s
           .split('\n')
           .map((subLine) => {
-            if (/^[ \t]*-[ \t]+/.test(subLine)) {
+            if (/^[ \t]*-[ \t]*/.test(subLine)) {
               return subLine.replace(
-                /(?<!-)([^\n\r\t -])[ \t]+-[ \t]+(?=\*\*|[\p{Extended_Pictographic}\u4e00-\u9fff（(「『【])/gu,
+                /(?<!-)([^\n\r\t -])[ \t]*-(?:[ \t]*(?=\*\*|[\p{Extended_Pictographic}\u4e00-\u9fff（(「『【])|[ \t]+(?=[A-Za-z]))/gu,
                 (match, prevChar, offset, fullStr) => {
                   const before = fullStr.slice(0, offset + prevChar.length);
                   if (hasUnclosedBrackets(before)) return match;
+                  // 保护常见的复合词或代码标识符，如 key-value、foo-bar
+                  const afterHyphen = fullStr.slice(offset + match.length);
+                  if (/[A-Za-z0-9]/.test(prevChar) && /^[A-Za-z0-9]/.test(afterHyphen)) return match;
                   return `${prevChar}\n- `;
                 }
               );
@@ -183,6 +257,19 @@ function normalizeInlineBulletLists(text: string): string {
             return subLine;
           })
           .join('\n');
+
+        // 4b. 若该行原本未以 - 开头，但在该行内拆出了连续的 - 列表项，且首段也是形如「xxx：yyy。」的并列结构（非冒号结尾的引导句），补全首项列表标记
+        const splitSubLines = s.split('\n');
+        if (
+          splitSubLines.length > 1 &&
+          !/^[ \t]*[-*•·]/.test(splitSubLines[0]) &&
+          !/[:：]\s*$/.test(splitSubLines[0]) &&
+          splitSubLines.slice(1).every((sub) => /^[ \t]*- /.test(sub)) &&
+          /[:：]/.test(splitSubLines[0])
+        ) {
+          splitSubLines[0] = `- ${splitSubLines[0].trimStart()}`;
+          s = splitSubLines.join('\n');
+        }
 
         // 5. CommonMark 规范化：确保行首（允许带缩进空格）- 后面有空格，支持 Emoji、中英文、粗体
         s = s.replace(/^([ \t]*)-(?=[\p{Extended_Pictographic}\u4e00-\u9fa5*（(「『【A-Za-z0-9])/gmu, '$1- ');
@@ -199,6 +286,8 @@ function normalizeInlineBulletLists(text: string): string {
       return processed.join('\n');
     })
     .join('');
+
+  return unmask(result);
 }
 
 /** 聊天 / 课节预览共用：拆粘连列表并规范行首 - 与 •（与深度思考区同源） */
@@ -366,17 +455,45 @@ function escapeHtmlText(s: string): string {
 
 /**
  * 将正文中的 **粗体** 预转为 <strong>，规避 CommonMark 在中文/引号/空格混排时无法闭合 emphasis 的问题。
+ * 精细化区分：
+ * 1. 结构化引导词/字段标签（如 **为什么错：**、**正确做法：**、**易错点：**、- **表现**：等）：赋予 class="chat-md-label"，渲染为主色调蓝；
+ * 2. 句中随文普通强调（如 **可能仍然存在**、**不确定**）：赋予 class="chat-md-bold"，保持自然深黑字重加粗，不染蓝色。
  */
 export function repairChatBoldMarkers(text: string): string {
   return text
     .split(FENCED_CODE_BLOCK_RE)
     .map((segment) => {
       if (segment.startsWith('```')) return segment;
-      return segment.replace(/\*\*([^*\n]+?)\*\*/g, (_match, inner: string) => {
-        const trimmed = inner.trim();
-        if (!trimmed) return _match;
-        return `<strong>${escapeHtmlText(trimmed)}</strong>`;
-      });
+      return segment.replace(
+        /(^|[\n\r]|[-*+•]\s*|[0-9]+\.\s*)?\*\*([^*\n]+?)\*\*([：:]?)/g,
+        (match, prefix = '', inner: string, colon = '') => {
+          const trimmed = inner.trim();
+          if (!trimmed) return match;
+
+          // 判断是否为结构化字段标签 / 引导小标头：
+          // a. 粗体内或紧随其后带中英文冒号（如 **为什么错：**、**正确做法**：、**注意：**、**Step 1:**）
+          // b. 格式为标签中括号（如 **【核心考点】**、**[重点]**）
+          // c. 紧跟在行首或列表项开头且短小（长度 <= 8 且无句逗符号，如 - **易错点**）
+          const hasColon = /[:：]$/.test(trimmed) || Boolean(colon);
+          const isBracketTag = /^[【\[].+[】\]]$/.test(trimmed);
+          const isLeadingShortTag = Boolean(prefix) && trimmed.length <= 8 && !/[，。！？；]/.test(trimmed);
+
+          const isLabel = hasColon || isBracketTag || isLeadingShortTag;
+          const displayInner = escapeHtmlText(trimmed);
+
+          if (isLabel) {
+            if (colon) {
+              return `${prefix}<strong class="chat-md-label">${displayInner}${colon}</strong>`;
+            }
+            return `${prefix}<strong class="chat-md-label">${displayInner}</strong>`;
+          }
+
+          if (colon) {
+            return `${prefix}<strong>${displayInner}${colon}</strong>`;
+          }
+          return `${prefix}<strong>${displayInner}</strong>`;
+        }
+      );
     })
     .join('');
 }
@@ -600,9 +717,15 @@ function normalizeGluedHeadingLines(text: string): string {
       if (segment.startsWith('```')) return segment;
 
       const lines = segment.split('\n');
-      const processed = lines.map((line) => {
+      const processed: string[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
         const m = line.match(/^([ \t]*#{1,6}[ \t]+)([^\n]+)$/);
-        if (!m) return line;
+        if (!m) {
+          processed.push(line);
+          continue;
+        }
 
         const marker = m[1].trim();
         const content = m[2];
@@ -637,15 +760,16 @@ function normalizeGluedHeadingLines(text: string): string {
                 hasListPunct
               ) {
                 const normalizedList = listPart.replace(/^-[ \t]*/, '- ');
-                return `${marker} ${headingText}\n\n${normalizedList}`;
+                processed.push(`${marker} ${headingText}\n\n${normalizedList}`);
+                continue;
               }
             }
           }
         }
 
-        // 2. 标题行末尾粘连有序列表序号（如「### 2. 使用步骤1. 先代入…」或「## 核心步骤1. 先求导…」）
+        // 2. 标题行末尾粘连有序列表序号（如「### 2. 使用步骤1. 先代入…」或「## 核心步骤1. 先求导…」或「七、变式训练1.求…」）
         const numberMatch = content.match(
-          /([\u4e00-\u9fa5A-Za-z）)】])[ \t]*([1-9]\.[ \t]+(?=[\p{Extended_Pictographic}\u4e00-\u9fa5\w*（(「『【]))/u
+          /([\u4e00-\u9fa5A-Za-z）)】])[ \t]*([1-9]\.[ \t]*(?=[\p{Extended_Pictographic}\u4e00-\u9fa5\w*（(「『【$\\]))/u
         );
         if (numberMatch && numberMatch.index !== undefined) {
           const splitPos = numberMatch.index + numberMatch[1].length;
@@ -654,8 +778,33 @@ function normalizeGluedHeadingLines(text: string): string {
             const headingText = formatHeadingTitle(beforeStr);
             const listPart = content.slice(splitPos).trim();
             if (headingText.length >= 2 && headingText.length <= 40) {
-              return `${marker} ${headingText}\n\n${listPart}`;
+              processed.push(`${marker} ${headingText}\n\n${listPart}`);
+              continue;
             }
+          }
+        }
+
+        // 2b. 标题行整行末尾以「1.」结尾（如「## 七、变式训练1.」），其后另起一行写题目「求...」
+        // 注意：不可将 1. 独立放在空行输出，否则 Markdown 会将其渲染为空的孤立列表项；应拼接到下一行题干开头
+        const trailingNumberMatch = content.match(/^(.+?[\u4e00-\u9fa5A-Za-z）)】])[ \t]*([1-9]\.)\s*$/);
+        if (trailingNumberMatch) {
+          const headingText = formatHeadingTitle(trailingNumberMatch[1]);
+          if (headingText.length >= 2 && headingText.length <= 40 && !hasUnclosedBrackets(headingText)) {
+            const numPrefix = `${trailingNumberMatch[2]} `;
+            let attached = false;
+            for (let j = i + 1; j < lines.length; j++) {
+              if (lines[j].trim().length > 0) {
+                lines[j] = `${numPrefix}${lines[j].trimStart()}`;
+                attached = true;
+                break;
+              }
+            }
+            if (attached) {
+              processed.push(`${marker} ${headingText}`);
+            } else {
+              processed.push(`${marker} ${headingText}\n\n${numPrefix}`);
+            }
+            continue;
           }
         }
 
@@ -667,7 +816,8 @@ function normalizeGluedHeadingLines(text: string): string {
           const headingText = formatHeadingTitle(proseMatch[1]);
           const prosePart = content.slice(proseMatch[0].length).trim();
           if (headingText.length >= 2 && prosePart.length > 0 && !hasUnclosedBrackets(headingText)) {
-            return `${marker} ${headingText}\n\n${prosePart}`;
+            processed.push(`${marker} ${headingText}\n\n${prosePart}`);
+            continue;
           }
         }
 
@@ -679,12 +829,13 @@ function normalizeGluedHeadingLines(text: string): string {
           const headingText = formatHeadingTitle(closerMatch[1]);
           const prosePart = closerMatch[2].trim();
           if (headingText.length >= 2 && !hasUnclosedBrackets(headingText)) {
-            return `${marker} ${headingText}\n\n${prosePart}`;
+            processed.push(`${marker} ${headingText}\n\n${prosePart}`);
+            continue;
           }
         }
 
-        return line;
-      });
+        processed.push(line);
+      }
 
       return processed.join('\n');
     })
@@ -781,8 +932,13 @@ export function normalizeChatMarkdown(raw: string): string {
   // 仅消除横向空格与制表符，避免误吞换行符 \n
   text = text.replace(/\*\*([^*\n]+?)\*\*[ \t]+(?=[\u4e00-\u9fa5（(「『【])/g, '**$1**');
 
+  // 3. 修复模型漏写闭合 $ 符号直接接中文标点/说明文字的问题
+  text = repairUnclosedMathBeforeChinesePunct(text);
+
   // 4. 同一行内粘连的「1.xxx 2.xxx 3.xxx」拆成 Markdown 有序列表（CommonMark 要求每条独占一行）
   text = normalizeInlineNumberedLists(text);
+  // 合并单独成行的数字序号（防止「1.」后换行导致空列表项与题干正文剥离）
+  text = text.replace(/(^|\n)([ \t]*\d{1,2}\.[ \t]*)\n+([^\n\s#])/g, '$1$2$3');
   // 5. 同一行内粘连的「-项1 … -项2 …」拆成无序列表
   text = normalizeInlineBulletLists(text);
   // 6. 关键词引号 "" 粘连拆行

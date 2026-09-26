@@ -60,15 +60,27 @@ public class FollowUpSuggestServiceImpl implements FollowUpSuggestService {
     private static final Pattern LEADING_MARKER =
             Pattern.compile("^(?:[-*•·]+|\\d{1,2}\\s*[.、)）:：](?!\\d)|[（(]\\d{1,2}[)）])\\s*");
     /**
+     * 行首小节号 / 章节编号：如「1.1 」「1.1求...」「1.1的...」「第1.1节 」「1.1.1 」。
+     * 用户要求推荐问题不要带有这些数字编号，必须净化为纯知识点。
+     */
+    private static final Pattern LEADING_SECTION_NO = Pattern.compile(
+            "^\\s*(?:第\\s*[0-9一二三四五六七八九十]+(?:\\.[0-9]+)*\\s*[章节讲课节]|[0-9]{1,2}(?:\\.[0-9]{1,2})+)\\s*(?:节|课|讲)?(?:的|：|:|——|\\s+)?");
+    /**
+     * 句子中间夹带的小节号：如「学1.2洛必达法则」「能拿一道1.1的题测我」「结合1.1节内容」。
+     */
+    private static final Pattern INLINE_SECTION_NO = Pattern.compile(
+            "(?<=[^a-zA-Z0-9_.]|^)(?:第\\s*[0-9]+(?:\\.[0-9]+)*\\s*[章节讲课节]|[0-9]{1,2}\\.[0-9]{1,2}(?:\\.[0-9]{1,2})?)\\s*(?:节|课|讲)?(?:的)?\\s*(?=[\\u4e00-\\u9fa5]|$)");
+    /**
      * 模型把多条追问挤进同一行时的切分点：
      * 「1. 甲？ 2. 乙？ 3. 丙？」这类输出必须先拆开，否则整行超长会被当成无效内容丢弃。
-     * 同样用 {@code (?!\\d)} 避免把「1.1 小节名」从中间切开。
      */
     private static final Pattern MERGED_MARKER =
             Pattern.compile("(?:(?<=\\s)|(?<=[？?。！!]))(?=\\d{1,2}\\s*[.、)）:：](?!\\d))");
     private static final Pattern MARKDOWN_NOISE = Pattern.compile("[*`_#>]");
     private static final Pattern WRAP_QUOTES =
             Pattern.compile("^[\"'“”‘’「」《》【】]+|[\"'“”‘’「」《》【】]+$");
+    private static final Pattern CJK_SPACES =
+            Pattern.compile("([\\u4e00-\\u9fa5])\\s+([\\u4e00-\\u9fa5])");
     /** 模型偷懒时的通用套话、客套开场与书面转述词，一律丢弃，避免又变成「写死的追问」 */
     private static final Pattern GENERIC_PROMPT = Pattern.compile(
             "还有什么(想|需要)|需要我(进一步|继续|再|展开)|希望(这些|以上|对你有帮助)|如需(更多|进一步)"
@@ -277,6 +289,9 @@ public class FollowUpSuggestServiceImpl implements FollowUpSuggestService {
             return "";
         }
         text = LEADING_MARKER.matcher(text).replaceFirst("");
+        text = LEADING_SECTION_NO.matcher(text).replaceFirst("");
+        text = INLINE_SECTION_NO.matcher(text).replaceAll("");
+        text = CJK_SPACES.matcher(text).replaceAll("$1$2");
         text = MARKDOWN_NOISE.matcher(text).replaceAll("");
         text = WRAP_QUOTES.matcher(text).replaceAll("");
         return text.trim();

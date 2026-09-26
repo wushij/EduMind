@@ -120,10 +120,25 @@ export function mapChapterTree(nodes: Chapter[], expandedFirst = true): ChapterN
 }
 
 /**
+ * 剥离小节 / 章节前导编号与代码（如「1.1 极限的概念」「1.1. 极限的概念」「第1节 极限的概念」→「极限的概念」）。
+ * 推荐问题、提问材料中应展示纯知识点，避免模型在推荐问题中输出硬编码编号。
+ */
+export function stripSectionNumber(title?: string): string {
+  if (!title) return '';
+  return (
+    title
+      .replace(
+        /^\s*(?:第\s*[\d一二三四五六七八九十]+(?:\.[\d]+)*\s*[章节讲课节]|[\d]+(?:\.[\d]+)+\.?)\s*[-_、.：:\s]*/,
+        ''
+      )
+      .trim() || title.trim()
+  );
+}
+
+/**
  * 为「推荐问题」构造模型材料：课程名 + 章节结构 + 当前小节。
  *
- * <p>只给一个小节标题，模型只能套通用说法；把章节结构一起给它，才知道本节在课程中的位置、
- * 前后相邻内容是什么，问出来的问题才会落在真实的知识点上。</p>
+ * <p>清洗掉机械的小节编号，使模型能够专注于核心知识点提问，不把「1.1」硬编码进问题。</p>
  */
 export function buildRecommendedQuestionMaterial(
   courseTitle: string,
@@ -134,19 +149,21 @@ export function buildRecommendedQuestionMaterial(
   const structure = chapters
     .slice(0, 12)
     .map((chapter) => {
+      const cleanChapter = stripSectionNumber(chapter.title);
       const sections = chapter.sections
         .slice(0, 12)
-        .map((sec) => `    - ${sec.title}`)
+        .map((sec) => `    - ${stripSectionNumber(sec.title)}`)
         .join('\n');
-      return `  - ${chapter.title}${sections ? `\n${sections}` : ''}`;
+      return `  - ${cleanChapter}${sections ? `\n${sections}` : ''}`;
     })
     .join('\n');
   if (structure) {
-    lines.push('章节结构：', structure);
+    lines.push('章节知识点体系：', structure);
   }
   if (sectionTitle?.trim()) {
-    lines.push(`当前正在学习的小节：${sectionTitle.trim()}`);
+    lines.push(`当前正在学习的知识点：${stripSectionNumber(sectionTitle)}`);
   }
+  lines.push('【提问规范】：生成的推荐问题必须面向具体知识点，严禁出现章节小节编号（如“1.1”、“1.2”、“第1节”等数字编号）。');
   return lines.join('\n');
 }
 
@@ -560,16 +577,17 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
    */
   function refreshRecommendedQuestions() {
     const courseTitle = displayCourseTitle.value;
-    const secTitle = activeSectionTitle.value?.trim();
-    const material = buildRecommendedQuestionMaterial(courseTitle, chaptersData.value, secTitle);
-    const asking = secTitle
-      ? `我正准备学习「${secTitle}」，请给出我最该先弄清楚的几个问题`
+    const rawSecTitle = activeSectionTitle.value?.trim();
+    const cleanSecTitle = rawSecTitle ? stripSectionNumber(rawSecTitle) : '';
+    const material = buildRecommendedQuestionMaterial(courseTitle, chaptersData.value, rawSecTitle);
+    const asking = cleanSecTitle
+      ? `我正准备学习「${cleanSecTitle}」，请给出我最该先弄清楚的几个问题`
       : `我想系统学习【${courseTitle}】，请给出我最该先弄清楚的几个问题`;
 
     recommendedQuestionsLoading.value = true;
     const prompts = requestFollowUps(asking, material, {
       courseTitle,
-      sectionTitle: secTitle || undefined,
+      sectionTitle: cleanSecTitle || undefined,
       courseId: resolveCourseId(),
       minMaterialChars: 0,
       count: 5,

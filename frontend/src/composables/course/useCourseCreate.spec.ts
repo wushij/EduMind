@@ -1,9 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  buildRandomCourseCode,
-  getSyllabusTemplateChapters,
-  SYLLABUS_TEMPLATES
-} from './useCourseCreate';
+import { buildRandomCourseCode } from './useCourseCreate';
 
 describe('buildRandomCourseCode', () => {
   it('generates code with expected prefix and numeric suffix', () => {
@@ -22,32 +18,5 @@ describe('buildRandomCourseCode', () => {
     expect(randomSpy).toHaveBeenCalled();
     expect(code).toMatch(/2026-\d{4}$/);
     randomSpy.mockRestore();
-  });
-});
-
-describe('getSyllabusTemplateChapters', () => {
-  it('returns core template with 6 chapters', () => {
-    const chapters = getSyllabusTemplateChapters('core');
-    expect(chapters).toHaveLength(6);
-    expect(chapters[0]).toContain('课程导论');
-    expect(chapters).toEqual([...SYLLABUS_TEMPLATES.core]);
-  });
-
-  it('returns practical template with 4 stages', () => {
-    const chapters = getSyllabusTemplateChapters('practical');
-    expect(chapters).toHaveLength(4);
-    expect(chapters[0]).toContain('第一阶段');
-  });
-
-  it('returns general template with 4 chapters', () => {
-    const chapters = getSyllabusTemplateChapters('general');
-    expect(chapters).toHaveLength(4);
-    expect(chapters[3]).toContain('未来技术趋势');
-  });
-
-  it('returns a new array copy each time', () => {
-    const first = getSyllabusTemplateChapters('core');
-    first.push('extra');
-    expect(getSyllabusTemplateChapters('core')).toHaveLength(6);
   });
 });

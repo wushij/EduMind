@@ -35,7 +35,7 @@
           />
           <div v-else class="lesson-empty inline">
             <el-icon class="empty-icon"><Reading /></el-icon>
-            <p v-if="preview">本课节尚未编写块式正文，请在大纲中点击「编辑内容」或「AI 生成正文」。</p>
+            <p v-if="preview">本课节尚未编写块式正文，请在大纲中点击「AI智能备课」或「AI 生成正文」。</p>
             <p v-else>教师正在为本课节备课，正文即将上线。</p>
             <button v-if="preview" type="button" class="capsule-btn" @click="goEditLesson">编辑课节正文</button>
           </div>

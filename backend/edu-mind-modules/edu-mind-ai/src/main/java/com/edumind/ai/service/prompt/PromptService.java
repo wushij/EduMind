@@ -21,11 +21,11 @@ public class PromptService {
     private final Map<String, String> cache = new ConcurrentHashMap<>();
 
     public String getSystemPrompt(String templateName) {
-        return cache.computeIfAbsent(templateName, this::loadTemplate);
+        return cache.computeIfAbsent("sys:" + templateName, k -> loadSystemPrompt(templateName));
     }
 
     public String renderTemplate(String templateName, Map<String, String> variables) {
-        String template = getSystemPrompt(templateName);
+        String template = cache.computeIfAbsent("content:" + templateName, k -> loadTemplateContent(templateName));
         return applyVariables(template, variables);
     }
 
@@ -67,10 +67,12 @@ public class PromptService {
     public void evictTemplate(String templateName) {
         if (templateName != null) {
             cache.remove(templateName);
+            cache.remove("sys:" + templateName);
+            cache.remove("content:" + templateName);
         }
     }
 
-    private String loadTemplate(String templateName) {
+    private String loadSystemPrompt(String templateName) {
         PromptTemplateEntity published = promptTemplateDao.findByCode(templateName);
         if (published != null && "PUBLISHED".equals(published.getStatus())) {
             if (org.springframework.util.StringUtils.hasText(published.getSystemPrompt())) {
@@ -78,6 +80,21 @@ public class PromptService {
             }
             return published.getContent();
         }
+        return loadFromFileOrFallback(templateName);
+    }
+
+    private String loadTemplateContent(String templateName) {
+        PromptTemplateEntity published = promptTemplateDao.findByCode(templateName);
+        if (published != null && "PUBLISHED".equals(published.getStatus())) {
+            if (org.springframework.util.StringUtils.hasText(published.getContent())) {
+                return published.getContent();
+            }
+            return published.getSystemPrompt();
+        }
+        return loadFromFileOrFallback(templateName);
+    }
+
+    private String loadFromFileOrFallback(String templateName) {
         String path = "prompt/" + templateName + ".st";
         try {
             ClassPathResource resource = new ClassPathResource(path);

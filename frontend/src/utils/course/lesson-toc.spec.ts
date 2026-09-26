@@ -148,4 +148,112 @@ describe('extractCleanTitleFromElement & applyLessonTocFromDom', () => {
     expect(toc[2].title).toBe('2. 函数极限');
     expect(toc[3].title).toBe('3. 极限存在的常用判别');
   });
+
+  it('correctly includes "二、JVM指令与栈帧执行模型" in TOC for glued Java lesson', () => {
+    const raw = `##一、从源码到字节码：WORA的起点Java的核心承诺是 WORA。
+
+###字节码的三个关键属性- **平台无关**：指令语义由 JVM规范统一定义。
+- **面向栈**：绝大多数指令操作的是操作数栈。
+- **紧凑**：单条指令多为1字节操作码。
+
+##二、JVM指令与栈帧执行模型JVM是“字节码的 CPU”，它的运算模型是**基于栈**的。
+
+##三、执行引擎：解释执行与 JIT的混合模式主流 JVM采用混合模式。`;
+    const items = buildLessonToc([{ type: 'markdown', body: raw }]);
+    const titles = items.map((i) => i.title);
+    expect(titles).toContain('一、从源码到字节码');
+    expect(titles).toContain('字节码的三个关键属性');
+    expect(titles).toContain('二、JVM指令与栈帧执行模型');
+    expect(titles).toContain('三、执行引擎');
+  });
+
+  it('correctly extracts exercise items 1 to 5 under 变式训练 into TOC with level 3 and clean titles', () => {
+    const raw = `## 七、变式训练
+1. 求 $\\displaystyle \\lim_{x\\to0}\\frac{\\ln(1+x)-x}{x^2}$。提示：洛必达或使用 $\\ln(1+x)-x\\sim -\\frac{x^2}{2}$，结果为 $-\\frac12$。
+2. 求 $\\lim_{x\\to0}\\frac{\\tan x-x}{x^3}$。提示：洛必达后利用 $\\tan^2 x\\sim x^2$，结果为 $\\frac13$。
+3. 求 $\\lim_{x\\to\\infty}\\left(1+\\frac2x\\right)^x$。提示：化为重要极限形式，结果为 $e^2$。
+4. 求 $\\lim_{x\\to0}\\frac{x-\\sin x}{x^3}$。提示：洛必达两次并配合 $1-\\cos x\\sim \\frac{x^2}{2}$，结果为 $\\frac16$。
+5. 判断：若 $\\lim_{x\\to x_0}\\frac{f'(x)}{g'(x)}$ 不存在，则 $\\lim_{x\\to x_0}\\frac{f(x)}{g(x)}$ 一定不存在。提示：错误。该结论不能由洛必达法则推出。`;
+
+    // 1. 验证静态构建 buildLessonToc
+    const items = buildLessonToc([{ type: 'markdown', body: raw }]);
+    expect(items.some((i) => i.title === '七、变式训练' && i.level === 2)).toBe(true);
+    const exerciseItems = items.filter((i) => i.level === 3);
+    expect(exerciseItems).toHaveLength(5);
+    expect(exerciseItems[0].title).toBe('1. 求 $\\displaystyle \\lim_{x\\to0}\\frac{\\ln(1+x)-x}{x^2}$');
+    expect(exerciseItems[1].title).toBe('2. 求 $\\lim_{x\\to0}\\frac{\\tan x-x}{x^3}$');
+    expect(exerciseItems[2].title).toBe('3. 求 $\\lim_{x\\to\\infty}\\left(1+\\frac2x\\right)^x$');
+    expect(exerciseItems[3].title).toBe('4. 求 $\\lim_{x\\to0}\\frac{x-\\sin x}{x^3}$');
+    expect(exerciseItems[4].title).toContain('5. 判断：若');
+
+    // 2. 验证 DOM 渲染提取 applyLessonTocFromDom
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <div class="lesson-block lesson-block--markdown">
+        <div class="markdown-body">
+          <h2>七、变式训练</h2>
+          <ol>
+            <li>求 $\\lim_{x\\to0}\\frac{\\ln(1+x)-x}{x^2}$。提示：洛必达或使用...</li>
+            <li>求 $\\lim_{x\\to0}\\frac{\\tan x-x}{x^3}$。提示：洛必达后利用...</li>
+            <li>求 $\\lim_{x\\to\\infty}\\left(1+\\frac2x\\right)^x$。提示：化为重要极限形式...</li>
+            <li>求 $\\lim_{x\\to0}\\frac{x-\\sin x}{x^3}$。提示：洛必达两次并配合...</li>
+            <li>判断：若 $\\lim_{x\\to x_0}\\frac{f'(x)}{g'(x)}$ 不存在...。提示：错误...</li>
+          </ol>
+        </div>
+      </div>
+    `;
+    const domToc = applyLessonTocFromDom(root);
+    expect(domToc).toHaveLength(6);
+    expect(domToc[0].title).toBe('七、变式训练');
+    expect(domToc[0].level).toBe(2);
+    expect(domToc[1].title).toBe('1. 求 $\\lim_{x\\to0}\\frac{\\ln(1+x)-x}{x^2}$');
+    expect(domToc[1].level).toBe(3);
+    expect(domToc[2].title).toBe('2. 求 $\\lim_{x\\to0}\\frac{\\tan x-x}{x^3}$');
+    expect(domToc[2].level).toBe(3);
+    expect(domToc[3].title).toBe('3. 求 $\\lim_{x\\to\\infty}\\left(1+\\frac2x\\right)^x$');
+    expect(domToc[4].title).toBe('4. 求 $\\lim_{x\\to0}\\frac{x-\\sin x}{x^3}$');
+    expect(domToc[5].title).toContain('5. 判断：若');
+  });
+
+  it('correctly includes item 1. 先直接代入 under 六、课堂小结 in TOC', () => {
+    const raw = `## 六、课堂小结
+本课节的核心是“先判断，再选择方法”。计算极限时可按以下顺序思考：
+1. 先直接代入，判断是否为确定值或未定式；
+2. 若是分式，可尝试因式分解、有理化、同除最高阶；
+3. 若含常见无穷小结构，优先考虑等价无穷小替换；
+4. 若出现放缩特征，考虑夹逼准则；
+5. 若为 $\\frac{0}{0}$ 或 $\\frac{\\infty}{\\infty}$，在条件满足时使用洛必达法则；
+6. 若为 $1^\\infty$、$0^0$、$\\infty^0$，优先取对数或化用重要极限。`;
+
+    // 1. buildLessonToc
+    const items = buildLessonToc([{ type: 'markdown', body: raw }]);
+    const subItems = items.filter((i) => i.level === 3);
+    expect(subItems).toHaveLength(6);
+    expect(subItems[0].title).toBe('1. 先直接代入，判断是否为确定值或未定式');
+    expect(subItems[1].title).toBe('2. 若是分式，可尝试因式分解、有理化、同除最高阶');
+
+    // 2. applyLessonTocFromDom
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <div class="lesson-block lesson-block--markdown">
+        <div class="markdown-body">
+          <h2>六、课堂小结</h2>
+          <p>本课节的核心是“先判断，再选择方法”。计算极限时可按以下顺序思考：</p>
+          <ol>
+            <li>先直接代入，判断是否为确定值或未定式；</li>
+            <li>若是分式，可尝试因式分解、有理化、同除最高阶；</li>
+            <li>若含常见无穷小结构，优先考虑等价无穷小替换；</li>
+            <li>若出现放缩特征，考虑夹逼准则；</li>
+            <li>若为 0/0 或 ∞/∞，在条件满足时使用洛必达法则；</li>
+            <li>若为 1^∞、0^0、∞^0，优先取对数或化用重要极限。</li>
+          </ol>
+        </div>
+      </div>
+    `;
+    const domToc = applyLessonTocFromDom(root);
+    expect(domToc).toHaveLength(7);
+    expect(domToc[0].title).toBe('六、课堂小结');
+    expect(domToc[1].title).toBe('1. 先直接代入，判断是否为确定值或未定式');
+    expect(domToc[2].title).toBe('2. 若是分式，可尝试因式分解、有理化、同除最高阶');
+  });
 });
