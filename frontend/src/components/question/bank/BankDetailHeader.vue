@@ -14,9 +14,9 @@
       </el-breadcrumb>
     </div>
 
-    <!-- 题库主体信息与操作栏 -->
+    <!-- 题库主体信息（整行铺开，避免右侧留白） -->
     <div class="header-main-section">
-      <!-- 左侧：题库形象、标题与元数据 -->
+      <!-- 题库形象、标题与元数据 -->
       <div class="header-info-col">
         <div class="bank-avatar-orb">
           <el-icon class="bank-icon"><FolderOpened /></el-icon>
@@ -32,108 +32,109 @@
             </span>
           </div>
 
-          <p class="bank-description">
-            {{
-              bankInfo?.description ||
-              '聚合课程核心知识点专项试题、历年真题与经典测验，支持全链路智能检索、AI 变式题扩充与快速组卷交付。'
-            }}
-          </p>
+          <!-- 描述与更新时间 / 维护状态压缩为同一行，减少纵向占用 -->
+          <div class="bank-summary-line">
+            <p class="bank-description">
+              {{
+                bankInfo?.description ||
+                '聚合课程核心知识点专项试题、历年真题与经典测验，支持全链路智能检索、AI 变式题扩充与快速组卷交付。'
+              }}
+            </p>
 
-          <div class="bank-time-meta">
-            <span class="time-item">
-              <el-icon><Clock /></el-icon>
-              最近更新于 {{ formatUpdateTime(bankInfo?.updateTime) }}
-            </span>
-            <span class="meta-dot">·</span>
-            <span class="status-item">
-              <span class="status-indicator-dot" />
-              题库维护就绪
-            </span>
+            <div class="bank-time-meta">
+              <span class="time-item">
+                <el-icon><Clock /></el-icon>
+                最近更新于 {{ formatUpdateTime(bankInfo?.updateTime) }}
+              </span>
+              <span class="meta-dot">·</span>
+              <span class="status-item">
+                <span class="status-indicator-dot" />
+                题库维护就绪
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- 右侧：分层现代操作按钮组 -->
-      <div class="header-actions-col">
-        <!-- 业务核心高频主操作 -->
-        <div class="actions-row actions-row--primary">
-          <button
-            type="button"
-            class="action-pill action-pill--brand"
-            @click="onCreateNewQuestion"
-          >
-            <el-icon><EditPen /></el-icon>
-            <span>录入新题</span>
-            <span class="ai-spark-chip">AI 辅导</span>
-          </button>
-
-          <button
-            type="button"
-            class="action-pill action-pill--compose"
-            @click="onFastComposeExam"
-          >
-            <el-icon><DocumentCopy /></el-icon>
-            <span>基于此题库组卷</span>
-          </button>
-
-          <button
-            type="button"
-            class="action-pill action-pill--ai"
-            @click="onAiExpand"
-          >
-            <el-icon><AiSparkleIcon /></el-icon>
-            <span>AI 智能扩题</span>
-          </button>
-        </div>
-
-        <!-- 辅助工具与管理操作 -->
-        <div class="actions-row actions-row--secondary">
-          <button
-            type="button"
-            class="action-pill action-pill--ghost"
-            @click="onOpenAddDrawer"
-          >
-            <el-icon><Plus /></el-icon>
-            <span>挑选题目入库</span>
-          </button>
-
-          <button
-            type="button"
-            class="action-pill action-pill--ghost"
-            @click="onExportMarkdown"
-          >
-            <el-icon><Download /></el-icon>
-            <span>导出试题集</span>
-          </button>
-
-          <el-popconfirm
-            title="确定要删除此题库吗？题库内试题在公共试题池仍会保留。"
-            confirm-button-text="确认删除"
-            cancel-button-text="取消"
-            confirm-button-type="danger"
-            @confirm="onDeleteBank"
-          >
-            <template #reference>
-              <button
-                type="button"
-                class="action-pill action-pill--danger"
-              >
-                <el-icon><Delete /></el-icon>
-                <span>删除题库</span>
-              </button>
-            </template>
-          </el-popconfirm>
-        </div>
-      </div>
     </div>
 
-    <!-- 底部：4 维教学资产微看板 -->
+    <!-- 中部：4 维教学资产微看板 -->
     <BankDetailStatsBar
       :question-count="questionCount"
       :total-score="totalScore"
       :questions="questions"
       :course-name="bankInfo?.courseName"
     />
+
+    <!-- 底部操作条：辅助工具靠左，核心主操作靠右收尾 -->
+    <div class="header-actions-bar">
+      <div class="actions-group actions-group--tools">
+        <button
+          type="button"
+          class="action-pill action-pill--ghost"
+          @click="onOpenAddDrawer"
+        >
+          <el-icon><Plus /></el-icon>
+          <span>挑选题目入库</span>
+        </button>
+
+        <button
+          type="button"
+          class="action-pill action-pill--ghost"
+          @click="onExportMarkdown"
+        >
+          <el-icon><Download /></el-icon>
+          <span>导出试题集</span>
+        </button>
+
+        <el-popconfirm
+          title="确定要删除此题库吗？题库内试题在公共试题池仍会保留。"
+          confirm-button-text="确认删除"
+          cancel-button-text="取消"
+          confirm-button-type="danger"
+          @confirm="onDeleteBank"
+        >
+          <template #reference>
+            <button
+              type="button"
+              class="action-pill action-pill--danger"
+            >
+              <el-icon><Delete /></el-icon>
+              <span>删除题库</span>
+            </button>
+          </template>
+        </el-popconfirm>
+      </div>
+
+      <div class="actions-group actions-group--primary">
+        <button
+          type="button"
+          class="action-pill action-pill--brand"
+          @click="onCreateNewQuestion"
+        >
+          <el-icon><EditPen /></el-icon>
+          <span>录入新题</span>
+        </button>
+
+        <button
+          type="button"
+          class="action-pill action-pill--compose"
+          @click="onFastComposeExam"
+        >
+          <el-icon><DocumentCopy /></el-icon>
+          <span>基于此题库组卷</span>
+        </button>
+
+        <button
+          type="button"
+          class="action-pill action-pill--ai"
+          @click="onAiExpand"
+        >
+          <el-icon><AiSparkleIcon /></el-icon>
+          <span>AI 智能扩题</span>
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -244,16 +245,10 @@ function formatUpdateTime(val: unknown): string {
     }
   }
 
+  /* 主体信息整行铺开，不再与右侧按钮挤同一行 */
   .header-main-section {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 28px;
-    flex-wrap: wrap;
-
-    @media (max-width: 1080px) {
-      flex-direction: column;
-    }
+    display: block;
+    width: 100%;
   }
 
   .header-info-col {
@@ -330,18 +325,29 @@ function formatUpdateTime(val: unknown): string {
         }
       }
 
+      /* 描述 + 更新时间 / 维护状态同一行排列，空间不足时自动换行 */
+      .bank-summary-line {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        min-width: 0;
+      }
+
       .bank-description {
         margin: 0;
         font-size: 13.5px;
         color: #64748b;
         line-height: 1.6;
-        max-width: 680px;
+        flex: 0 1 auto;
+        min-width: 0;
       }
 
       .bank-time-meta {
         display: flex;
         align-items: center;
         gap: 8px;
+        flex-shrink: 0;
         font-size: 12.5px;
         color: #94a3b8;
 
@@ -349,6 +355,7 @@ function formatUpdateTime(val: unknown): string {
           display: inline-flex;
           align-items: center;
           gap: 5px;
+          white-space: nowrap;
 
           .el-icon {
             font-size: 13px;
@@ -378,37 +385,38 @@ function formatUpdateTime(val: unknown): string {
     }
   }
 
-  .header-actions-col {
+  /* 底部操作条：整行铺满，工具组在左、主操作组在右 */
+  .header-actions-bar {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 10px;
-    flex-shrink: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    width: 100%;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(226, 232, 240, 0.8);
 
     @media (max-width: 1080px) {
-      align-items: flex-start;
-      width: 100%;
+      justify-content: flex-start;
     }
 
-    .actions-row {
+    .actions-group {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
-
-      &--secondary {
-        justify-content: flex-end;
-      }
+      min-width: 0;
     }
 
     .action-pill {
       display: inline-flex;
       align-items: center;
-      gap: 7px;
-      height: 38px;
-      padding: 0 16px;
+      gap: 5px;
+      height: 32px;
+      padding: 0 12px;
       border-radius: 9999px;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       border: none;
@@ -418,56 +426,47 @@ function formatUpdateTime(val: unknown): string {
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
       .el-icon {
-        font-size: 14px;
+        font-size: 13px;
       }
 
       /* 品牌主蓝：录入新题 */
       &--brand {
-        background: linear-gradient(135deg, #1677ff 0%, #2563eb 100%);
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
         color: #ffffff;
-        box-shadow: 0 4px 14px rgba(22, 119, 255, 0.25);
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.22);
 
         &:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 18px rgba(22, 119, 255, 0.35);
-          background: linear-gradient(135deg, #0958d9 0%, #1d4ed8 100%);
-        }
-
-        .ai-spark-chip {
-          padding: 1px 7px;
-          border-radius: 9999px;
-          background: rgba(255, 255, 255, 0.24);
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.02em;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+          background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
         }
       }
 
-      /* 组卷主操作：深蓝科技渐变 */
+      /* 组卷操作：白底描边蓝字 */
       &--compose {
         background: #ffffff;
         color: #1e40af;
-        border: 1.5px solid #93c5fd;
-        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+        border: 1px solid #93c5fd;
+        box-shadow: 0 1px 4px rgba(37, 99, 235, 0.06);
 
         &:hover {
           background: #eff6ff;
           border-color: #3b82f6;
           color: #1d4ed8;
           transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.14);
+          box-shadow: 0 3px 10px rgba(37, 99, 235, 0.14);
         }
       }
 
-      /* AI 专属紫粉渐变 */
+      /* AI 专属紫蓝渐变 */
       &--ai {
-        background: linear-gradient(135deg, #1677ff 0%, #722ed1 100%);
+        background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
         color: #ffffff;
-        box-shadow: 0 4px 14px rgba(114, 46, 209, 0.26);
+        box-shadow: 0 2px 8px rgba(124, 58, 237, 0.22);
 
         &:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(114, 46, 209, 0.38);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 14px rgba(124, 58, 237, 0.32);
         }
       }
 
@@ -475,7 +474,7 @@ function formatUpdateTime(val: unknown): string {
       &--ghost {
         background: #ffffff;
         color: #475569;
-        border: 1px solid #cbd5e1;
+        border: 1px solid #dbe3ec;
 
         &:hover {
           background: #f8fafc;

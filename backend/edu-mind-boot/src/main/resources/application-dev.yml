@@ -51,7 +51,7 @@ edumind:
     enabled: false
   rag:
     hybrid-enabled: true
-    min-rrf-score: 0.03
+    min-rrf-score: 0.005
   chunk:
     size: 800
     overlap: 128

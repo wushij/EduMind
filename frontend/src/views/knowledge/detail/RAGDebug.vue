@@ -61,19 +61,35 @@
             </div>
           </div>
 
-          <div class="form-row">
-            <div class="form-group flex-1">
-              <label>召回数量 Top-K: {{ topK }}</label>
-              <el-slider v-model="topK" :min="1" :max="8" :step="1" />
-            </div>
-            <div class="form-group flex-1">
-              <label>阈值: {{ scoreThreshold.toFixed(2) }}</label>
-              <el-slider v-model="scoreThreshold" :min="0.4" :max="0.9" :step="0.05" />
-            </div>
+          <div class="form-group">
+            <label>
+              <span class="lbl-text">召回数量 Top-K</span>
+              <span class="lbl-value">{{ topK }}</span>
+            </label>
+            <el-slider v-model="topK" :min="1" :max="8" :step="1" show-stops />
           </div>
 
           <div class="form-group">
-            <label>生成温度 (Temperature 覆盖): {{ temperature }}</label>
+            <label>
+              <span class="lbl-text">
+                召回阈值 (RRF 分下限)
+                <el-tooltip
+                  content="混合检索阶段返回的是 RRF 融合分（量级 0.005 ~ 0.1），不是 0~1 的余弦相似度；阈值越高召回越少"
+                  placement="top"
+                >
+                  <el-icon class="tip-icon"><InfoFilled /></el-icon>
+                </el-tooltip>
+              </span>
+              <span class="lbl-value">{{ scoreThreshold.toFixed(3) }}</span>
+            </label>
+            <el-slider v-model="scoreThreshold" :min="0.005" :max="0.1" :step="0.005" />
+          </div>
+
+          <div class="form-group">
+            <label>
+              <span class="lbl-text">生成温度 (Temperature 覆盖)</span>
+              <span class="lbl-value">{{ temperature.toFixed(1) }}</span>
+            </label>
             <el-slider v-model="temperature" :min="0.0" :max="1.0" :step="0.1" />
           </div>
 
@@ -152,8 +168,15 @@
               <el-tag v-if="debugResponse.llmResponse" size="small" type="success">生成完成</el-tag>
               <el-tag v-else size="small" type="info">未返回内容</el-tag>
             </div>
-            <div class="response-box" :class="{ 'is-empty': !debugResponse.llmResponse }">
-              {{ debugResponse.llmResponse || '本次诊断未返回生成内容（可能跳过了模型生成，或模型调用失败）。' }}
+            <!-- 复用全站聊天 Markdown 管线（markdown-it + KaTeX + 代码高亮 + 表格 + Mermaid），避免裸文本展示 -->
+            <div
+              v-if="debugResponse.llmResponse"
+              ref="answerRef"
+              class="response-box markdown-body chat-md-content"
+              v-html="renderedAnswer"
+            />
+            <div v-else class="response-box is-empty">
+              本次诊断未返回生成内容（可能跳过了模型生成，或模型调用失败）。
             </div>
             <div class="gen-meta">
               <span>实际使用模型：<strong>{{ debugResponse.modelKey || '—' }}</strong></span>
@@ -179,9 +202,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRAG } from '@/composables/knowledge/useRAG';
 import { useKnowledgeRoute } from '@/composables/knowledge/useKnowledgeRoute';
+import { bindMarkdownCodeCopy, renderChatMarkdown, renderMermaidInElement } from '@/utils/ai/chat-markdown';
 import RAGDebugPanel from '@/components/knowledge/RAGDebugPanel.vue';
 import {
   VideoPlay,
@@ -189,7 +213,8 @@ import {
   DocumentCopy,
   Cpu,
   Files,
-  ChatLineRound
+  ChatLineRound,
+  InfoFilled
 } from '@element-plus/icons-vue';
 
 const { kbId } = useKnowledgeRoute();
@@ -211,6 +236,21 @@ const {
 
 // 模型列表读取平台真实配置（已启用 + 允许自选的对话模型），不再使用前端写死的型号
 onMounted(loadAvailableModels);
+
+/** 模型回复按全站标准 Markdown 渲染（含公式/表格/代码块/引用与引文上标） */
+const answerRef = ref<HTMLElement | null>(null);
+const renderedAnswer = computed(() => renderChatMarkdown(debugResponse.value?.llmResponse || ''));
+
+/** 渲染后补齐代码复制按钮与 Mermaid 图谱（与聊天区行为一致） */
+function refreshAnswerMarkdown() {
+  nextTick(() => {
+    if (!answerRef.value) return;
+    bindMarkdownCodeCopy(answerRef.value);
+    renderMermaidInElement(answerRef.value);
+  });
+}
+
+watch(renderedAnswer, () => refreshAnswerMarkdown());
 </script>
 
 <style scoped lang="scss">
@@ -315,10 +355,54 @@ onMounted(loadAvailableModels);
             flex-direction: column;
             gap: 6px;
 
+            /* 标题左对齐、数值右对齐：保证同排两个滑块的标签高度一致，不会因换行错位 */
             label {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 8px;
+              min-height: 18px;
               font-size: 12px;
               color: #475569;
               font-weight: 600;
+              line-height: 18px;
+
+              .lbl-text {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              }
+
+              .lbl-value {
+                flex-shrink: 0;
+                font-family: ui-monospace, monospace;
+                font-size: 11.5px;
+                font-weight: 700;
+                color: #2563EB;
+                background: #EFF6FF;
+                border-radius: 4px;
+                padding: 1px 6px;
+              }
+
+              .tip-icon {
+                font-size: 12px;
+                color: #94A3B8;
+                cursor: help;
+
+                &:hover {
+                  color: #2563EB;
+                }
+              }
+            }
+
+            /* 滑轨紧贴标签，收敛上下留白，视觉上更紧凑 */
+            :deep(.el-slider) {
+              margin: 0;
+              --el-slider-button-size: 14px;
+              --el-slider-height: 4px;
             }
 
             .prompt-textarea {
@@ -334,12 +418,6 @@ onMounted(loadAvailableModels);
               border-radius: 6px;
               padding: 6px 8px;
             }
-          }
-
-          .form-row {
-            display: flex;
-            gap: 12px;
-            .flex-1 { flex: 1; }
           }
         }
       }
@@ -479,11 +557,26 @@ onMounted(loadAvailableModels);
               font-size: 13px;
               line-height: 1.7;
               color: #1E293B;
-              white-space: pre-wrap;
+
+              /* Markdown 渲染后的首个/末个块级元素贴边，避免容器内出现多余空白 */
+              :deep(> :first-child) {
+                margin-top: 0;
+              }
+
+              :deep(> :last-child) {
+                margin-bottom: 0;
+              }
+
+              /* 诊断面板内的表格与代码块限制宽度，防止撑破右栏 */
+              :deep(.table-wrap),
+              :deep(.code-block-wrapper) {
+                max-width: 100%;
+              }
 
               &.is-empty {
                 color: #94A3B8;
                 font-size: 12.5px;
+                white-space: pre-wrap;
               }
             }
 

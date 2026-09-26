@@ -85,6 +85,7 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
         if (useRag) {
             RagAugmentation augmentation = augmentWithKnowledgeBase(request);
             systemPrompt = augmentation.systemPrompt();
+            userPrompt = augmentation.userPrompt();
             citations = augmentation.citations();
         } else if (StringUtils.hasText(request.getLessonEnrichmentBlock())) {
             systemPrompt = systemPrompt + "\n\n" + request.getLessonEnrichmentBlock().trim();
@@ -110,7 +111,7 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
         if (useRag) {
             RagAugmentation augmentation = augmentWithKnowledgeBase(request);
             systemPrompt = augmentation.systemPrompt();
-            userPrompt = augmentation.promptPreview() != null ? augmentation.promptPreview() : userPrompt;
+            userPrompt = augmentation.userPrompt() != null ? augmentation.userPrompt() : userPrompt;
             citations = augmentation.citations();
         } else if (StringUtils.hasText(request.getLessonEnrichmentBlock())) {
             systemPrompt = systemPrompt + "\n\n" + request.getLessonEnrichmentBlock().trim();
@@ -207,17 +208,38 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
                 .conversationHistory(request.getConversationHistory())
                 .build();
         RagResult ragResult = executeLessonScopedRag(request, retrievalQuery, rewriteContext);
+        String context = ragResult.getContext() != null ? ragResult.getContext().trim() : "";
         Map<String, String> vars = new HashMap<>();
-        vars.put("context", ragResult.getContext() != null ? ragResult.getContext() : "");
+        vars.put("context", context);
         String questionForTemplate = StringUtils.hasText(request.getRetrievalQuery())
                 ? request.getRetrievalQuery()
                 : request.getMessage();
         vars.put("question", questionForTemplate);
-        String systemPrompt = promptService.renderTemplate("chat_rag", vars);
+
+        String systemPrompt = promptService.renderSystemPrompt("chat_rag", vars);
+        if (!StringUtils.hasText(systemPrompt)) {
+            systemPrompt = promptService.renderTemplate("chat_rag", vars);
+        }
+        if (!StringUtils.hasText(systemPrompt)) {
+            systemPrompt = resolveBaseSystemPrompt(request);
+        }
         if (StringUtils.hasText(request.getLessonEnrichmentBlock())) {
             systemPrompt = systemPrompt + "\n\n" + request.getLessonEnrichmentBlock().trim();
         }
-        return new RagAugmentation(systemPrompt, ragResult.getPromptPreview(), toCitations(ragResult, request));
+
+        String userPrompt;
+        if (StringUtils.hasText(context)) {
+            String userContentTemplate = promptService.renderUserContent("chat_rag", vars);
+            if (StringUtils.hasText(userContentTemplate) && userContentTemplate.contains(context)) {
+                userPrompt = userContentTemplate;
+            } else {
+                userPrompt = "请结合以下课程参考资料，回答用户的学习问题。\n\n【参考资料】\n"
+                        + context + "\n\n【用户问题】\n" + request.getMessage();
+            }
+        } else {
+            userPrompt = request.getMessage();
+        }
+        return new RagAugmentation(systemPrompt, userPrompt, toCitations(ragResult, request));
     }
 
     private RagResult executeLessonScopedRag(IntentDispatchRequest request, String retrievalQuery,
@@ -252,7 +274,7 @@ public class IntentDispatchServiceImpl implements IntentDispatchService {
         );
     }
 
-    private record RagAugmentation(String systemPrompt, String promptPreview, List<CitationVO> citations) {
+    private record RagAugmentation(String systemPrompt, String userPrompt, List<CitationVO> citations) {
     }
 
     private String resolveCourseName(IntentDispatchRequest request) {

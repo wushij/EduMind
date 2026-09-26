@@ -466,7 +466,8 @@ export function useCourseAIWorkspace(options: UseCourseAIWorkspaceOptions) {
       lessonChapterId: resolvedLessonId,
       sectionTitle: activeSectionTitle.value || undefined,
       // 不传 modelKey：由后端按「场景路由 → 平台默认对话模型(is_default)」自动选择
-      useRag: Boolean(course.value?.knowledgeBaseId),
+      // 当 course 包含明确 knowledgeBaseId 时传 true；否则传 undefined 由后端按 courseId 自动关联知识库
+      useRag: course.value?.knowledgeBaseId ? true : undefined,
       webSearch,
       attachmentIds
     });

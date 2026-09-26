@@ -56,32 +56,62 @@ public class RagRetrieverImpl implements RagRetriever {
 
     public List<RetrievalHit> retrieveWithRewrittenQuery(String rewritten, Long knowledgeBaseId, int topK,
                                                          double minScore, Long documentId) {
-        if (!StringUtils.hasText(rewritten)) {
-            return List.of();
-        }
-        if (ragProperties.isHybridEnabled()) {
-            return hybridRetrieve(rewritten, knowledgeBaseId, topK, minScore, documentId);
-        }
-        return vectorOnlyRetrieve(rewritten, knowledgeBaseId, topK, minScore, documentId);
+        return retrieveWithRewrittenQuery(rewritten, rewritten, knowledgeBaseId, topK, minScore, documentId);
     }
 
-    private List<RetrievalHit> hybridRetrieve(String rewritten, Long knowledgeBaseId, int topK, double minScore,
-                                              Long documentId) {
+    /**
+     * 混合检索（向量语义分支 + 关键词字面分支）。
+     *
+     * <p>两个分支刻意使用不同的 Query：向量分支用改写结果以改善语义召回，
+     * 关键词分支用原始 Query。因为改写输出通常是自然语言问句（例：{@code 洛必达法则}
+     * → {@code 什么是洛必达法则?}），而关键词分支执行的是 {@code content LIKE '%整串%'}
+     * 字面匹配，拿改写问句去匹配讲义正文必然命中 0 条，最终表现为
+     * 「检索召回 0 条 → 上下文 0 字符 → 模型无参考资料只能拒答」。</p>
+     *
+     * @param rewritten    改写后的 Query，供向量语义分支使用
+     * @param keywordQuery 原始 Query，供关键词字面分支使用
+     */
+    public List<RetrievalHit> retrieveWithRewrittenQuery(String rewritten, String keywordQuery,
+                                                         Long knowledgeBaseId, int topK, double minScore,
+                                                         Long documentId) {
+        boolean hasVectorQuery = StringUtils.hasText(rewritten);
+        boolean hasKeywordQuery = StringUtils.hasText(keywordQuery);
+        if (!hasVectorQuery && !hasKeywordQuery) {
+            return List.of();
+        }
+        String vectorQuery = hasVectorQuery ? rewritten : keywordQuery;
+        String literalQuery = hasKeywordQuery ? keywordQuery : rewritten;
+        if (ragProperties.isHybridEnabled()) {
+            return hybridRetrieve(vectorQuery, literalQuery, knowledgeBaseId, topK, minScore, documentId);
+        }
+        return vectorOnlyRetrieve(vectorQuery, knowledgeBaseId, topK, minScore, documentId);
+    }
+
+    private List<RetrievalHit> hybridRetrieve(String vectorQuery, String keywordQuery, Long knowledgeBaseId, int topK,
+                                              double minScore, Long documentId) {
         List<RetrievalHit> vectorHits = vectorOnlyRetrieve(
-                rewritten, knowledgeBaseId, HYBRID_BRANCH_LIMIT, 0.0, documentId);
+                vectorQuery, knowledgeBaseId, HYBRID_BRANCH_LIMIT, 0.0, documentId);
         List<Long> vectorIds = vectorHits.stream()
                 .map(RetrievalHit::getChunkId)
                 .filter(id -> id != null)
                 .toList();
 
         ChunkKeywordSearchVO keyword = chunkRetrievalApi.searchKeywords(
-                knowledgeBaseId, documentId, rewritten, HYBRID_BRANCH_LIMIT);
+                knowledgeBaseId, documentId, keywordQuery, HYBRID_BRANCH_LIMIT);
+        // 若原始自然语言问句在数据库字面匹配为 0，且改写 Query 存在，则用改写词进行字面补充检索
+        if (isKeywordEmpty(keyword) && StringUtils.hasText(vectorQuery) && !vectorQuery.equals(keywordQuery)) {
+            ChunkKeywordSearchVO fallbackKeyword = chunkRetrievalApi.searchKeywords(
+                    knowledgeBaseId, documentId, vectorQuery, HYBRID_BRANCH_LIMIT);
+            if (!isKeywordEmpty(fallbackKeyword)) {
+                keyword = fallbackKeyword;
+            }
+        }
 
         Map<String, List<Long>> rankedLists = new LinkedHashMap<>();
         rankedLists.put("vector", vectorIds);
-        rankedLists.put("phrase", safeList(keyword.getPhraseRankedChunkIds()));
-        rankedLists.put("token", safeList(keyword.getTokenRankedChunkIds()));
-        rankedLists.put("tech", safeList(keyword.getTechTermRankedChunkIds()));
+        rankedLists.put("phrase", safeList(keyword != null ? keyword.getPhraseRankedChunkIds() : null));
+        rankedLists.put("token", safeList(keyword != null ? keyword.getTokenRankedChunkIds() : null));
+        rankedLists.put("tech", safeList(keyword != null ? keyword.getTechTermRankedChunkIds() : null));
 
         Map<String, Double> weights = new HashMap<>();
         weights.put("vector", 1.0);
@@ -92,15 +122,35 @@ public class RagRetrieverImpl implements RagRetriever {
         Map<Long, Double> fused = ReciprocalRankFusion.fuse(
                 rankedLists, weights, ragProperties.getRrfK());
 
-        double rrfFloor = minScore > 0 ? minScore : ragProperties.getMinRrfScore();
+        double effectiveFloor = Math.min(
+                minScore > 0 ? minScore : ragProperties.getMinRrfScore(),
+                ragProperties.getMinRrfScore());
         List<Long> orderedIds = fused.entrySet().stream()
-                .filter(e -> e.getValue() >= rrfFloor)
+                .filter(e -> e.getValue() >= effectiveFloor)
                 .sorted(Comparator.comparing(Map.Entry<Long, Double>::getValue).reversed())
                 .map(Map.Entry::getKey)
                 .limit(topK)
                 .toList();
 
+        // 避免因阈值过严导致有命中却全部清零，若非空则至少保留最高分候选
+        if (orderedIds.isEmpty() && !fused.isEmpty()) {
+            orderedIds = fused.entrySet().stream()
+                    .sorted(Comparator.comparing(Map.Entry<Long, Double>::getValue).reversed())
+                    .map(Map.Entry::getKey)
+                    .limit(topK)
+                    .toList();
+        }
+
         return buildHits(orderedIds, fused, knowledgeBaseId);
+    }
+
+    private boolean isKeywordEmpty(ChunkKeywordSearchVO vo) {
+        if (vo == null) {
+            return true;
+        }
+        return (vo.getPhraseRankedChunkIds() == null || vo.getPhraseRankedChunkIds().isEmpty())
+                && (vo.getTokenRankedChunkIds() == null || vo.getTokenRankedChunkIds().isEmpty())
+                && (vo.getTechTermRankedChunkIds() == null || vo.getTechTermRankedChunkIds().isEmpty());
     }
 
     private List<RetrievalHit> vectorOnlyRetrieve(String rewritten, Long knowledgeBaseId, int topK,

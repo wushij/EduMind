@@ -62,15 +62,24 @@ public class ChunkRetrievalService {
 
     private List<String> splitSearchTokens(String query) {
         List<String> tokens = new ArrayList<>();
-        for (String part : query.split("\\s+")) {
+        for (String part : query.split("[\\s,\\.!?;:，。！？；：、\\(\\)\\[\\]【】_+\\-]+")) {
             if (part.length() >= 2) {
                 tokens.add(part);
+            }
+        }
+        var exampleMatcher = Pattern.compile("(例题?|习题?)\\s*(\\d+)").matcher(query);
+        while (exampleMatcher.find()) {
+            String prefix = exampleMatcher.group(1);
+            String num = exampleMatcher.group(2);
+            tokens.add(prefix + num);
+            if (prefix.contains("题")) {
+                tokens.add(prefix.replace("题", "") + num);
             }
         }
         if (tokens.isEmpty() && query.length() >= 2) {
             tokens.add(query);
         }
-        return tokens;
+        return tokens.stream().distinct().toList();
     }
 
     private List<String> extractEnglishTokens(String query) {

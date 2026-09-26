@@ -288,6 +288,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  /* 抽屉里未读提示在「全部已读」后会被移除，靠 auto 外边距保证按钮始终右对齐，避免位置跳动 */
+  margin-left: auto;
 }
 
 .notify-pagination-bar {

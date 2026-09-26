@@ -136,7 +136,7 @@
                             v-for="(item, cIdx) in msg.citations"
                             :key="cIdx"
                             class="citation-card"
-                            @click="jumpToCitation(item)"
+                            @click="openCitationDetail(item, msg.citations)"
                           >
                             <div class="citation-top">
                               <span class="citation-idx">[{{ cIdx + 1 }}]</span>
@@ -287,6 +287,15 @@
               <!-- 流式输出平滑跟随锚点与底部留白 -->
               <div ref="streamAnchorRef" class="stream-follow-anchor" aria-hidden="true" />
               <div class="chat-bottom-spacer" aria-hidden="true" />
+
+              <!-- 切片出处排版详情弹窗（统一课程 AI 交互风格，左侧带出处跳转链接） -->
+              <CitationDetailModal
+                v-model="citationModalVisible"
+                :citation="activeCitationItem"
+                :peer-scores="activePeerScores"
+                has-jump-handler
+                @jump="handleCitationJump"
+              />
             </div>
 </template>
 
@@ -301,6 +310,7 @@ import {
 } from '@/utils/ai/citation-excerpt';
 import AIThinking from '@/components/ai/AIChat/AIThinking.vue';
 import LessonStudioInsertActions from '@/components/ai/global-assistant/LessonStudioInsertActions.vue';
+import CitationDetailModal from '@/components/knowledge/CitationDetailModal.vue';
 import { globalAssistantUiKey } from '@/components/ai/global-assistant/global-assistant-ui-key';
 
 const {
@@ -362,5 +372,21 @@ function toggleCitationTray(key: string) {
     next.add(key);
   }
   expandedCitationTrays.value = next;
+}
+
+/** 切片出处排版详情弹窗状态 */
+const citationModalVisible = ref(false);
+const activeCitationItem = ref<CitationItem | null>(null);
+const activePeerScores = ref<number[]>([]);
+
+function openCitationDetail(item: CitationItem, citations: CitationItem[]) {
+  activeCitationItem.value = item;
+  activePeerScores.value = collectCitationScores(citations);
+  citationModalVisible.value = true;
+}
+
+function handleCitationJump(item: CitationItem) {
+  citationModalVisible.value = false;
+  jumpToCitation(item);
 }
 </script>

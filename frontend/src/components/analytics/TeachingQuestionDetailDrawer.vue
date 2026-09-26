@@ -7,14 +7,35 @@
     class="question-detail-drawer"
   >
     <div v-if="question" class="drawer-inner-body">
-      <!-- 考点与题目基本信息徽章行 -->
+      <!-- 考点与题目基本信息徽章行：错因随当前题目切换，避免徽章与下方诊断对不上 -->
       <div class="meta-tag-line">
-        <span class="type-badge">{{ question.errorTypeName || '待归因' }}</span>
+        <span class="type-badge">{{ activeQuestion?.errorTypeName || question.errorTypeName || '待归因' }}</span>
         <span class="course-badge">{{ question.course }}</span>
         <span class="mastery-badge" :class="`badge-${question.status}`">
           <template v-if="question.rate === null">掌握度: 暂无数据 ({{ question.statusLabel }})</template>
           <template v-else>掌握度: {{ question.rate }}% ({{ question.statusLabel }})</template>
         </span>
+      </div>
+
+      <!-- 合并口径提示：卡片写「合并 N 道错题」时，抽屉必须能逐题核对，而不是只给一道 -->
+      <div v-if="hasMergedQuestions" class="content-block merged-question-block">
+        <div class="merged-hint">
+          本考点合并 {{ question.wrongQuestionCount ?? mergedQuestions.length }} 道错题 · 累计
+          {{ question.wrongCount ?? 0 }} 人次，点击切换逐题核对：
+        </div>
+        <div class="merged-switch-list">
+          <button
+            v-for="(item, idx) in mergedQuestions"
+            :key="item.questionId ?? idx"
+            type="button"
+            class="merged-switch-chip"
+            :class="{ 'is-active': idx === activeIndex }"
+            @click="activeIndex = idx"
+          >
+            <span class="chip-label">第 {{ idx + 1 }} 题</span>
+            <span class="chip-times">{{ item.wrongCount }} 人次</span>
+          </button>
+        </div>
       </div>
 
       <!-- 题目题干区域 -->
@@ -24,9 +45,13 @@
           <span v-if="questionTypeLabel" class="question-type-tag">{{ questionTypeLabel }}</span>
         </h4>
         <div class="stem-box math-rendered-box">
-          <div v-if="question.questionStem" v-html="renderMath(question.questionStem)" />
+          <div v-if="activeQuestion?.questionStem" v-html="renderMath(activeQuestion.questionStem)" />
           <div v-else class="empty-stem-hint">
-            <span>原题干：关于「{{ question.name }}」的变式练习与概念辨析题（题目 #{{ question.questionId }}）</span>
+            <span>
+              原题干：关于「{{ question.name }}」的变式练习与概念辨析题（题目 #{{
+                activeQuestion?.questionId ?? question.questionId
+              }}）
+            </span>
           </div>
         </div>
 
@@ -48,11 +73,21 @@
         </div>
       </div>
 
-      <!-- AI 深度错因分析 -->
+      <!-- AI 深度错因分析：随当前题目切换，不编造错因 -->
       <div class="content-block">
-        <h4 class="block-title">AI 学情深度诊断归因</h4>
+        <h4 class="block-title">
+          AI 学情深度诊断归因
+          <span v-if="activeQuestion?.errorTypeName" class="question-type-tag">{{ activeQuestion.errorTypeName }}</span>
+        </h4>
         <div class="diagnosis-box" :class="`diag-${question.status}`">
-          <div class="diag-reason math-rendered-box" v-html="renderMath(question.errorReason || '学生对该考点的概念内涵与外延理解模糊。')" />
+          <div
+            v-if="activeQuestion?.errorReason"
+            class="diag-reason math-rendered-box"
+            v-html="renderMath(activeQuestion.errorReason)"
+          />
+          <div v-else class="diag-reason diag-reason--empty">
+            该题暂无 AI 归因结论：可在「错题分析」中对原题发起 AI 深度诊断后查看。
+          </div>
         </div>
       </div>
 
@@ -84,7 +119,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { KnowledgeMasteryItem } from '@/composables/analytics/useTeachingReport';
 import { renderMathText } from '@/utils/format/render-math';
 import { parseQuestionOptions } from '@/utils/question/normalize-question';
@@ -117,7 +152,35 @@ function renderMath(text?: string): string {
   return renderMathText(text);
 }
 
-const questionTypeLabel = computed(() => OBJECTIVE_TYPE_LABELS[String(props.question?.questionType || '')] || '');
+/** 同一考点合并的错题明细（后端按答错人次降序，最多 10 条） */
+const mergedQuestions = computed(() => props.question?.mergedQuestions ?? []);
+
+/** 是否真的合并了多道题：只有明细多于一道才需要切换 UI */
+const hasMergedQuestions = computed(() => mergedQuestions.value.length > 1);
+
+/** 当前查看的题目下标 */
+const activeIndex = ref(0);
+
+/** 切换考点时回到第一道题，避免沿用上一个考点的选中位置 */
+watch(
+  () => props.question?.knowledgePointId ?? props.question?.questionId,
+  () => {
+    activeIndex.value = 0;
+  }
+);
+
+/**
+ * 当前展示的题目：合并多题时取明细中的一道，否则就是考点级的代表题。
+ * 题干、选项、错因诊断全部以它为准，保证「看到的这道题」与「这段诊断」永远对应。
+ */
+const activeQuestion = computed(() => {
+  if (!hasMergedQuestions.value) {
+    return props.question;
+  }
+  return mergedQuestions.value[activeIndex.value] ?? props.question;
+});
+
+const questionTypeLabel = computed(() => OBJECTIVE_TYPE_LABELS[String(activeQuestion.value?.questionType || '')] || '');
 
 /**
  * 原题选项：后端透出的是题目表里的 options JSON 字符串，
@@ -125,9 +188,9 @@ const questionTypeLabel = computed(() => OBJECTIVE_TYPE_LABELS[String(props.ques
  * 避免这里再写一套「只认数组」的解析导致选项整段消失。
  */
 const optionList = computed(() => {
-  const raw = props.question?.questionOptions;
+  const raw = activeQuestion.value?.questionOptions;
   if (!raw) return [];
-  return parseQuestionOptions(raw, props.question?.questionAnswer ?? undefined).filter(
+  return parseQuestionOptions(raw, activeQuestion.value?.questionAnswer ?? undefined).filter(
     (opt) => String(opt.content ?? '').trim().length > 0
   );
 });
@@ -158,9 +221,10 @@ function handleJumpQuiz() {
     gap: 8px;
     flex-wrap: wrap;
 
+    /* 徽章行长圆口径统一：不能与「掌握度」胶囊一个直角一个长圆 */
     .type-badge {
       padding: 3px 10px;
-      border-radius: 6px;
+      border-radius: 9999px;
       background: #eff6ff;
       color: #1d4ed8;
       font-size: 12px;
@@ -169,7 +233,7 @@ function handleJumpQuiz() {
 
     .course-badge {
       padding: 3px 10px;
-      border-radius: 6px;
+      border-radius: 9999px;
       background: #f1f5f9;
       color: #475569;
       font-size: 12px;
@@ -199,8 +263,8 @@ function handleJumpQuiz() {
       gap: 8px;
 
       .question-type-tag {
-        padding: 2px 8px;
-        border-radius: 6px;
+        padding: 2px 9px;
+        border-radius: 9999px;
         background: #f1f5f9;
         color: #64748b;
         font-size: 11px;
@@ -279,6 +343,76 @@ function handleJumpQuiz() {
       color: #92400e;
       font-size: 12.5px;
       line-height: 1.6;
+    }
+
+    /**
+     * 考点合并了多道错题时的逐题切换区。
+     * 该块自身就带 .content-block，必须写成复合选择器：写成 .content-block .merged-question-block
+     * 会变成「后代」语义而整块规则失效，chip 直接掉回浏览器默认按钮边框。
+     */
+    &.merged-question-block {
+      .merged-hint {
+        margin-bottom: 10px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: #fef9ec;
+        border: 1px solid #f5e0b7;
+        color: #92400e;
+        font-size: 12.5px;
+        line-height: 1.6;
+      }
+
+      .merged-switch-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .merged-switch-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 9px;
+        border-radius: 9999px;
+        border: 1px solid #dbe3ec;
+        background: #ffffff;
+        color: #475569;
+        font-size: 11px;
+        line-height: 1.5;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        /* 人次用分隔线隔开，避免与「第 N 题」粘成「第 1 题 2 人次」读成一串 */
+        .chip-times {
+          margin-left: 6px;
+          padding-left: 6px;
+          border-left: 1px solid #e2e8f0;
+          color: #94a3b8;
+          font-size: 10.5px;
+        }
+
+        &:hover {
+          border-color: #93c5fd;
+          color: #1d4ed8;
+        }
+
+        &.is-active {
+          border-color: #2563eb;
+          background: #eff6ff;
+          color: #1d4ed8;
+          font-weight: 600;
+
+          .chip-times {
+            border-left-color: #bfdbfe;
+            color: #2563eb;
+          }
+        }
+      }
+    }
+
+    /* 该题没有归因结论：如实说明，不复用一句编造的错因 */
+    .diag-reason--empty {
+      color: #64748b;
+      font-style: italic;
     }
 
     .stem-box {

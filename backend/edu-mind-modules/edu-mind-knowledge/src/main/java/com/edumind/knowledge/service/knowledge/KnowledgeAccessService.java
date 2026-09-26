@@ -76,6 +76,9 @@ public class KnowledgeAccessService {
             assertCourseAccessible(courseId);
             return knowledgeBaseDao.findByCourseId(courseId);
         }
+        if (isAdmin()) {
+            return knowledgeBaseDao.findAll();
+        }
         List<Long> courseIds = listAccessibleCourseIds();
         if (courseIds.isEmpty()) {
             return Collections.emptyList();
@@ -92,29 +95,27 @@ public class KnowledgeAccessService {
         if (userId != null) {
             return userId;
         }
-        if (cn.dev33.satoken.stp.StpUtil.isLogin()) {
-            try {
+        try {
+            if (cn.dev33.satoken.stp.StpUtil.isLogin()) {
                 return cn.dev33.satoken.stp.StpUtil.getLoginIdAsLong();
-            } catch (Exception ignored) {
             }
+        } catch (Exception ignored) {
         }
         return null;
     }
 
     private boolean isAdmin() {
         LoginUser user = UserContext.get();
-        if (user != null && user.getRoles() != null && 
-                (user.getRoles().contains(SecurityConstant.ROLE_ADMIN) || user.getRoles().contains(SecurityConstant.ROLE_TEACHER))) {
-            return true;
+        if (user != null && user.getRoles() != null) {
+            return user.getRoles().contains(SecurityConstant.ROLE_ADMIN);
         }
-        if (cn.dev33.satoken.stp.StpUtil.isLogin()) {
-            try {
+        try {
+            if (cn.dev33.satoken.stp.StpUtil.isLogin()) {
                 Long loginId = cn.dev33.satoken.stp.StpUtil.getLoginIdAsLong();
                 return Long.valueOf(1L).equals(loginId)
-                        || cn.dev33.satoken.stp.StpUtil.hasRole(SecurityConstant.ROLE_ADMIN)
-                        || cn.dev33.satoken.stp.StpUtil.hasRole(SecurityConstant.ROLE_TEACHER);
-            } catch (Exception ignored) {
+                        || cn.dev33.satoken.stp.StpUtil.hasRole(SecurityConstant.ROLE_ADMIN);
             }
+        } catch (Exception ignored) {
         }
         return false;
     }

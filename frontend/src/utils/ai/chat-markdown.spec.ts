@@ -163,5 +163,43 @@ $$\\lim_{n\\to\\infty} \\frac{5n^3 - 2n^2 + 1}{2n^3 + 7n - 4}$$
     expect(htmlNoBold).toContain('<ol>');
     expect(htmlNoBold).toContain('<li>');
   });
+
+  it('自动拆分标题末尾粘连的无序列表、多级标题及正文引导句', () => {
+    // 1. 标题粘连无序列表第一项（用户实际场景）
+    const rawGluedList = `##八、易错点提醒- **不是未定式不能用洛必达**；
+- **每用一次洛必达，都要重新判断是否仍是未定式**；
+- **洛必达后极限不存在，不能说明原极限不存在**；`;
+    const htmlList = renderChatMarkdown(rawGluedList);
+    expect(htmlList).toContain('<h2>八、易错点提醒</h2>');
+    expect(htmlList).toContain('<li><strong>不是未定式不能用洛必达</strong>；</li>');
+    expect(htmlList).toContain('<li><strong>每用一次洛必达，都要重新判断是否仍是未定式</strong>；</li>');
+
+    // 2. 二级标题粘连三级标题与正文
+    const rawGluedHeadings = `##三、洛必达法则###1.法则内容若极限存在
+代入分析。`;
+    const htmlHeadings = renderChatMarkdown(rawGluedHeadings);
+    expect(htmlHeadings).toContain('<h2>三、洛必达法则</h2>');
+    expect(htmlHeadings).toContain('<h3>1. 法则内容</h3>');
+    expect(htmlHeadings).toMatch(/<p>若极限存在[\s\S]*代入分析。<\/p>/);
+
+    // 3. 标题以经典收尾词（注意事项）结尾粘连正文
+    const rawGluedProse = `##四、洛必达法则的注意事项洛必达法则很强，但不是万能的。`;
+    const htmlProse = renderChatMarkdown(rawGluedProse);
+    expect(htmlProse).toContain('<h2>四、洛必达法则的注意事项</h2>');
+    expect(htmlProse).toContain('<p>洛必达法则很强，但不是万能的。</p>');
+
+    // 4. 标题粘连假设正文引导词（如果不是）
+    const rawGluedCondition = `###1.必须验证未定式类型如果不是 0/0 或无穷比无穷，不能随便使用。`;
+    const htmlCondition = renderChatMarkdown(rawGluedCondition);
+    expect(htmlCondition).toContain('<h3>1. 必须验证未定式类型</h3>');
+    expect(htmlCondition).toContain('<p>如果不是 0/0 或无穷比无穷，不能随便使用。</p>');
+
+    // 5. 普通副标题不被误拆（如「模块一 - 基础篇」）
+    const rawNormalSub = `## 模块一 - 基础篇`;
+    const htmlNormalSub = renderChatMarkdown(rawNormalSub);
+    expect(htmlNormalSub).toContain('<h2>模块一 - 基础篇</h2>');
+    expect(htmlNormalSub).not.toContain('<li>');
+  });
 });
+
 

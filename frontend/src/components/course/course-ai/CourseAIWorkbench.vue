@@ -169,6 +169,7 @@
               v-for="(msg, idx) in allDisplayMessages"
               :key="msg.id || idx"
               :message="msg"
+              :course-id="currentCourseIdNum"
               :is-last="idx === allDisplayMessages.length - 1 && !streaming"
               :follow-up-prompts="followUpPrompts"
               @send-prompt="handleSendPrompt"

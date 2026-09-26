@@ -8,7 +8,7 @@
           <h3 class="panel-title">本学期核心考点掌握度热力排行榜</h3>
         </div>
         <div class="header-right-group">
-          <span class="rank-order-hint">按实测掌握度升序 · 同分按答错人次</span>
+          <span class="rank-order-hint">可归因薄弱点优先 · 掌握度升序 · 同分按答错人次</span>
           <span class="badge-pill">{{ knowledgeMasteryList.length }} 个薄弱考点</span>
         </div>
       </div>
@@ -34,9 +34,22 @@
                 <div class="name-row">
                   <span class="kp-title" v-html="renderMath(kp.name)" />
                   <span class="course-name-tag">{{ kp.course }}</span>
-                  <!-- 同一考点的多道错题已合并：如实标注，避免教师以为漏了数据 -->
-                  <span v-if="(kp.wrongQuestionCount ?? 1) > 1" class="merged-wrong-tag">
+                  <!-- 纯空白作答没有可归因内容：如实标注，并说明它不按掌握度抢榜位 -->
+                  <span
+                    v-if="kp.unansweredOnly"
+                    class="merged-wrong-tag merged-wrong-tag--unanswered"
+                  >
+                    {{ kp.wrongStudentCount ?? 1 }} 人未作答 · 暂无归因
+                  </span>
+                  <!-- 题目数与人次必须分开标注：写着「合并 4 道错题」点开只有 1 道，就是这两个口径被混用 -->
+                  <span v-else-if="(kp.wrongQuestionCount ?? 1) > 1" class="merged-wrong-tag">
                     合并 {{ kp.wrongQuestionCount }} 道错题
+                  </span>
+                  <span
+                    v-else-if="(kp.wrongCount ?? 0) > 1"
+                    class="merged-wrong-tag merged-wrong-tag--times"
+                  >
+                    {{ kp.wrongCount }} 人次答错
                   </span>
                 </div>
               </div>
@@ -407,6 +420,18 @@ function renderMath(text?: string): string {
                   background: #fef3c7;
                   color: #b45309;
                   font-size: 11px;
+                }
+
+                /* 只有一道题、多个学生答错：说「人次」，不能说「道数」 */
+                .merged-wrong-tag--times {
+                  background: #eef2ff;
+                  color: #4338ca;
+                }
+
+                /* 纯空白作答：中性色标注，避免与真实错因混淆 */
+                .merged-wrong-tag--unanswered {
+                  background: #f1f5f9;
+                  color: #64748b;
                 }
               }
             }

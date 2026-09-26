@@ -407,7 +407,7 @@ async function handleChapterCommand(cmd: string, chapter: any) {
   } else if (cmd === 'delete') {
     try {
       await ElMessageBox.confirm(
-        `确定要删除大纲章节「${chapter.title}」吗？删除后该章节下的所有微课节将同步被级联移除，且无法恢复。`,
+        `确定要删除大纲章节「${chapter.title}」吗？该章节下的所有微课节将同步移除，其在知识库中生成的切片与向量索引也会一并清理，且无法恢复。`,
         '删除确认',
         {
           type: 'warning',
@@ -427,7 +427,7 @@ async function handleChapterCommand(cmd: string, chapter: any) {
 async function confirmDeleteSection(chapter: any, sec: any) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除微课节「${sec.title}」吗？删除后将无法恢复。`,
+      `确定要删除微课节「${sec.title}」吗？该课节在知识库中生成的切片与向量索引将被同步清理，且无法恢复。`,
       '删除确认',
       {
         type: 'warning',

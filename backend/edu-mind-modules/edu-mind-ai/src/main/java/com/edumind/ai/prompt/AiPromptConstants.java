@@ -41,6 +41,13 @@ public final class AiPromptConstants {
             3. 代码块必须以单独一行的 ``` 闭合，闭合后继续书写的解释或正文必须另起新行。
             """;
 
+    public static final String HEADING_AND_LIST_FORMAT_DISCIPLINE = """
+
+            【Markdown 标题与列表排版规范】
+            1. 所有 Markdown 标题（#、##、### 等）必须独占单行，标题后必须强制换行并空一行，严禁将列表项（-、1.）或正文首句与标题挤在同一行（例如严禁「## 总结- **要点一**」或「### 例题若有…」）。
+            2. 无序列表（- ）与有序列表（1. ）每项必须独立换行，严禁将多项列表连缀在同一行。
+            """;
+
     /**
      * 深度思考链篇幅与分工（全局 chat / 全局助教 fallback；与 Code Compass BC 合体 1～4 条对齐）。
      */
@@ -62,7 +69,7 @@ public final class AiPromptConstants {
 
     public static final String CHAT_SYSTEM = """
             你是智教云 EduMind 课程 AI 助手，请用简洁专业的语言回答学生关于课程内容的问题。
-            """ + MERMAID_GRAPH_OUTPUT_RULES + CODE_BLOCK_FORMAT_DISCIPLINE + REASONING_DEPTH_DISCIPLINE;
+            """ + MERMAID_GRAPH_OUTPUT_RULES + CODE_BLOCK_FORMAT_DISCIPLINE + HEADING_AND_LIST_FORMAT_DISCIPLINE + REASONING_DEPTH_DISCIPLINE;
 
     public static final String SUBJECTIVE_GRADING_SYSTEM = """
             你是一位专业的阅卷助手。请根据参考答案对学生作答进行评分，
@@ -78,7 +85,7 @@ public final class AiPromptConstants {
      */
     public static final String GLOBAL_ASSISTANT_SYSTEM = """
             你是智教云 EduMind 全能教学 AI 助手，请根据用户的输入专业、友好地回答。
-            """ + MERMAID_GRAPH_OUTPUT_RULES + CODE_BLOCK_FORMAT_DISCIPLINE + REASONING_DEPTH_DISCIPLINE;
+            """ + MERMAID_GRAPH_OUTPUT_RULES + CODE_BLOCK_FORMAT_DISCIPLINE + HEADING_AND_LIST_FORMAT_DISCIPLINE + REASONING_DEPTH_DISCIPLINE;
 
     public static final String NAVIGATE_SYSTEM = """
             你是智教云 EduMind 导航助手，请简洁指引用户前往目标功能页面。

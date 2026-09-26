@@ -2,7 +2,11 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { useLearningAnalytics } from '@/composables/analytics/useLearningAnalytics';
-import type { TeachingReportMasteryStatus, TeachingReportVO } from '@/types/analytics/report';
+import type {
+  TeachingReportMasteryStatus,
+  TeachingReportMergedQuestion,
+  TeachingReportVO
+} from '@/types/analytics/report';
 import { useTeacherCourses } from '@/composables/course/useTeacherCourses';
 import { canAccessRoute } from '@/utils/router/route-access';
 
@@ -21,8 +25,16 @@ export interface KnowledgeMasteryItem {
   masterySampleCount?: number | null;
   /** 该考点累计测评次数；与覆盖人数成对展示，避免「人次」口径被误读 */
   masteryAssessmentCount?: number | null;
-  /** 该考点聚合的错题条数（>1 表示多道错题已合并为一行） */
+  /** 该考点聚合的不同题目数（>1 表示多道错题已合并为一行） */
   wrongQuestionCount?: number;
+  /** 该考点累计答错人次：同一道题被多人答错会累加，与「题目数」口径不同 */
+  wrongCount?: number;
+  /** 该考点下出现过错误的去重学生数 */
+  wrongStudentCount?: number | null;
+  /** 该考点的失分是否全部来自空白作答（无可归因内容，已排序后置） */
+  unansweredOnly?: boolean;
+  /** 合并的错题明细，供「查看原题」抽屉逐题切换 */
+  mergedQuestions?: TeachingReportMergedQuestion[];
   /** 错因类型是否为关键词推断（非库中显式标注） */
   errorTypeInferred?: boolean;
   questionId?: number | string;
@@ -205,6 +217,10 @@ export function useTeachingReport(defaultCourseId?: number) {
             masterySampleCount: item.masterySampleCount ?? null,
             masteryAssessmentCount: item.masteryAssessmentCount ?? null,
             wrongQuestionCount: item.wrongQuestionCount ?? 1,
+            wrongCount: item.wrongCount ?? 0,
+            wrongStudentCount: item.wrongStudentCount ?? null,
+            unansweredOnly: item.unansweredOnly === true,
+            mergedQuestions: item.mergedQuestions ?? [],
             errorTypeInferred: item.errorTypeInferred === true,
             questionId: item.questionId,
             questionStem: item.questionStem,

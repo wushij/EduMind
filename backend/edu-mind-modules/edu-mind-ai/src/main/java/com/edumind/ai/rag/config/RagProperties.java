@@ -10,8 +10,8 @@ public class RagProperties {
     /** 向量 + 关键词多路召回 + RRF（对齐 Code Compass HybridSearch） */
     private boolean hybridEnabled = true;
 
-    /** RRF 融合分下限（与 Compass MinRAGCitationRRFScore 一致量级） */
-    private double minRrfScore = 0.03;
+    /** RRF 融合分下限：单路命中首位约为 0.01639，下限设为 0.005 保证单路前列切片不被清空 */
+    private double minRrfScore = 0.005;
 
     private double rrfK = 60.0;
 

@@ -1120,7 +1120,21 @@ export function useGlobalAssistant() {
     if (courseId && lessonId) {
       drawerVisible.value = false;
       const hash = citation.anchor ? `#${encodeURIComponent(citation.anchor)}` : '';
-      router.push(`/course/${courseId}/learn/${lessonId}${hash}`);
+      const cleanExcerpt = (citation.snippet || citation.excerpt || '')
+        .replace(/[#*`$\\]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 36);
+
+      router.push({
+        path: `/course/${courseId}/learn/${lessonId}`,
+        hash,
+        query: {
+          ...(citation.anchor ? { anchor: citation.anchor } : {}),
+          ...(citation.chunkId ? { chunkId: String(citation.chunkId) } : {}),
+          ...(cleanExcerpt ? { excerpt: cleanExcerpt } : {})
+        }
+      });
       return;
     }
 

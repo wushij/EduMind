@@ -19,8 +19,11 @@ import com.edumind.system.vo.user.UserBriefVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -118,7 +121,19 @@ public class CourseQueryServiceImpl implements CourseQueryService {
 
     @Override
     public List<Long> listCourseIdsByUserId(Long userId) {
-        return courseMemberDao.findCourseIdsByUserId(userId);
+        if (userId == null) {
+            return Collections.emptyList();
+        }
+        Set<Long> ids = new LinkedHashSet<>(courseMemberDao.findCourseIdsByUserId(userId));
+        List<CourseEntity> teacherCourses = courseDao.findByTeacherId(userId);
+        if (teacherCourses != null) {
+            for (CourseEntity c : teacherCourses) {
+                if (c.getId() != null) {
+                    ids.add(c.getId());
+                }
+            }
+        }
+        return new ArrayList<>(ids);
     }
 
     @Override

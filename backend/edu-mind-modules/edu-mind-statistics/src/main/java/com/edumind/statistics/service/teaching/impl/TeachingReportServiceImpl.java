@@ -18,6 +18,7 @@ import com.edumind.statistics.service.analytics.KnowledgeMasteryService;
 import com.edumind.statistics.service.analytics.LearningAnalyticsService;
 import com.edumind.statistics.service.teaching.TeachingReportService;
 import com.edumind.statistics.service.teaching.support.DiagnosisAdviceExtractor;
+import com.edumind.statistics.service.teaching.support.WrongQuestionGroupMetrics;
 import com.edumind.statistics.vo.analytics.KnowledgeMasteryVO;
 import com.edumind.statistics.vo.analytics.LearningAnalyticsVO;
 import com.edumind.statistics.vo.teaching.TeachingReportVO;
@@ -63,6 +64,13 @@ public class TeachingReportServiceImpl implements TeachingReportService {
 
     /** 薄弱考点榜单最大条数 */
     private static final int MAX_WEAK_POINTS = 6;
+
+    /**
+     * 单个考点最多透出的错题明细条数。
+     * 明细要支撑「查看原题」抽屉逐题核对，但同一考点积累几十道错题时不能把接口体量放大，
+     * 因此只保留答错人次最高的前若干道。
+     */
+    private static final int MAX_MERGED_QUESTIONS = 10;
 
     /** 单份答卷人工批改均时（分钟），用于估算 AI 辅助批改节约工时。属估算系数，前端需标注"估算" */
     private static final double AI_GRADING_MINUTES_PER_PAPER = 3.0;
@@ -110,11 +118,18 @@ public class TeachingReportServiceImpl implements TeachingReportService {
             Map.entry("CONCEPT", List.of("概念", "定义", "定理", "判定条件", "适用条件")));
 
     /**
-     * 薄弱考点榜单排序：实测掌握度升序（越薄弱越靠前），无实测数据的统一后置；
-     * 同掌握度按累计答错人次降序。榜单标题承诺的是"掌握度榜"，排序依据必须与之一致。
+     * 薄弱考点榜单排序：
+     * <ol>
+     *   <li>有作答痕迹的排在「纯空白作答」之前：空白作答没有可归因内容，
+     *       让它按 0% 占据榜首会把真正讲得清的薄弱点挤出前几名，点进去也只能看到「不作认知归因」；</li>
+     *   <li>实测掌握度升序（越薄弱越靠前），无实测数据的统一后置；</li>
+     *   <li>同掌握度按累计答错人次降序。</li>
+     * </ol>
      */
     private static final Comparator<TeachingReportVO.WeakPointVO> WEAK_POINT_ORDER =
-            Comparator.comparingInt((TeachingReportVO.WeakPointVO w) -> w.getMasteryRate() == null ? 1 : 0)
+            Comparator.comparingInt(
+                            (TeachingReportVO.WeakPointVO w) -> Boolean.TRUE.equals(w.getUnansweredOnly()) ? 1 : 0)
+                    .thenComparingInt(w -> w.getMasteryRate() == null ? 1 : 0)
                     .thenComparingInt(w -> w.getMasteryRate() == null ? 0 : w.getMasteryRate())
                     .thenComparingInt(w -> w.getWrongCount() == null ? 0 : -w.getWrongCount());
 
@@ -575,10 +590,13 @@ public class TeachingReportServiceImpl implements TeachingReportService {
 
         TeachingReportVO.WeakPointVO weak = new TeachingReportVO.WeakPointVO();
         weak.setQuestionId(primary.getQuestionId());
-        weak.setWrongQuestionCount(group.size());
-        weak.setWrongCount(group.stream()
-                .mapToInt(r -> r.getWrongCount() != null ? r.getWrongCount() : 1)
-                .sum());
+        // 口径修正：group 是「学生 × 题目」的记录集合，直接当题目数会得出
+        // 「卡片写合并 4 道错题、点开只有 1 道题」——同一道题被 4 人答错就是 4 条记录
+        weak.setWrongQuestionCount(WrongQuestionGroupMetrics.distinctQuestionCount(group));
+        weak.setWrongStudentCount(WrongQuestionGroupMetrics.distinctStudentCount(group));
+        weak.setWrongCount(WrongQuestionGroupMetrics.sumWrongCount(group));
+        // 全组都没有作答痕迹：该考点只有空白作答，排序时后置并由前端如实标注
+        weak.setUnansweredOnly(!WrongQuestionGroupMetrics.hasAnsweringEvidence(group));
 
         Long knowledgePointId = primary.getKnowledgePointId();
         String knowledgePointName = null;
@@ -627,7 +645,63 @@ public class TeachingReportServiceImpl implements TeachingReportService {
                 resolution != null ? resolution.code() : null,
                 knowledgePointName,
                 primary.getDiagnosis()));
+        // 卡片承诺「合并 N 道错题」，抽屉就必须能看到这 N 道题，而不是只有代表题
+        weak.setMergedQuestions(buildMergedQuestions(group));
         return weak;
+    }
+
+    /**
+     * 合并错题明细：组内再按题目分组，按答错人次降序。
+     *
+     * <p>每个条目自带题干与自身的错因诊断，抽屉切换题目时不会串题
+     * （历史问题：正文与题干来自不同记录，教师无法核对）。</p>
+     */
+    private List<TeachingReportVO.MergedQuestionVO> buildMergedQuestions(List<WrongQuestionRecordEntity> group) {
+        Map<Long, List<WrongQuestionRecordEntity>> byQuestion = new LinkedHashMap<>();
+        for (WrongQuestionRecordEntity record : group) {
+            if (record == null || record.getQuestionId() == null) {
+                continue;
+            }
+            byQuestion.computeIfAbsent(record.getQuestionId(), key -> new ArrayList<>()).add(record);
+        }
+        return byQuestion.entrySet().stream()
+                .sorted(Comparator.comparingInt(
+                        (Map.Entry<Long, List<WrongQuestionRecordEntity>> entry) ->
+                                WrongQuestionGroupMetrics.sumWrongCount(entry.getValue())
+                ).reversed())
+                .limit(MAX_MERGED_QUESTIONS)
+                .map(entry -> toMergedQuestion(entry.getKey(), entry.getValue()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    /** 单道错题的明细：题干/选项与它自己的错因诊断同源 */
+    private TeachingReportVO.MergedQuestionVO toMergedQuestion(Long questionId,
+                                                               List<WrongQuestionRecordEntity> records) {
+        if (questionId == null || records == null || records.isEmpty()) {
+            return null;
+        }
+        TeachingReportVO.MergedQuestionVO merged = new TeachingReportVO.MergedQuestionVO();
+        merged.setQuestionId(questionId);
+        merged.setWrongCount(WrongQuestionGroupMetrics.sumWrongCount(records));
+        merged.setWrongStudentCount(WrongQuestionGroupMetrics.distinctStudentCount(records));
+
+        QuestionVO question = safeGetQuestion(questionId);
+        if (question != null) {
+            merged.setQuestionStem(question.getStem());
+            merged.setQuestionType(question.getType());
+            merged.setQuestionOptions(question.getOptions());
+            merged.setQuestionAnswer(question.getAnswer());
+        }
+
+        WrongQuestionRecordEntity primary = pickRepresentative(records);
+        ErrorTypeResolution resolution = resolveErrorType(primary);
+        merged.setErrorType(resolution != null ? resolution.code() : null);
+        merged.setErrorTypeName(resolution != null
+                ? ERROR_TYPE_LABELS.getOrDefault(resolution.code(), "典型错因")
+                : "待归因");
+        merged.setErrorReason(cleanDiagnosisText(primary.getDiagnosis()));
+        return merged;
     }
 
     /**

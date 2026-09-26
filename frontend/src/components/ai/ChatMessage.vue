@@ -74,6 +74,7 @@
       <CitationList
         v-if="message.role === 'assistant' && message.citations && message.citations.length > 0"
         :citations="message.citations"
+        :course-id="courseId"
       />
 
       <!-- 底部辅助长圆小工具条 (用户与AI均支持复制与删除，AI额外支持重新生成) -->
@@ -158,10 +159,12 @@ const props = withDefaults(
     message: ChatMessage;
     isLast?: boolean;
     followUpPrompts?: string[];
+    courseId?: number;
   }>(),
   {
     isLast: false,
-    followUpPrompts: () => []
+    followUpPrompts: () => [],
+    courseId: undefined
   }
 );
 

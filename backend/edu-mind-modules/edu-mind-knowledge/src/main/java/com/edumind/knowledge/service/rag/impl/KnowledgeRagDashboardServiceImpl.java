@@ -59,7 +59,12 @@ public class KnowledgeRagDashboardServiceImpl implements KnowledgeRagDashboardSe
         long failed = knowledgeRagStatsMapper.countFailedChunkIndexes();
         long totalChunks = knowledgeRagStatsMapper.countTotalChunks();
         long normal = Math.max(0, indexed - failed);
-        KnowledgeIndexTaskEntity latestTask = knowledgeIndexTaskDao.findLatestGlobal();
+        // 进度以「真正在执行的任务」为准：有正在进行的任务则优先展示它（实时进度），
+        // 否则回退到最近一条任务（用于展示上次执行结果），避免被已终态任务干扰。
+        KnowledgeIndexTaskEntity latestIndexing = knowledgeIndexTaskDao.findLatestIndexing();
+        KnowledgeIndexTaskEntity latestTask = latestIndexing != null
+                ? latestIndexing
+                : knowledgeIndexTaskDao.findLatestGlobal();
         return KnowledgeRagDashboardVO.builder()
                 .totalDocuments(knowledgeRagStatsMapper.countDocuments())
                 .indexedDocuments(knowledgeRagStatsMapper.countIndexedDocuments())

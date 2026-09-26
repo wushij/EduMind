@@ -36,8 +36,20 @@ export interface TeachingReportWeakPoint {
   masterySampleCount?: number | null;
   /** 该考点累计测评次数（knowledge_mastery.sample_count 求和），与覆盖人数成对展示 */
   masteryAssessmentCount?: number | null;
-  /** 该考点聚合的错题条数；>1 表示同一考点有多道错题已合并为一行 */
+  /**
+   * 该考点聚合的**不同题目数**（按 question_id 去重）；>1 表示多道错题已合并为一行。
+   * 与 wrongCount（累计答错人次）口径不同：同一道题被多人答错时题目数是 1、人次可能是 N。
+   */
   wrongQuestionCount?: number | null;
+  /** 该考点下出现过错误的去重学生数 */
+  wrongStudentCount?: number | null;
+  /**
+   * 该考点的错题是否全部来自空白作答（没有可归因的作答痕迹）。
+   * 为 true 时列表会把它排在可归因薄弱点之后，前端需标注「N 人未作答」。
+   */
+  unansweredOnly?: boolean;
+  /** 合并的错题明细，供「查看原题」抽屉逐题切换 */
+  mergedQuestions?: TeachingReportMergedQuestion[] | null;
   errorType?: string | null;
   errorTypeName?: string | null;
   /** 错因类型是否为关键词推断（非库中显式标注），前端需标注「推断」 */
@@ -46,6 +58,23 @@ export interface TeachingReportWeakPoint {
   suggestion?: string | null;
   status?: TeachingReportMasteryStatus;
   statusLabel?: string;
+}
+
+/** 同一考点下合并的单个错题明细（每个条目自带题干与自身的错因诊断，切换时不串题） */
+export interface TeachingReportMergedQuestion {
+  questionId?: number | string;
+  questionStem?: string;
+  questionType?: string | null;
+  questionOptions?: string | null;
+  questionAnswer?: string | null;
+  /** 该题累计答错人次 */
+  wrongCount: number;
+  /** 该题答错学生数 */
+  wrongStudentCount?: number | null;
+  errorType?: string | null;
+  errorTypeName?: string | null;
+  /** 该题的 AI 诊断正文；空白作答或尚未归因时为 null */
+  errorReason?: string | null;
 }
 
 export interface TeachingReportVO {

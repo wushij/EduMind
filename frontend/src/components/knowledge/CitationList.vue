@@ -37,80 +37,47 @@
       </div>
     </div>
 
-    <!-- 引用切片弹窗预览 -->
-    <el-dialog
+    <!-- 引用切片弹窗预览（统一通用组件，底部带出处跳转链接） -->
+    <CitationDetailModal
       v-model="dialogVisible"
-      :title="`教材出处引用 · ${activeCitation?.docTitle || activeCitation?.documentName || '课程资料'}`"
-      width="min(640px, 92vw)"
-      append-to-body
-      destroy-on-close
-      class="citation-modal"
-    >
-      <div v-if="activeCitation" class="modal-inner">
-        <div class="meta-row">
-          <span class="tag page">页码：P.{{ activeCitation.page || activeCitation.pageNo || 1 }}</span>
-          <span class="tag score">
-            相关度：{{
-              activeCitation.score != null
-                ? formatCitationMatchLabel(activeCitation.score, peerScores)
-                : '—'
-            }}
-          </span>
-          <span class="tag hint">以下为知识库切片原文（已排版）</span>
-        </div>
-        <div
-          ref="modalBodyRef"
-          class="modal-quote-box markdown-body chat-md-content citation-excerpt-md"
-          v-html="activeExcerptHtml"
-        />
-      </div>
-      <template #footer>
-        <el-button type="primary" @click="dialogVisible = false">确定</el-button>
-      </template>
-    </el-dialog>
+      :citation="activeCitation"
+      :peer-scores="peerScores"
+      :course-id="props.courseId"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed } from 'vue';
 import { Document, ArrowDown } from '@element-plus/icons-vue';
 import type { CitationItem } from '@/types/ai/assistant';
 import { collectCitationScores, formatCitationMatchLabel } from '@/utils/ai/citation-score';
 import {
   citationExcerptSource,
-  formatCitationCardPreview,
-  prepareCitationMarkdown
+  formatCitationCardPreview
 } from '@/utils/ai/citation-excerpt';
-import { bindMarkdownCodeCopy, renderChatMarkdown } from '@/utils/ai/chat-markdown';
+import CitationDetailModal from '@/components/knowledge/CitationDetailModal.vue';
 
-const props = defineProps<{
-  citations: CitationItem[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    citations: CitationItem[];
+    courseId?: number;
+  }>(),
+  {
+    courseId: undefined
+  }
+);
 
 const peerScores = computed(() => collectCitationScores(props.citations));
 
 const isExpanded = ref(false);
 const dialogVisible = ref(false);
 const activeCitation = ref<CitationItem | null>(null);
-const modalBodyRef = ref<HTMLElement | null>(null);
-
-const activeExcerptHtml = computed(() => {
-  if (!activeCitation.value) return '';
-  const raw = citationExcerptSource(activeCitation.value);
-  if (!raw) return '';
-  return renderChatMarkdown(prepareCitationMarkdown(raw));
-});
 
 const openSnippetDialog = (item: CitationItem) => {
   activeCitation.value = item;
   dialogVisible.value = true;
 };
-
-watch(dialogVisible, (open) => {
-  if (open) {
-    nextTick(() => bindMarkdownCodeCopy(modalBodyRef.value));
-  }
-});
 </script>
 
 <style scoped lang="scss">

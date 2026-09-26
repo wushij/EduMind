@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getKnowledgeRagDashboardStats,
@@ -33,6 +33,43 @@ export function useRagKnowledgeDashboard() {
   const targetDocumentId = ref('')
   const syncBanner = ref<string | null>(null)
 
+  // 索引任务在后台异步执行，必须轮询才能看到 0 → N 的实时进度；
+  // 只在「有任务进行中」时轮询，任务结束后自动停止。
+  let pollTimer: ReturnType<typeof setInterval> | null = null
+
+  function stopPolling() {
+    if (pollTimer) {
+      clearInterval(pollTimer)
+      pollTimer = null
+    }
+  }
+
+  function startPolling() {
+    if (pollTimer) return
+    let pollCount = 0
+    pollTimer = setInterval(async () => {
+      pollCount++
+      // 最多轮询 90 次（约 3.75 分钟）后自动停止，避免极端情况下无休止请求
+      if (pollCount > 90) {
+        stopPolling()
+        return
+      }
+      await fetchStats(true)
+      if (stats.value.latestIndexStatus !== 'INDEXING') {
+        stopPolling()
+      }
+    }, 2500)
+  }
+
+  /** 依据最新任务状态决定是否开始/停止轮询。 */
+  function syncPolling() {
+    if (stats.value.latestIndexStatus === 'INDEXING') {
+      startPolling()
+    } else {
+      stopPolling()
+    }
+  }
+
   const healthRate = computed(() => {
     if (stats.value.indexHealthPercent != null) {
       return stats.value.indexHealthPercent
@@ -50,6 +87,7 @@ export function useRagKnowledgeDashboard() {
     try {
       const res = await getKnowledgeRagDashboardStats()
       if (res?.data) stats.value = { ...emptyStats(), ...res.data }
+      syncPolling()
     } catch (e: unknown) {
       if (!silent) {
         ElMessage.error(e instanceof Error ? e.message : '获取 RAG 大盘失败')
@@ -62,7 +100,7 @@ export function useRagKnowledgeDashboard() {
   async function handleSyncAll() {
     try {
       await ElMessageBox.confirm(
-        '将对全部课程知识库执行 FULL 向量重建，并同步已发布课节讲义索引。任务在后台执行，请稍后刷新大盘。',
+        '将对全部课程知识库执行 FULL 向量重建，并同步已发布课节讲义索引。任务在后台异步执行，进度会自动刷新。',
         '全量切片同步与重建',
         { type: 'warning', confirmButtonText: '开始同步' }
       )
@@ -114,6 +152,8 @@ export function useRagKnowledgeDashboard() {
       syncingDoc.value = false
     }
   }
+
+  onUnmounted(stopPolling)
 
   return {
     loading,

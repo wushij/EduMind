@@ -40,6 +40,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class IndexingServiceImpl implements IndexingService {
 
+    /** 每处理多少条切片写一次任务进度：既避免过于频繁写库，又保证前端轮询能看到递增。 */
+    private static final int PROGRESS_FLUSH_INTERVAL = 20;
+
     private final KnowledgeBaseDao knowledgeBaseDao;
     private final KnowledgeDocumentChunkDao knowledgeDocumentChunkDao;
     private final KnowledgeDocumentDao knowledgeDocumentDao;
@@ -86,6 +89,11 @@ public class IndexingServiceImpl implements IndexingService {
         try {
             KnowledgeIndexTaskEntity task = knowledgeIndexTaskDao.findLatestByKnowledgeBaseId(knowledgeBaseId);
             if (task == null || !task.getId().equals(taskId)) {
+                // 该任务已被同一知识库更新的任务取代：必须显式写终态。
+                // 否则这条记录会永久停留在 INDEXING，导致大盘一直显示「进行中 0 / N」。
+                TenantContext.callWithoutTenant(() -> knowledgeIndexTaskDao.markTerminalStatus(
+                        taskId, "SUPERSEDED", "该任务已被同一知识库更新触发的索引任务取代，未执行"));
+                log.info("索引任务 #{} 已被更新的任务取代，标记为 SUPERSEDED", taskId);
                 return;
             }
             List<KnowledgeDocumentChunkEntity> chunks = knowledgeDocumentChunkDao.findByKnowledgeBaseId(knowledgeBaseId);
@@ -143,6 +151,11 @@ public class IndexingServiceImpl implements IndexingService {
                         error.setMessage(ex.getMessage());
                         errors.add(error);
                     }
+                    // 每处理 PROGRESS_FLUSH_INTERVAL 条就落一次进度，让前端轮询能看到 0 → N 的递增，
+                    // 而不是整库跑完才一次性从 0 跳到 N。
+                    if ((indexed + failed) % PROGRESS_FLUSH_INTERVAL == 0) {
+                        flushTaskProgress(task, indexed, failed);
+                    }
                 }
                 task.setStatus(failed > 0 && indexed == 0 ? "INDEX_FAILED" : "INDEXED");
                 task.setIndexedChunks(indexed);
@@ -177,6 +190,54 @@ public class IndexingServiceImpl implements IndexingService {
         String content = "知识库 #" + knowledgeBaseId + " 索引状态：" + status
                 + "，成功 " + indexed + " 条，失败 " + failed + " 条。";
         notificationWriteApi.sendToUser(userId, title, content, "KNOWLEDGE_INDEX", knowledgeBaseId);
+    }
+
+    /**
+     * 刷新任务进度到数据库。写失败只告警、不中断索引主流程。
+     */
+    private void flushTaskProgress(KnowledgeIndexTaskEntity task, int indexed, int failed) {
+        try {
+            task.setIndexedChunks(indexed);
+            task.setFailedChunks(failed);
+            knowledgeIndexTaskDao.updateById(task);
+        } catch (Exception ex) {
+            log.warn("刷新索引任务进度失败 taskId={}: {}", task.getId(), ex.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int recoverStaleIndexingTasks(long staleMinutes) {
+        LocalDateTime before = LocalDateTime.now().minusMinutes(Math.max(staleMinutes, 1));
+        List<Long> affectedKnowledgeBaseIds = knowledgeIndexTaskDao.findStaleIndexingKnowledgeBaseIds(before);
+        int recovered = knowledgeIndexTaskDao.failStaleIndexingTasks(before,
+                "索引任务长时间无进展（应用重启或执行线程中断），已自动复位为失败，请重新触发索引");
+        for (Long knowledgeBaseId : affectedKnowledgeBaseIds) {
+            reconcileKnowledgeBaseIndexStatus(knowledgeBaseId);
+        }
+        return recovered;
+    }
+
+    /**
+     * 依据真实切片/索引计数重新对齐知识库的 index_status，避免僵尸任务导致其永久停留在 INDEXING。
+     */
+    private void reconcileKnowledgeBaseIndexStatus(Long knowledgeBaseId) {
+        KnowledgeBaseEntity knowledgeBase = knowledgeBaseDao.findById(knowledgeBaseId);
+        if (knowledgeBase == null) {
+            return;
+        }
+        long total = knowledgeDocumentChunkDao.countByKnowledgeBaseId(knowledgeBaseId);
+        long indexed = knowledgeChunkIndexDao.countIndexedByKnowledgeBaseId(knowledgeBaseId);
+        if (total <= 0) {
+            knowledgeBase.setIndexStatus("IDLE");
+        } else if (indexed >= total) {
+            knowledgeBase.setIndexStatus("INDEXED");
+        } else if (indexed > 0) {
+            knowledgeBase.setIndexStatus("INDEXING");
+        } else {
+            knowledgeBase.setIndexStatus("IDLE");
+        }
+        knowledgeBaseDao.updateById(knowledgeBase);
     }
 
     @Override

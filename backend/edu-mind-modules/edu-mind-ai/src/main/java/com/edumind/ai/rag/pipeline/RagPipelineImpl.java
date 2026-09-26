@@ -3,6 +3,7 @@ package com.edumind.ai.rag.pipeline;
 import com.edumind.ai.gateway.AiGatewayFacade;
 import com.edumind.ai.integration.llm.LlmChatOptions;
 import com.edumind.ai.integration.llm.TokenEstimator;
+import com.edumind.ai.rag.config.RagProperties;
 import com.edumind.ai.rag.context.ContextBuilder;
 import com.edumind.ai.rag.model.RagDebugOptions;
 import com.edumind.ai.rag.model.RagResult;
@@ -41,12 +42,23 @@ public class RagPipelineImpl implements RagPipeline {
     /** 诊断场景码，与网关路由/AI 审计中的 RAG 场景保持一致 */
     private static final String SCENE = "RAG";
 
+    /**
+     * 混合检索分值上限量级判定线。
+     *
+     * <p>混合检索产出的是 RRF 融合分（Σ weight/(rrfK+rank+1)，默认 rrfK=60、tech 权重 2.0），
+     * 四路分支全中时的理论上限约 0.082。调用方若传入明显超出该量级的阈值（历史前端按
+     * 0~1 余弦相似度语义传 0.4~0.9），按原值过滤会把召回结果整体清零，表现为
+     * 「诊断页中栏永远没有切片」。</p>
+     */
+    private static final double RRF_SCORE_CEILING = 0.2;
+
     private final QueryRewriter queryRewriter;
     private final RagRetrieverImpl ragRetriever;
     private final ScoreReranker scoreReranker;
     private final ContextBuilder contextBuilder;
     private final PromptService promptService;
     private final AiGatewayFacade aiGatewayFacade;
+    private final RagProperties ragProperties;
 
     @Override
     public String execute(String query, Long knowledgeBaseId) {
@@ -78,6 +90,9 @@ public class RagPipelineImpl implements RagPipeline {
                                      Long documentId, boolean skipLlm, QueryRewriteContext rewriteContext,
                                      RagDebugOptions debugOptions) {
         RagDebugOptions options = debugOptions != null ? debugOptions : RagDebugOptions.none();
+        // 阈值必须先按检索模式归一化：混合检索阶段与重排阶段共用同一个有效阈值，
+        // 否则「阈值调高」会把 RRF 分值整体过滤掉而不是收敛结果集
+        double effectiveMinScore = resolveMinScore(minScore);
         long pipelineStart = System.nanoTime();
         List<RagStageTiming> stageTimings = new ArrayList<>(5);
 
@@ -90,17 +105,18 @@ public class RagPipelineImpl implements RagPipeline {
                         : "未改写，使用原始问题"));
 
         stageStart = System.nanoTime();
+        // 向量分支用改写结果（语义），关键词分支用原始问题（字面 LIKE），两者再经 RRF 融合
         List<RetrievalHit> hits = ragRetriever.retrieveWithRewrittenQuery(
-                rewritten, knowledgeBaseId, topK, minScore, documentId);
+                rewritten, query, knowledgeBaseId, topK, effectiveMinScore, documentId);
         stageTimings.add(stage(STAGE_VECTOR_SEARCH, "向量 + 关键词混合检索", stageStart,
                 STATUS_SUCCESS,
                 "召回候选切片 " + hits.size() + " 条"));
 
         stageStart = System.nanoTime();
-        List<RetrievalHit> ranked = scoreReranker.rerank(hits, topK, minScore);
+        List<RetrievalHit> ranked = scoreReranker.rerank(hits, topK, effectiveMinScore);
         stageTimings.add(stage(STAGE_RERANK, "重排与阈值过滤", stageStart,
                 STATUS_SUCCESS,
-                "保留 " + ranked.size() + " 条（topK=" + topK + "，minScore=" + minScore + "）"));
+                "保留 " + ranked.size() + " 条（topK=" + topK + "，minScore=" + effectiveMinScore + "）"));
 
         stageStart = System.nanoTime();
         String context = contextBuilder.build(ranked);
@@ -163,6 +179,24 @@ public class RagPipelineImpl implements RagPipeline {
                 .totalTokens(promptTokens + completionTokens)
                 .totalLatencyMs(elapsedMs(pipelineStart))
                 .build();
+    }
+
+    /**
+     * 归一化召回阈值。
+     *
+     * <p>混合检索模式下分值是 RRF 融合分（量级 1e-2），调用方若按 0~1 余弦相似度语义传入
+     * 超过 {@link #RRF_SCORE_CEILING} 的阈值，说明语义不匹配，此时回落为配置的
+     * {@code edumind.rag.min-rrf-score}，保证「阈值调高」只会收紧召回而不会误清空结果；
+     * 纯向量模式（hybrid-enabled=false）分值为余弦相似度，按原值生效不做改写。</p>
+     */
+    private double resolveMinScore(double minScore) {
+        if (!ragProperties.isHybridEnabled()) {
+            return minScore;
+        }
+        if (minScore <= 0 || minScore > RRF_SCORE_CEILING) {
+            return ragProperties.getMinRrfScore();
+        }
+        return Math.min(minScore, ragProperties.getMinRrfScore());
     }
 
     /** 系统提示词：诊断覆盖优先，其次平台默认 chat 系统提示词 */

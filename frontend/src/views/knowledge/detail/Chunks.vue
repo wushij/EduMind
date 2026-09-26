@@ -104,6 +104,7 @@
           v-for="chunk in paginatedChunks"
           :key="chunk.id"
           class="chunk-row"
+          :data-chunk-id="chunk.id"
           @click="openViewer(chunk)"
         >
           <span class="chunk-index-tag">{{ displayChunkNo(chunk) }}</span>
@@ -200,6 +201,8 @@ const {
   Number.isFinite(initialDocId) && initialDocId > 0 ? initialDocId : undefined
 );
 
+import { scrollElementIntoView } from '@/utils/dom/scroll-into-view';
+
 function displayChunkNo(chunk: { chunkIndex: number }) {
   return String((chunk.chunkIndex ?? 0) + 1);
 }
@@ -210,10 +213,32 @@ function openChunkFromRouteQuery() {
   if (!Number.isFinite(chunkId) || chunkId <= 0) {
     return;
   }
-  const hit = chunks.value.find((c) => Number(c.id) === chunkId);
-  if (hit) {
-    openViewer(hit);
+  const idx = chunks.value.findIndex((c) => Number(c.id) === chunkId);
+  if (idx < 0) {
+    return;
   }
+  const hit = chunks.value[idx];
+
+  // 1. 若切片不在当前页，自动跳转到切片所在的正确页码
+  const targetPage = Math.floor(idx / pageSize.value) + 1;
+  if (currentPage.value !== targetPage) {
+    currentPage.value = targetPage;
+  }
+
+  // 2. 页面元素就位后滚动至卡片并触发高亮
+  setTimeout(() => {
+    const el = document.querySelector(`[data-chunk-id="${chunkId}"]`) as HTMLElement | null;
+    if (el) {
+      scrollElementIntoView(el, 120);
+      el.classList.remove('citation-target-highlight');
+      void el.offsetWidth;
+      el.classList.add('citation-target-highlight');
+      setTimeout(() => el.classList.remove('citation-target-highlight'), 3200);
+    }
+  }, 180);
+
+  // 3. 打开抽屉查看切片详情
+  openViewer(hit);
 }
 
 watch(
@@ -415,6 +440,12 @@ onMounted(async () => {
           }
         }
 
+        &.citation-target-highlight {
+          border-left: 4px solid #2563eb;
+          background: #eff6ff;
+          animation: chunkPulseGlow 3s ease-out forwards;
+        }
+
         .chunk-index-tag {
           flex-shrink: 0;
           margin-top: 2px;
@@ -506,6 +537,21 @@ onMounted(async () => {
         row-gap: 8px;
       }
     }
+  }
+}
+
+@keyframes chunkPulseGlow {
+  0% {
+    background-color: rgba(37, 99, 235, 0.25);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+  }
+  40% {
+    background-color: rgba(37, 99, 235, 0.15);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  }
+  100% {
+    background-color: #f8fafc;
+    box-shadow: none;
   }
 }
 </style>

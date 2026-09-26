@@ -90,14 +90,114 @@ const { loading, lesson, content, errorMessage, markCompleted } = useLessonLearn
   preview.value
 );
 
+import { scrollElementIntoView } from '@/utils/dom/scroll-into-view';
+
 const tocItems = ref<LessonTocItem[]>([]);
+
+function tryLocateCitationTarget() {
+  const hash = route.hash ? decodeURIComponent(route.hash.replace(/^#/, '')) : '';
+  const anchor = ((route.query.anchor as string) || hash || '').trim();
+  const excerpt = ((route.query.excerpt as string) || '').trim();
+  const chunkId = (route.query.chunkId as string) || '';
+
+  if (!anchor && !excerpt && !chunkId) return;
+
+  // 延迟给 DOM 与 KaTeX 公式渲染留出充分时间
+  setTimeout(() => {
+    performScrollAndHighlight(anchor, excerpt, chunkId);
+  }, 160);
+}
+
+function performScrollAndHighlight(anchor?: string, excerpt?: string, chunkId?: string) {
+  const container = document.querySelector('.lesson-blocks');
+  if (!container) return;
+
+  let targetEl: HTMLElement | null = null;
+
+  // 1. 尝试直接通过 ID 查找
+  if (anchor) {
+    targetEl = document.getElementById(anchor);
+  }
+
+  // 2. 尝试在目录 tocItems 中通过标题匹配 ID
+  if (!targetEl && anchor && tocItems.value.length) {
+    const cleanAnchor = anchor.replace(/[#*`$\\]/g, '').trim();
+    const matchedToc = tocItems.value.find(item => {
+      const cleanTitle = item.title.replace(/[#*`$\\]/g, '').trim();
+      return (
+        cleanTitle === cleanAnchor ||
+        cleanTitle.includes(cleanAnchor) ||
+        cleanAnchor.includes(cleanTitle)
+      );
+    });
+    if (matchedToc) {
+      targetEl = document.getElementById(matchedToc.id);
+    }
+  }
+
+  // 3. 遍历标题元素 (.block-heading, .callout-title, h1-h6) 匹配文本
+  if (!targetEl && anchor) {
+    const cleanAnchor = anchor.replace(/[#*`$\\]/g, '').trim();
+    const headings = container.querySelectorAll<HTMLElement>(
+      '.block-heading, .callout-title, h1, h2, h3, h4, h5, h6'
+    );
+    for (const h of Array.from(headings)) {
+      const text = (h.textContent || '').replace(/[#*`$\\]/g, '').trim();
+      if (text && (text === cleanAnchor || text.includes(cleanAnchor) || cleanAnchor.includes(text))) {
+        targetEl = h;
+        break;
+      }
+    }
+  }
+
+  // 4. 尝试通过切片摘要片段 (excerpt) 在正文段落中模糊匹配
+  if (!targetEl && excerpt) {
+    const cleanExcerpt = excerpt.replace(/[#*`$\\]/g, '').trim();
+    if (cleanExcerpt.length >= 4) {
+      const sample = cleanExcerpt.slice(0, 16);
+      const candidates = container.querySelectorAll<HTMLElement>(
+        '.lesson-block p, .lesson-block li, .lesson-block blockquote, .lesson-block .markdown-body > *'
+      );
+      for (const el of Array.from(candidates)) {
+        const text = (el.textContent || '').trim();
+        if (text.includes(cleanExcerpt) || (sample.length >= 4 && text.includes(sample))) {
+          targetEl = el;
+          break;
+        }
+      }
+    }
+  }
+
+  // 5. 如果找到目标元素，执行平滑滚动并施加呼吸聚焦高亮
+  if (targetEl) {
+    scrollElementIntoView(targetEl, 100);
+
+    targetEl.classList.remove('citation-target-highlight');
+    void targetEl.offsetWidth; // 触发 reflow 重置动画
+    targetEl.classList.add('citation-target-highlight');
+
+    setTimeout(() => {
+      targetEl?.classList.remove('citation-target-highlight');
+    }, 3200);
+  }
+}
 
 watch(
   () => content.value.blocks,
   blocks => {
     tocItems.value = buildLessonToc(blocks, lesson.value?.title);
+    if (blocks.length) {
+      tryLocateCitationTarget();
+    }
   },
   { immediate: true, deep: true }
+);
+
+watch(
+  () => [route.hash, route.query.anchor, route.query.chunkId, route.query.excerpt],
+  () => {
+    tryLocateCitationTarget();
+  }
 );
 
 const teachingCopilotStore = useTeachingCopilotStore();
@@ -246,6 +346,37 @@ function goEditLesson() {
   // 单列布局下没有右侧目录列，hero 恢复通栏
   .lesson-hero-block {
     width: 100%;
+  }
+}
+
+:deep(.citation-target-highlight) {
+  border-radius: 8px;
+  animation: citationPulseGlow 3s ease-out forwards;
+  transition: all 0.3s ease;
+}
+
+:deep(.block-heading.citation-target-highlight),
+:deep(.callout-title.citation-target-highlight) {
+  border-left: 4px solid #2563eb;
+  padding-left: 8px;
+}
+
+@keyframes citationPulseGlow {
+  0% {
+    background-color: rgba(37, 99, 235, 0.22);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2), 0 2px 12px rgba(37, 99, 235, 0.15);
+  }
+  30% {
+    background-color: rgba(37, 99, 235, 0.15);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12), 0 2px 8px rgba(37, 99, 235, 0.1);
+  }
+  70% {
+    background-color: rgba(37, 99, 235, 0.08);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.05);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
   }
 }
 </style>

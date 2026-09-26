@@ -356,15 +356,23 @@ async function loadCourse(id: string) {
   }
 }
 
-// 仅当 params.id 真实跨课程变更时触发，子 Tab 切换（overview -> chapters 等）时绝不重新触发请求
-watch(
-  () => route.params.id,
-  (newId, oldId) => {
-    if (newId && newId !== oldId && (!currentCourse.value || String(currentCourse.value.id) !== String(newId))) {
-      void loadCourse(String(newId));
-    }
+// 仅当 params.id 真实跨课程变更时触发，子 Tab 切换（overview -> chapters 等）时绝不重新触发请求。
+//
+// 注意：本组件在 layouts/components/AppContent.vue 的 keep-alive 保活列表内，离开课程页后实例不销毁，
+// 这个 watcher 会继续响应全局路由变化；而知识库 /knowledge/:id/**、题目 /question/:id 等路由同样把参数
+// 命名为 id。若不限定「当前确实停在课程空间路由」，就会拿别的模块的 id 去查课程：典型表现是从课程页首次
+// 切到知识库页时弹出「课程不存在」（即 GET /api/courses/{知识库id} 返回 500），之后因为 params.id 再无变化，
+// watcher 不再触发，报错看起来"自己好了"，实际是随机复现的跨模块 id 串扰。
+const routeCourseId = computed(() => {
+  const inCourseDetail = route.matched.some(record => record.name === 'CourseDetail');
+  return inCourseDetail && route.params.id ? String(route.params.id) : '';
+});
+
+watch(routeCourseId, (newId, oldId) => {
+  if (newId && newId !== oldId && (!currentCourse.value || String(currentCourse.value.id) !== String(newId))) {
+    void loadCourse(newId);
   }
-);
+});
 
 watch(
   () => currentCourse.value?.knowledgeBaseId,

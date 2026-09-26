@@ -56,22 +56,9 @@
         </div>
       </div>
 
-      <!-- 右侧操作栏（对标图 2 的分层现代操作按钮组） -->
+      <!-- 右侧操作栏（单行紧凑工具条，对标参考图的胶囊按钮排列） -->
       <div class="header-actions-col">
-        <div class="actions-row actions-row--primary">
-          <button
-            type="button"
-            class="action-pill action-pill--ai"
-            :disabled="batchAILoading"
-            @click="$emit('batch-ai-grade')"
-          >
-            <el-icon><Service /></el-icon>
-            <span>{{ batchAILoading ? 'AI 正在批改中...' : '一键全班 AI 智能预批改' }}</span>
-            <span class="ai-spark-chip">自动推演</span>
-          </button>
-        </div>
-
-        <div class="actions-row actions-row--secondary">
+        <div class="actions-row">
           <button
             type="button"
             class="action-pill action-pill--ghost"
@@ -89,6 +76,16 @@
           >
             <el-icon><Delete /></el-icon>
             <span>删除作业</span>
+          </button>
+
+          <button
+            type="button"
+            class="action-pill action-pill--ai"
+            :disabled="batchAILoading"
+            @click="$emit('batch-ai-grade')"
+          >
+            <el-icon><Service /></el-icon>
+            <span>{{ batchAILoading ? 'AI 正在批改中...' : '一键全班 AI 智能预批改' }}</span>
           </button>
         </div>
       </div>
@@ -438,35 +435,36 @@ defineEmits<{
 
   .header-actions-col {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 10px;
+    align-items: center;
+    justify-content: flex-end;
     flex-shrink: 0;
+    max-width: 100%;
 
     @media (max-width: 1080px) {
-      align-items: flex-start;
+      justify-content: flex-start;
       width: 100%;
     }
 
     .actions-row {
       display: flex;
       align-items: center;
-      gap: 10px;
+      justify-content: flex-end;
+      gap: 8px;
       flex-wrap: wrap;
 
-      &--secondary {
-        justify-content: flex-end;
+      @media (max-width: 1080px) {
+        justify-content: flex-start;
       }
     }
 
     .action-pill {
       display: inline-flex;
       align-items: center;
-      gap: 7px;
-      height: 38px;
-      padding: 0 16px;
+      gap: 5px;
+      height: 32px;
+      padding: 0 12px;
       border-radius: 9999px;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       border: none;
@@ -476,38 +474,29 @@ defineEmits<{
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
       .el-icon {
-        font-size: 14px;
+        font-size: 13px;
       }
 
       &--ai {
-        background: linear-gradient(135deg, #1677ff 0%, #722ed1 100%);
+        background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
         color: #ffffff;
-        box-shadow: 0 4px 14px rgba(114, 46, 209, 0.26);
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.22);
 
         &:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(114, 46, 209, 0.38);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
         }
 
         &:disabled {
           opacity: 0.65;
           cursor: not-allowed;
         }
-
-        .ai-spark-chip {
-          padding: 1px 7px;
-          border-radius: 9999px;
-          background: rgba(255, 255, 255, 0.24);
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.02em;
-        }
       }
 
       &--ghost {
         background: #ffffff;
         color: #475569;
-        border: 1px solid #cbd5e1;
+        border: 1px solid #dbe3ec;
 
         &:hover {
           background: #f8fafc;

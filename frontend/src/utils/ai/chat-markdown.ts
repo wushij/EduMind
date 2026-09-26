@@ -412,7 +412,9 @@ export function normalizeReasoningMarkdown(raw: string): string {
   text = normalizeInlineAsciiTree(text);
 
   text = text.replace(/^\s*#{1,3}\s*(?:回答|答案|解决方案)[:：]?\s*\n+/gi, '');
+  text = normalizeGluedInlineHeadings(text);
   text = text.replace(/(^|\n)(#{1,6})([^\s#\n])/g, '$1$2 $3');
+  text = normalizeGluedHeadingLines(text);
 
   text = normalizeInlineNumberedLists(text);
   text = normalizeInlineBulletLists(text);
@@ -564,18 +566,127 @@ function closeFenceAfterJavaLine(head: string, openFence: string, body: string):
   return null;
 }
 
-/** 正文中间粘连的小节标题，如「运行链路##5.1编写」 */
+/** 行内粘连的标题，如「运行链路##5.1编写」或「洛必达法则###1.法则内容」 */
 function normalizeGluedInlineHeadings(text: string): string {
   return text
     .split(FENCED_CODE_BLOCK_RE)
     .map((segment) => {
       if (segment.startsWith('```')) return segment;
-      let s = segment.replace(/([^\s#\n])(#{2,6})(\d+(?:\.\d+)?)/g, '$1\n\n$2 $3');
-      s = s.replace(
-        /([^\s#\n])(#{2,6})(?=[\u4e00-\u9fa5（(「『【A-Za-z])/g,
-        '$1\n\n$2 '
-      );
-      return s;
+      return segment.replace(/([^\s#\n])(#{2,6})[ \t]*(?=[^\s#\n])/g, '$1\n\n$2 ');
+    })
+    .join('');
+}
+
+/**
+ * 拆分标题行粘连的无序列表、有序列表或紧随其后的正文叙述。
+ * 例如：
+ * 1. 标题粘连无序列表：
+ *    「##八、易错点提醒- **不是未定式不能用洛必达**；」 -> 「## 八、易错点提醒\n\n- **不是未定式不能用洛必达**；」
+ *    「## 重点归纳：- 极限运算」 -> 「## 重点归纳\n\n- 极限运算」
+ * 2. 标题粘连有序列表：
+ *    「### 2. 使用步骤1. 先代入…」 -> 「### 2. 使用步骤\n\n1. 先代入…」
+ * 3. 标题粘连正文起笔：
+ *    「### 1. 法则内容若\[\lim…」 -> 「### 1. 法则内容\n\n若\[\lim…」
+ *    「## 四、洛必达法则的注意事项洛必达法则很强，但不是万能的。」 -> 「## 四、洛必达法则的注意事项\n\n洛必达法则很强，但不是万能的。」
+ *
+ * 严格保护：
+ * - 括号内副标题（如「### 题目二（数列极限 - 四则运算）」）
+ * - 普通副标题连字符（如「## 模块一 - 基础篇」）
+ */
+function normalizeGluedHeadingLines(text: string): string {
+  return text
+    .split(FENCED_CODE_BLOCK_RE)
+    .map((segment) => {
+      if (segment.startsWith('```')) return segment;
+
+      const lines = segment.split('\n');
+      const processed = lines.map((line) => {
+        const m = line.match(/^([ \t]*#{1,6}[ \t]+)([^\n]+)$/);
+        if (!m) return line;
+
+        const marker = m[1].trim();
+        const content = m[2];
+
+        const formatHeadingTitle = (t: string) =>
+          t.trim().replace(/[：:]$/, '').replace(/^(\d{1,2}\.)(?=[\u4e00-\u9fa5])/u, '$1 ');
+
+        // 1. 标题行末尾粘连无序列表（如「##八、易错点提醒- **不是未定式…」或「## 重点：- 极限…」）
+        const bulletMatch = content.match(
+          /(?:([：:][ \t]*)|(?<!-)([^\s\-（(【])([ \t]*))(-[ \t]*\*\*|-[ \t]+(?=[\p{Extended_Pictographic}\u4e00-\u9fa5A-Za-z0-9]))/u
+        );
+        if (bulletMatch && bulletMatch.index !== undefined) {
+          const splitPos = bulletMatch.index + (bulletMatch[1] ? 0 : (bulletMatch[2] ? bulletMatch[2].length : 0));
+          const beforeStr = content.slice(0, splitPos);
+          if (!hasUnclosedBrackets(beforeStr)) {
+            const headingText = formatHeadingTitle(beforeStr);
+            const listPart = content.slice(
+              bulletMatch.index +
+                (bulletMatch[1] ? bulletMatch[1].length : (bulletMatch[2]?.length || 0) + (bulletMatch[3]?.length || 0))
+            ).trim();
+
+            if (headingText.length >= 2 && headingText.length <= 40) {
+              const isBoldList = /^-[ \t]*\*\*/.test(listPart);
+              const hasColon = Boolean(bulletMatch[1]);
+              const noSpaceBefore = !bulletMatch[3];
+              const hasListPunct = /[；;]$/.test(listPart) || /[。！!]$/.test(listPart);
+
+              if (
+                isBoldList ||
+                hasColon ||
+                (noSpaceBefore && /^[一二三四五六七八九十\d]/.test(headingText)) ||
+                hasListPunct
+              ) {
+                const normalizedList = listPart.replace(/^-[ \t]*/, '- ');
+                return `${marker} ${headingText}\n\n${normalizedList}`;
+              }
+            }
+          }
+        }
+
+        // 2. 标题行末尾粘连有序列表序号（如「### 2. 使用步骤1. 先代入…」或「## 核心步骤1. 先求导…」）
+        const numberMatch = content.match(
+          /([\u4e00-\u9fa5A-Za-z）)】])[ \t]*([1-9]\.[ \t]+(?=[\p{Extended_Pictographic}\u4e00-\u9fa5\w*（(「『【]))/u
+        );
+        if (numberMatch && numberMatch.index !== undefined) {
+          const splitPos = numberMatch.index + numberMatch[1].length;
+          const beforeStr = content.slice(0, splitPos);
+          if (!hasUnclosedBrackets(beforeStr)) {
+            const headingText = formatHeadingTitle(beforeStr);
+            const listPart = content.slice(splitPos).trim();
+            if (headingText.length >= 2 && headingText.length <= 40) {
+              return `${marker} ${headingText}\n\n${listPart}`;
+            }
+          }
+        }
+
+        // 3. 标题行后直接粘连正文引导叙述（如「### 1. 法则内容若\[\lim…」或「## 五、其他未定式的转化方法除了…」）
+        const proseMatch = content.match(
+          /^((?:[一二三四五六七八九十]+[、．.]|\d+\.|\d+\.\d+|例\d+|变式)?\s*[\u4e00-\u9fa5A-Za-z0-9_\\(\\)]{2,25}?)(?=若|如果|当|设|除了|遇到|可以按|例如|比如|注意[，,：:]|求[$\\ \t\d]|在计算|在一定条件下)/u
+        );
+        if (proseMatch && proseMatch[1]) {
+          const headingText = formatHeadingTitle(proseMatch[1]);
+          const prosePart = content.slice(proseMatch[0].length).trim();
+          if (headingText.length >= 2 && prosePart.length > 0 && !hasUnclosedBrackets(headingText)) {
+            return `${marker} ${headingText}\n\n${prosePart}`;
+          }
+        }
+
+        // 4. 标题以经典收尾词（注意事项/常见误区/解题步骤等）结尾，后面紧贴未换行的正文
+        const closerMatch = content.match(
+          /^((?:[一二三四五六七八九十]+[、．.]|\d+\.|\d+\.\d+|例\d+|变式)?\s*[\u4e00-\u9fa5A-Za-z0-9_]{1,25}?(?:注意事项|常见误区|核心考点|基本概念|定义与性质|解题步骤|解题总策略|学习目标|归纳总结))([^\n]+)$/u
+        );
+        if (closerMatch && closerMatch[1] && closerMatch[2]?.trim()) {
+          const headingText = formatHeadingTitle(closerMatch[1]);
+          const prosePart = closerMatch[2].trim();
+          if (headingText.length >= 2 && !hasUnclosedBrackets(headingText)) {
+            return `${marker} ${headingText}\n\n${prosePart}`;
+          }
+        }
+
+        return line;
+      });
+
+      return processed.join('\n');
     })
     .join('');
 }
@@ -660,6 +771,7 @@ export function normalizeChatMarkdown(raw: string): string {
   text = text.replace(/^\s*#{1,3}\s*((?:针对)?您关于)/, '$1');
   text = normalizeGluedInlineHeadings(text);
   text = text.replace(/(^|\n)(#{1,6})([^\s#\n])/g, '$1$2 $3');
+  text = normalizeGluedHeadingLines(text);
 
   // 只消除「加粗标记内侧」的水平空白：\s 会跨行匹配，把上一行的 **分组标题** 与下一行的
   // "- **列表项**" 误配成一对加粗，导致换行与列表标记一起被吞进加粗文本

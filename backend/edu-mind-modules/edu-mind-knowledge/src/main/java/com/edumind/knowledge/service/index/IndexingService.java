@@ -26,4 +26,15 @@ public interface IndexingService {
      * 直接调用本方法会变回同步执行并阻塞当前请求线程。</p>
      */
     void runIndexTask(Long taskId, Long knowledgeBaseId, String mode, Long operatorId, Long tenantId);
+
+    /**
+     * 启动恢复：把超过 {@code staleMinutes} 仍停留在 INDEXING 的任务复位为失败，
+     * 并重新对齐其知识库的 index_status。
+     *
+     * <p>索引任务由异步线程执行，应用重启、线程中断或任务被新任务取代时都会留下
+     * 「永久 INDEXING」僵尸记录，使大盘一直显示「进行中 0/N」。此方法用于清理这类脏数据。</p>
+     *
+     * @return 被复位的任务条数
+     */
+    int recoverStaleIndexingTasks(long staleMinutes);
 }

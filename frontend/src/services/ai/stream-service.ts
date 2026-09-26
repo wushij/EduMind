@@ -257,14 +257,20 @@ export function formatSessionTime(raw: unknown): string {
 
 export function mapCitation(raw: Record<string, unknown>): CitationItem {
   return {
-    id: raw.chunkId as number | string | undefined,
+    id: (raw.chunkId ?? raw.id) as number | string | undefined,
+    chunkId: (raw.chunkId ?? raw.id) as number | string | undefined,
+    chunkIndex: raw.chunkIndex as number | undefined,
     docTitle: (raw.documentName as string) || (raw.docTitle as string),
-    documentName: raw.documentName as string,
-    page: raw.pageNo as number | undefined,
-    pageNo: raw.pageNo as number | undefined,
+    documentName: (raw.documentName as string) || (raw.docTitle as string),
+    page: (raw.pageNo ?? raw.page) as number | undefined,
+    pageNo: (raw.pageNo ?? raw.page) as number | undefined,
     score: raw.score as number | undefined,
     snippet: (raw.excerpt as string) || (raw.snippet as string),
-    excerpt: raw.excerpt as string
+    excerpt: (raw.excerpt as string) || (raw.snippet as string),
+    lessonChapterId: (raw.lessonChapterId ?? raw.chapterId) as number | undefined,
+    anchor: raw.anchor as string | undefined,
+    documentId: raw.documentId as number | undefined,
+    knowledgeBaseId: raw.knowledgeBaseId as number | undefined
   };
 }
 

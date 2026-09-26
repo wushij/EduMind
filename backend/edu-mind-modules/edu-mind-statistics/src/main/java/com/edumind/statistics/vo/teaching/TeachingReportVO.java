@@ -148,8 +148,26 @@ public class TeachingReportVO {
          * 与 {@link #masterySampleCount} 成对展示，教师才能判断百分比覆盖了多少人、多少次测评。
          */
         private Integer masteryAssessmentCount;
-        /** 该考点聚合的错题条数：>1 表示同一考点有多道错题，已被合并为一行 */
+        /**
+         * 该考点聚合的<b>不同题目数</b>（按 question_id 去重）。
+         *
+         * <p>与 {@link #wrongCount}（累计答错人次）口径不同：同一道题被多人答错时，
+         * 题目数是 1、人次可能是 N。历史实现直接透出「错题记录条数」，
+         * 于是出现「卡片写着合并 4 道错题、点开只有 1 道题」的误导。</p>
+         */
         private Integer wrongQuestionCount;
+        /** 该考点下出现过错误的去重学生数 */
+        private Integer wrongStudentCount;
+        /**
+         * 该考点的错题是否全部来自空白作答（留下错题记录，但没有任何作答内容）。
+         * 为 {@code true} 时前端标注「N 人未作答，暂无归因」，且榜单会把这类考点排在可归因薄弱点之后。
+         */
+        private Boolean unansweredOnly;
+        /**
+         * 合并的错题明细（按答错人次降序，最多 {@code MAX_MERGED_QUESTIONS} 条）。
+         * 「查看原题」抽屉据此在题目之间切换：卡片承诺了几道题，抽屉就要能看到几道。
+         */
+        private List<MergedQuestionVO> mergedQuestions;
         private String errorType;
         private String errorTypeName;
         /**
@@ -161,5 +179,28 @@ public class TeachingReportVO {
         private String suggestion;
         private String status;
         private String statusLabel;
+    }
+
+    /**
+     * 同一考点下合并的单个错题明细。
+     *
+     * <p>每个条目自带题干、选项与自身的错因诊断，抽屉切换题目时不会串题。</p>
+     */
+    @Data
+    public static class MergedQuestionVO {
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long questionId;
+        private String questionStem;
+        private String questionType;
+        private String questionOptions;
+        private String questionAnswer;
+        /** 该题累计答错人次 */
+        private Integer wrongCount;
+        /** 该题答错学生数 */
+        private Integer wrongStudentCount;
+        private String errorType;
+        private String errorTypeName;
+        /** 该题的 AI 诊断正文（可能为空：空白作答或尚未归因） */
+        private String errorReason;
     }
 }

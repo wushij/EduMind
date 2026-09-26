@@ -28,7 +28,12 @@ export function useRAG(kbIdInput?: MaybeRef<number | undefined>) {
 
   const query = ref('');
   const topK = ref(4);
-  const scoreThreshold = ref(0.6);
+  /**
+   * 召回阈值默认值必须与后端混合检索的分值量级对齐：
+   * RRF 融合分 = Σ weight/(60+rank+1)，四路分支上限约 0.082（后端 edumind.rag.min-rrf-score 默认 0.03）。
+   * 若沿用 0~1 余弦相似度语义（如 0.6），过滤结果会恒为空 —— 这是诊断页「中栏永远无切片」的根因。
+   */
+  const scoreThreshold = ref(0.03);
   const hybridSearch = ref(false);
   const selectedDocIds = ref<number[]>([]);
 

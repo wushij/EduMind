@@ -29,8 +29,13 @@
           </div>
 
           <div class="param-item">
-            <span class="param-label">相似度阈值 (Threshold): <strong>{{ scoreThreshold.toFixed(2) }}</strong></span>
-            <el-slider v-model="scoreThreshold" :min="0.30" :max="0.95" :step="0.05" style="width: 130px" />
+            <el-tooltip
+              content="后端默认走混合检索，分值为 RRF 融合分（量级 0.005 ~ 0.1），不是 0~1 的余弦相似度"
+              placement="top"
+            >
+              <span class="param-label">召回阈值 (RRF 分): <strong>{{ scoreThreshold.toFixed(3) }}</strong></span>
+            </el-tooltip>
+            <el-slider v-model="scoreThreshold" :min="0.005" :max="0.1" :step="0.005" style="width: 130px" />
           </div>
         </div>
 
